@@ -1,123 +1,25 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>i.MX6ULL · Linux 从零到驱动 · 总入口</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>i.MX6ULL 学习站已迁移</title>
+<link rel="canonical" href="../embedded/imx6ull/">
+<meta http-equiv="refresh" content="0;url=../embedded/imx6ull/">
+<meta name="robots" content="noindex">
 <style>
-:root{--bg:#080b12;--card:#0f1420;--line:#1e2637;--tx:#dfe6f3;--dim:#8b97ad;--gr:#5ce1a0;--vi:#8b7bff;--cy:#3ddbd9;--or:#ffb35c}
-*{box-sizing:border-box}
-body{margin:0;min-height:100vh;color:var(--tx);font:16px/1.72 -apple-system,"Segoe UI","Noto Sans SC",system-ui,sans-serif;
-background:radial-gradient(1100px 560px at 12% -8%,#17223c 0,transparent 60%),radial-gradient(900px 500px at 92% 8%,#231a3a 0,transparent 55%),var(--bg)}
-.wrap{max-width:1080px;margin:0 auto;padding:56px 22px 72px}
-.top{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--dim);letter-spacing:.06em}
-.dot{width:9px;height:9px;border-radius:50%;background:var(--gr);box-shadow:0 0 12px var(--gr)}
-.top .sp{flex:1}
-.top a{color:var(--dim);text-decoration:none;border:1px solid var(--line);padding:5px 11px;border-radius:999px}
-.top a:hover{color:var(--tx);border-color:#33405a}
-h1{margin:26px 0 10px;font-size:clamp(30px,4.6vw,46px);line-height:1.25;letter-spacing:-.01em}
-h1 em{font-style:normal;background:linear-gradient(92deg,var(--cy),var(--vi) 55%,var(--gr));-webkit-background-clip:text;background-clip:text;color:transparent}
-.sub{max-width:720px;color:#a9b4c7;font-size:16.5px}
-.path{display:flex;flex-wrap:wrap;gap:8px;margin:22px 0 34px;font-size:12.5px;color:var(--dim)}
-.path span{border:1px solid var(--line);background:#0c111b;padding:5px 10px;border-radius:8px}
-.path b{color:#c9d4e6;font-weight:600}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:16px} .band{display:flex;align-items:center;gap:18px;margin-top:16px;padding:16px 20px;border:1px solid rgba(139,123,255,.32);border-radius:14px;background:linear-gradient(110deg,rgba(139,123,255,.12),rgba(61,219,217,.08));text-decoration:none}
-.band:hover{border-color:rgba(139,123,255,.7)}
-.band.tl{margin-top:10px;border-color:rgba(3,214,180,.4);background:linear-gradient(110deg,rgba(3,214,180,.12),rgba(139,123,255,.07))}
-.band.tl:hover{border-color:rgba(3,214,180,.8)}
-.band.tl .bno{color:#03d6b4;border-color:rgba(3,214,180,.45)}
-.band.tl .bg{color:#03d6b4}
-.band .bno{flex:none;font-size:11px;letter-spacing:.12em;color:#b7aaff;border:1px solid rgba(139,123,255,.4);border-radius:6px;padding:3px 8px}
-.band .bt{flex:1;min-width:0}
-.band .bt b{display:block;font-size:16px;color:#eaf3ff;margin-bottom:5px}
-.band .bt span{display:block;font-size:12.5px;line-height:1.7;color:#a9b8d2}
-.band .bg{flex:none;font-size:21px;color:#8b7bff}
-.card{position:relative;display:block;text-decoration:none;color:inherit;background:linear-gradient(160deg,rgba(255,255,255,.045),rgba(255,255,255,.012));
-border:1px solid var(--line);border-radius:16px;padding:20px 20px 18px;transition:.22s ease;overflow:hidden}
-.card:hover{transform:translateY(-3px);border-color:rgba(92,225,160,.5);box-shadow:0 14px 34px -18px rgba(92,225,160,.55)}
-.card .no{font-size:12px;letter-spacing:.14em;color:var(--dim)}
-.card h3{margin:6px 0 8px;font-size:19.5px;line-height:1.35}
-.card p{margin:0 0 14px;font-size:14px;color:#98a4b8}
-.card .go{font-size:13px;color:var(--gr)}
-.card.vi{border-left:3px solid var(--vi)} .card.cy{border-left:3px solid var(--cy)}
-.card.or{border-left:3px solid var(--or)} .card.gr{border-left:3px solid var(--gr)} .card.as{border-left:3px solid #03d6b4}
-.tag{display:inline-block;font-size:11.5px;color:#9fb0c9;border:1px solid #263149;border-radius:6px;padding:1px 7px;margin-right:6px}
-.note{margin-top:34px;border:1px solid var(--line);border-radius:14px;background:#0b1018;padding:16px 20px;font-size:13.5px;color:#8e9aae}
-.note b{color:#c2cddf;font-weight:600}
-code{background:#141b28;border:1px solid #212b3d;border-radius:5px;padding:1px 6px;font-size:12.5px;color:#a9e7c6}
-@media(min-width:760px){.grid{grid-template-columns:repeat(2,1fr)}}
-@media(min-width:1180px){.grid{grid-template-columns:repeat(4,1fr)}}
-@media(max-width:560px){.wrap{padding:34px 16px 56px}h1{font-size:27px}.card{padding:17px 16px}}
+body{margin:0;min-height:100vh;background:#08090c;color:#e7eaf0;display:flex;align-items:center;justify-content:center;
+font:16px/1.75 -apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;padding:24px}
+.box{max-width:520px;border:1px solid #20242e;border-radius:14px;padding:28px;background:rgba(255,255,255,.02)}
+p{color:#98a1b2;margin:0 0 12px}
+a{color:#8fb0ff}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="top"><span class="dot"></span><b style="color:#c3cfe2;letter-spacing:.12em">IMX6</b><span class="sp"></span><a href="juan/index.html">十四卷总览</a></div>
-
-  <h1>Linux 学习手册<br><em>用 i.MX6ULL 从零走到驱动</em></h1>
-  <p class="sub">这是一页路口，放六样东西：<b>十四卷 113 篇</b>的主线、按章查细节的<b>参考卷</b>、能拖着玩的<b>互动台</b>、<b>手上这块板子的硬件入口</b>、<b>芯片手册怎么读</b>，以及<b>手写汇编的 20 道练习</b>。主线是唯一推荐顺着读的一条路。</p>
-
-  <div class="path">
-    <span><b>juan/</b> 十四卷 · 113 篇 · 约 495h</span>
-    <span><b>ref/</b> 理论 18 + 实践 14 + 路线图</span>
-    <span><b>viz/</b> 六个互动台</span>
-    <span><b>hardware/</b> 板子硬件</span>
-    <span><b>asm/</b> 汇编 10 节 20 题</span>
-    <span><b>manual/</b> 芯片手册</span>
-    <span><b>course/</b> 49 课旧主线</span>
-    <span><b>docs/</b> 正文页</span>
-  </div>
-
-  <div class="grid">
-    <a class="card gr" href="juan/index.html">
-      <div class="no">入口 01 · 主线</div>
-      <h3>十四卷 · 从零学计算机</h3>
-      <p>卷 00 起步到卷 13 产品化，14 卷 113 篇，120 小时通读、375 小时动手。先看总览选一卷，进去左栏就是该卷篇目。</p>
-      <div><span class="tag">113 篇</span><span class="tag">14 卷</span></div>
-      <div class="go">→ 打开总览</div>
-    </a>
-
-    <a class="card or" href="ref/index.html">
-      <div class="no">入口 02 · 参考卷</div>
-      <h3>Linux 理论与上板实践</h3>
-      <p>T01–T18 讲操作系统分层、调度、地址翻译、VFS、设备模型、中断、ARM 架构、启动链、总线、时钟、DDR、eMMC、驱动；C01–C14 是从装系统到写驱动的实操。</p>
-      <div><span class="tag">T01–T18</span><span class="tag">C01–C14</span></div>
-      <div class="go">→ 打开参考卷</div>
-    </a>
-
-    <a class="card cy" href="viz/index.html">
-      <div class="no">入口 03 · 互动</div>
-      <h3>互动台 · 六台一起</h3>
-      <p>时钟树配频、MMU 页表、GPIO 复用、中断抢占、上电启动链路、Cache 层次。每台都是单页离线可跑，改参数即时看结果；进去也是一个目录页。</p>
-      <div><span class="tag">时钟</span><span class="tag">内存</span><span class="tag">外设</span><span class="tag">启动</span></div>
-      <div class="go">→ 打开互动目录</div>
-    </a>
-
-    <a class="card vi" href="hardware/index.html">
-      <div class="no">入口 04 · 硬件</div>
-      <h3>手上这块板子</h3>
-      <p>板子地图点着看：SoC、DDR、eMMC、电源、晶振各自负责什么；再走一遍上电到 shell 的五段路，玩启动拨码与引脚复用。底子薄就从 9 篇硬件基础课起（每篇独立成文）：电阻、电容、二极管、门电路、时序、总线。</p>
-      <div><span class="tag">板子地图</span><span class="tag">启动链</span><span class="tag">引脚复用</span></div>
-      <div class="go">→ 打开硬件入口</div>
-    </a>
-  </div>
-
-  <a class="band tl" href="asm/index.html">
-    <div class="bno">入口 05</div>
-    <div class="bt"><b>手写 ARM 汇编 · 20 道练习</b><span>十篇独立文章，从一条 mov 到裸机点灯：立即数那道 8 位旋转墙、四种寻址与满递减栈、AAPCS 里 lr 为什么必须保、有符号与无符号两套条件码、位操作读改写三行式。三个小工具（寄存器单步台 / 立即数检查 / 条件码判断）＋ 20 道题，每题都写了验收法。</span></div>
-    <div class="bg">→</div>
-  </a>
-
-  <a class="band" href="manual/index.html">
-    <div class="bno">入口 06</div>
-    <div class="bt"><b>芯片手册研读 · 从文档到寄存器</b><span>八篇独立文章：六份文档各自管什么、RM 一章的五段骨架、寄存器表逐列读、四个真实例子（时钟 / 引脚复用 / 波特率 / GPIO），再给一条「板子上的脚 → dts」的查表路径。</span></div>
-    <div class="bg">→</div>
-  </a>
-
-  <div class="note">
-    <b>怎么读。</b>第一次进来走 <code>juan/index.html</code>：先在总览里挑一卷（比如卷 01 机器与指令），进去后左栏只列这一卷的篇目，一篇篇往下点；看完再回总览选下一卷。
-    只想查某个机制，去 <code>ref/</code> 按章找。想带走整站，用 <code>dist/</code> 里的单文件版或离线 zip。
-  </div>
+<div class="box">
+  <p>i.MX6ULL 学习站已迁到子目录。</p>
+  <p><a href="../embedded/imx6ull/">前往 /embedded/imx6ull/</a></p>
 </div>
+<script>location.replace('../embedded/imx6ull/');</script>
 </body>
 </html>
