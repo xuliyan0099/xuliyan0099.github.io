@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第 02 章 · 无源五件套：电阻、电容、电感、二极管、晶振 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/doc-compat.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+<link rel="stylesheet" href="../../assets/asm.css">
+</head><body style="--acc:#ffb545">
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../../index.html">☰ 六个入口</a>
+  <a class="home hide-sm" href="../../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">硬件是怎么工作的 · 9 篇</div>
+    <ol>
+      <li><a href="index.html"><span class="no">⌂</span><span>路口目录<span class="sub">篇目总览与读法</span></span></a></li>
+      <li><a href="b0.html"><span class="no">00</span><span>先修：怎么学才算学会<span class="sub">三条判断标准，和一条错的路径</span></span></a></li>
+      <li><a href="b1.html"><span class="no">01</span><span>电的四个字：电压、电流、电阻、功率<span class="sub">欧姆定律、串并联、LED 限流实算</span></span></a></li>
+      <li><a href="b2.html" class="active"><span class="no">02</span><span>无源五件套：电阻、电容、电感、二极管、晶振<span class="sub">每个元件都在解决一个具体问题</span></span></a></li>
+      <li><a href="b3.html"><span class="no">03</span><span>有源器件：三极管与 MOS 管<span class="sub">为什么一个「开关」需要三个脚</span></span></a></li>
+      <li><a href="b4.html"><span class="no">04</span><span>数字电路的骨架：电平、门、组合、时序<span class="sub">五种门、真值表、加法器、触发器</span></span></a></li>
+      <li><a href="b5.html"><span class="no">05</span><span>时间：时钟、建立保持、抖动、消抖<span class="sub">为什么电路需要「等一会儿」</span></span></a></li>
+      <li><a href="b6.html"><span class="no">06</span><span>总线到底是什么<span class="sub">地址、数据、控制，与片选、时序</span></span></a></li>
+      <li><a href="b7.html"><span class="no">07</span><span>回到这块板子：元件对号入座<span class="sub">电源树、晶振、DDR、eMMC、按键、LED</span></span></a></li>
+      <li><a href="b8.html"><span class="no">08</span><span>工具与六个实验<span class="sub">万用表、示波器、逻辑分析仪怎么用</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="../index.html">硬件入口</a><a href="../../juan/index.html">十四卷总览</a></div>
+  </aside>
+  <main class="doc">
+    <div class="doc-kicker">硬件基础课 · 从一颗电阻开始 <span>·</span> 第 02 章</div>
+    <div class="ch-head">
+      <h1>无源五件套：电阻、电容、电感、二极管、晶振</h1>
+      <div class="ch-meta"><span class="hot">第 02 章</span><span>约 26 分钟</span><span>★ 必读</span></div>
+    </div>
+<h2 id="s1">无源 = 不需要额外电源就能工作</h2>
+<p>「无源器件」指不需要供电、只靠信号本身就能发挥作用的元件。五个必备：电阻、电容、电感、二极管、晶振（严格说晶振是无源+有源的家族，这里按「被动谐振元件」讲）。</p>
+<p><b>每一个都在解决一个具体问题。</b> 记住问题，比记住名字有用。</p>
+<h2 id="s2">① 电阻：三种用途，别混</h2>
+<table class="regtbl"><thead><tr><th>用途</th><th>解决什么问题</th><th>典型值</th></tr></thead><tbody><tr><td class="nm">限流</td><td>别让电流烧掉器件（LED、三极管基极）</td><td>100Ω–1kΩ</td></tr><tr><td class="nm">上拉 / 下拉</td><td>让「没人驱动的线」有确定的电平</td><td>4.7k–100k</td></tr><tr><td class="nm">分压 / 采样</td><td>把高电压降到 ADC 能测的范围</td><td>按比例算</td></tr></tbody></table>
+<p><b>上拉是这里面最常被误解的。</b> 一条信号线在「所有器件都不驱动」时是悬空的，悬空意味着电平不确定——读到的值随机，甚至随手指靠近而变。</p>
+<p>上拉电阻做的事：<b>给这条线一个「默认是高」的弱连接</b>。它很弱（几 kΩ 到几十 kΩ），所以任何一个真正的驱动器都能轻松把它拉低；但没人驱动时，它保证读到高。</p>
+<p>这就是 I2C 必须上拉的原因：I2C 是「开漏」总线，器件只会「拉低」，不会「推高」，高电平完全靠上拉电阻。</p>
+<h2 id="s3">② 电容：三种用途</h2>
+<table class="regtbl"><thead><tr><th>用途</th><th>解决什么问题</th><th>典型值</th></tr></thead><tbody><tr><td class="nm">去耦 / 旁路</td><td>芯片瞬间要大电流时，就近给它</td><td>0.1µF（每颗电源脚一个）</td></tr><tr><td class="nm">滤波</td><td>把高频噪声短路到地</td><td>10pF–10µF</td></tr><tr><td class="nm">定时 / 延时</td><td>与电阻组成 RC，决定时间</td><td>按 τ=RC 算</td></tr></tbody></table>
+<p><b>去耦电容是板上最多的元件</b>，一颗芯片周围能有十几个。它的作用不是「储能给整板」，而是「芯片内部开关瞬间产生的电流尖峰，由就近的电容提供，避免整条电源线一起抖」。</p>
+<p>所以布局规则是「尽量靠近电源脚」——离得远，走线的电感就把它的作用抵消了。</p>
+<h2 id="s4">③ 电感：只对「变化」有反应</h2>
+<p>电感的阻抗与频率成正比：</p>
+<div class="fm">Z<sub>L</sub> = 2π f L　　频率越高，感抗越大；直流时几乎为零。</div>
+<ul>
+<li>直流：阻抗几乎为 0，畅通。</li>
+<li>高频：阻抗很大，挡住。</li>
+</ul>
+<p>用途：<b>电源滤波（挡高频）、DC-DC 变换（储能）、共模扼流（抑制差分噪声）</b>。</p>
+<p>一个实用结论：<b>开关电源旁边的电感发烫是正常的</b>，它本来就在储能放能。但如果它啸叫，说明开关频率落到了音频范围。</p>
+<h2 id="s5">④ 二极管：一个方向通</h2>
+<p>正向导通（有约 0.6–0.7V 压降，肖特基约 0.3V），反向截止。四种常见用法：</p>
+<table class="regtbl"><thead><tr><th>用法</th><th>作用</th></tr></thead><tbody><tr><td class="nm">整流</td><td>把交流变直流（板子上少见）</td></tr><tr><td class="nm">续流 / 钳位</td><td>感性负载断电时的反向尖峰，用它泄掉</td></tr><tr><td class="nm">防反接</td><td>电源入口串一颗，接反了不通</td></tr><tr><td class="nm">TVS / ESD</td><td>静电打过来时瞬间导通，把能量泄掉，保护后面的芯片</td></tr></tbody></table>
+<p><b>TVS 与普通二极管不同</b>：它平时截止，只有电压超过阈值才动作，动作后能承受很大的瞬时电流。USB、按键、外部接口旁边那颗小元件多半就是它。</p>
+<h2 id="s6">⑤ 晶振：给「节奏」</h2>
+<p>晶振提供精确的频率基准。i.MX6ULL 的板子上通常有两颗：一颗 24MHz（给 SoC 的主参考），一颗 32.768kHz（给 RTC 走时）。</p>
+<p>为什么不能只用内部振荡器？<b>精度</b>。内部 RC 振荡器的误差可能有百分之几，做串口通信时波特率误差超过约 3% 就会开始丢字节；做 RTC 走时，一天可能偏几分钟。</p>
+<p>两个配套元件：</p>
+<ul>
+<li><b>负载电容</b>（两颗小电容）：晶振手册会指定，不能随便换，否则频率偏。</li>
+<li><b>串联电阻</b>（有时有）：抑制过驱动，防止晶振「跑在谐振上」。</li>
+</ul>
+<h2 id="s7">五件套的「谁解决什么」总表</h2>
+<table class="regtbl"><thead><tr><th>元件</th><th>解决的物理问题</th><th>一句话记法</th></tr></thead><tbody><tr><td class="nm">电阻</td><td>电流太大 / 电平不确定</td><td>限流与定电平</td></tr><tr><td class="nm">电容</td><td>电压会抖 / 高频会串</td><td>就近供能与短路高频</td></tr><tr><td class="nm">电感</td><td>高频会串进电源</td><td>只挡变化</td></tr><tr><td class="nm">二极管</td><td>反向电压会打坏东西</td><td>单向阀 + 泄压阀</td></tr><tr><td class="nm">晶振</td><td>时间不准</td><td>节奏的来源</td></tr></tbody></table>
+<h2 id="s8">在 i.MX6ULL 板子上找一遍</h2>
+<p>拿你的板子（或原理图）数一数：</p>
+<ul>
+<li><b>电阻</b>：LED 限流、I2C 上拉（通常 4.7k）、复位上拉、USB 分压、DDR 端接（几十 Ω）。</li>
+<li><b>电容</b>：每颗芯片电源脚旁 0.1µF、电源入口大电容（几十 µF）、晶振负载电容（十几 pF）。</li>
+<li><b>电感</b>：DC-DC 旁边的功率电感（µH 级）、USB/以太网共模电感。</li>
+<li><b>二极管</b>：电源防反接、TVS（USB/按键/网口）、LED 本身。</li>
+<li><b>晶振</b>：24MHz 主晶振、32.768kHz RTC 晶振。</li>
+</ul>
+<p><b>这五类都找到实物并说出它的作用，这一章就过了。</b></p>
+<h2 id="s9">本篇验收</h2>
+<ul>
+<li>能说出上拉电阻解决什么问题，并解释 I2C 为什么必须上拉。</li>
+<li>能说出「去耦电容为什么要靠近电源脚」。</li>
+<li>能解释电感的「只挡变化」，并举一个板上的用途。</li>
+<li>能区分普通二极管与 TVS 的作用。</li>
+<li>能说出主晶振与 RTC 晶振各自的频率与用途。</li>
+<li>在自己的板子上找到五类器件各至少一个。</li>
+</ul>
+<h2 id="s10">下一篇</h2>
+<p>无源器件只会「被动响应」，做不了放大与开关。03 篇讲三极管与 MOS 管——为什么一个电子开关需要三个脚，以及「栅极不耗电」这句常被误解的话到底什么意思。</p>
+<div class="pager">
+      <a href="b1.html"><span>上一篇</span><b>← 01 电的四个字：电压、电流、电阻、功率</b></a>
+      <a href="index.html"><span>目录</span><b>篇目总览</b></a>
+      <a class="nx" href="b3.html"><span>下一篇</span><b>03 有源器件：三极管与 MOS 管 →</b></a>
+    </div>
+  </main>
+</div>
+<script src="../../assets/hw-tools.js"></script>
+</body>
+</html>

@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=../docs/course-ch03.html">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第 03 章 · 命令行与文件系统 | i.MX6ULL Linux 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="../assets/viz.css">
+  <link rel="stylesheet" href="../assets/iviz.css">
+  <link rel="stylesheet" href="../assets/anim2.css">
+  <script src="../assets/readmode.js" defer></script>
+</head>
+<body data-page="ch03">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>03 · 命令行与文件系统</h1>
+    <p class="lede">这一章是全书最长的一章，也是最不能跳的一章。板子上没有鼠标，所有操作都是命令；命令不熟，第 8 章以后你连「把文件从 PC 拷到板子」都要卡半天。</p>
+    <div class="viz" data-kind="tree" data-title="根目录下每个文件夹的职责" data-sub="一切皆文件，但要记住它是哪一类文件" data-json='{"nodes":[{"n":"/ 根","d":"整棵树的起点","c":"cy","ch":[{"n":"/bin /sbin","d":"可执行程序，最基础的那批","c":"gr"},{"n":"/etc","d":"配置文件，全是纯文本","c":"vi"},{"n":"/dev","d":"设备文件，驱动在这里露脸","c":"or","ch":[{"n":"ttyS0","d":"一个串口就是这样一个文件"},{"n":"mmcblk0","d":"一块 eMMC 也是这样"}]},{"n":"/proc /sys","d":"内核暴露的假文件，读它就是读内核状态","c":"or"},{"n":"/var/log","d":"日志，排障第一站"},{"n":"/lib","d":"动态库，程序运行时才找它"}]}],"note":"嵌入式里最常看的是 /proc、/sys、/dev 三个。板子上出了问题，先 cat /proc/cpuinfo、看 /sys/class 下有没有你的设备、ls /dev 看节点在不在。"}'></div>
+
+
+    <div class="card">
+      <h4>本章目标</h4>
+      <p>① 记住 <code>/bin</code>、<code>/etc</code>、<code>/dev</code>、<code>/proc</code>、<code>/sys</code> 各放什么；② 20 个核心命令不查文档能敲；③ 会用管道和重定向把命令串起来；④ 彻底理解权限位；⑤ 说清软硬链接差别。</p>
+    </div>
+
+    <div class="anim2" data-json='{"title":"你敲一条 ls，底下发生了什么","hint":"命令 → 系统调用 → 文件系统","nodes":[{"k":"敲命令","s":"ls /etc"},{"k":"Shell 解析","s":"拆参数"},{"k":"系统调用","s":"open/read"},{"k":"VFS → 磁盘","s":"取目录项"}],"frames":[{"i":0,"d":"键盘输入进终端，行缓冲到回车才交给 shell。"},{"i":1,"d":"shell 按空格拆出命令与参数，查 PATH 找到 /bin/ls，fork 再 exec。"},{"i":2,"d":"ls 调 open 打开目录、getdents 读目录项，打印到标准输出。"},{"i":3,"d":"VFS 把路径翻成 inode 与数据块，命中缓存就直接返回，不命中才读盘。"}],"kind":"flow"}'></div>
+
+    <h2>3.1 根目录下每个文件夹是干什么的</h2>
+
+    <p>Linux 不按「C 盘 D 盘」分，只有一棵树，根是 <code>/</code>。<strong>所有设备都挂在树上的某个位置</strong>——这就是「挂载」。</p>
+
+    <table>
+      <thead><tr><th>目录</th><th>放什么</th><th>你会在哪章用到</th></tr></thead>
+      <tbody>
+        <tr><td><code>/bin</code> <code>/sbin</code></td><td>最基础的命令程序（ls、cp、shutdown）</td><td>全程</td></tr>
+        <tr><td><code>/usr</code></td><td>用户程序与库，<code>/usr/bin</code> 是绝大多数命令住的地方</td><td>全程</td></tr>
+        <tr><td><code>/etc</code></td><td><b>所有配置文件</b>：网络、SSH、NFS、启动脚本</td><td>02 / 06 / 09</td></tr>
+        <tr><td><code>/dev</code></td><td>设备文件，每个硬件一个节点，如 <code>/dev/ttyUSB0</code>、<code>/dev/mmcblk0</code></td><td>03 / 12</td></tr>
+        <tr><td><code>/proc</code></td><td>内核运行时状态，虚拟文件，如 <code>/proc/cpuinfo</code>、<code>/proc/meminfo</code></td><td>03 / 13</td></tr>
+        <tr><td><code>/sys</code></td><td>内核设备模型，能直接读写硬件属性，如 <code>/sys/class/leds</code></td><td>10 / 12</td></tr>
+        <tr><td><code>/home</code></td><td>普通用户的家目录，你的代码都在这</td><td>全程</td></tr>
+        <tr><td><code>/root</code></td><td>root 用户的家目录</td><td>04</td></tr>
+        <tr><td><code>/var</code></td><td>会变的数据：<code>/var/log</code> 日志、<code>/var/lib</code> 数据库</td><td>04 / 13</td></tr>
+        <tr><td><code>/tmp</code></td><td>临时文件，重启清空</td><td>全程</td></tr>
+        <tr><td><code>/lib</code></td><td>共享库，相当于 Windows 的 dll</td><td>07</td></tr>
+        <tr><td><code>/mnt</code> <code>/media</code></td><td>手动挂载点 / 自动挂载（U 盘、SD 卡）</td><td>06 / 09</td></tr>
+        <tr><td><code>/opt</code></td><td>第三方大软件（如交叉工具链常装在这）</td><td>07</td></tr>
+        <tr><td><code>/boot</code></td><td>内核镜像、启动配置（板子上很关键）</td><td>09 / 10</td></tr>
+      </tbody>
+    </table>
+
+    <h2>3.2 「一切皆文件」到底什么意思</h2>
+
+    <p>这是 Linux 最核心的设计思想：硬件、内核状态、甚至网络连接，都被抽象成文件，你能用同一套 <code>cat</code> / <code>echo</code> / <code>read</code> / <code>write</code> 去操作。</p>
+
+    <pre><code><span class="c"># 1. 硬件是文件：串口设备就是 /dev 下的一个节点</span>
+$ ls -l /dev/ttyUSB0
+
+<span class="c"># 2. 内核状态是文件：读 CPU 信息</span>
+$ cat /proc/cpuinfo | head -20
+$ cat /proc/meminfo | head -5
+
+<span class="c"># 3. 硬件属性是文件：直接 echo 就能改</span>
+$ ls /sys/class/leds/
+$ echo 1 &gt; /sys/class/leds/sys-led/brightness   <span class="c"># 点亮</span>
+$ echo 0 &gt; /sys/class/leds/sys-led/brightness   <span class="c"># 熄灭</span>
+
+<span class="c"># 4. 网络连接也是文件</span>
+$ cat /proc/net/tcp</code></pre>
+
+    <div class="key">
+      <b>这条思想为什么重要</b>
+      第 12 章写驱动时，你要做的事本质上就是「<b>在 /dev 下造一个文件</b>，让用户程序通过 read/write 控制硬件」。理解了这一层，驱动开发就不再神秘。
+    </div>
+
+    <h2>3.3 路径、通配符、Tab 补全</h2>
+    <div class="viz" data-kind="matrix" data-title="命令按用途分组，练到盲打" data-sub="不是背命令，是背「这类问题用哪把刀」" data-json='{"corner":"用途","cols":["最常用","进阶","什么时候用"],"rows":[{"n":"看文件","cells":[{"v":"ls -l","c":"cy"},{"v":"tree/find","c":"vi"},{"v":"不确定路径、找文件","c":"gray"}]},{"n":"看内容","cells":[{"v":"cat/less","c":"cy"},{"v":"head/tail -f","c":"vi"},{"v":"大文件、追日志","c":"gray"}]},{"n":"处理文本","cells":[{"v":"grep","c":"cy"},{"v":"awk/sed/sort","c":"vi"},{"v":"从日志里挖字段","c":"gray"}]},{"n":"权限","cells":[{"v":"chmod/chown","c":"cy"},{"v":"umask/setfacl","c":"vi"},{"v":"脚本跑不动、权限拒绝","c":"gray"}]}],"note":"90% 的排障是这三个组合：find 找位置、grep 找证据、ls -l 看权限。"}'></div>
+
+
+    <ul>
+      <li><strong>绝对路径</strong>：从 <code>/</code> 开始，如 <code>/home/ubuntu/work</code>。</li>
+      <li><strong>相对路径</strong>：从当前位置算，如 <code>../work</code>；<code>.</code> 是当前目录，<code>..</code> 是上一级。</li>
+      <li><strong>家目录简写</strong>：<code>~</code> 等于 <code>/home/你的用户名</code>。</li>
+      <li><strong>通配符</strong>：<code>*</code> 任意字符，<code>?</code> 一个字符，<code>[abc]</code> 集合，<code>{a,b}</code> 展开。</li>
+    </ul>
+
+    <pre><code>$ ls *.c                <span class="c"># 所有 .c 文件</span>
+$ ls file[1-3].txt      <span class="c"># file1~file3</span>
+$ cp img.{jpg,bak} /tmp <span class="c"># 展开成 img.jpg img.bak</span></code></pre>
+
+    <div class="tip">
+      <b>两个救命键</b>
+      <span class="kbd">Tab</span> 补全路径（敲一半按 Tab，按两次列出所有候选）；<span class="kbd">Ctrl+C</span> 中断当前命令。新手 80% 的输错路径，Tab 都能避免。
+    </div>
+
+    <h2>3.4 核心命令（按用途分组，必须练到盲打）</h2>
+
+    <h3>① 我在哪 / 我去哪</h3>
+    <table>
+      <thead><tr><th>命令</th><th>作用</th><th>常用写法</th></tr></thead>
+      <tbody>
+        <tr><td><code>pwd</code></td><td>打印当前路径</td><td><code>pwd</code></td></tr>
+        <tr><td><code>cd</code></td><td>切换目录</td><td><code>cd /etc</code>、<code>cd ..</code>、<code>cd ~</code>、<code>cd -</code>（回上一个目录）</td></tr>
+        <tr><td><code>ls</code></td><td>列目录</td><td><code>ls -l</code>（详细）、<code>ls -lh</code>（人读大小）、<code>ls -a</code>（含隐藏）、<code>ls -lt</code>（按时间）</td></tr>
+        <tr><td><code>tree</code></td><td>树形展示</td><td><code>tree -L 2</code>（只看两层）</td></tr>
+      </tbody>
+    </table>
+
+    <h3>② 建 / 删 / 改 / 移</h3>
+    <table>
+      <thead><tr><th>命令</th><th>作用</th><th>注意</th></tr></thead>
+      <tbody>
+        <tr><td><code>mkdir</code></td><td>建目录</td><td><code>mkdir -p a/b/c</code> 一次建多层</td></tr>
+        <tr><td><code>touch</code></td><td>建空文件 / 更新时间戳</td><td><code>touch a.c b.c</code></td></tr>
+        <tr><td><code>cp</code></td><td>复制</td><td><code>cp -r dir1 dir2</code> 复制目录必须 <code>-r</code></td></tr>
+        <tr><td><code>mv</code></td><td>移动 / 改名</td><td><code>mv a.c b.c</code> 就是改名</td></tr>
+        <tr><td><code>rm</code></td><td>删除</td><td><code>rm -rf</code> 极危险，删前先用 <code>ls</code> 看一下</td></tr>
+        <tr><td><code>ln</code></td><td>建链接</td><td><code>ln -s 源 目标</code> 建软链接</td></tr>
+      </tbody>
+    </table>
+
+    <div class="warn">
+      <b>关于 rm -rf</b>
+      Linux 没有回收站。一条 <code>rm -rf /*</code> 能让系统在几秒内变成空壳。养成三个习惯：① 删之前先 <code>ls</code> 确认 ② 路径用 Tab 补全而不是手打 ③ 不确定时先用 <code>-i</code> 逐个确认。<b>本书所有实验都别用 root 执行 rm</b>。
+    </div>
+
+    <h3>③ 看内容</h3>
+    <table>
+      <thead><tr><th>命令</th><th>作用</th><th>场景</th></tr></thead>
+      <tbody>
+        <tr><td><code>cat</code></td><td>整个文件打印出来</td><td>小文件、拼接 <code>cat a b &gt; c</code></td></tr>
+        <tr><td><code>less</code></td><td>分页浏览，可搜索</td><td>大文件、日志（<code>/关键字</code> 搜索）</td></tr>
+        <tr><td><code>head</code> <code>tail</code></td><td>头 / 尾 N 行</td><td><code>tail -f log</code> 实时看日志，调试必备</td></tr>
+        <tr><td><code>wc</code></td><td>统计行数/字数</td><td><code>wc -l file</code> 数行数</td></tr>
+        <tr><td><code>grep</code></td><td>按内容搜索</td><td><code>grep -rn "keyword" .</code> 递归搜代码</td></tr>
+      </tbody>
+    </table>
+
+    <h3>④ 找文件</h3>
+    <table>
+      <thead><tr><th>命令</th><th>按什么找</th><th>示例</th></tr></thead>
+      <tbody>
+        <tr><td><code>find</code></td><td>按名称/大小/时间/权限</td><td><code>find . -name "*.c"</code>、<code>find / -size +10M</code></td></tr>
+        <tr><td><code>which</code></td><td>命令的可执行文件在哪</td><td><code>which gcc</code></td></tr>
+        <tr><td><code>whereis</code></td><td>命令 + 手册 + 源码位置</td><td><code>whereis ls</code></td></tr>
+        <tr><td><code>locate</code></td><td>数据库查找（快，可能过期）</td><td><code>sudo updatedb</code> 后 <code>locate stdio.h</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>⑤ 压缩打包（传文件必用）</h3>
+    <pre><code><span class="c"># 打包 + gzip 压缩（最常用）</span>
+$ tar -zcvf work.tar.gz work/
+<span class="c"># 解压到指定目录</span>
+$ tar -zxvf work.tar.gz -C /tmp/
+<span class="c"># 只看内容不接压</span>
+$ tar -ztvf work.tar.gz
+<span class="c"># zip</span>
+$ zip -r work.zip work/ &amp;&amp; unzip work.zip</code></pre>
+
+    <p>参数记忆法：<code>z</code> 用 gzip、<code>c</code> 创建、<code>x</code> 解压、<code>v</code> 显示过程、<code>f</code> 指定文件名（必须放最后）。</p>
+
+    <h2>3.5 管道与重定向：把命令串起来</h2>
+
+    <p>单个命令能力有限。<strong>管道 <code>|</code></strong> 把前一个命令的输出交给后一个命令当输入，这才是 Linux 的真正威力。</p>
+
+    <div class="flow">
+      <div class="box"><b>ps aux</b><span>列出所有进程</span></div>
+      <div class="arrow">|</div>
+      <div class="box"><b>grep nginx</b><span>筛出含 nginx 的行</span></div>
+      <div class="arrow">|</div>
+      <div class="box"><b>wc -l</b><span>数一数有几个</span></div>
+    </div>
+
+    <pre><code><span class="c"># 找出占用 CPU 最高的 5 个进程</span>
+$ ps aux --sort=-%cpu | head -6
+
+<span class="c"># 统计当前目录下 .c 文件有多少行代码</span>
+$ find . -name "*.c" | xargs wc -l | tail -1
+
+<span class="c"># 看谁在占用 22 端口</span>
+$ ss -lntp | grep :22</code></pre>
+
+    <p>重定向则是把输出写进文件，而不是打印到屏幕：</p>
+
+    <table>
+      <thead><tr><th>写法</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td><code>&gt; file</code></td><td>覆盖写入（清空原内容）</td></tr>
+        <tr><td><code>&gt;&gt; file</code></td><td>追加写入</td></tr>
+        <tr><td><code>2&gt; err.log</code></td><td>只把错误输出写进文件</td></tr>
+        <tr><td><code>&amp;&gt; all.log</code></td><td>正确 + 错误都写进去</td></tr>
+        <tr><td><code>2&gt;&amp;1</code></td><td>把错误重定向到标准输出（常配合管道用）</td></tr>
+        <tr><td><code>&lt; file</code></td><td>把文件当标准输入</td></tr>
+      </tbody>
+    </table>
+
+    <pre><code><span class="c"># 编译并把所有输出存日志，屏幕只看结尾</span>
+$ make &gt; build.log 2&gt;&amp;1 &amp;&amp; tail -5 build.log
+
+<span class="c"># 丢弃输出（不想看又不想存）</span>
+$ command &gt; /dev/null 2&gt;&amp;1</code></pre>
+
+    <div class="tip">
+      <b><code>/dev/null</code> 是什么</b>
+      一个黑洞设备文件，写进去的东西全部消失。第 5 章写脚本时天天用。
+    </div>
+
+    <h2>3.6 find + grep：定位问题的第一把刀</h2>
+    <div class="viz" data-kind="bits" data-title="chmod 755 到底改了哪几个位" data-sub="9 个权限位，三组人各三位" data-json='{"w":9,"fields":[{"n":"属主 rwx","lo":6,"hi":8,"c":"gr","t":"7 = 111，读写执行全给"},{"n":"属组 r-x","lo":3,"hi":5,"c":"cy","t":"5 = 101，可读可执行不可写"},{"n":"其他人 r-x","lo":0,"hi":2,"c":"or","t":"5 = 101，同上"}],"note":"755 = 7(rwx) 5(r-x) 5(r-x)。目录上的 x 表示「能进得去」，所以没有 x 的目录连 ls 都会 Permission denied。"}'></div>
+
+
+    <p>后面调试时，你会反复用这两个命令。记住四种组合就够：</p>
+
+    <pre><code><span class="c"># 1. 按名字找</span>
+$ find /home -name "*.c" -type f
+
+<span class="c"># 2. 按大小找（找占空间的大文件）</span>
+$ find / -type f -size +100M 2&gt;/dev/null
+
+<span class="c"># 3. 找到后对每个文件执行命令</span>
+$ find . -name "*.log" -exec rm -f {} \;
+
+<span class="c"># 4. 在文件内容里搜（写驱动时找某个宏定义）</span>
+$ grep -rn "CONFIG_LEDS_GPIO" drivers/leds/
+
+<span class="c"># 5. 组合：找出所有 .dts 里含 gpio 的文件</span>
+$ grep -rl "gpio" --include="*.dts" arch/arm/boot/dts/</code></pre>
+
+    <h2>3.7 权限：Linux 最重要的一道门</h2>
+
+    <p>看这一行，每个字符都有含义：</p>
+
+    <pre><code>$ ls -l hello.c
+-rwxr-xr-x 1 ubuntu ubuntu 1024 Nov 20 10:00 hello.c
+ ↑↑↑↑↑↑↑↑↑  ↑      ↑
+ │└┬┘└┬┘└┬┘  │      └── 所属组
+ │ │  │  │   └───────── 属主
+ │ │  │  └───────────── 其他人 rwx
+ │ │  └──────────────── 同组用户 rwx
+ │ └─────────────────── 属主 rwx
+ └───────────────────── 类型：- 普通文件, d 目录, l 链接, c/b 设备</code></pre>
+
+    <table>
+      <thead><tr><th>字母</th><th>对文件</th><th>对目录</th></tr></thead>
+      <tbody>
+        <tr><td><code>r</code></td><td>读内容</td><td>能列出里面有什么（ls）</td></tr>
+        <tr><td><code>w</code></td><td>改内容</td><td>能新建/删除里面的文件</td></tr>
+        <tr><td><code>x</code></td><td>执行（可执行文件）</td><td>能进入（cd）</td></tr>
+      </tbody>
+    </table>
+
+    <p>数字表示法：<code>r=4</code>、<code>w=2</code>、<code>x=1</code>，三位相加。所以 <code>755</code> = <code>rwx r-x r-x</code>，<code>644</code> = <code>rw- r-- r--</code>。</p>
+
+    <pre><code>$ chmod 755 hello.c        <span class="c"># 属主全权，其他人读+执行</span>
+$ chmod u+x script.sh      <span class="c"># 给属主加执行权</span>
+$ chmod -R 755 dir/        <span class="c"># 递归改整目录</span>
+$ chown ubuntu:ubuntu file <span class="c"># 改属主与属组</span>
+$ chgrp dialout /dev/ttyUSB0</code></pre>
+
+    <div class="key">
+      <b>为什么板子上老报 Permission denied</b>
+      ① 文件没有 <code>w</code> 或 <code>x</code>；② 你不是属主也不是同组；③ 串口/设备需要 <code>dialout</code> 组；④ 目录没有 <code>x</code> 你连 cd 都进不去。按这四条查，基本必中。
+    </div>
+
+    <h3>umask：新文件的默认权限从哪来</h3>
+
+    <pre><code>$ umask
+0002          <span class="c"># 普通用户默认</span>
+<span class="c"># 新建目录 = 777 - 002 = 775；新建文件 = 666 - 002 = 664</span>
+$ umask 022    <span class="c"># 临时改：新文件变成 644</span></code></pre>
+
+    <h2>3.8 软链接和硬链接</h2>
+
+    <table>
+      <thead><tr><th></th><th>软链接 <code>ln -s</code></th><th>硬链接 <code>ln</code></th></tr></thead>
+      <tbody>
+        <tr><td>本质</td><td>一个存着目标路径的「快捷方式」文件</td><td>同一个 inode 的另一个名字</td></tr>
+        <tr><td>跨分区</td><td>可以</td><td>不行（必须同一文件系统）</td></tr>
+        <tr><td>指向目录</td><td>可以</td><td>不行</td></tr>
+        <tr><td>目标删了</td><td>链接变红/失效</td><td>文件还在，数据不丢</td></tr>
+        <tr><td>典型用途</td><td>换版本（<code>/usr/bin/gcc -&gt; gcc-11</code>）、跨目录共享</td><td>备份、省空间</td></tr>
+      </tbody>
+    </table>
+
+    <pre><code>$ ln -s /opt/gcc-linaro/bin/arm-linux-gnueabihf-gcc ~/bin/arm-gcc
+$ ln data.txt data_hard.txt
+$ ls -l      <span class="c"># 软链接显示 -&gt;，硬链接看不出差别</span>
+$ stat data.txt data_hard.txt   <span class="c"># 看 inode 是否相同</span></code></pre>
+
+    <h2>3.9 动手任务</h2>
+    <ul class="steps">
+      <li>只用终端，在家目录建 <code>~/lab/ch03/{src,log,backup}</code> 三层目录。</li>
+      <li>在 <code>src</code> 下建 5 个 <code>.c</code> 文件、3 个 <code>.h</code> 文件，每个随意写几行。</li>
+      <li>用 <code>find</code> 找出 <code>~/lab</code> 下所有 <code>.c</code> 文件，用 <code>xargs wc -l</code> 统计总行数。</li>
+      <li>把整个 <code>lab</code> 打包成 <code>lab.tar.gz</code> 放进 <code>backup</code>，再解压到 <code>/tmp</code> 验证。</li>
+      <li>给 <code>src</code> 下一个脚本加执行权限，然后 <code>./</code> 运行它；再故意 <code>chmod 000</code>，感受 Permission denied。</li>
+      <li>给 <code>src</code> 建一个软链接到 <code>~/lab/link_src</code>，删掉 <code>src</code> 看链接怎么变；再建硬链接重复一次，对比 <code>stat</code> 输出。</li>
+      <li>读 <code>/proc/cpuinfo</code>，找出你的 CPU 型号和核数；读 <code>/proc/meminfo</code> 找总内存。</li>
+    </ul>
+
+    <h2>3.10 验收标准</h2>
+    <ul class="checklist">
+      <li>不看资料能说出 <code>/etc</code>、<code>/dev</code>、<code>/proc</code>、<code>/sys</code>、<code>/var</code> 各放什么</li>
+      <li>能在 30 秒内：找出家目录下所有大于 5MB 的文件</li>
+      <li>能解释 <code>-rw-r--r--</code> 每一段含义，并改成 755</li>
+      <li>能写出「ps → grep → kill」和「find → xargs」两条完整管道</li>
+      <li>能说清 <code>&gt;</code> 与 <code>&gt;&gt;</code>、<code>2&gt;</code> 与 <code>2&gt;&amp;1</code> 的差别</li>
+      <li>能说清软链接和硬链接三个差别，并知道什么时候用哪个</li>
+    </ul>
+
+    <footer id="pager"></footer>
+  
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"四个必须认识的目录","items":[{"b":"/proc","d":"内核的实时快照：进程、内存、中断、设备。文件是内存里生成的，读一次算一次，不占硬盘。"},{"b":"/sys","d":"设备和驱动的结构化视图。ls /sys/class 就能看到所有设备类，改属性文件等于调驱动。"},{"b":"/dev","d":"设备节点。串口是 /dev/ttyS0，SD 卡是 /dev/mmcblk0，字符设备你以后自己建。"},{"b":"/etc","d":"配置。改完要重启对应服务，不是改了就生效。"}],"note":"排障第一招：dmesg 看内核说了什么，/proc 和 /sys 看当前状态。两处对齐，问题基本就定位了。"}'></div>
+  </main>
+</div>
+<script src="../assets/nav.js"></script>
+<script src="../assets/viz.js"></script>
+<script src="../assets/iviz.js"></script>
+<script src="../assets/anime.iife.min.js"></script>
+<script src="../assets/anim2.js"></script>
+</body>
+</html>

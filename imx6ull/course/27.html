@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=../docs/course-27.html">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>27 · 进程、线程与 task_struct</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/viz.css">
+<link rel="stylesheet" href="assets/iviz.css">
+<link rel="stylesheet" href="assets/anim2.css">
+  <script src="assets/readmode.js" defer></script>
+</head>
+<body data-page="27">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>第 27 课 · 进程、线程与 task_struct</h1>
+    <p class="lede">Linux 在这件事上有个非常「反教科书」的设计：<b>它根本不区分进程和线程</b>。内核里只有一种东西——task。所谓「进程」只是「有自己地址空间的 task」，而「线程」是「和别人共享地址空间的 task」。这一课讲清这个统一模型，以及描述它的那个巨大结构体。</p>
+
+    <div class="viz" data-kind="compare" data-title="进程与线程：差在「共享什么」" data-sub="Linux 的答案：只差在 mm 与 files 是否共享" data-json='{"bad":{"t":"进程","items":["独立地址空间（独立 mm_struct）","独立文件描述符表","切换要换页表（贵）","崩溃不影响别人"]},"good":{"t":"线程","items":["共享同一 mm_struct（同一堆、同一全局变量）","共享 fd 表、信号处理","切换不换页表（便宜）","一个崩掉整个组都受影响"]},"note":"这就是「线程共享内存所以要用锁」的物理来源：它们真的在用同一张页表访问同一块内存。不是约定，是同一个 mm。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① Linux 为什么不分进程/线程？② task_struct 里最关键的是哪几个字段？③ 内核栈和用户栈是什么关系？④ 线程组 / TGID / PID 怎么理解？⑤ 怎么从 /proc 里看出线程？</p>
+    </div>
+
+    <h2>1. task_struct：一个几 KB 的「任务身份证」</h2>
+
+    <div class="viz" data-kind="layers" data-title="task_struct 的几组关键字段" data-sub="几百个字段里，这几组最常被问到" data-json='{"items":[{"n":"state / flags","d":"运行、可中断睡眠、不可中断、僵尸","c":"cy"},{"n":"mm / active_mm","d":"地址空间；线程共享同一个 mm","c":"vi"},{"n":"files / fs","d":"打开的文件表、当前工作目录","c":"or"},{"n":"sched_entity / prio","d":"调度实体与优先级（第 31 课）","c":"gr"},{"n":"stack / thread_info","d":"内核栈指针","c":"rd"},{"n":"pid / tgid / group_leader","d":"线程组归属","c":"gray"}],"note":"这个结构体在 32 位 ARM 上大约 1.7KB，每个任务一份，放在内核堆里。它同时被几十个链表挂着（就绪队列、进程树、PID 哈希），所以字段多到难以通读。"}'></div>
+
+    <h2>2. 四个状态，看 /proc 就能对上</h2>
+
+    <table>
+      <thead><tr><th>state</th><th>/proc 里的字母</th><th>含义</th><th>能不能被信号唤醒</th></tr></thead>
+      <tbody>
+        <tr><td>TASK_RUNNING</td><td>R</td><td>正在跑或就绪排队</td><td>—</td></tr>
+        <tr><td>TASK_INTERRUPTIBLE</td><td>S</td><td>可中断睡眠（等事件）</td><td>能</td></tr>
+        <tr><td>TASK_UNINTERRUPTIBLE</td><td>D</td><td>不可中断睡眠（等 IO）</td><td>不能（kill -9 也杀不掉）</td></tr>
+        <tr><td>EXIT_ZOMBIE</td><td>Z</td><td>已退出，等父进程回收</td><td>—</td></tr>
+      </tbody>
+    </table>
+
+    <p><b>看到 D 状态且长期不消失，通常意味着 IO 卡住</b>（磁盘、NFS、驱动等待）。这是嵌入式排障里非常关键的一个信号：D 状态的进程连 <code>kill -9</code> 都无效，只能修 IO。</p>
+
+    <h2>3. 内核栈：每个任务 8KB</h2>
+
+    <p>用户态的栈在进程自己的地址空间里（默认 8MB），内核态的栈是<b>另一块内存</b>，通常 8KB，随 task_struct 一起分配。</p>
+
+    <pre><code>// 内核代码运行在这个 8KB 栈上
+// 所以：
+//   - 不能放大数组（第 17 课讲过）
+//   - 递归深度极其有限
+//   - 中断上下文用同一个栈（或独立 IRQ 栈）
+
+// 查当前任务的内核栈使用：
+cat /proc/<pid>/stack        # 内核栈回溯
+# 编译时开启 CONFIG_DEBUG_STACK_USAGE 可在 panic 时打印余量</code></pre>
+
+    <h2>4. TGID 与 PID：线程组的两个视角</h2>
+
+    <p>创建线程（<code>clone</code> 时带 CLONE_THREAD）后：</p>
+
+    <ul>
+      <li>每个线程有自己的 <b>PID</b>（内核调度单位）。</li>
+      <li>它们共享同一个 <b>TGID</b>（即「进程 ID」，用户看到的那个）。</li>
+      <li><code>getpid()</code> 返回 TGID，<code>gettid()</code> 返回自己的 PID。</li>
+    </ul>
+
+    <pre><code>ls /proc/<pid>/task/          # 列出该进程的所有线程
+cat /proc/<pid>/status | grep -E "Pid|Tgid|Threads"
+ps -eLf                       # 显示线程
+top -H                        # 按线程显示</code></pre>
+
+    <p>这条知识在调试死锁时很有用：<b>你看到的「进程卡住」往往是某个线程卡住</b>，而线程才是调度与 CPU 占用的真实单位。</p>
+
+    <h2>5. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于进程线程的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["进程比线程重，所以线程一定更快","一个进程内的线程互不影响","kill 一个进程等于停掉它所有线程"]},"good":{"t":"实际","items":["「轻」只体现在创建/切换成本；若线程共享数据需加锁，总成本可能更高","共享地址空间，一个写坏内存全体受害","信号默认投递给整个线程组；kill -9 也是整组"]},"note":"「线程更快」是有条件的：共享数据越少越接近独立进程，共享越多锁竞争越重。这就是为什么多线程程序有时不如多进程。"}'></div>
+
+    <h2>6. 实验：观察一个任务的内部</h2>
+
+    <pre><code># 造一个多线程程序
+#include &lt;pthread.h&gt;
+void *worker(void *a) { while (1) sleep(1); }
+int main(void) {
+    pthread_t t[3];
+    for (int i = 0; i &lt; 3; i++) pthread_create(&amp;t[i], 0, worker, 0);
+    while (1) sleep(1);
+}
+
+# 观察
+PID=$(pgrep -f a.out | head -1)
+cat /proc/$PID/status | grep -E "Pid|Tgid|Threads|VmRSS"
+ls /proc/$PID/task/
+cat /proc/$PID/task/*/stat | awk '{print $1, $2, $3}'   # pid, comm, state</code></pre>
+
+    <p>你会看到 4 个 task（1 主 + 3 线程），<b>同一个 Tgid，各自的 Pid</b>。这就是「Linux 统一任务模型」最直白的证据。</p>
+
+    <h2>7. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>Linux 区分进程与线程吗？靠什么区分？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>不区分，都是 task。靠是否共享 mm_struct（与 files 等）来体现「线程」语义。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>D 状态为什么 kill -9 也杀不掉？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>不可中断睡眠不响应信号，必须等内核里的等待完成（通常是被 IO 卡住）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>内核栈多大？为什么不能放大数组？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>通常 8KB，与用户态 8MB 栈完全不同；一个大数组加调用链就会溢出。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>getpid 与 gettid 返回什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>getpid 返回 TGID（进程号），gettid 返回线程自己的 PID。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>为什么说「线程共享内存」不是约定而是事实？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>它们共用同一个 mm_struct，同一张页表，访问的就是同一块物理内存——硬件层面没有隔离。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>跑多线程程序，观察 <code>/proc/pid/task/</code> 下的目录数量。</li>
+        <li>看 <code>status</code> 里的 Threads 与 Tgid。</li>
+        <li>制造一个 D 状态（如读一个卡住的设备），确认 kill -9 无效。</li>
+        <li>读一份 task_struct 的源码片段，标出 mm、files、stack 三个字段。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      任务从哪来？第 28 课讲 fork 与 exec：一个 task 怎么复制出另一个，以及 exec 为什么「不创建新进程，只是换掉身体」。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="switch" data-iviz="1" data-json='{"title":"进程和线程，共享什么、不共享什么","hint":"切换对比","note":"一句话记住：线程共享地址空间，进程不共享。所以线程切换便宜（不换页表），但也正因为共享，一个线程踩坏内存，全进程一起死。","views":[{"b":"进程独有","items":[{"t":"页表 / 地址空间","d":"每个进程一张页表，切换进程必须换页表基址，还要刷 TLB——这是进程切换比线程贵的主因。"},{"t":"文件描述符表","d":"打开的文件各自一份。fork 之后子进程继承一份副本。"},{"t":"信号处理与身份","d":"各自的信号掩码、uid、cwd、环境变量。"}]},{"b":"线程共享","items":[{"t":"代码段、数据段、堆","d":"同一个地址空间，一个线程 malloc 出来的指针另一个线程直接能用。"},{"t":"已打开的文件","d":"同一个 fd 表，所以多线程写同一个文件要加锁。"},{"t":"线程各自独有","d":"只有栈、寄存器现场、errno、信号掩码这几样是自己的。"}]}]}'></div>
+  </main>
+</div>
+<script src="assets/cnav.js"></script>
+<script src="assets/viz.js"></script>
+<script src="assets/iviz.js"></script>
+<script src="assets/anime.iife.min.js"></script>
+<script src="assets/anim2.js"></script>
+</body>
+</html>

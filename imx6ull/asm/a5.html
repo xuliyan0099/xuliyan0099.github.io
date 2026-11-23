@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第 05 章 · 条件码与分支：两套门，别走错 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<link rel="stylesheet" href="../assets/asm.css">
+</head><body style="--acc:#03d6b4">
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../index.html">☰ 六个入口</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">手写 ARM 汇编 · 10 篇</div>
+    <ol>
+      <li><a href="index.html"><span class="no">⌂</span><span>路口目录<span class="sub">篇目总览与读法</span></span></a></li>
+      <li><a href="a0.html"><span class="no">00</span><span>为什么非写不可<span class="sub">三个真实场景，和一笔成本账</span></span></a></li>
+      <li><a href="a1.html"><span class="no">01</span><span>最小可跑：工具链与第一条指令<span class="sub">编、链接、反汇编，看到自己写的字节</span></span></a></li>
+      <li><a href="a2.html"><span class="no">02</span><span>寄存器与立即数：那道 8 位旋转墙<span class="sub">16 个寄存器、APSR、4096 种立即数</span></span></a></li>
+      <li><a href="a3.html"><span class="no">03</span><span>寻址与栈：地址是怎么算出来的<span class="sub">四种寻址、批量搬运、满递减栈</span></span></a></li>
+      <li><a href="a4.html"><span class="no">04</span><span>函数调用与 AAPCS：lr 为什么必须保<span class="sub">传参、返回、保存责任、栈帧布局</span></span></a></li>
+      <li><a href="a5.html" class="active"><span class="no">05</span><span>条件码与分支：两套门，别走错<span class="sub">cmp 的本质、14 个条件、IT 块</span></span></a></li>
+      <li><a href="a6.html"><span class="no">06</span><span>位操作：配置一个寄存器的标准三行<span class="sub">bic/orr/bfi，掩码怎么造出来</span></span></a></li>
+      <li><a href="a7.html"><span class="no">07</span><span>C 与汇编互调：四条约束和两个别省<span class="sub">内联汇编、volatile、memory clobber</span></span></a></li>
+      <li><a href="a8.html"><span class="no">08</span><span>裸机第一条：在这块板子上点灯<span class="sub">关狗、开钟、配脚、定方向</span></span></a></li>
+      <li><a href="a9.html"><span class="no">09</span><span>二十道练习清单<span class="sub">A/B/C 三档，每题都写了验收法</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="../hardware/index.html">硬件入口</a><a href="../juan/index.html">十四卷总览</a></div>
+  </aside>
+  <main class="doc">
+    <div class="doc-kicker">汇编练习 · i.MX6ULL / Cortex-A7 <span>·</span> 第 05 章</div>
+    <div class="ch-head">
+      <h1>条件码与分支：两套门，别走错</h1>
+      <div class="ch-meta"><span class="hot">第 05 章</span><span>约 28 分钟</span><span>★ 必读</span><span>含互动工具</span></div>
+    </div>
+<h2 id="s1"><code>cmp</code> 不是「比较」，是「减法丢掉结果」</h2>
+<pre class="asm"><code>    <span class="k">cmp</span>  r0, r1<span class="c">        @ 等价于 subs r2, r0, r1（但结果不写回，只更新标志）</span></code></pre>
+<p>它从不产生寄存器结果，只更新 <code>N/Z/C/V</code> 四位。所以后面跟什么条件码，取决于这四位怎么组合。</p>
+<p>同理还有三个只看标志的指令：</p>
+<table class="regtbl"><thead><tr><th>指令</th><th>做的事</th><th>常用条件</th></tr></thead><tbody><tr><td class="nm"><code>cmp r0, r1</code></td><td class="nm"><code>r0 - r1</code>，丢结果</td><td class="nm"><code>eq/ne/lt/gt/hi/ls</code></td></tr><tr><td class="nm"><code>cmn r0, r1</code></td><td class="nm"><code>r0 + r1</code>，丢结果</td><td>判断「负数加正数」、<code>cmn r0,#1</code> 实现「r0 == -1」</td></tr><tr><td class="nm"><code>tst r0, r1</code></td><td class="nm"><code>r0 &amp; r1</code>，丢结果</td><td>测某位是否为 0（<code>tst r0,#0x8; beq</code>）</td></tr><tr><td class="nm"><code>teq r0, r1</code></td><td class="nm"><code>r0 ^ r1</code>，丢结果</td><td>测「是否相同」（异或为 0）</td></tr></tbody></table>
+<h2 id="s2">14 个条件码，两张表就够</h2>
+<p><b>第一张：纯标志位</b></p>
+<table class="regtbl"><thead><tr><th>后缀</th><th>成立条件</th><th>用途</th></tr></thead><tbody><tr><td class="nm"><code>eq</code></td><td>Z=1</td><td>相等</td></tr><tr><td class="nm"><code>ne</code></td><td>Z=0</td><td>不等</td></tr><tr><td class="nm"><code>cs</code> / <code>hs</code></td><td>C=1</td><td>无符号「有进位/无借位」，即 ≥</td></tr><tr><td class="nm"><code>cc</code> / <code>lo</code></td><td>C=0</td><td>无符号 &lt;</td></tr><tr><td class="nm"><code>mi</code></td><td>N=1</td><td>结果为负</td></tr><tr><td class="nm"><code>pl</code></td><td>N=0</td><td>结果非负</td></tr><tr><td class="nm"><code>vs</code></td><td>V=1</td><td>有符号溢出</td></tr><tr><td class="nm"><code>vc</code></td><td>V=0</td><td>无溢出</td></tr></tbody></table>
+<p><b>第二张：比较结论（最常用）</b></p>
+<table class="regtbl"><thead><tr><th>后缀</th><th>成立条件</th><th>语义</th></tr></thead><tbody><tr><td class="nm"><code>hi</code></td><td>C=1 且 Z=0</td><td><b>无符号</b>大于</td></tr><tr><td class="nm"><code>ls</code></td><td>C=0 或 Z=1</td><td><b>无符号</b>小于等于</td></tr><tr><td class="nm"><code>ge</code></td><td>N=V</td><td><b>有符号</b>大于等于</td></tr><tr><td class="nm"><code>lt</code></td><td>N≠V</td><td><b>有符号</b>小于</td></tr><tr><td class="nm"><code>gt</code></td><td>Z=0 且 N=V</td><td><b>有符号</b>大于</td></tr><tr><td class="nm"><code>le</code></td><td>Z=1 或 N≠V</td><td><b>有符号</b>小于等于</td></tr></tbody></table>
+<h2 id="s3">最大的坑：有符号与无符号是两套门</h2>
+<p>看这个例子：<code>r0 = 0xFFFFFFFF</code>（有符号是 -1），<code>r1 = 1</code>。</p>
+<pre class="asm"><code>    <span class="k">mvn</span>  r0, <span class="hl">#0</span><span class="c">        @ r0 = 0xFFFFFFFF = -1</span>
+    <span class="k">mov</span>  r1, <span class="hl">#1</span>
+    <span class="k">cmp</span>  r0, r1
+    <span class="k">blt</span>  signed_less<span class="c">   @ ✓ 成立：有符号 -1 &lt; 1</span>
+    <span class="k">blo</span>  unsigned_less<span class="c"> @ ✗ 不成立：无符号 0xFFFFFFFF &gt; 1</span></code></pre>
+<p>同一对操作数、同一条 <code>cmp</code>，<code>blt</code> 跳、<code>blo</code> 不跳。这就是为什么「数组下标用 <code>blt</code> 判越界」是漏洞：</p>
+<pre class="asm"><code><span class="c">/* 危险写法 */</span>
+if (i &lt; len) buf[i] = 0;<span class="c">      /* i 是 int，len 是 unsigned → 混合比较 */</span></code></pre>
+<p>编译器会怎么编？如果 <code>len</code> 是 <code>unsigned</code>，<code>i</code> 被提升成 <code>unsigned</code>，<code>i = -1</code> 变成 <code>0xFFFFFFFF</code>，比较变成 <code>bhi</code> 形式——结果「超大下标」通过了检查。</p>
+<p><b>判断口诀</b>：变量是无符号的（<code>size_t</code>、<code>uint32_t</code>、指针长度、数组下标）→ 用 <code>hi/ls</code>；变量是有符号的（<code>int</code>、<code>int32_t</code>、差值）→ 用 <code>gt/lt/ge/le</code>。混用时以「提升后的类型」为准，<code>int</code> 与 <code>unsigned</code> 混比会被提升成无符号，这是 C 语言埋的坑，汇编层面才看得见。</p>
+<h2 id="s4">工具：14 个条件一次算给你看</h2>
+<div class="tool">
+  <h4>条件码判断器 · 给两个数，逐个标成立/落空</h4>
+  <div class="sim-row">
+    <input id="cndA" type="text" value="0xFFFFFFFF">
+    <input id="cndB" type="text" value="0x1">
+    <button class="tbtn" id="cndGo">比较</button>
+    <button class="tbtn ct" data-a="1" data-b="0xFFFFFFFF">1 与 -1</button>
+    <button class="tbtn ct" data-a="5" data-b="5">5 与 5</button>
+  </div>
+  <div class="out" id="cndOut"></div>
+  <div id="cndTab"></div>
+</div>
+<p>试三组，把结论记住：</p>
+<ul>
+<li><code>-1</code> 与 <code>1</code>：<code>lt</code> 成立、<code>lo</code> 不成立 —— 有符号与无符号分道扬镳。</li>
+<li><code>1</code> 与 <code>-1</code>：<code>gt</code> 成立、<code>hi</code> 不成立 —— 反过来也一样。</li>
+<li><code>5</code> 与 <code>5</code>：<code>eq/ge/le/hs/ls</code> 全成立，<code>ne/lt/gt/hi/lo</code> 全不成立 —— 相等时「大于」「小于」都不成立，但「大于等于」「小于等于」成立。</li>
+</ul>
+<h2 id="s5">条件执行：不跳也能选</h2>
+<p>ARM 态几乎每条指令都能带条件后缀，省掉跳转和流水线冲刷：</p>
+<pre class="asm"><code>    <span class="k">cmp</span>  r0, <span class="hl">#5</span>
+    movgt r1, <span class="hl">#1</span><span class="c">        @ r0&gt;5 才执行，否则这条相当于 nop</span>
+    movle r1, <span class="hl">#0</span></code></pre>
+<p>Thumb 态没这么自由：<b>只有 <code>b</code> 系列能带条件，其余条件指令必须包在 <code>IT</code> 块里</b>：</p>
+<pre class="asm"><code>    <span class="k">cmp</span>  r0, <span class="hl">#5</span>
+    <span class="k">ite</span>  gt<span class="c">             @ t: 紧跟 1 条(then)；e: 再跟 1 条(else)</span>
+    movgt r1, <span class="hl">#1</span>
+    movle r1, <span class="hl">#0</span></code></pre>
+<p><code>IT</code> 的字母含义：<code>IT</code> 后面最多 4 个字母，<code>T</code> 表示该位指令按条件执行，<code>E</code> 表示按「条件取反」执行。<code>IT</code> = 1 条 then；<code>ITT</code> = 2 条 then；<code>ITE</code> = then + else；<code>ITTEE</code> = 2 then + 2 else。</p>
+<p>写错 IT 块的表现是汇编器报 <code>Thumb IT block error</code>，或者更糟：编过了但行为不对（比如把 <code>E</code> 写成 <code>T</code>，条件反了）。</p>
+<h2 id="s6">循环的三种标准形态</h2>
+<p><b>计数循环</b>（最常用）：</p>
+<pre class="asm"><code>    <span class="k">mov</span>  r0, <span class="hl">#0</span><span class="c">            @ sum</span>
+    <span class="k">mov</span>  r1, <span class="hl">#1</span><span class="c">            @ i</span>
+loop:
+    <span class="k">add</span>  r0, r0, r1
+    <span class="k">add</span>  r1, r1, <span class="hl">#1</span>
+    <span class="k">cmp</span>  r1, <span class="hl">#6</span>
+    <span class="k">blt</span>  loop<span class="c">              @ 有符号小于则回跳（i 是 1..5）</span></code></pre>
+<p><b>指针遍历</b>（找字符串结尾）：</p>
+<pre class="asm"><code>strlen:
+    <span class="k">mov</span>  r1, r0<span class="c">            @ 保存起点</span>
+1:  ldrb r2, [r0], <span class="hl">#1</span><span class="c">      @ 取一个字节并后索引 +1</span>
+    <span class="k">cmp</span>  r2, <span class="hl">#0</span>
+    <span class="k">bne</span>  1b<span class="c">                @ 非 0 继续（1b 是「向后找最近的局部标号 1」）</span>
+    <span class="k">sub</span>  r0, r0, r1
+    <span class="k">sub</span>  r0, r0, <span class="hl">#1</span><span class="c">        @ 减掉多走的那一步</span>
+    <span class="k">bx</span>   lr</code></pre>
+<p>局部标号 <code>1:</code> / <code>1b</code>（backward）/ <code>1f</code>（forward）是 GNU as 的写法，适合短距离跳转，不会污染符号表。</p>
+<p><b>先减后判</b>（<code>do-while</code>，省一条指令）：</p>
+<pre class="asm"><code>    <span class="k">mov</span>  r1, <span class="hl">#10</span>
+1:  subs r1, r1, <span class="hl">#1</span>
+    <span class="k">bne</span>  1b<span class="c">                @ 减到 0 之前一直回跳，天然执行 10 次</span></code></pre>
+<p>注意 <code>subs</code> 带 <code>s</code> 才会更新标志——<code>sub</code> 不带 <code>s</code> 不改标志，<code>bne</code> 就会用到上一次的旧标志。<b>这是新手最常见的「循环次数不对」原因</b>：忘了 <code>s</code>。</p>
+<h2 id="s7">跳转表：<code>adr + ldr pc</code></h2>
+<p>多分支（<code>switch</code>）不该写成 <code>cmp</code> 链：</p>
+<pre class="asm"><code>    <span class="k">cmp</span>  r0, <span class="hl">#3</span>
+    <span class="k">bhi</span>  default
+    <span class="k">adr</span>  r1, table<span class="c">          @ r1 = table 的地址（位置无关）</span>
+    <span class="k">ldr</span>  pc, [r1, r0, lsl <span class="hl">#2</span>]<span class="c">   @ pc = *(table + r0*4)，直接跳</span>
+table:
+    .word case0
+    .word case1
+    .word case2
+    .word case3</code></pre>
+<p><code>adr</code> 是伪指令：汇编器算成 <code>add/sub pc, #偏移</code>，所以拿到的是「运行地址」而不是「链接地址」，位置无关代码也能用。<code>enable_mmu</code> 前后跳转表必须用 <code>adr</code>，用绝对地址就会崩——这是开启 MMU 阶段最典型的坑之一。</p>
+<h2 id="s8">本篇验收</h2>
+<ul>
+<li>能解释 <code>cmp</code> 为什么没有结果寄存器，以及 <code>N/Z/C/V</code> 各自怎么来。</li>
+<li>能给一个具体数值对，说出 <code>hi</code> 与 <code>gt</code> 哪个成立、为什么。</li>
+<li>能指出「数组越界漏洞」在汇编层面长什么样（<code>blt</code> 换成 <code>bhi</code> 就修了）。</li>
+<li>能写出 Thumb 态下的 <code>IT</code> 块，并说清 <code>IT</code> 后面字母的含义。</li>
+<li>能解释 <code>subs</code> 与 <code>sub</code> 的差别，以及它为什么会让循环多跑或少跑一次。</li>
+<li>能写出跳转表，并说清 <code>adr</code> 与绝对地址的差别。</li>
+</ul>
+<h2 id="s9">下一篇</h2>
+<p>判断与跳转都会了，剩下最密集的一类指令是位操作——因为外设配置全是位操作。06 篇把 <code>bic/orr/bfi</code> 练成肌肉记忆，并且回到真实寄存器：<code>IOMUXC</code>、<code>CCM</code>、<code>GPIO</code>。</p>
+<div class="pager">
+      <a href="a4.html"><span>上一篇</span><b>← 04 函数调用与 AAPCS：lr 为什么必须保</b></a>
+      <a href="index.html"><span>目录</span><b>篇目总览</b></a>
+      <a class="nx" href="a6.html"><span>下一篇</span><b>06 位操作：配置一个寄存器的标准三行 →</b></a>
+    </div>
+  </main>
+</div>
+<script src="../assets/asm-tools.js"></script>
+</body>
+</html>

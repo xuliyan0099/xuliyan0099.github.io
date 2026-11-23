@@ -1,0 +1,225 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Linux 全景认知 · 卷 00 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j00.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 00 · 起步 · Linux 与实验台</div>
+<ol><li><a href="course-ch01.html" class="active">
+  <span class="no">01</span><span>Linux 全景认知<span class="sub">约 4 小时 · 当前</span></span></a></li>
+<li><a href="course-ch02.html">
+  <span class="no">02</span><span>搭好实验台<span class="sub">约 10 小时</span></span></a></li>
+<li><a href="course-ch03.html">
+  <span class="no">03</span><span>命令行与文件系统<span class="sub">约 16 小时</span></span></a></li>
+<li><a href="course-ch04.html">
+  <span class="no">04</span><span>系统管理四件事<span class="sub">约 16 小时</span></span></a></li>
+<li><a href="course-ch05.html">
+  <span class="no">05</span><span>Vim 与 Shell 脚本<span class="sub">约 14 小时</span></span></a></li>
+<li><a href="course-ch06.html">
+  <span class="no">06</span><span>网络与远程开发<span class="sub">约 10 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <span></span>
+  <a href="../juan/j01.html">卷 01 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 00<span>·</span>起步 · Linux 与实验台<span>·</span>第 01 篇</div>
+  <h1>Linux 全景认知</h1>
+  <p class="lede">这一章不敲命令，只解决一个问题：你接下来要学的这一堆东西，各自在哪一层、为什么存在。概念不清就开始敲命令，等于背电话号码。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 4 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+    <div class="viz" data-kind="tree" data-title="Linux 的三个世界，别混着学" data-sub="内核 / 发行版 / 嵌入式" data-json='{"nodes":[{"n":"Linux 内核","d":"只有代码，没有界面","c":"cy","ch":[{"n":"发行版 Ubuntu / Debian","d":"内核 + 软件包 + 包管理器","c":"vi","ch":[{"n":"你日常用的桌面","d":"apt 装一切"}]},{"n":"嵌入式系统 i.MX6ULL","d":"内核 + U-Boot + 根文件系统","c":"gr","ch":[{"n":"自己做的最小系统","d":"BusyBox 就够用"}],"ch":[{"n":"差别在「谁装配」","d":"发行版替你装，嵌入式要你自己装","c":"or"}]}]}],"note":"很多人学 Linux 卡住，是因为把这三层混成一件事。你要学的是「装配一个系统」——所以内核、引导程序、根文件系统三样必须分开理解。"}'></div>
+
+
+    <div class="card">
+      <h4>本章目标</h4>
+      <p>① 能画出「硬件 → 内核 → 系统调用 → 应用」的层次图；② 能区分内核、发行版、GNU 工具；③ 知道嵌入式 Linux 和服务器 Linux 的六大差别；④ 知道 i.MX6ULL 是什么定位的芯片；⑤ 知道板子上要跑的四件套是什么。</p>
+    </div>
+
+    <div class="anim2" data-json='{"title":"Linux 四块拼图怎么咬合","hint":"从硬件到你要用的程序","nodes":[{"k":"硬件","s":"CPU/内存/外设"},{"k":"内核","s":"唯一碰硬件"},{"k":"Shell","s":"把命令翻译"},{"k":"用户程序","s":"你的代码"}],"frames":[{"i":0,"d":"CPU、内存、外设是物理存在，寄存器与中断线是它们与软件的接缝。"},{"i":1,"d":"内核是唯一直接操作这些接缝的东西：管进程、内存、文件、网络、驱动。"},{"i":2,"d":"Shell 是普通程序，把你的输入翻成系统调用，再把结果打印回来。"},{"i":3,"d":"用户程序（包括你的代码）全都通过系统调用请内核办事，谁都不能绕过它碰硬件。"}],"kind":"flow"}'></div>
+
+    <h2 id="s1">1.1 操作系统到底在管什么</h2>
+
+    <p>把电脑想成一栋楼。硬件是钢筋水泥，应用程序是住户，<strong>内核就是物业</strong>：谁用电梯（CPU 时间片）、谁分到房间（内存）、谁能进仓库（磁盘）、谁能打电话（网络），全归它调度。住户不能直接去配电房拉闸，只能填单子——这张单子就叫<strong>系统调用</strong>。</p>
+
+    <div class="flow">
+      <div class="box"><b>应用程序</b><span>你的 C 程序 / shell / nginx</span></div>
+      <div class="arrow">↓</div>
+      <div class="box"><b>库 / C 库</b><span>glibc、musl：把系统调用包装成函数</span></div>
+      <div class="arrow">↓</div>
+      <div class="box"><b>系统调用接口</b><span>open / read / write / ioctl</span></div>
+      <div class="arrow">↓</div>
+      <div class="box"><b>内核</b><span>进程·内存·文件系统·驱动·网络</span></div>
+      <div class="arrow">↓</div>
+      <div class="box"><b>硬件</b><span>CPU / DDR / eMMC / 网卡 / GPIO</span></div>
+    </div>
+
+    <p>关键点：<strong>应用程序永远不直接操作寄存器</strong>。你想点亮一个 LED，代码最终是 <code>write()</code> 到一个设备文件，由内核里的驱动去写 GPIO 寄存器。这条链路就是本书第 12 章要打通的东西。</p>
+
+    <div class="key">
+      <b>一句话记住</b>
+      内核是唯一能碰硬件的代码。用户程序想碰硬件，必须<b>通过内核提供的接口</b>。所以「学 Linux」的本质是：学怎么用这些接口，以及怎么在内核里加新的接口。
+    </div>
+
+    <h2 id="s2">1.2 内核、发行版、GNU 工具，别再混为一谈</h2>
+
+    <table>
+      <thead><tr><th>名词</th><th>是什么</th><th>谁做的</th><th>你可以怎么改</th></tr></thead>
+      <tbody>
+        <tr><td><strong>内核（kernel）</strong></td><td>真正管硬件的那坨代码，一个 <code>zImage</code> / <code>uImage</code> 文件</td><td>Linus 及全球社区，版本如 4.1.15、5.15</td><td>配置裁剪、改驱动、打补丁、加自己的模块</td></tr>
+        <tr><td><strong>GNU 工具</strong></td><td>shell、编译器 gcc、调试器 gdb、各种命令行工具</td><td>GNU 计划</td><td>换版本、换实现（如 BusyBox）</td></tr>
+        <tr><td><strong>发行版</strong></td><td>内核 + 工具 + 包管理器 + 默认配置，打包成一个能装的系统</td><td>Ubuntu、Debian、Fedora、Yocto、Buildroot</td><td>整包替换，或自己用 Buildroot 造一个</td></tr>
+        <tr><td><strong>根文件系统</strong></td><td>挂载成 <code>/</code> 的那套目录和文件，里面装着 shell、库、配置</td><td>你（用 BusyBox / Buildroot 做）</td><td>随便改，是自己做的就完全可控</td></tr>
+      </tbody>
+    </table>
+
+    <p>新手最常见的误解是「Linux 就是一个系统」。严格讲，Linux 只是内核；你平时说的「装个 Linux」其实装的是发行版；板子上跑的往往是「内核 + 一个自己做的根文件系统」，根本没有发行版的概念。</p>
+
+    <h2 id="s3">1.3 嵌入式 Linux 和服务器 Linux，差在哪</h2>
+    <div class="viz" data-kind="compare" data-title="服务器 Linux 与嵌入式 Linux" data-sub="同一个内核，两种活法" data-json='{"bad":{"t":"服务器 Linux","items":["硬盘、大内存、双路电源","出问题最多宕一台机器","apt 直接装、随时升级","有键盘显示器，本地就能操作"]},"good":{"t":"嵌入式 Linux（i.MX6ULL）","items":["Flash 512MB、内存 512MB 起","出问题可能是「变砖」","工具链交叉编译，库要自己裁","只有串口一根线，全靠日志"]},"note":"内核是同一套源码，差别在「配置、资源、出错代价」。所以嵌入式要先学会「最小可用」，再谈功能。"}'></div>
+
+
+    <p>命令是同一套，但工程约束完全不同。这张表决定了你后面为什么会被一些「服务器上很正常的操作」坑到：</p>
+
+    <table>
+      <thead><tr><th>维度</th><th>服务器 / 桌面 Linux</th><th>嵌入式 Linux（i.MX6ULL）</th></tr></thead>
+      <tbody>
+        <tr><td>CPU</td><td>x86_64，多核，几 GHz</td><td>ARM Cortex-A7，单核，528 MHz</td></tr>
+        <tr><td>内存</td><td>32–512 GB</td><td>256 MB / 512 MB DDR</td></tr>
+        <tr><td>存储</td><td>SSD / 云盘，几百 GB</td><td>8–16 GB eMMC，或 8 GB SD 卡</td></tr>
+        <tr><td>编译</td><td>本机 gcc 直接编</td><td><b>交叉编译</b>：PC 上编，板子上跑</td></tr>
+        <tr><td>启动</td><td>BIOS/UEFI → GRUB → 内核</td><td>BootROM → SPL → U-Boot → 内核</td></tr>
+        <tr><td>显示</td><td>桌面环境随便装</td><td>可能只有一个串口终端，没有屏幕</td></tr>
+        <tr><td>调试</td><td>ssh 上去，随便装工具</td><td><b>串口是最后的生命线</b>，SSH 挂了只能靠它</td></tr>
+        <tr><td>升级</td><td>apt upgrade</td><td>重新烧写整机镜像，或做 OTA</td></tr>
+      </tbody>
+    </table>
+
+    <div class="warn">
+      <b>最要命的一条</b>
+      板子内存只有 256MB 时，你在 PC 上编译一个「随便就吃 2GB」的程序，板子上根本跑不起来。交叉编译出来的文件还要考虑体积、依赖库、ABI，这些都是服务器开发不需要操心的。
+    </div>
+
+    <h2 id="s4">1.4 为什么选 i.MX6ULL</h2>
+
+    <p>i.MX6ULL（全称 i.MX 6UltraLite）是 NXP 的<strong>单核 Cortex-A7</strong> 应用处理器，主频 528MHz，主打低功耗、工业级、长供货周期。它不是性能怪兽，但作为「第一块能跑完整 Linux 的板子」，性价比极高：</p>
+
+    <table>
+      <thead><tr><th>芯片 / 平台</th><th>定位</th><th>跑 Linux 的难度</th><th>适合谁</th></tr></thead>
+      <tbody>
+        <tr><td>STM32F103</td><td>MCU，无 MMU</td><td>跑不了标准 Linux，只能跑 RTOS / uClinux</td><td>学裸机、RTOS</td></tr>
+        <tr><td><strong>i.MX6ULL</strong></td><td>低端 MPU，单核 A7</td><td>难度低，资料极多，板子便宜</td><td><strong>第一次学嵌入式 Linux</strong></td></tr>
+        <tr><td>RK3588 / i.MX8M</td><td>高端 MPU，多核 A76/A55</td><td>难度中，BSP 庞大，编译慢</td><td>做产品、跑 AI</td></tr>
+        <tr><td>树莓派 5</td><td>消费级 SBC</td><td>几乎零难度（官方镜像开箱即用）</td><td>应用层验证，但学不到启动链</td></tr>
+      </tbody>
+    </table>
+
+    <p>选它的真正理由：<strong>它的启动链你能完整走一遍</strong>。树莓派给你一个装好的系统，你碰不到 U-Boot、碰不到 DTS、也看不到 BootROM 怎么加载。而 i.MX6ULL 从烧写、U-Boot 命令行、内核编译、设备树、根文件系统，每一环都暴露在你面前——这才是「学嵌入式 Linux」而不是「用一个 Linux 小电脑」。</p>
+
+    <div class="tip">
+      <b>它有什么外设</b>
+      双路 10/100M 以太网（ENET1/2）、2 路 CAN、多路 UART、I2C、SPI、LCD 控制器、ADC、SD/eMMC、NAND、USB OTG/Host、GPIO 若干组。做工业网关、车载终端、HMI 面板的经典选择，你后面点 LED、接传感器都够用。
+    </div>
+
+    <h2 id="s5">1.5 板子里跑的是「四件套」</h2>
+
+    <p>一块能启动的 i.MX6ULL 板子，存储介质里一定躺着这四个东西。后面第 8–11 章就是把它们逐个拆开讲：</p>
+
+    <div class="flow">
+      <div class="box"><b>U-Boot</b><span>引导程序<br>负责初始化 DDR、加载内核</span></div>
+      <div class="arrow">+</div>
+      <div class="box"><b>zImage</b><span>内核镜像<br>真正管硬件的那坨代码</span></div>
+      <div class="arrow">+</div>
+      <div class="box"><b>.dtb</b><span>设备树<br>告诉内核这块板子有什么硬件</span></div>
+      <div class="arrow">+</div>
+      <div class="box"><b>rootfs</b><span>根文件系统<br>shell、库、你的程序</span></div>
+    </div>
+
+    <p>少任何一个都起不来：没有 U-Boot 芯片不知道从哪加载；没有 dtb 内核不知道 LED 接在哪个引脚；没有 rootfs 内核最后一步会报 <code>Kernel panic - not syncing: No working init found</code>——这个报错你以后一定会见到，现在先记住它长什么样。</p>
+
+    <h2 id="s6">1.6 三个心理陷阱，提前拆掉</h2>
+    <div class="viz" data-kind="layers" data-title="板子里跑的「四件套」" data-sub="从上到下，缺一层都起不来" data-json='{"items":[{"n":"应用程序","d":"你的业务代码 / BusyBox 命令","c":"gr"},{"n":"根文件系统","d":"ext4 或 ubifs，挂载成 /","c":"vi"},{"n":"内核 zImage","d":"驱动、内存管理、调度","c":"cy"},{"n":"Bootloader","d":"U-Boot：初始化 DDR、加载内核","c":"or"},{"n":"BootROM","d":"芯片内固化，选启动介质","c":"rd"}],"note":"「板子起不来」先分层判断：串口有没有 BootROM 输出？有没有 U-Boot 提示符？内核有没有打印？每层都有各自的标志。"}'></div>
+
+
+    <div class="grid three">
+      <div class="card">
+        <h4>陷阱一：追新版本</h4>
+        <p>看到教程用 4.1.15，自己去找 6.x 版内核，然后配置项全对不上。跟着板卡厂商的版本走，这是唯一正确姿势。</p>
+      </div>
+      <div class="card">
+        <h4>陷阱二：先啃内核源码</h4>
+        <p>没跑通过一次编译链就去读 <code>kernel/sched/core.c</code>，只会死在里面。先会用，再会改，最后才谈懂。</p>
+      </div>
+      <div class="card">
+        <h4>陷阱三：怕命令行</h4>
+        <p>板子上没有鼠标，所有操作都是敲命令。第 3 章必须练到盲打级别，否则后面寸步难行。</p>
+      </div>
+    </div>
+
+    <h2 id="s7">1.7 动手任务</h2>
+
+    <ul class="steps">
+      <li>拿一张纸，默画「应用 → 库 → 系统调用 → 内核 → 硬件」五层图，标出 LED 点亮时数据走的路径。</li>
+      <li>查你手上（或打算买的）板子的资料：确认 SoC 型号、DDR 容量、eMMC/SD 容量、串口是哪个 UART、调试串口波特率。</li>
+      <li>把板卡厂商提供的资料包目录列一遍，找出这四样文件：U-Boot 镜像、内核镜像（zImage）、设备树（.dtb）、根文件系统镜像。找不到就说明你的资料不完整，这会直接影响第 8 章之后的进度。</li>
+      <li>用一句话向自己解释：为什么板子上的程序要在 PC 上编译？</li>
+    </ul>
+
+    <h2 id="s8">1.8 验收标准</h2>
+    <ul class="checklist">
+      <li>能说出内核和发行版的区别，并举一个例子说明「板子上没有发行版」</li>
+      <li>能列出嵌入式 Linux 与服务器 Linux 至少 5 个差别</li>
+      <li>能解释为什么 i.MX6ULL 适合作为第一块学习板</li>
+      <li>能说出四件套各是什么、缺了会怎样</li>
+      <li>知道自己板子的 SoC 型号、内存大小、调试串口编号</li>
+    </ul>
+
+    <footer id="pager"></footer>
+  
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"Linux 全景：四块拼图","items":[{"b":"内核","d":"唯一直接碰硬件的东西。管进程、内存、文件、网络、驱动。它不提供界面。"},{"b":"Shell","d":"一个普通程序，把你的命令翻成系统调用。bash、zsh、busybox 都是它。"},{"b":"用户程序","d":"编译器、编辑器、数据库、你的代码。全都通过系统调用请内核办事。"},{"b":"包管理","d":"apt / opkg / yum，负责把上面三样按依赖装好。嵌入式里常用 opkg 或直接手搓 rootfs。"}],"note":"学 Linux 的顺序建议：先会用 shell 跑通日常操作，再理解进程与文件，最后才进内核与驱动。倒着学容易挫败。"}'></div>
+  
+
+<nav class="pager">
+  <span></span>
+  <a class="nx" href="course-ch02.html"><span>下一篇 →</span><b>搭好实验台</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

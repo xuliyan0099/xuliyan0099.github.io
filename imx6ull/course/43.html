@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=../docs/course-43.html">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>43 · 排障方法论</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/viz.css">
+<link rel="stylesheet" href="assets/iviz.css">
+<link rel="stylesheet" href="assets/anim2.css">
+  <script src="assets/readmode.js" defer></script>
+</head>
+<body data-page="43">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>第 43 课 · 排障方法论：从现象收敛到原因</h1>
+    <p class="lede">嵌入式排障最容易犯的错是「乱试」：改个参数、重启、还是不行、再改一个。十分钟过去，你既不知道改了什么有效，也不知道问题还在不在。这一课给一套可复用的流程：<b>先分层，再二分，最后只改一个变量。</b></p>
+
+    <div class="anim2" data-json='{"title":"排障方法论：从现象收敛到原因","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"1 描述现象"},{"k":"2 定位层次"},{"k":"3 找证据"},{"k":"4 提出假设"},{"k":"5 验证并记录"}],"frames":[{"i":0,"d":"能复现吗？多久一次？什么条件下？"},{"i":1,"d":"硬件 / 驱动 / 内核 / 用户态？"},{"i":2,"d":"日志、计数、抓波形、strace"},{"i":3,"d":"一次只提一个，能被证据证伪"},{"i":4,"d":"改一个变量，记录结果"}]}'></div>
+
+    <div class="viz" data-kind="flow" data-title="五步收敛：把模糊现象变成明确结论" data-sub="每一步都在缩小搜索范围" data-json='{"steps":[{"n":"1 描述现象","d":"能复现吗？多久一次？什么条件下？"},{"n":"2 定位层次","d":"硬件 / 驱动 / 内核 / 用户态？"},{"n":"3 找证据","d":"日志、计数、抓波形、strace"},{"n":"4 提出假设","d":"一次只提一个，能被证据证伪"},{"n":"5 验证并记录","d":"改一个变量，记录结果"}],"note":"第 4 步的「能被证伪」是关键：如果假设无法被任何观测推翻，它就不是一个工程假设，只是一种猜测。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 怎么快速判断问题在哪一层？② 三个必看的信息源是什么？③ 二分法怎么用在嵌入式？④ 为什么必须「一次只改一个」？⑤ 那些「重启就好」的问题怎么处理？</p>
+    </div>
+
+    <h2>1. 现象 → 层次对照表</h2>
+
+    <table>
+      <thead><tr><th>现象</th><th>最可能的层</th><th>第一个动作</th></tr></thead>
+      <tbody>
+        <tr><td>完全无输出</td><td>硬件</td><td>量电源、晶振、启动引脚</td></tr>
+        <tr><td>串口乱码</td><td>时钟</td><td>核对晶振与波特率</td></tr>
+        <tr><td>设备不识别</td><td>设备树 / 驱动</td><td><code>dmesg</code>、<code>/proc/device-tree</code></td></tr>
+        <tr><td>读写数据错</td><td>时序 / 电平</td><td>示波器看波形</td></tr>
+        <tr><td>偶发卡顿</td><td>中断 / 内存</td><td><code>/proc/interrupts</code>、<code>perf</code></td></tr>
+        <tr><td>程序崩</td><td>用户态</td><td><code>strace</code>、<code>gdb</code>、core dump</td></tr>
+      </tbody>
+    </table>
+
+    <p>这张表的用法：<b>先确定「最可能的层」，再只在该层取证</b>。跨层乱查是效率最低的做法。</p>
+
+    <h2>2. 三个必看的信息源</h2>
+
+    <pre><code># 1) dmesg：内核说过的每一句话
+dmesg | grep -i "error\|fail\|timeout"
+dmesg -w            # 实时跟踪（复现时用）
+
+# 2) /proc/interrupts：中断是否在正常工作
+watch -n1 'cat /proc/interrupts'
+# 计数不动 → 硬件没产生中断（引脚/时钟/使能）
+# 计数暴涨 → 没清标志，或电平没释放
+
+# 3) strace：用户态到底在做什么
+strace -f -e trace=open,read,write,ioctl ./prog
+# 卡在哪个系统调用，就是问题的位置</code></pre>
+
+    <p>这三条几乎能覆盖「软件侧」的全部问题。<b>排查顺序建议就是 dmesg → interrupts → strace，从底往上。</b></p>
+
+    <h2>3. 二分法：把范围砍半</h2>
+
+    <ul>
+      <li><b>代码二分</b>：git bisect 找出引入问题的提交。</li>
+      <li><b>配置二分</b>：注释掉一半设备树节点，看是否恢复。</li>
+      <li><b>硬件二分</b>：换一块板/换一根线/换一个电源，看现象是否跟随。</li>
+      <li><b>时序二分</b>：降低频率/加大延时，看是否复现。</li>
+    </ul>
+
+    <p>「换一块板试试」是最快的二分：<b>如果问题跟着板走，是代码/配置；如果不跟着走，是这块板的硬件个体问题。</b>这一句话能省掉几小时的纠结。</p>
+
+    <h2>4. 那些「重启就好」的问题</h2>
+
+    <div class="viz" data-kind="compare" data-title="偶发问题的三类根因" data-sub="它们都不会被「重启」真正修好" data-json='{"bad":{"t":"表象","items":["重启就好，所以先不管","复现不了，就当已修复","加个 sleep 好像就不出现了"]},"good":{"t":"实际根因","items":["未初始化变量 / 悬空引脚（上电时电平随机）","竞态与缺同步（时序窗口极窄）","电源/时钟边缘状态（温度、批次相关）"]},"note":"第三条尤其危险：加 sleep 只是把竞态窗口「挪开」，问题仍在，只是更难复现。生产环境换个负载就爆。"}'></div>
+
+    <h2>5. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于排障的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["改了很多地方，总有一个有用","报错信息就是根因","我的代码没改，所以问题不在代码"]},"good":{"t":"实际","items":["一次改一个，否则无法归因","报错常是「最后一道防线」的反应，真正原因在更早的日志","环境、温度、批次、电源都会让「同一份代码」表现不同"]},"note":"第三条是硬件工程师的口头禅：「软件没改，但板子换了一批电容」。所以排障记录里一定要写清环境与硬件版本。"}'></div>
+
+    <h2>6. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>串口乱码最先查什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>晶振频率与波特率配置，其次是接线与电平。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>中断计数不动说明什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>硬件根本没产生中断：引脚复用、时钟未开、中断未使能，或外设没配置。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>换板测试能区分什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>问题跟着板走 = 代码/配置问题；不跟着走 = 这块板的硬件个体问题。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>为什么加 sleep 有时「修好」了？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>它只是改变了竞态窗口，问题并未消除，属于掩盖而非修复。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>一次只改一个变量的理由？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>否则无法归因：你不知道哪个改动有效，也无法确认问题是否真的消失。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>拿一个你遇到过的问题，按五步重写一遍过程。</li>
+        <li>练习用 <code>dmesg -w</code> 实时抓一次错误。</li>
+        <li>用 git bisect 定位一次历史 bug。</li>
+        <li>建立一份自己的「现象 → 层次 → 动作」速查表。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      最后一课：把 44 课的知识压成一张地图，再给你一条「接下来该学什么」的路线。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"五级日志，从粗到细","hint":"点一级看用途","note":"排障的顺序永远是「先证明哪一层是好的」，而不是「猜哪里坏了」。每跳一层，证据就具体一分。","items":[{"b":"第 1 级：串口全部输出","d":"最原始也最可靠。内核 panic 时网络和文件系统都没了，只有串口还能吐字。"},{"b":"第 2 级：dmesg","d":"内核环形缓冲区。驱动 probe 失败、设备树没匹配、内存不足，都在这里留了第一句话。"},{"b":"第 3 级：驱动自己的 printk","d":"在最可疑的位置打日志，先把「进没进 probe」「寄存器读到什么」确认下来。"},{"b":"第 4 级：逻辑分析仪 / 示波器","d":"软件说没收到数据时，直接看线上的波形：时钟有没有、从设备有没有应答、时序对不对。"},{"b":"第 5 级：JTAG / OpenOCD","d":"连 CPU 都不听话时，直接读寄存器、读内存、单步。这是最后一层，也是最贵的一层。"}]}'></div>
+  </main>
+</div>
+<script src="assets/cnav.js"></script>
+<script src="assets/viz.js"></script>
+<script src="assets/iviz.js"></script>
+<script src="assets/anime.iife.min.js"></script>
+<script src="assets/anim2.js"></script>
+</body>
+</html>

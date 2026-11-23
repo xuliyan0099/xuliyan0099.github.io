@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=../docs/course-th18.html">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>理论 T18 · CPU 是怎么执行一行代码的 | i.MX6ULL Linux 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+  <link rel="stylesheet" href="../assets/iviz.css">
+  <link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+  <script src="../assets/readmode.js" defer></script>
+</head>
+<body data-page="th18">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>理论 T18 · CPU 是怎么执行一行代码的</h1>
+    <p class="lede">这一章是「计算机组成原理」的实机版：从一串 0 和 1 开始，讲到一条指令怎么被取出来、译码、执行、访存、写回，再讲到 Linux 里一次系统调用、一次时钟中断、一次线程切换时，CPU 里那 16 个通用寄存器、CPSR、PC、SP、页表基址寄存器到底被谁改成了什么值。全程用 i.MX6ULL 的 Cortex-A7 与真实汇编、真实机器码对照，不玩概念。</p>
+<div class="cpu3" data-json='{"title":"一条指令的完整四拍：取指、译码、执行、写回","hint":"Flash 里的字节怎么变成寄存器里的值"}'></div>
+
+    <div class="viz" data-kind="bits" data-title="ARM A32 指令的 32 个比特怎么分工" data-sub="以数据处理·立即数格式为例：cond / opcode / Rn / Rd / rotate / imm8" data-json='{"w":32,"fields":[{"n":"cond","lo":28,"hi":31,"c":"or","t":"执行条件：1110=无条件，0000=EQ，0001=NE…16 种条件"},{"n":"00","lo":26,"hi":27,"c":"gray","t":"固定 00，告诉译码器这是数据处理类"},{"n":"I","lo":25,"hi":25,"c":"cy","t":"1=第二操作数是立即数，0=是寄存器"},{"n":"opcode","lo":21,"hi":24,"c":"vi","t":"0000=AND 0010=SUB 0100=ADD 1101=MOV 1110=BIC…"},{"n":"S","lo":20,"hi":20,"c":"gr","t":"1=顺带更新 CPSR 的标志位（N/Z/C/V）"},{"n":"Rn","lo":16,"hi":19,"c":"rd","t":"第一个源寄存器编号 r0~r15"},{"n":"Rd","lo":12,"hi":15,"c":"rd","t":"目标寄存器编号"},{"n":"rotate","lo":8,"hi":11,"c":"gray","t":"立即数循环右移的偶数位数（0,2,4…30）"},{"n":"imm8","lo":0,"hi":7,"c":"cy","t":"8 位立即数本体"}],"note":"总共只有 32 个比特，没有任何多余位置。CPU 里那堆与门、或门、多路选择器就是按这张表接线：某几位进译码器，某几位进寄存器堆的地址口，某几位进 ALU 的控制脚。"}'></div>
+
+    <div class="card">
+      <h4>本章要解决的问题</h4>
+      <p>① 机器码里的 0/1 到底怎么划分成「指令」；② 一条 <code>mov r0,#1</code> 从内存到执行完，中间经过哪些硬件部件；③ 流水线为什么要「猜」；④ 为什么访问 DDR 那么慢、Cache 怎么救；⑤ Linux 切换线程时，究竟保存了哪几个寄存器、谁改的 PC、谁改的页表；⑥ 切一次线程为什么贵。</p>
+    </div>
+
+    <div class="card">
+      <h4>读完你应该能回答</h4>
+      <ul>
+        <li>为什么 <code>mov r0, #0x12345678</code> 在 ARM 上编不出来，必须拆成 <code>movw</code> + <code>movt</code>？</li>
+        <li>一条 <code>ldr r0,[r1]</code> 从发出到数据进 r0，最短几个周期、最长几个周期？</li>
+        <li>ARM 的 <code>bl</code> 和 <code>b</code> 差在哪一位？（提示：L 位）</li>
+        <li>中断来时，硬件自动做了什么、软件还要补做什么？</li>
+        <li><code>switch_to</code> 只保存 r4–r11 + sp + pc，为什么不保存 r0–r3？</li>
+        <li>切线程时页表换了，TLB 一定要全刷吗？</li>
+      </ul>
+    </div>
+
+    <div class="anim2" data-json='{"title":"一行代码在 CPU 里走完八个动作","hint":"这就是「执行」的全部","nodes":[{"k":"取指","s":"PC → I-Cache"},{"k":"译码","s":"拆位段"},{"k":"读寄存器","s":"r0–r15"},{"k":"执行","s":"ALU + 标志位"},{"k":"访存/写回","s":"结果落地"}],"frames":[{"i":0,"d":"PC 指向的 32 位机器码被取出，命中指令 Cache 只要 1 个周期。"},{"i":1,"d":"译码器拆出条件码、操作码、目标寄存器、立即数或寄存器编号。"},{"i":2,"d":"寄存器堆两个读口取操作数，一个写口留给结果——所以一条指令最多读两个写一个。"},{"i":3,"d":"ALU 做加减与逻辑，N/Z/C/V 标志位在这一步更新，后续条件跳转就看它们。"},{"i":4,"d":"ldr/str 才走访存；写回后 PC 加 4。跳转指令直接改 PC，后面的取指要重来。"}],"kind":"flow"}'></div>
+
+    <h2>1. 先给一张全局地图：CPU 一辈子只干五件事</h2>
+
+    <p>不管多复杂的程序，落到硬件层面就是这五步在循环：<b>取指（Fetch）→ 译码（Decode）→ 执行（Execute）→ 访存（Memory）→ 写回（Write back）</b>。所谓「CPU 在工作」，就是 PC 指到哪里，这五步就在那里重复一次。</p>
+
+    <div class="viz" data-kind="flow" data-title="一条指令的一生 · 五个动作循环" data-sub="i.MX6ULL Cortex-A7：8 级流水线把这些动作拆得更细并重叠起来" data-json='{"steps":[{"n":"取指","d":"PC 送地址 → 读 L1 I-Cache → 拿到 32 位机器码"},{"n":"译码","d":"按位段切开：这是 mov？ldr？cond 满不满足？"},{"n":"读寄存器","d":"按 Rn/Rd 编号从寄存器堆取出源操作数"},{"n":"执行","d":"ALU 做加减/逻辑，或算地址、判条件"},{"n":"访存","d":"要读写内存（ldr/str）才走 Cache/MMU"},{"n":"写回","d":"结果写进 Rd，顺带更新 CPSR 标志"}],"note":"中间任何一步都可能被「异常」打断：缺页、中断、未定义指令。这就是第 8 节之后要讲的入口。"}'></div>
+
+    <p>这里有一个非常关键的认知：<b>CPU 内部没有「程序」这个概念</b>。它不知道什么是循环、什么是函数、什么是线程。它只知道三样东西：</p>
+
+    <ul>
+      <li>一个叫 PC 的寄存器，里面存着「下一条要执行的指令的地址」；</li>
+      <li>一堆寄存器（r0–r15 + CPSR），里面存着临时数据；</li>
+      <li>一组按位段接线的组合逻辑，负责把读进来的 32 个比特解释成一个动作。</li>
+    </ul>
+
+    <p>所谓「程序在运行」，就是内存里一段连续的 32 位字被 PC 一个个点过去。<b>所谓线程切换，就是把 PC 和那堆寄存器换一套。</b>后面所有内容都是这句话的展开。</p>
+
+    <h2>2. 从二进制开始：一条指令就是 32 个比特</h2>
+
+    <p>拿最简单的一句 C 代码开刀：</p>
+
+    <pre><code>int add(int a, int b) { return a + b; }</code></pre>
+
+    <p>交叉编译之后反汇编出来是这样（示意，寄存器分配随优化等级变化）：</p>
+
+    <pre><code>00000000 &lt;add&gt;:
+   0:  e0800001   add  r0, r0, r1
+   4:  e12fff1e   bx   lr</code></pre>
+
+    <p>左边那一列 <code>e0800001</code> 就是<b>机器码</b>，右边是它的人类可读形式。<code>e0800001</code> 写成 32 位二进制是：</p>
+
+    <pre><code>1110 0000 1000 0000 0000 0000 0000 0001
+cond 00 I opcode  S   Rn    Rd   shifter/Rm</code></pre>
+
+    <p>按第 1 块图的分段表逐段读：</p>
+
+    <table>
+      <thead><tr><th>位段</th><th>二进制</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td>[31:28] cond</td><td><code>1110</code></td><td>AL，无条件执行（这是为什么普通指令不会被执行条件拦住）</td></tr>
+        <tr><td>[27:26]</td><td><code>00</code></td><td>数据类型指令</td></tr>
+        <tr><td>[25] I</td><td><code>0</code></td><td>第二操作数来自寄存器，不是立即数</td></tr>
+        <tr><td>[24:21] opcode</td><td><code>0100</code></td><td>ADD（0b0100）</td></tr>
+        <tr><td>[20] S</td><td><code>0</code></td><td>不更新 CPSR 标志位（所以 C 语句里的 <code>if (a+b &gt; 0)</code> 会另生成一条带 S 的加法）</td></tr>
+        <tr><td>[19:16] Rn</td><td><code>0000</code></td><td>r0</td></tr>
+        <tr><td>[15:12] Rd</td><td><code>0000</code></td><td>r0</td></tr>
+        <tr><td>[11:0]</td><td><code>0000 0000 0001</code></td><td>移位类型与 Rm：Rm = 0001 即 r1</td></tr>
+      </tbody>
+    </table>
+
+    <p>所以这三个名字说的完全是同一件事：</p>
+
+    <table>
+      <thead><tr><th>层次</th><th>写法</th><th>谁读它</th></tr></thead>
+      <tbody>
+        <tr><td>比特流（内存里的样子）</td><td><code>0xE0800001</code>，小端存放为字节 <code>01 00 80 E0</code></td><td>CPU 取指单元</td></tr>
+        <tr><td>汇编助记符</td><td><code>add r0, r0, r1</code></td><td>人，以及汇编器/反汇编器</td></tr>
+        <tr><td>高级语言</td><td><code>a + b</code></td><td>编译器</td></tr>
+      </tbody>
+    </table>
+
+    <p><b>注意小端这个细节</b>：机器码本身按字（32 位）组织，但内存按字节编址，所以 <code>0xE0800001</code> 这四字节在内存里是低字节在前：<code>01 00 80 E0</code>。用十六进制编辑器看内核镜像时，指令是「反着」显示的，就是这个原因。</p>
+
+    <h3>2.1 为什么 <code>mov r0, #0x12345678</code> 编不出来</h3>
+
+    <p>看第 1 块图：立即数只有 <b>8 位本体</b> + <b>4 位循环右移量</b>（且移位量必须是偶数）。所以合法的立即数是一个 8 位值旋转偶数位的结果——一共只有 16×256 种。试图装 0x12345678 这种「散落在 32 位里」的数，编码位不够。</p>
+
+    <p>ARMv7 后来加了 <code>movw</code>/<code>movt</code>（16 位立即数进低半/高半），于是：</p>
+
+    <pre><code>movw r0, #0x5678      @ 低 16 位
+movt r0, #0x1234      @ 高 16 位
+@ 两条指令拼出一个 32 位常量</code></pre>
+
+    <p>这就是「指令编码决定语言能力」的真实案例：编译器不是随便定的，它受硬件的位段约束。<b>学组成原理最大的收益，是看到任何一条汇编都能反推它在硬件里怎么走线。</b></p>
+
+    <h3>2.2 三种你会天天见到的编码格式</h3>
+
+    <table>
+      <thead><tr><th>指令</th><th>机器码</th><th>关键位段</th><th>用在</th></tr></thead>
+      <tbody>
+        <tr><td><code>ldr r0,[r1]</code></td><td><code>0xE5910000</code></td><td>[27:26]=01，I=0，P=1，U=1，B=0，W=0，<b>L=1</b>，Rn=r1，Rd=r0，offset=0</td><td>读内存/读外设寄存器</td></tr>
+        <tr><td><code>str r0,[r1,#4]</code></td><td><code>0xE5810004</code></td><td>同上但 <b>L=0</b>，offset=4</td><td>写内存/写外设寄存器</td></tr>
+        <tr><td><code>bl func</code></td><td><code>0xEBxxxxxx</code></td><td>[27:25]=101（分支），<b>L=1</b>（把返回地址存进 lr），imm24=相对偏移</td><td>函数调用</td></tr>
+        <tr><td><code>b func</code></td><td><code>0xEAxxxxxx</code></td><td>同上但 <b>L=0</b></td><td>goto / 循环回跳</td></tr>
+        <tr><td><code>svc #0</code></td><td><code>0xEF000000</code></td><td>[27:24]=1111，imm24=0</td><td>系统调用（进内核）</td></tr>
+        <tr><td><code>push {r4,lr}</code></td><td><code>0xE92D4010</code></td><td>[27:25]=100（多寄存器），P=1,U=0,W=1,L=0，Rn=sp，reglist bit4=r4、bit14=lr</td><td>保存现场</td></tr>
+      </tbody>
+    </table>
+
+    <p><b>注意 <code>bl</code> 和 <code>b</code> 只差一位 L</b>。L=1 时硬件顺手把「下一条指令的地址」写进 r14（lr），这就是函数调用能返回的全部秘密——不是什么软件栈魔法，是译码器看到这一位就多接了一条线。</p>
+
+    <p>自己验证一遍（在 Ubuntu 虚拟机上就能做，不需要板子）：</p>
+
+    <pre><code>cat &gt; t.c &lt;&lt;'EOF'
+int add(int a,int b){return a+b;}
+int main(){return add(1,2);}
+EOF
+arm-linux-gnueabihf-gcc -c t.c -o t.o
+arm-linux-gnueabihf-objdump -d t.o | head -20
+arm-linux-gnueabihf-objcopy -O binary t.o t.bin
+xxd t.bin | head</code></pre>
+
+    <p>最后一行你会看到「指令在前，字节反着来」的真实二进制。对着第 1 块图的分段去拆，一路拆到 ALU 的控制脚，这一章就通了三分之一。</p>
+
+    <h2>3. 寄存器堆：CPU 唯一能「立刻」摸到的东西</h2>
+
+    <p>Cortex-A7 是 32 位核，通用寄存器 r0–r15 各 32 位，加一个 CPSR。数量少得可怜，所以编译器的核心工作就是「怎么把这 16 个格子用满」。</p>
+
+    <table>
+      <thead><tr><th>寄存器</th><th>别名</th><th>约定用途（AAPCS）</th><th>切换线程时</th></tr></thead>
+      <tbody>
+        <tr><td>r0–r3</td><td>a1–a4</td><td>函数参数 1–4、返回值</td><td><b>不用保存</b>（调用者已认为它们作废）</td></tr>
+        <tr><td>r4–r10</td><td>v1–v7</td><td>局部变量，被调用者负责保护</td><td><b>必须保存</b></td></tr>
+        <tr><td>r11</td><td>fp</td><td>帧指针（可选）</td><td><b>必须保存</b></td></tr>
+        <tr><td>r12</td><td>ip</td><td>过程间临时寄存器</td><td>不保存</td></tr>
+        <tr><td>r13</td><td>sp</td><td>栈顶指针（每个模式各有一个）</td><td><b>必须保存</b>（换了栈就换了一切）</td></tr>
+        <tr><td>r14</td><td>lr</td><td>返回地址</td><td><b>必须保存</b></td></tr>
+        <tr><td>r15</td><td>pc</td><td>下一条指令地址</td><td><b>必须保存</b>（否则回不到原处）</td></tr>
+        <tr><td>—</td><td>cpsr</td><td>模式位、中断开关、N/Z/C/V 标志</td><td><b>必须保存</b>（模式与标志都要恢复）</td></tr>
+      </tbody>
+    </table>
+
+    <p>这张表看着平淡，但它直接决定了 Linux 的 <code>switch_to</code> 只存 r4–r11 + sp + pc（第 10 节会看到那 5 行汇编），也决定了为什么 r0–r3 在切换后是「不可信」的。<b>所谓「上下文」，就是这张表里必须保存的那几格。</b></p>
+
+    <div class="viz" data-kind="matrix" data-title="谁负责保存哪些寄存器" data-sub="行=参与者，列=寄存器组；对照 AAPCS 与 Linux 内核做法" data-json='{"corner":"参与者","cols":["r0–r3","r4–r11","sp","lr/pc","cpsr","页表基址"],"rows":[{"n":"普通函数调用 bl","c":"cy","cells":["不用存","被调者存","被调者存","lr 存返回地址","不用","不用"]},{"n":"中断处理","c":"or","cells":["全存进 pt_regs","全存进 pt_regs","硬件切到 IRQ 栈","硬件存 lr_irq","硬件存 SPSR","不动"]},{"n":"线程切换 switch_to","c":"vi","cells":["不存","存进 cpu_context","存","存","存进 thread_info","switch_mm 换 TTBR0"]},{"n":"fork 新建进程","c":"gr","cells":["r0 置 0 表示返回子进程","复制父进程现场","新栈","从 ret_from_fork 开始","复制","复制 mm 或新建"]}],"note":"看懂这张表，就看懂了「现场」到底指什么：不是「所有变量」，而是「让这段代码能从原处继续跑下去所必需的最小集合」。"}'></div>
+
+    <h2>4. 一个周期里发生了什么：8 级流水线</h2>
+
+    <p>Cortex-A7 的流水线是 <b>8 级、顺序双发射</b>。8 级的大致划分（ARM 官方对 A7/A12 类核的经典划分）：</p>
+
+    <div class="viz" data-kind="pipe" data-title="Cortex-A7 的 8 级流水线" data-sub="两条发射口：整数/分支 与 load-store/乘法；顺序执行，允许有限重排" data-json='{"stages":[{"n":"FE1","d":"取指 1：PC → L1 I-Cache","c":"cy"},{"n":"FE2","d":"取指 2：指令进指令队列","c":"cy"},{"n":"DE","d":"译码：切位段、判条件、读寄存器","c":"vi"},{"n":"IS","d":"发射：分到 ALU 或 LSU","c":"vi"},{"n":"EX1","d":"执行 1：移位 + ALU 运算","c":"or"},{"n":"EX2","d":"执行 2：乘法/地址计算","c":"or"},{"n":"WB","d":"写回寄存器堆","c":"gr"},{"n":"RR","d":"退休：提交状态，异常可以在此精确报告","c":"gr"}],"note":"关键点：只要没有冒险，同一时刻流水线里有 8 条指令在不同阶段。所以 IPC（每周期完成指令数）可以大于 1，但单条指令的「延迟」依然很长。"}'></div>
+
+    <p>流水线带来的第一个反直觉结论：<b>「一条指令几周期」和「流水线跑满时几周期一条指令」是两个不同的问题</b>。前者叫延迟（latency），后者叫吞吐（throughput）。</p>
+
+    <table>
+      <thead><tr><th>动作</th><th>典型延迟（A7 量级）</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>纯 ALU（add/mov/and）</td><td>1 周期</td><td>结果下个周期就能被下一条用（有前递）</td></tr>
+        <tr><td>L1 D-Cache 命中 load</td><td>约 3–4 周期</td><td>紧跟着用这个值，会插入 2–3 个停顿周期</td></tr>
+        <tr><td>L2 命中</td><td>约 12–20 周期</td><td>L2 是芯片内 128KB</td></tr>
+        <tr><td>DDR 命中（未缓存）</td><td>约 100–200 周期</td><td>这就是「内存墙」，第 6 节的主题</td></tr>
+        <tr><td>分支预测错误</td><td>约 10+ 周期</td><td>流水线被清空重填</td></tr>
+        <tr><td>乘法（32 位）</td><td>1–2 周期发射，多周期完成</td><td>取决于是否要等结果</td></tr>
+        <tr><td>CP15 协处理器访问（mcr/mrc）</td><td>数十周期</td><td>所以 <code>dsb</code>/<code>isb</code> 很贵，不能滥用</td></tr>
+      </tbody>
+    </table>
+
+    <p>这些数字请当「量级」记，不同手册、不同编译器优化会差一点。<b>重要的是差距的数量级</b>：寄存器 1 周期 vs DDR 150 周期，差了两个数量级——这才是 Cache、预取、DMA 存在的理由。</p>
+
+    <h3>4.1 流水线的三种冒险，以及硬件怎么救</h3>
+
+    <p><b>① 数据冒险</b>：下一条要用的寄存器，上一条还没写回。</p>
+
+    <pre><code>add r0, r1, r2     @ r0 = r1+r2
+sub r3, r0, r4     @ 立刻用 r0</code></pre>
+
+    <p>硬件用「前递（forwarding/bypass）」解决：EX 阶段算出的结果不等 WB，直接旁路给下一条的 ALU 输入。救不了的情况（比如 load 后立刻用，值要到 WB 才出来）就插入<b>停顿周期（stall）</b>。编译器也会帮你排指令顺序，把不相关指令插进来填缝——这叫指令调度。</p>
+
+    <p><b>② 控制冒险</b>：分支还没算出跳不跳，后面已经预取了指令。A7 有动态分支预测（BTB），猜错就清流水线。所以 <code>if</code> 分支在热循环里代价真实存在；这也是为什么内核里有大量 <code>likely()/unlikely()</code> 把「大概率走哪条」排成顺序执行。</p>
+
+    <p><b>③ 结构冒险</b>：两条指令抢同一个部件（比如同时要 LSU、同时访问寄存器堆的同一端口）。A7 双发射但顺序提交，遇到冲突就只发一条。</p>
+
+    <p>把这三点记住，你再读内核里那些看起来「多此一举」的写法（提前算好、拆循环、<code>__builtin_expect</code>），就知道都有硬件层面的理由。</p>
+
+    <h2>5. 访存路径：一条 ldr 到底走了哪些门</h2>
+
+    <p>这是全章最值得画清楚的一条路径。执行 <code>ldr r0, [r1]</code>（r1 = 一个虚拟地址）时，硬件依次做：</p>
+
+    <div class="viz" data-kind="flow" data-title="一条 ldr 的完整访存路径" data-sub="从虚拟地址到数据进寄存器，中间每一步失败都有不同的后果" data-json='{"steps":[{"n":"算地址","d":"EX 阶段：r1 + offset"},{"n":"查 TLB","d":"MMU 用 VA 查 TLB，命中直接得物理页帧"},{"n":"页表遍历","d":"TLB 未命中：硬件自动走两级页表（TTBR0 → L1 → L2）"},{"n":"权限检查","d":"AP 位判断可读/可写/仅内核，失败 → data abort"},{"n":"查 D-Cache","d":"按 PA 查 L1；命中 → 3 周期返回"},{"n":"L2 / DDR","d":"L1 未命中 → L2 → 最后走 AXI 总线到 DDR 控"},{"n":"写回 r0","d":"数据进目标寄存器，可能同时更新 cache line"}],"note":"注意顺序：TLB 在 Cache 之前。也就是说「地址翻译」和「数据查找」是两级独立缓存，任何一级缺失都可能拖慢十倍以上。"}'></div>
+
+    <p>对应到 Linux 里的现象：</p>
+
+    <ul>
+      <li><b>page fault</b>：TLB 未命中不算错，但页表项无效（或者页不在内存）时，硬件抛 data abort，内核在异常处理里补页表、调页、再返回重试——这就是 T14 讲的缺页。</li>
+      <li><b>段错误</b>：权限位 AP 说「不许写」，你偏要写，同样走 data abort，内核发现是用户态越权，直接给你 SIGSEGV。</li>
+      <li><b>ioremap 必须用</b>：外设寄存器地址在页表里要标成 Device 类型（强序、不缓存），否则 CPU 会把写入攒在写缓冲里、把读当成缓存命中，行为诡异。</li>
+    </ul>
+
+    <p>这也解释了 T07 里那句「DMA 收完数据要 invalidate」：DMA 绕过 CPU 直接写 DDR，Cache 里还是旧副本，CPU 读到的就是旧值。</p>
+
+    <h2>6. 为什么内存这么慢：Cache 与「内存墙」</h2>
+
+    <p>CPU 主频 528MHz（一个周期约 1.9ns），而 DDR3 的一次随机访问要几十上百纳秒。两者差 50–100 倍。如果不做缓存，一颗 528MHz 的核实际表现会像 5MHz 的老机器。</p>
+
+    <div class="viz" data-kind="bars" data-title="取一个数据的代价（周期数，量级）" data-sub="寄存器 vs Cache vs DDR：差两个数量级" data-json='{"items":[{"n":"寄存器","v":1,"unit":" 周期","c":"gr"},{"n":"L1 命中","v":4,"unit":" 周期","c":"cy"},{"n":"L2 命中","v":16,"unit":" 周期","c":"vi"},{"n":"DDR 随机","v":150,"unit":" 周期","c":"or"},{"n":"DDR + 缺页 IO","v":1000000,"unit":" 周期","c":"rd"}],"note":"最后一根是「页不在内存、要去读存储卡」的量级（毫秒级），比 DDR 又慢三个数量级。这三层差距构成了整个存储层次结构（memory hierarchy）。"}'></div>
+
+    <p>Cache 的三个关键参数（写成工程语言）：</p>
+
+    <table>
+      <thead><tr><th>参数</th><th>A7 实际值</th><th>工程含义</th></tr></thead>
+      <tbody>
+        <tr><td>行大小 cache line</td><td>64 字节</td><td>一次搬运 64B；DMA 缓冲要按 64B 对齐并独占，否则 invalidate 会误伤邻居变量</td></tr>
+        <tr><td>组相联</td><td>4 路</td><td>同一组只能放 4 条不同地址的 line，第 5 条会挤掉一条（冲突缺失）</td></tr>
+        <tr><td>写策略</td><td>写回 + 写分配（数据 cache）</td><td>写入先落在 cache 里标脏，之后才回写内存；所以「写完立刻给 DMA 用」必须 clean</td></tr>
+        <tr><td>地址类型</td><td>VA 索引 / PA 标记（VIPT）</td><td>切换进程换了页表，指令 cache 不一定要刷——这也是 ASID 能省 TLB 刷新的原因</td></tr>
+      </tbody>
+    </table>
+
+    <p>在 Linux 上观察这些事最直接的工具是 <code>perf</code>：</p>
+
+    <pre><code>perf stat -e cycles,instructions,cache-misses,cache-references ./your_app
+perf stat -e L1-dcache-loads,L1-dcache-load-misses,branch-misses ./your_app</code></pre>
+
+    <p>「cache-misses / cache-references」这个比值，就是你的代码到底有没有「顺着内存走」。数组按行遍历和按列遍历，在同一份数据上能差出 5–10 倍，原因全在这一节。</p>
+
+<h2>7. 函数调用：bl、lr 与栈帧，一次调用在硬件里怎么记账</h2>
+
+    <p>先把「函数调用」这件事拆开看，因为线程切换和它长得极像，只是保存的东西更多。</p>
+
+    <pre><code>main:
+    ...
+    bl   add          @ ①硬件：lr = 返回地址；pc = add
+    mov  r3, r0       @ ④add 返回后从这里继续
+
+add:
+    push {r4, lr}     @ ②把用到的 callee-saved 寄存器押进栈
+    ...
+    pop  {r4, pc}     @ ③弹栈，pc 直接取回返回地址</code></pre>
+
+    <p>四个动作逐条对应硬件：</p>
+
+    <table>
+      <thead><tr><th>动作</th><th>谁做的</th><th>发生了什么</th></tr></thead>
+      <tbody>
+        <tr><td>① <code>bl</code></td><td>译码器看到 L=1</td><td>把 PC+4 写进 r14，同时把 PC 改成目标地址（相对偏移 + 符号扩展）</td></tr>
+        <tr><td>② <code>push {r4,lr}</code></td><td>LSU</td><td><code>stmdb sp!, {...}</code>：sp 先减 8，再把 r4、lr 依次写入内存</td></tr>
+        <tr><td>③ <code>pop {r4,pc}</code></td><td>LSU</td><td><code>ldmia sp!, {...}</code>：把值读回 r4 与 PC——<b>写 PC 就等于跳转</b>，不需要额外的返回指令</td></tr>
+        <tr><td>④ 继续执行</td><td>取指单元</td><td>PC 已是 main 里的下一条，流水线重新填满</td></tr>
+      </tbody>
+    </table>
+
+    <p>栈帧在内存里长这样（栈向低地址生长）：</p>
+
+    <div class="viz" data-kind="stack" data-title="一次函数调用的栈帧布局" data-sub="从高地址到低地址：返回地址在帧底、局部变量在帧顶" data-json='{"frames":[{"n":"调用者的局部变量 / 保存的寄存器","d":"高地址一侧，属于 caller 的帧"},{"n":"实参 5 及以后（前 4 个走 r0–r3）","d":"超过 4 个参数才压栈"},{"n":"lr（返回地址）","d":"push {r4, lr} 中第二个字，靠低地址"},{"n":"r4（被调者要保护的值）","d":"push 中第一个字","sp":"← 进入函数后 sp 指向这里"},{"n":"本函数的局部数组 / 临时变量","d":"sub sp, sp, #N 之后","sp":"← 函数体内 sp"}],"spHint":"栈向低地址生长：每压一次，sp 变小；函数返回时 sp 必须精确复原，否则 pop 到错位、PC 被写脏就会跑飞。","note":"这就是「栈溢出」为什么危险：越界写会覆盖 lr，函数返回时 pop {pc} 直接把攻击者给的地址装进 PC。"}'></div>
+
+    <p>理解了这个结构，你在 <code>gdb</code> 里 <code>bt</code>（backtrace）看到的每一行就有了物理含义：它就是沿着 fp/lr 链条，把一层层栈帧里的返回地址读出来，翻译成函数名。</p>
+
+    <h2>8. 从用户态进内核：一条 svc 指令走完的路</h2>
+
+    <p>Linux 里调用 <code>read()</code>，C 库最终会执行一条 <code>svc #0</code>（老叫法是 <code>swi</code>）。这条指令是<b>唯一合法的「越权入口」</b>：用户态代码不能直接改 CPSR 的模式位，只能靠这条指令触发异常，由硬件帮你切模式。</p>
+
+    <div class="viz" data-kind="timeline" data-title="一次 read() 系统调用：从用户态到内核再回来" data-sub="每一次跨越特权级，都要在栈上留下一份精确的现场" data-json='{"items":[{"t":"用户态执行 svc #0","n":"r7=syscall 号，r0–r6=参数","d":"PC 停在 svc 后一条","c":"or"},{"t":"硬件切模式","n":"CPSR→SPSR_svc","d":"PC→LR_svc，模式位改 SVC，I 位不变","c":"or"},{"t":"跳向量表","n":"PC = VBAR + 0x08","d":"进入 vector_swi","c":"vi"},{"t":"压 pt_regs","n":"stmdb sp!, {r0-r12, lr}","d":"18 个字：r0–r15 + CPSR + orig_r0","c":"vi"},{"t":"分发系统调用","n":"查 sys_call_table[r7]","d":"进入内核 C 函数，用内核栈","c":"cy"},{"t":"返回准备","n":"恢复 pt_regs","d":"ldm + 把 SPSR 写回 CPSR","c":"gr"},{"t":"回到用户态","n":"PC 回到 svc 下一条","d":"r0 = 返回值或 -errno","c":"gr"}],"note":"注意：整个过程 CPU 并没有「停止」再「启动」，它只是在同一个核上换了模式、换了栈、换了一段代码继续取指。所谓「陷入内核」，物理上就是这几步。"}'></div>
+
+    <p>硬件在 <code>svc</code> 那一刻自动做的三件事，一定要背下来（这是组成原理的核心考点，也是读懂所有异常处理的前提）：</p>
+
+    <ol>
+      <li><b>保存返回地址</b>：把「svc 的下一条指令地址」写进 <code>LR_svc</code>（每个异常模式有自己的 LR）。</li>
+      <li><b>保存状态</b>：把当前 <code>CPSR</code> 整份复制到 <code>SPSR_svc</code>。</li>
+      <li><b>切模式 + 关中断 + 跳向量</b>：CPSR 的 M[4:0] 改成 0b10011（SVC），跳转到向量表偏移 0x08。</li>
+    </ol>
+
+    <p>软件接着做的是：把 r0–r12 和 lr 压进内核栈（形成 <code>pt_regs</code>），这样内核 C 代码随便用寄存器都不会破坏用户现场；返回时反向弹栈，并用 <code>movs pc, lr</code>（或 <code>ldm ..., {pc}^</code>）把 SPSR 一次性写回 CPSR ——<b>一条指令同时完成「跳回去」和「切回用户模式」</b>。</p>
+
+    <p>确认一下你手上的板子：</p>
+
+    <pre><code>[board] cat /proc/cpuinfo | head -3
+[board] strace -c ls /          # 看每个系统调用被调用几次
+[board] strace -f -e trace=read,write ls /</code></pre>
+
+    <p><b>为什么要有这道门？</b> 因为如果用户态能直接改页表基址寄存器、直接改 CPSR，那么「进程隔离」就不存在了。特权级不是礼貌约定，是硬件层面的门锁：一般指令在 USR 模式下执行会直接触发未定义指令异常。</p>
+
+    <h2>9. 时钟中断：内核怎么把 CPU 抢回来</h2>
+
+    <p>如果只有 <code>svc</code>，一个死循环的进程会永远占着 CPU——因为它永远不会主动进内核。所以必须有一个<b>不由程序控制</b>的入口：定时器中断。</p>
+
+    <p>i.MX6ULL 上常见配置是内核 HZ=100（可以在 <code>/proc/config.gz</code> 或 defconfig 里确认），也就是每 <b>10 毫秒</b>，GPT 定时器把 IRQ 线拉高一次。IRQ 到来时，硬件做的是：</p>
+
+    <ul>
+      <li>CPSR → SPSR_irq；</li>
+      <li>返回地址 → LR_irq（IRQ 的返回地址是「被打断那条指令的地址 + 4」，所以返回时要减 4 修正）；</li>
+      <li>模式切 IRQ、<b>I 位置 1 屏蔽后续 IRQ</b>（这就是为什么中断处理里不能睡眠，也是为什么要有「上半部/下半部」）；</li>
+      <li>PC ← VBAR + 0x18。</li>
+    </ul>
+
+    <p>软件侧的关键几行（<code>arch/arm/kernel/entry-armv.S</code> 的 <code>vector_irq</code> 形态）：</p>
+
+    <pre><code>vector_irq:
+    sub   lr, lr, #4          @ 修正流水线超前造成的 +4
+    srsdb sp!, #SVC_MODE      @ 把 LR_irq 与 SPSR_irq 一起压到 SVC 栈
+    cpsid i                   @ 关中断（此时已在 SVC 模式）
+    cps   #SVC_MODE           @ 正式切到内核使用的 SVC 模式
+    stmdb sp!, {r0-r12, lr}   @ 补齐 r0–r12，形成 pt_regs
+    ...
+    bl    asm_do_IRQ          @ 进 C 世界：读 GIC、找 irq_desc、调 handler</code></pre>
+
+    <p><code>srsdb</code> 这条指令值得单独注意：它能「把当前模式的 LR 和 SPSR 一起存到另一个模式的栈上」。这是 ARMv6 之后专门为异常处理加的指令，省掉了「先切模式再想办法拿 SPSR」的麻烦。</p>
+
+    <p>进到 C 之后发生的事（与 T06、T12 呼应）：</p>
+
+    <ol>
+      <li><code>asm_do_IRQ</code> 用 <code>plar</code>（或 GIC 的 IAR 寄存器）读出中断号；</li>
+      <li>查 <code>irq_desc[irq]</code>，调用驱动注册的 handler（比如 GPT 的定时器 handler）；</li>
+      <li>定时器 handler 做两件事：更新 jiffies、触发调度器检查（<code>scheduler_tick</code>）；</li>
+      <li>如果当前任务的 vruntime 已经落后太多，或者时间片用完，把 <code>TIF_NEED_RESCHED</code> 标志置上；</li>
+      <li>中断返回前，内核检查这个标志——一旦置位，就在返回用户态的路上做切换（而不是在中断上下文里切）。</li>
+    </ol>
+
+    <p>这里有一个极其重要的设计：<b>中断处理函数本身不切换线程</b>，它只「打标记」。真正的切换发生在返回路径上（<code>ret_to_user</code> / <code>preempt_schedule_irq</code>）。原因是中断上下文没有「进程」的概念，在那里切栈会让收尾工作（EOI、恢复中断）变得无处安放。</p>
+
+    <h2>10. 一次线程切换，CPU 到底动了哪些寄存器</h2>
+
+    <p>现在把前面所有零件拼起来。假设你的板子上有两个进程在跑，tick 到来时内核决定从 A 切到 B。这 10 微秒里发生的事，按时间顺序是：</p>
+
+    <div class="viz" data-kind="timeline" data-title="一次上下文切换的完整时间轴" data-sub="发生在 tick 中断的返回路径上，不是在中断处理函数里" data-json='{"items":[{"t":"tick 到来","n":"10ms 一次","d":"硬件存 SPSR、LR，切 IRQ 模式","c":"or"},{"t":"保存 A 的用户现场","n":"pt_regs","d":"r0–r12 + lr + cpsr 落到 A 的内核栈","c":"or"},{"t":"调度决策","n":"schedule()","d":"CFS 从红黑树取 vruntime 最小的 B","c":"vi"},{"t":"switch_to(A,B)","n":"汇编 5 行","d":"存 A 的 r4–r11/sp/pc 到 cpu_context","c":"vi"},{"t":"换栈换页表","n":"sp 与 TTBR0","d":"sp←B 的内核栈；switch_mm 写 TTBR0 + ASID","c":"cy"},{"t":"恢复 B 的内核现场","n":"ldmia","d":"弹回 B 上次 switch_to 的返回点","c":"gr"},{"t":"恢复 B 的用户现场","n":"pt_regs","d":"弹 r0–r12，movs pc,lr 切回 USR","c":"gr"}],"note":"注意第 3 步：CPU 上一秒还在执行 A 的用户代码，这一秒在跑「决定谁该跑」的内核代码——同一颗核，同一套寄存器，只是栈和页表换成了内核的。"}'></div>
+
+    <h3>10.1 内核栈上到底存了什么</h3>
+
+    <div class="viz" data-kind="stack" data-title="A 的内核栈：一次切换时被写下的现场" data-sub="上面是中断压入的 pt_regs，下面是调度链路的 C 栈帧" data-json='{"frames":[{"n":"pt_regs.ARM_r0 – r3","d":"用户寄存器，低地址一侧先压"},{"n":"pt_regs.ARM_r4 – r12","d":"共 9 个"},{"n":"pt_regs.ARM_sp / lr","d":"用户态 sp 与返回地址"},{"n":"pt_regs.ARM_pc","d":"被打断的那条指令地址"},{"n":"pt_regs.ARM_cpsr","d":"用户态 CPSR：模式位、I/F、NZCV 全在里面"},{"n":"调度函数栈帧（schedule → __schedule）","d":"C 语言局部变量","sp":"← 切换时 sp 在这一带"},{"n":"switch_to 保存的 r4–r11 / sp / lr","d":"写进 task_struct 的 thread.cpu_context，不在栈上","sp":"← A 的栈指针值被记进 cpu_context"}],"spHint":"关键：A 的内核栈地址被记进 A 的 thread.cpu_context.sp。切回来时，先把这个 sp 装回 r13，栈就「复活」了——栈本身就是上下文的一部分。","note":"每个任务的内核栈是独立的（通常 8KB，THREAD_SIZE）。这就是为什么内核里不能递归太深：栈只有 8KB，溢出会直接踩到相邻内存。"}'></div>
+
+    <h3>10.2 switch_to 那五行汇编，逐行读</h3>
+
+    <p>Linux ARM 的 <code>__switch_to(prev, next, last)</code> 核心就是「存自己、换指针、跳对方」三步。下面是按结构简化的形态（真实源码还处理 TLS 寄存器、CPU 号、架构版本分支，寄存器顺序与偏移随版本略有差异）：</p>
+
+    <pre><code>__switch_to:
+    @ r0 = prev, r1 = next
+    add   ip, r1, #TI_CPU_SAVE        @ ip = &amp;next-&gt;thread.cpu_context
+    stmia ip!, {r4-r11, sp, lr}       @ ① 把「当前正在跑的现场」存进槽位
+    ...
+    ldr   sp, [r0, #...]              @ ② 取回 prev 上次被切走时记下的 sp
+    ldmia r0, {r4-r11, sp, pc}        @ ③ 弹回现场，pc 一写就跳回去了</code></pre>
+
+    <p>三行注释就是全部秘密：</p>
+
+    <ol>
+      <li><b>存</b>：只存 r4–r11 + sp + lr。因为 r0–r3、r12 是「调用者保存」的，调用 <code>switch_to</code> 的那段 C 代码已经不指望它们了；而用户态的 r0–r15 早就躺在 pt_regs 里了，不用重复存。</li>
+      <li><b>换 sp</b>：这一行是「换线程」的真正分界线。sp 一变，栈就变了，之后所有 <code>push/pop</code>、所有局部变量、所有返回地址都落到另一个任务的地盘。</li>
+      <li><b>跳</b>：<code>ldmia ..., {pc}</code> 把对方上次存的 lr 装进 PC。于是函数「返回」到了 B 上次停在的地方——<b>不是返回到调用 switch_to 的地方，而是返回到 B 自己的历史里</b>。这是上下文切换与普通函数调用最本质的区别。</li>
+    </ol>
+
+    <p>用普通函数调用切线程会怎样？想一下：普通 <code>bl</code> 只保存一个返回地址，栈还是同一个栈，函数返回时必然回到「调用的下一条」。要让 B 从它自己的旧位置继续，你必须能<b>伪造一个返回地址并换掉栈</b> —— 那正是 <code>switch_to</code> 干的事。所以「线程切换不能用函数调用来实现」不是规定，是硬件语义决定的。</p>
+
+    <h3>10.3 页表也要换，但 TLB 不一定全刷</h3>
+
+    <p>每个进程有自己的地址空间，所以 <code>switch_mm</code> 会写 CP15 的 <code>TTBR0</code>（用户空间页表基址）。写完之后：</p>
+
+    <table>
+      <thead><tr><th>做法</th><th>代价</th><th>什么时候用</th></tr></thead>
+      <tbody>
+        <tr><td>换 TTBR0 + 全刷 TLB</td><td>几十到上百周期，且之后每次访存都 TLB miss 一阵</td><td>内核线程 ↔ 用户进程、ASID 用尽时</td></tr>
+        <tr><td>换 TTBR0 + 换 ASID（8 位）</td><td>几乎免费，老条目标成「非当前 ASID」自然失效</td><td>常态，ARMv7 支持 ASID，Linux 默认用它</td></tr>
+      </tbody>
+    </table>
+
+    <p>这也回答了第 6 节留下的问题：<b>指令 Cache 不需要因为换页表而刷</b>，因为 A7 的 L1 是 VIPT 并且带 ASID，同一个虚拟地址在不同进程下不会互相污染。</p>
+
+    <h3>10.4 回来的时候：恢复用户现场</h3>
+
+    <p>B 被恢复后，从它自己的 <code>switch_to</code> 返回点继续跑，一路返回到 <code>ret_to_user</code>，最后做：</p>
+
+    <pre><code>ldmia sp!, {r0-r12}        @ 弹回用户寄存器
+add   sp, sp, #...         @ 跳过 sp/lr 占位
+ldmia sp!, {pc}^           @ ① pc 写回 ② 带 ^ 表示同时把 SPSR 恢复到 CPSR</code></pre>
+
+    <p>那一条 <code>ldmia ..., {pc}^</code> 同时干了两件事：把 PC 装成用户态被打断的地址、把 CPSR 装成用户态的模式与标志位。<b>从这一刻起，CPU 又变回「用户态」——硬件上就是 CPSR 的 M[4:0] 从 0b10011 变回 0b10000。</b></p>
+
+    <p>再加一句对照：你现在在学的 FreeRTOS 跑在 Cortex-M 上，用的是 <code>PendSV</code> 异常 + <code>vPortSVCHandler</code>，思路完全一样——硬件自动压 8 个寄存器（xPSR、PC、LR、R12、R3–R0），软件再补压 r4–r11 到任务栈，然后改 PSP 换栈。区别只是 ARMv7-A 用 SVC/IRQ 模式加 CP15，ARMv7-M 用 PSP/MSP 双栈指针加 NVIC。**同一套「存现场 → 换栈 → 弹现场」的三段式，跨架构通用。**</p>
+
+    <h2>11. 切换到底有多贵：把账算给你看</h2>
+
+    <div class="viz" data-kind="donut" data-title="一次线程切换的开销构成（量级）" data-sub="不含调度决策，只算切换动作本身加后续冷启动" data-json='{"items":[{"n":"保存/恢复寄存器","v":1,"c":"gr"},{"n":"换栈与页表写入","v":1,"c":"cy"},{"n":"TLB/Cache 冷启动摊销","v":3,"c":"or"}],"center":"约 5µs","unit":"","note":"数字是量级：直接切换动作约 1–2µs，真正贵的是「切完之后新任务要重新把代码和数据读进 Cache」——这部分会摊到后续执行里。"}'></div>
+
+    <table>
+      <thead><tr><th>项目</th><th>量级</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>进入中断 + 保存 pt_regs</td><td>数百纳秒</td><td>十几条 store，L1 命中</td></tr>
+        <tr><td>CFS 选下一个任务</td><td>数百纳秒</td><td>红黑树取最左节点，O(log n)</td></tr>
+        <tr><td>switch_to 本体</td><td>百纳秒级</td><td>20 条左右的指令</td></tr>
+        <tr><td>换页表 + ASID</td><td>数十纳秒</td><td>一次 CP15 写 + 屏障</td></tr>
+        <tr><td><b>冷启动（Cache/TLB 重填）</b></td><td><b>几微秒到几十微秒</b></td><td>这才是真正的成本，且难以直接测量</td></tr>
+      </tbody>
+    </table>
+
+    <p>所以在 tick=10ms、切换开销几微秒的情况下，单看 CPU 时间，切换本身只占千分之一；但如果你的程序是「大量小任务 + 频繁 IPC」，那么每个任务真正干活的时间可能还没它冷启动长——这就是为什么服务端会做「线程池 + 批量处理」，嵌入式会做「事件驱动单线程」。</p>
+
+    <p>实测方法（板子上都能跑）：</p>
+
+    <pre><code>[board] grep -E 'ctxt_switches' /proc/$$/status        # 自己这个 shell 被切了多少次
+[board] cat /proc/stat | grep ctxt                      # 全系统累计上下文切换次数
+[board] perf sched record -- sleep 5 ; perf sched latency   # 谁在等、等了多久
+[board] cat /sys/kernel/debug/tracing/available_events | grep sched_switch</code></pre>
+
+    <p>把 <code>sched_switch</code> 事件打开，你能看到每次切换的 <code>prev</code>/<code>next</code> 和 <code>prev_state</code>——这就是第 10 节那条时间轴的逐条实证。</p>
+
+    <h2>12. 常见误解对照</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于「CPU 执行代码」的八个误解" data-sub="左边是常见的想当然，右边是硬件实际发生的事" data-json='{"bad":{"t":"听起来很对，但硬件不是这样","items":["CPU 一次执行一整行 C 代码","线程切换就是把变量存到硬盘/内存里","中断来了，CPU 停下来等处理完再继续","函数调用靠栈，所以线程切换也是函数调用","Cache 是软件管的，编译器负责","用户态和内核态只是权限检查，硬件不参与","一个进程独占一个核，所以切换很慢","立即数可以随便写，编译器总会想办法"]},"good":{"t":"实际的硬件行为","items":["每条指令 32 位，一次一条（流水线重叠多条但按序提交）","只保存「能继续跑下去」的最小寄存器集合，栈本身就是上下文","硬件自动存 SPSR/LR 并切模式；处理函数跑完才决定是否切换","切换要伪造返回地址并换栈，普通 bl 做不到这一点","Cache 是硬件自动填充的，软件只能通过布局和屏障影响它","模式位在 CPSR 里，切模式由异常硬件完成，普通指令无法越权","进程不独占核，是被时间片切成碎片轮流上","立即数只有 8 位 + 旋转，0x12345678 必须拆成 movw/movt"]},"note":"把这八条左边的话改口成右边，你对「程序在跑」的理解就从「软件视角」换到了「硬件视角」。"}'></div>
+
+    <h2>13. 自检：十道题</h2>
+
+    <div class="q"><span class="n">1</span><p>把 <code>0xE3A00001</code> 拆成位段，说出它是什么指令、操作数是什么。</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>cond=1110(AL)、[27:26]=00、I=1（立即数）、opcode=1101(MOV)、S=0、Rd=0000(r0)、rotate=0、imm8=1 → <code>mov r0, #1</code>。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p><code>bl</code> 和 <code>b</code> 差哪一位？这一位由谁解释？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>差 L 位（bit24）。译码器看到 L=1 就把 PC+4 写进 lr，同时把 PC 改为目标地址；L=0 只改 PC。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>为什么 <code>ldr r0,[r1]</code> 后紧接 <code>add r2,r0,#1</code> 会停顿？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>load 的数据要到访存末尾才有，前递路径覆盖不到「EX 就要用」的场景，硬件插停顿；编译器通常会在这两条之间插一条无关指令填缝。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>一条 ldr 走了哪些硬件环节？哪一步失败会变成 SIGSEGV？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>算地址 → TLB → 页表遍历 → 权限检查 → L1/L2/DDR → 写回。权限检查失败抛 data abort，内核判定为用户越权后投递 SIGSEGV；页表项不存在则可能补页后重试。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p><code>svc</code> 触发后，硬件自动做了哪三件事？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>LR_svc ← 返回地址；SPSR_svc ← CPSR；CPSR 模式位切 SVC 并跳到向量表 0x08。</p>
+    </div></details>
+
+    <div class="q"><span class="n">6</span><p>IRQ 返回时为什么要 <code>sub lr, lr, #4</code>？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>因为流水线超前取指，硬件保存的 LR 指向「被打断指令的下一条 +4」，减去 4 才回到真正该重试的指令。</p>
+    </div></details>
+
+    <div class="q"><span class="n">7</span><p><code>switch_to</code> 为什么不保存 r0–r3 和 r12？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>它们属于「调用者保存」，调用 switch_to 的 C 代码已把它们当临时值丢弃；用户态的 r0–r15 早已在 pt_regs 里保存过，不必重复。</p>
+    </div></details>
+
+    <div class="q"><span class="n">8</span><p>切线程后不刷 TLB 为什么还能正确？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>ARMv7 的 TLB 条目带 ASID（地址空间标识），换页表时同时换 ASID，老条目属于别的 ASID 自然不命中，不需要全刷。</p>
+    </div></details>
+
+    <div class="q"><span class="n">9</span><p>中断处理函数里为什么不能睡眠？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>它没有「当前进程」的合法上下文可切（用的是中断栈，不是任何任务的栈），也没有可调度的 task_struct；且 I 位已屏蔽，睡下去没人能唤醒这套栈。</p>
+    </div></details>
+
+    <div class="q"><span class="n">10</span><p>同样是「换栈」，Cortex-M 的 PendSV 和 Cortex-A 的 switch_to 有什么共同点？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>都是「保存 callee-saved 现场 → 把 SP 换成对方保存的值 → 弹现场并写 PC 返回对方历史位置」。区别只在硬件自动压栈的范围、用什么寄存器存页表基址（A 用 CP15 TTBR0，M 常靠 MPU 或不用）。</p>
+    </div></details>
+
+    <h2>14. 这一章要动手的命令</h2>
+
+    <div class="steps">
+      <ol>
+        <li>反汇编你自己写的一个 C 函数：<code>arm-linux-gnueabihf-gcc -O0 -c x.c &amp;&amp; arm-linux-gnueabihf-objdump -d x.o</code>，找出 push/pop、bl、ldr 三种指令。</li>
+        <li>用 <code>xxd</code> 看二进制，挑一条指令手工拆位段，和反汇编对一遍（验证第 2 节）。</li>
+        <li><code>arm-linux-gnueabihf-objdump -d vmlinux | grep -A5 "&lt;__switch_to&gt;"</code>，找到那几行 stmia/ldmia（需要内核镜像的符号）。</li>
+        <li><code>[board] grep ctxt /proc/stat</code> 连看两次，算出你这台板子每秒切多少次。</li>
+        <li><code>[board] cat /proc/interrupts</code> 找定时器那一行，看每秒涨多少（对照 HZ）。</li>
+        <li><code>[board] perf stat -e cache-misses,instructions ./busybox true</code>，感受 Cache 命中率。</li>
+        <li><code>[board] strace -c ls /</code>，看一次 <code>ls</code> 到底发了多少次 svc。</li>
+        <li>在 FreeRTOS 那个工程里找到 <code>xPortPendSVHandler</code>，把它的汇编和本文第 10.2 节并排看。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一章预告</b>
+      T19 会把这一章的「切换」放大到「一次缺页 + 一次切换」的组合场景：进程访问一个还没加载的页面，CPU 先抛 data abort，内核补页、可能还要读存储卡，然后再切回来。你会看到同一套寄存器在一个更长的链路里怎么被反复保存与恢复。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"一行代码在 CPU 里的八个动作","steps":[{"t":"① 取指","d":"PC 指向的地址送到指令 Cache，取出 32 位机器码。命中就 1 个周期，不命中要几十个。"},{"t":"② 译码","d":"拆位段：条件码、操作码、目标寄存器、立即数或寄存器。ARM 是定长 32 位，拆起来规整。"},{"t":"③ 读寄存器","d":"按译码结果读 r0–r15。寄存器堆两个读口，一个写口，所以一条指令最多读两个写一个。"},{"t":"④ 执行","d":"ALU 算加减与逻辑，或算地址。标志位 N/Z/C/V 在这一步更新。"},{"t":"⑤ 访存","d":"只有 ldr/str 走这一步。地址经 MMU 翻译，命中 Cache 就几个周期，不命中就等 DDR。"},{"t":"⑥ 写回","d":"结果写进寄存器堆。写回后这条指令才算「完成」。"},{"t":"⑦ PC 自增","d":"PC 加 4（ARM 态）。跳转则由分支指令直接改 PC，后面的取指要重来。"},{"t":"⑧ 流水线重叠","d":"下一批指令早就开始取指了。所以一条指令要 5 个周期，不代表吞吐是 5 周期一条——那是两回事。"}],"note":"看汇编时记住：C 里一行可能对应十几条指令；而真正决定快慢的，往往不是指令条数，而是访存和 Cache 命中。"}'></div>
+  </main>
+</div>
+<script src="../assets/nav.js"></script>
+<script src="../assets/viz.js"></script>
+<script src="../assets/iviz.js"></script>
+<script src="../assets/anime.iife.min.js"></script>
+<script src="../assets/anim2.js"></script>
+<script src="../assets/cpu3.js"></script>
+</body>
+</html>

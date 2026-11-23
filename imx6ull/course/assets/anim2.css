@@ -1,0 +1,144 @@
+/* ============================================================
+   anim2.css · 章节机制动画
+   ============================================================ */
+.an2{
+  position:relative;margin:28px 0 36px;padding:16px 20px 14px;
+  border:1px solid rgba(61,219,217,.22);border-radius:18px;
+  background:
+    radial-gradient(760px 220px at 12% -18%,rgba(61,219,217,.13),transparent 62%),
+    radial-gradient(560px 200px at 94% 112%,rgba(139,92,246,.12),transparent 60%),
+    linear-gradient(180deg,rgba(13,21,33,.97),rgba(9,14,23,.97));
+  box-shadow:0 18px 44px -22px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.04);
+  overflow:hidden;outline:none;
+  transform:translateZ(0);backface-visibility:hidden;
+  contain:layout;
+}
+.an2::before{
+  content:"";position:absolute;inset:0 0 auto 0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(61,219,217,.55),rgba(139,92,246,.4),transparent);
+}
+.an2-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.an2-badge{
+  font-size:10.5px;letter-spacing:1.6px;padding:3px 10px;border-radius:999px;
+  border:1px solid rgba(61,219,217,.42);color:#5fe9e6;background:rgba(61,219,217,.1);white-space:nowrap
+}
+.an2-title{font-size:14px;color:#e8f3ff;letter-spacing:.2px}
+.an2-hint{font-size:11.5px;color:#7f93ab}
+.an2-stage{position:relative;margin:2px 0 0;min-height:206px}
+.an2-svg{display:block;width:100%;height:auto;overflow:visible}
+
+/* 节点 */
+.an2-node rect{
+  fill:rgba(17,26,40,.94);stroke:rgba(110,168,254,.3);stroke-width:1.4;
+  transition:fill .3s,stroke .3s,filter .3s;
+}
+.an2-node .an2-k{
+  fill:#dbe9fb;font-size:13.5px;font-weight:700;letter-spacing:.2px;
+  transition:fill .3s;
+}
+.an2-node .an2-s{fill:#7f93ab;font-size:10.5px}
+.an2-node.done rect{stroke:rgba(61,219,217,.42)}
+.an2-node.on rect{
+  fill:rgba(61,219,217,.2);stroke:#3ddbd9;stroke-width:2;
+  filter:drop-shadow(0 0 14px rgba(61,219,217,.6));
+}
+.an2-node.on .an2-k{fill:#ffffff}
+.an2-node.on .an2-s{fill:#bff1f0}
+
+/* 连线 */
+.an2-edge{
+  fill:none;stroke:rgba(110,168,254,.34);stroke-width:1.6;
+  stroke-dasharray:var(--len,0);stroke-dashoffset:var(--len,0);
+  transition:stroke-dashoffset .55s cubic-bezier(.4,0,.2,1),stroke .3s;
+}
+.an2-edge.on{stroke:#3ddbd9;stroke-dashoffset:0;filter:drop-shadow(0 0 7px rgba(61,219,217,.65))}
+
+/* 数据包光点 */
+.an2-pkt{fill:#3ddbd9;opacity:0;filter:drop-shadow(0 0 9px #3ddbd9)}
+
+/* 说明 */
+.an2-cap{
+  display:flex;gap:12px;align-items:flex-start;margin-top:8px;padding-top:10px;
+  border-top:1px dashed rgba(255,255,255,.08);min-height:56px
+}
+.an2-step{
+  flex:0 0 auto;font-size:11.5px;color:#8ea3bd;padding:2px 9px;border-radius:7px;
+  border:1px solid rgba(255,255,255,.1);white-space:nowrap;margin-top:2px
+}
+.an2-step b{color:#3ddbd9;font-size:12.5px;font-weight:700}
+.an2-desc{margin:0;font-size:12.8px;line-height:1.8;color:#c6d7ea;opacity:0}
+
+/* 控件 */
+.an2-ctl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+.an2-btn{
+  appearance:none;cursor:pointer;font:inherit;font-size:11.8px;color:#c9dcf2;
+  padding:6px 11px;border-radius:9px;border:1px solid rgba(255,255,255,.13);
+  background:rgba(255,255,255,.045);transition:.2s
+}
+.an2-btn:hover{border-color:rgba(61,219,217,.55);color:#fff;background:rgba(61,219,217,.13)}
+.an2-btn.pri{border-color:rgba(61,219,217,.5);background:rgba(61,219,217,.13);color:#eafcfc;font-weight:600}
+.an2-speed{margin-left:auto;font-size:11.5px;color:#7f93ab;display:flex;align-items:center;gap:6px}
+.an2-speed select{
+  appearance:none;font:inherit;font-size:11.5px;color:#cfe6ff;background:rgba(17,26,40,.9);
+  border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:4px 8px;cursor:pointer
+}
+.an2-dots{display:flex;align-items:center;gap:5px;margin-left:10px}
+.an2-dot{
+  appearance:none;cursor:pointer;width:9px;height:9px;padding:0;border-radius:50%;
+  border:1px solid rgba(255,255,255,.22);background:transparent;transition:.22s
+}
+.an2-dot.done{background:rgba(61,219,217,.45);border-color:rgba(61,219,217,.6)}
+.an2-dot.on{
+  background:#3ddbd9;border-color:#3ddbd9;transform:scale(1.25);
+  box-shadow:0 0 10px rgba(61,219,217,.85)
+}
+
+/* 窄屏 */
+@media (max-width:900px){
+  .an2{padding:14px 14px 12px;border-radius:14px}
+  .an2-svg{max-width:560px;margin:0 auto}
+  .an2-stage{min-height:300px}
+  .an2-node .an2-k{font-size:15px}
+  .an2-node .an2-s{font-size:11px}
+  .an2-desc{font-size:12.6px;line-height:1.75}
+  .an2-ctl{gap:7px}
+  .an2-speed{margin-left:0;order:9;width:100%}
+  .an2-dots{margin-left:auto}
+}
+@media (max-width:420px){
+  .an2{padding:12px 11px}
+  .an2-badge{font-size:10px;padding:2px 8px}
+  .an2-title{font-size:13px}
+  .an2-hint{display:none}
+  .an2-btn{font-size:11px;padding:5px 9px}
+  .an2-step{font-size:10.5px}
+}
+
+/* 时间轴（chain 类） */
+.an2-axis{stroke:rgba(110,168,254,.22);stroke-width:1}
+.an2-tick{stroke:rgba(110,168,254,.18);stroke-width:1;stroke-dasharray:3 5}
+.an2-tno{fill:#5d7088;font-size:9.5px;letter-spacing:1px}
+/* 帧进度条 + 当前节点呼吸 */
+.an2::after{
+  content:"";position:absolute;left:0;bottom:0;height:2px;width:var(--p,0%);
+  background:linear-gradient(90deg,#3ddbd9,#8b5cf6);opacity:.85;transition:width .45s ease
+}
+@keyframes an2pulse{
+  0%,100%{opacity:.9}
+  50%{opacity:1}
+}
+/* 当前节点的静态发光（原来用无限 filter 呼吸，平板上每帧重绘会闪屏，改成一次性 transition） */
+.an2-node.on rect{filter:drop-shadow(0 0 12px rgba(61,219,217,.55))}
+@media (prefers-reduced-motion:reduce){
+  .an2-node.on rect{animation:none}
+  .an2-edge,.an2::after{transition:none}
+}
+/* ---------- 连线常显 + 无副标题版 ---------- */
+.an2-edge{
+  stroke-dasharray:none !important;stroke-dashoffset:0 !important;
+  stroke:rgba(110,168,254,.4);stroke-width:1.4;
+  transition:stroke .3s,stroke-width .3s,filter .3s
+}
+.an2-edge.on{stroke:#5ff1ef;stroke-width:2.5;filter:drop-shadow(0 0 10px rgba(61,219,217,.85))}
+.an2-node .an2-k{font-size:14.5px}
+@media (max-width:900px){.an2-node .an2-k{font-size:15.5px}}

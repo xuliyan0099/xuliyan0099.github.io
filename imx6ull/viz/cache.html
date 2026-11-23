@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cache 与内存层次台 · i.MX6ULL</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0a0e17;color:#e6ecfa;font:15px/1.7 "Noto Sans SC","PingFang SC",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1040px;margin:0 auto;padding:34px 18px 70px}
+a.back{display:inline-block;margin:0 0 16px;padding:6px 12px;border:1px solid rgba(110,168,254,.28);border-radius:9px;color:#cfdcf7;text-decoration:none;font-size:12.5px}
+a.back:hover{border-color:#5ff1ef;color:#5ff1ef}
+h1{font-size:23px;margin:0 0 6px}
+p.sub{color:#8b9cbb;font-size:13px;margin:0 0 20px}
+.grid{display:grid;grid-template-columns:250px 1fr;gap:14px;align-items:start}
+.panel{border:1px solid rgba(110,168,254,.16);border-radius:12px;padding:14px;background:linear-gradient(180deg,rgba(16,22,36,.92),rgba(11,16,27,.94))}
+.stage{border:1px solid rgba(110,168,254,.16);border-radius:12px;padding:14px;background:linear-gradient(180deg,rgba(16,22,36,.92),rgba(11,16,27,.94));min-height:420px}
+.lbl{font-size:12px;color:#8b9cbb;margin:0 0 8px}
+.lbl:not(:first-child){margin-top:14px}
+.btns{display:flex;flex-wrap:wrap;gap:6px}
+.btn{padding:5px 9px;border:1px solid rgba(110,168,254,.24);border-radius:8px;background:transparent;color:#cddcf7;font-size:12px;cursor:pointer;font-family:ui-monospace,Consolas,monospace}
+.btn:hover{border-color:#5ff1ef;color:#5ff1ef}
+.btn.on{background:rgba(95,241,239,.14);border-color:#5ff1ef;color:#eafcff}
+table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 6px;border-bottom:1px solid rgba(110,168,254,.1);text-align:left;font-family:ui-monospace,Consolas,monospace}
+th{color:#8b9cbb;font-weight:500;font-size:11px;font-family:inherit}
+td.set{color:#8b9cbb}
+td.tag{color:#9fd8ff}
+td.w{color:#cfe0ff}
+tr.hit td{background:rgba(95,241,239,.12)}
+tr.miss td{background:rgba(255,107,138,.1)}
+.bar{height:10px;border-radius:5px;background:#16233a;overflow:hidden;margin:10px 0 6px}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#5ff1ef,#8b5cf6);transition:width .35s}
+.verdict{padding:10px 12px;border-radius:9px;font-size:13px;margin:8px 0 0;border:1px solid rgba(110,168,254,.2);color:#cfe0ff;background:rgba(110,168,254,.06);line-height:1.75}
+.verdict.bad{border-color:rgba(255,107,138,.45);color:#ffc6d3;background:rgba(255,107,138,.08)}
+.verdict.good{border-color:rgba(95,241,239,.4);color:#c8feff;background:rgba(95,241,239,.08)}
+.stat{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:#8b9cbb}
+.stat b{color:#e6ecfa;font-family:ui-monospace,Consolas,monospace}
+.why{margin-top:16px;border-left:2px solid #a78bfa;padding:2px 0 2px 12px;color:#a9bad8;font-size:13px;line-height:1.8}
+.why b{color:#e6ecfa}
+@media(max-width:860px){.grid{grid-template-columns:1fr}.stage{min-height:0}}
+</style></head>
+<body><div class="wrap">
+<a class="back" href="index.html">← 互动台目录</a>
+<h1>Cache 与内存层次台</h1>
+<p class="sub">一个 load 花几个周期，取决于它落在哪一层。按地址访问，看行被填进来、被挤出去。</p>
+
+<div class="grid">
+  <div class="panel">
+    <p class="lbl">选一个地址访问（32 字节一行）</p>
+    <div class="btns" id="addr"></div>
+
+    <p class="lbl">访问类型</p>
+    <div class="btns" id="op">
+      <button class="btn on" data-v="r">读 load</button>
+      <button class="btn" data-v="w">写 store</button>
+    </div>
+
+    <p class="lbl">Cache</p>
+    <div class="btns" id="cc">
+      <button class="btn on" data-v="1">开</button>
+      <button class="btn" data-v="0">关</button>
+    </div>
+
+    <p class="lbl">立即对比</p>
+    <div class="btns" id="loop">
+      <button class="btn" data-v="10">连跑 10 次首地址</button>
+    </div>
+  </div>
+
+  <div class="stage">
+    <table>
+      <tr><th>Set</th><th>Tag</th><th>V</th><th>D</th><th>32 字节内容（8 个字）</th></tr>
+      <tbody id="rows"></tbody>
+    </table>
+
+    <div class="bar"><i id="barfill"></i></div>
+    <div class="verdict" id="verdict">点一个地址开始</div>
+    <div class="stat" id="stat"></div>
+  </div>
+</div>
+
+<div class="why">
+<b>为什么 32 字节一行？</b> 内存是按突发传输的，一次取一整行（8 个字）比逐个字取快得多；所以命中时你拿到的其实是「邻居也顺便进来了」。<br>
+<b>为什么同 set 的两个地址会互相挤？</b> 直接映射的 cache 里，地址低位固定了它只能放进某一行；两个地址低位相同、tag 不同，就会反复替换（抖动），命中率掉到很低。<br>
+<b>写为什么比读麻烦？</b> 写命中要决定写回（write-back，行标脏等淘汰）还是写穿（write-through，同步写内存）；写未命中还要决定是否分配行。ARM 里这些由 CP15 / SCTLR 的 C、W 位控制。
+</div>
+</div>
+
+<script>
+(function(){
+  var ADDRS = [0x80001000, 0x80001020, 0x80001040, 0x80001060, 0x80001080, 0x800010A0];
+  var SETS = 4;
+  var cache = [];
+  for (var i = 0; i < SETS; i++) cache.push({ valid: false, dirty: false, tag: 0, words: [] });
+  var l2 = {};                          // 曾在 L2 里出现过的 tag
+  var stats = { n: 0, l1: 0, l2: 0, ddr: 0, cyc: 0 };
+  var op = 'r', cacheOn = true;
+
+  function el(id){ return document.getElementById(id); }
+  function hex(n, w){ return '0x' + n.toString(16).toUpperCase().padStart(w || 8, '0'); }
+  function lineOf(a){ return (a >>> 5) & (SETS - 1); }
+  function tagOf(a){ return a >>> 7; }
+
+  function fill(s, tag){
+    var words = [];
+    for (var i = 0; i < 8; i++) words.push(tag * 128 + i * 4);
+    return words;
+  }
+
+  function access(addr, silent){
+    var set = lineOf(addr), tag = tagOf(addr);
+    var row = cache[set];
+    var cyc, kind;
+    if (!cacheOn) { cyc = 40; kind = 'ddr'; stats.ddr++; }
+    else if (row.valid && row.tag === tag) { cyc = 1; kind = 'l1'; stats.l1++; }
+    else if (l2[tag]) { cyc = 12; kind = 'l2'; stats.l2++; }
+    else { cyc = 40; kind = 'ddr'; stats.ddr++; }
+    stats.n++; stats.cyc += cyc;
+
+    if (cacheOn && kind !== 'l1') {
+      row.valid = true; row.tag = tag; row.words = fill(set, tag); row.dirty = false;
+      l2[tag] = true;
+    }
+    if (op === 'w' && cacheOn && kind === 'l1') row.dirty = true;
+
+    if (!silent) {
+      paint(set, kind, cyc, addr);
+      render();
+    }
+    return cyc;
+  }
+
+  function paint(set, kind, cyc, addr){
+    var rows = el('rows').children;
+    for (var i = 0; i < rows.length; i++) { rows[i].className = ''; }
+    if (rows[set]) rows[set].className = kind === 'l1' ? 'hit' : 'miss';
+
+    el('barfill').style.width = Math.min(100, (cyc / 40) * 100) + '%';
+    var v = el('verdict');
+    if (!cacheOn) {
+      v.className = 'verdict bad';
+      v.textContent = hex(addr) + '：Cache 关闭，每次都直接访问 DDR，40 周期。跑循环代码会慢十几倍。';
+    } else if (kind === 'l1') {
+      v.className = 'verdict good';
+      v.textContent = hex(addr) + '：L1 命中，1 个周期。行已在 set ' + set + '（tag ' + tagOf(addr) + '）。';
+    } else if (kind === 'l2') {
+      v.className = 'verdict';
+      v.textContent = hex(addr) + '：L1 未命中，但 L2 里有，12 个周期；行已从 L2 补进 L1。';
+    } else {
+      v.className = 'verdict bad';
+      v.textContent = hex(addr) + '：L1 / L2 都没有，落到 DDR，40 个周期，整行 32 字节被搬进 set ' + set + '。';
+    }
+  }
+
+  function render(){
+    var tb = el('rows'); tb.innerHTML = '';
+    cache.forEach(function(r, i){
+      var tr = document.createElement('tr');
+      var ws = r.valid ? r.words.map(function(w){ return hex(w).slice(-4); }).join(' ') : '— 空 —';
+      tr.innerHTML = '<td class="set">' + i + '</td><td class="tag">' + (r.valid ? hex(r.tag, 7) : '—') + '</td>' +
+        '<td>' + (r.valid ? '1' : '0') + '</td><td>' + (r.dirty ? '1' : '0') + '</td>' +
+        '<td class="w">' + ws + '</td>';
+      tb.appendChild(tr);
+    });
+    var n = stats.n || 1;
+    el('stat').innerHTML =
+      '访问 <b>' + stats.n + '</b> 次 · L1 命中 <b>' + stats.l1 + '</b> · L2 命中 <b>' + stats.l2 + '</b> · 落 DDR <b>' + stats.ddr + '</b>' +
+      ' · 命中率 <b>' + (stats.n ? Math.round((stats.l1 / n) * 100) : 0) + '%</b> · 平均 <b>' + (stats.n ? (stats.cyc / n).toFixed(1) : '0') + '</b> 周期';
+  }
+
+  function buildControls(){
+    var box = el('addr'); box.innerHTML = '';
+    ADDRS.forEach(function(a){
+      var b = document.createElement('button');
+      b.className = 'btn'; b.textContent = hex(a);
+      b.onclick = function(){ access(a, false); };
+      box.appendChild(b);
+    });
+    [].forEach.call(el('op').children, function(b){
+      b.onclick = function(){
+        op = b.getAttribute('data-v');
+        [].forEach.call(el('op').children, function(x){ x.className = 'btn' + (x === b ? ' on' : ''); });
+      };
+    });
+    [].forEach.call(el('cc').children, function(b){
+      b.onclick = function(){
+        cacheOn = b.getAttribute('data-v') === '1';
+        [].forEach.call(el('cc').children, function(x){ x.className = 'btn' + (x === b ? ' on' : ''); });
+        el('verdict').className = 'verdict';
+        el('verdict').textContent = cacheOn ? 'Cache 已开启' : 'Cache 已关闭：所有访问都走 DDR';
+      };
+    });
+    el('loop').children[0].onclick = function(){
+      var t0 = stats.cyc, n0 = stats.n;
+      for (var i = 0; i < 10; i++) access(ADDRS[0], i < 9);
+      paint(lineOf(ADDRS[0]), 'l1', 1, ADDRS[0]);
+      render();
+      el('verdict').className = 'verdict good';
+      el('verdict').textContent = '连跑 10 次 ' + hex(ADDRS[0]) + '：第一次 40 周期，之后 9 次全命中，共 ' + (stats.cyc - t0) + ' 周期（关 Cache 要 400 周期）。';
+    };
+  }
+
+  buildControls();
+  access(ADDRS[0], false);
+  render();
+})();
+</script>
+</body></html>

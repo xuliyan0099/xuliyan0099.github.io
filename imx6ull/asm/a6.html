@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第 06 章 · 位操作：配置一个寄存器的标准三行 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<link rel="stylesheet" href="../assets/asm.css">
+</head><body style="--acc:#03d6b4">
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../index.html">☰ 六个入口</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">手写 ARM 汇编 · 10 篇</div>
+    <ol>
+      <li><a href="index.html"><span class="no">⌂</span><span>路口目录<span class="sub">篇目总览与读法</span></span></a></li>
+      <li><a href="a0.html"><span class="no">00</span><span>为什么非写不可<span class="sub">三个真实场景，和一笔成本账</span></span></a></li>
+      <li><a href="a1.html"><span class="no">01</span><span>最小可跑：工具链与第一条指令<span class="sub">编、链接、反汇编，看到自己写的字节</span></span></a></li>
+      <li><a href="a2.html"><span class="no">02</span><span>寄存器与立即数：那道 8 位旋转墙<span class="sub">16 个寄存器、APSR、4096 种立即数</span></span></a></li>
+      <li><a href="a3.html"><span class="no">03</span><span>寻址与栈：地址是怎么算出来的<span class="sub">四种寻址、批量搬运、满递减栈</span></span></a></li>
+      <li><a href="a4.html"><span class="no">04</span><span>函数调用与 AAPCS：lr 为什么必须保<span class="sub">传参、返回、保存责任、栈帧布局</span></span></a></li>
+      <li><a href="a5.html"><span class="no">05</span><span>条件码与分支：两套门，别走错<span class="sub">cmp 的本质、14 个条件、IT 块</span></span></a></li>
+      <li><a href="a6.html" class="active"><span class="no">06</span><span>位操作：配置一个寄存器的标准三行<span class="sub">bic/orr/bfi，掩码怎么造出来</span></span></a></li>
+      <li><a href="a7.html"><span class="no">07</span><span>C 与汇编互调：四条约束和两个别省<span class="sub">内联汇编、volatile、memory clobber</span></span></a></li>
+      <li><a href="a8.html"><span class="no">08</span><span>裸机第一条：在这块板子上点灯<span class="sub">关狗、开钟、配脚、定方向</span></span></a></li>
+      <li><a href="a9.html"><span class="no">09</span><span>二十道练习清单<span class="sub">A/B/C 三档，每题都写了验收法</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="../hardware/index.html">硬件入口</a><a href="../juan/index.html">十四卷总览</a></div>
+  </aside>
+  <main class="doc">
+    <div class="doc-kicker">汇编练习 · i.MX6ULL / Cortex-A7 <span>·</span> 第 06 章</div>
+    <div class="ch-head">
+      <h1>位操作：配置一个寄存器的标准三行</h1>
+      <div class="ch-meta"><span class="hot">第 06 章</span><span>约 26 分钟</span><span>★ 必读</span></div>
+    </div>
+<h2 id="s1">七条指令覆盖外设配置的 90%</h2>
+<table class="regtbl"><thead><tr><th>指令</th><th>语义</th><th>配置寄存器时对应什么</th></tr></thead><tbody><tr><td class="nm"><code>and</code></td><td>按位与</td><td>取出某几位、判断某位</td></tr><tr><td class="nm"><code>orr</code></td><td>按位或</td><td>置位（其他位不动）</td></tr><tr><td class="nm"><code>eor</code></td><td>按位异或</td><td>翻转某位、交换两个寄存器</td></tr><tr><td class="nm"><code>bic</code></td><td>位清零（<code>and</code> 的补码形式）</td><td>清位，比「先 mvn 再 and」少一条</td></tr><tr><td class="nm"><code>mvn</code></td><td>取反搬移</td><td>造 <code>~mask</code>、得到 -1</td></tr><tr><td class="nm"><code>lsl/lsr/asr/ror</code></td><td>移位</td><td>造掩码、取位域、对齐</td></tr><tr><td class="nm"><code>bfi/bfc/ubfx/sbfx</code></td><td>位域插入/清除/取出</td><td><b>一条指令改一段位</b>（ARMv7 新增）</td></tr></tbody></table>
+<p><code>bic</code> 是这套里最容易被忽略、又最该用的：<code>bic r1, r1, r2</code> 等价于 <code>r1 = r1 &amp; ~r2</code>，专为「清位」而生。内核里 <code>regmap_update_bits</code> 的掩码取反就靠它。</p>
+<h2 id="s2">移位量的两种形态</h2>
+<pre class="asm"><code>    <span class="k">lsl</span>  r0, r1, <span class="hl">#3</span><span class="c">        @ 立即数移位：0–31</span>
+    <span class="k">lsl</span>  r0, r1, r2<span class="c">        @ 寄存器移位：用 r2 的低 8 位（0–255）</span></code></pre>
+<p><b>立即数移位只能 0–31</b>，这是硬限制。需要移 32 位以上时，要么用寄存器形式的移位量，要么拆两次。</p>
+<p>另一个细节：<code>ror</code>（循环右移）在普通数据处理里用得少，但配合 <code>and</code> 取位域时很有用——<code>ror r0, r0, #8</code> 可以把某个字节转到最低位再 <code>and #0xFF</code>。</p>
+<h2 id="s3">位域三件套</h2>
+<pre class="asm"><code>    <span class="k">bfi</span>  r0, r1, <span class="hl">#3</span>, <span class="hl">#3</span><span class="c">    @ 把 r1 的低 3 位 → 放进 r0 的 bit[5:3]，其他位不动</span>
+    <span class="k">bfc</span>  r0, <span class="hl">#3</span>, <span class="hl">#3</span><span class="c">        @ 把 r0 的 bit[5:3] 清 0</span>
+    <span class="k">ubfx</span> r2, r0, <span class="hl">#3</span>, <span class="hl">#3</span><span class="c">    @ 从 r0 的 bit[5:3] 取出，零扩展到 32 位</span>
+    <span class="k">sbfx</span> r2, r0, <span class="hl">#3</span>, <span class="hl">#3</span><span class="c">    @ 同上，但符号扩展</span></code></pre>
+<p><code>bfi</code> 的参数顺序容易记错：<code>bfi 目标, 源, lsb, 宽度</code>——<b>lsb 在前、宽度在后</b>，不是「起始位，结束位」。</p>
+<p>还有一条坑：<code>bfi</code> 取源的<b>低 n 位</b>，超出宽度的高位被忽略（不是截断报错）。如果源值本身超范围，结果不会错，但可能不是你想要的。</p>
+<h2 id="s4">标准三行：配置一个寄存器的正确姿势</h2>
+<p>真实场景：把 <code>IOMUXC_SW_MUX_CTL_PAD_GPIO1_IO03</code> 的 <code>MUX_MODE</code>（bit[2:0]）改成 5（ALT5 = GPIO），其余位原样保留。</p>
+<pre class="asm"><code>    <span class="k">ldr</span>  r0, =0x020E0068<span class="c">       @ 寄存器地址</span>
+    <span class="k">ldr</span>  r1, [r0]<span class="c">              @ ① 读：拿到当前值</span>
+    <span class="k">bic</span>  r1, r1, <span class="hl">#0x7</span><span class="c">          @ ② 清：低 3 位归零，其他位一个不动</span>
+    <span class="k">orr</span>  r1, r1, <span class="hl">#0x5</span><span class="c">          @ ③ 置：写入 5</span>
+    <span class="k">str</span>  r1, [r0]<span class="c">              @ ④ 写回</span></code></pre>
+<p>四步里最容易被省掉的是①②，直接 <code>str #5</code> 一次覆盖。后果：SION（bit4）、保留位、以及同一寄存器里别人的位全部归零。<b>在 i.MX6 的 IOMUXC 上，写错 SION 会让输入回读失效；在 CCM 上误写别人那两位，会关掉别的外设时钟。</b></p>
+<h2 id="s5">掩码编不进怎么办：造出来</h2>
+<p>掩码 <code>0x38</code>（bit[5:3]）能编，但 <code>0x1C0</code>（bit[8:6]）、<code>0x7&lt;&lt;26</code>（时钟门控位）编不进。标准造法：</p>
+<pre class="asm"><code>    <span class="k">mov</span>  r2, <span class="hl">#0x7</span>
+    <span class="k">lsl</span>  r2, r2, <span class="hl">#6</span><span class="c">            @ r2 = 0x1C0</span>
+    <span class="k">bic</span>  r1, r1, r2<span class="c">            @ 清 bit[8:6]</span>
+    <span class="k">orr</span>  r1, r1, <span class="hl">#0x80</span><span class="c">         @ 置 bit7（0x80 能编）</span></code></pre>
+<p>这就是内核里满地 <code>#define MASK(x)</code> + 运行时移位的由来：编译期常量在 C 里能算，写进指令时却编不过。</p>
+<h2 id="s6">真实寄存器实战四例</h2>
+<p><b>① 时钟门控（CCM_CCGRx）</b>——每 2 位管一个模块：</p>
+<pre class="asm"><code>    <span class="k">ldr</span>  r0, =0x020C406C<span class="c">       @ CCM_CCGR1</span>
+    <span class="k">ldr</span>  r1, [r0]
+    <span class="k">mov</span>  r2, <span class="hl">#3</span>
+    <span class="k">lsl</span>  r2, r2, <span class="hl">#26</span><span class="c">           @ 3 &lt;&lt; 26 → bit[27:26]</span>
+    <span class="k">bic</span>  r1, r1, r2<span class="c">            @ 先清</span>
+    <span class="k">orr</span>  r1, r1, r2<span class="c">            @ 再置（00 关 / 11 开）</span>
+    <span class="k">str</span>  r1, [r0]</code></pre>
+<p>注意这里 bic 和 orr 用的是同一个 r2：先清再置，写法最省。<b>顺序反了（先 orr 后 bic）就等于全清 0，模块时钟永远开不起来。</b></p>
+<p><b>② 引脚电气属性（SW_PAD_CTL）</b>——驱动强度、上下拉、速率，多位域：</p>
+<pre class="asm"><code>    <span class="k">ldr</span>  r0, =0x020E02F4
+    <span class="k">ldr</span>  r1, [r0]
+    <span class="k">mov</span>  r2, <span class="hl">#0x3F</span>
+    <span class="k">lsl</span>  r2, r2, <span class="hl">#3</span><span class="c">            @ 清 bit[8:3] 这几位域</span>
+    <span class="k">bic</span>  r1, r1, r2
+    <span class="k">orr</span>  r1, r1, <span class="hl">#0x30</span><span class="c">         @ 置需要的组合</span>
+    <span class="k">str</span>  r1, [r0]</code></pre>
+<p><b>③ GPIO 方向（GDIR）</b>——一位一个脚：</p>
+<pre class="asm"><code>    <span class="k">ldr</span>  r0, =0x0209C004
+    <span class="k">ldr</span>  r1, [r0]
+    <span class="k">orr</span>  r1, r1, <span class="hl">#0x8</span><span class="c">          @ bit3 = 1 → 输出</span>
+    <span class="k">str</span>  r1, [r0]</code></pre>
+<p><b>④ 状态判断（PSR）</b>——只读位、W1C 位：</p>
+<pre class="asm"><code>    <span class="k">ldr</span>  r0, =0x0209C008
+    <span class="k">ldr</span>  r1, [r0]<span class="c">              @ 读 PSR（只读）</span>
+    <span class="k">tst</span>  r1, <span class="hl">#0x8</span><span class="c">              @ 测 bit3</span>
+    <span class="k">beq</span>  is_low<span class="c">                @ 为 0 就跳</span></code></pre>
+<h2 id="s7">两个必须知道的边界</h2>
+<ul>
+<li><b><code>bfi/ubfx</code> 不是所有核都有</b>。它们是 ARMv6T2/ARMv7 引入的，Cortex-A7 有；老的 ARMv5（比如某些 ARM9）没有，写进去直接非法指令。跨核移植代码时要小心。</li>
+<li><b>位带（bit-band）在 Cortex-A 上不存在</b>。那是 Cortex-M3/M4 的特性（把某段别名区的一个字映射到一位）。你在 A7 上找不到 <code>0x22000000</code> 那块别名区，别照着 M 系列的资料配。</li>
+</ul>
+<h2 id="s8">本篇验收</h2>
+<ul>
+<li>能默写「读—清—置—写回」四步，并解释为什么不能直接赋值。</li>
+<li>给定掩码 <code>0x1C0</code> 与 <code>0x7&lt;&lt;26</code>，能写出「先 mov 再 lsl」的造法。</li>
+<li>能说出 <code>bic</code> 与 <code>and + mvn</code> 的关系，并说明为什么 <code>bic</code> 更好。</li>
+<li>能写出 <code>bfi</code> 的参数顺序（目标、源、lsb、宽度）。</li>
+<li>能解释「先 orr 后 bic」为什么会把时钟门控写成 0。</li>
+</ul>
+<h2 id="s9">下一篇</h2>
+<p>位操作复习完，可以把注意力从「指令」转回「语言」了。07 篇讲 C 与汇编的边界：内联汇编的四种约束、<code>volatile</code> 与 <code>"memory"</code> 为什么不能省，以及你在驱动里真正会用到的那几行汇编。</p>
+<div class="pager">
+      <a href="a5.html"><span>上一篇</span><b>← 05 条件码与分支：两套门，别走错</b></a>
+      <a href="index.html"><span>目录</span><b>篇目总览</b></a>
+      <a class="nx" href="a7.html"><span>下一篇</span><b>07 C 与汇编互调：四条约束和两个别省 →</b></a>
+    </div>
+  </main>
+</div>
+<script src="../assets/asm-tools.js"></script>
+</body>
+</html>

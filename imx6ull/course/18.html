@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=../docs/course-18.html">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>18 · 从 C 到汇编</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/viz.css">
+<link rel="stylesheet" href="assets/iviz.css">
+<link rel="stylesheet" href="assets/anim2.css">
+<link rel="stylesheet" href="assets/cpu3.css">
+  <script src="assets/readmode.js" defer></script>
+</head>
+<body data-page="18">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>第 18 课 · 从 C 到汇编：编译器到底做了什么</h1>
+    <p class="lede">C 常被称为「高级的汇编语言」，因为它离硬件足够近：一个 <code>i++</code> 对应一条 add，一次 <code>a[i]</code> 对应一条带移位的 ldr。但 <code>-O2</code> 之后，它又完全不像你写的那样。这一课把同一段 C 在不同优化级别下的汇编摆在一起，让你看清「编译器在替你做哪些决定」。</p>
+<div class="cpu3" data-json='{"title":"C 编译成汇编之后，CPU 就是这样一条条跑","hint":"取指 → 译码 → 执行 → 写回，PC 自己往前走"}'></div>
+
+    <div class="anim2" data-json='{"title":"从 C 到汇编：编译器到底做了什么","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"预处理 cpp"},{"k":"编译 cc1"},{"k":"汇编 as"},{"k":"链接 ld"}],"frames":[{"i":0,"d":"展开 #include、宏、条件编译 → .i"},{"i":1,"d":"语法/语义分析、优化 → .s 汇编"},{"i":2,"d":"汇编 → .o 目标文件（机器码 + 符号表）"},{"i":3,"d":"合并 .o、解析符号、重定位 → 可执行"}]}'></div>
+
+    <div class="viz" data-kind="flow" data-title="从 .c 到可执行：四个阶段" data-sub="每一步都能单独停下来看（-E / -S / -c）" data-json='{"steps":[{"n":"预处理 cpp","d":"展开 #include、宏、条件编译 → .i"},{"n":"编译 cc1","d":"语法/语义分析、优化 → .s 汇编"},{"n":"汇编 as","d":"汇编 → .o 目标文件（机器码 + 符号表）"},{"n":"链接 ld","d":"合并 .o、解析符号、重定位 → 可执行"}],"note":"这四步是理解「编译错误 vs 链接错误」的关键：语法错在 cc1，符号未定义在 ld。你遇到的 undefined reference 永远是链接阶段的事。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 编译器在哪一步优化？② 为什么 -O0 的代码那么「笨」？③ 局部变量到底在寄存器还是栈上？④ 未定义行为为什么会被优化成「怪物」？⑤ volatile 到底阻止了什么？</p>
+    </div>
+
+    <h2>1. 同一段 C，三个优化级别</h2>
+
+    <pre><code>int sum_to(int n) {
+    int s = 0;
+    for (int i = 1; i &lt;= n; i++) s += i;
+    return s;
+}</code></pre>
+
+    <pre><code>; -O0（几乎逐句翻译，每个变量都在栈上）
+sum_to:
+    push {r7, lr}
+    sub  sp, sp, #16
+    add  r7, sp, #0
+    str  r0, [r7, #12]     ; n 存栈
+    movs r3, #0
+    str  r3, [r7, #8]      ; s = 0 存栈
+    movs r3, #1
+    str  r3, [r7, #4]      ; i = 1 存栈
+.L3:
+    ldr  r3, [r7, #4]      ; 每次循环都从栈读 i
+    ldr  r2, [r7, #12]     ; 读 n
+    cmp  r3, r2
+    bgt  .L4
+    ldr  r3, [r7, #8]      ; 读 s
+    ldr  r2, [r7, #4]      ; 读 i
+    add  r3, r3, r2
+    str  r3, [r7, #8]      ; 写回 s
+    ldr  r3, [r7, #4]
+    adds r3, r3, #1
+    str  r3, [r7, #4]      ; 写回 i
+    b    .L3
+
+; -O2（寄存器化 + 强度削减 + 循环优化）
+sum_to:
+    cmp   r0, #0
+    ble   .L2
+    add   r1, r0, #1
+    mul   r0, r0, r1       ; n(n+1)
+    lsr   r0, r0, #1       ; /2  —— 直接算出解析解！
+.L2:
+    mov   r0, #0
+    bx    lr</code></pre>
+
+    <p>看懂这个对比，你就理解了两件事：<b>-O0 是「忠实翻译」，方便调试；-O2 是「重新发明你的算法」</b>。前者每条语句都能对应到代码行，后者已经认不出原样了——这也是为什么 <code>-O2</code> 下 gdb 单步会「跳来跳去」。</p>
+
+    <div class="viz" data-kind="compare" data-title="-O0 vs -O2：差在哪几个维度" data-sub="不是你写得多好，是编译器允许自己多想" data-json='{"bad":{"t":"-O0","items":["每个局部变量都在栈上","每次循环都重复读写内存","不合并常量、不消除死代码","单步调试与源码一一对应"]},"good":{"t":"-O2","items":["变量尽量驻留寄存器","循环不变量外提、强度削减（乘变移）","内联小函数、消除死代码、代数化简","可能完全重写算法，调试信息错位"]},"note":"嵌入式常用 -Os（优化体积）：它会放弃部分激进优化，让代码不那么长。Flash 只有 512KB 时，-Os 往往是正确选择。"}'></div>
+
+    <h2>2. 局部变量在哪：寄存器优先</h2>
+
+    <p>ARM 有 16 个寄存器，其中约 12 个可用作通用。编译器会把最热的变量放进 r4-r11，只有「取地址了、太多、或跨函数调用要保留」的才落到栈上。</p>
+
+    <p>这解释了一个常见困惑：<b>「我加了局部变量，为什么没有栈帧？」</b>——因为它在寄存器里。也解释了 <code>-O0</code> 为什么慢：它把每个变量都赶回栈，每个 <code>i++</code> 变成「load-add-store」三步。</p>
+
+    <h2>3. 未定义行为：编译器的「合法乱来」</h2>
+
+    <pre><code>// 经典例子：有符号溢出是 UB
+int f(int x) { return x + 1 &gt; x; }
+
+// -O2 直接优化成：return 1;
+// 理由：如果溢出是 UB，编译器可以假设「不会溢出」，
+//       那么 x+1 必然 &gt; x，恒为真。
+
+// 另一个：空指针解引用是 UB
+int g(int *p) { int v = *p; if (!p) return 0; return v; }
+// -O2 会把 if 删掉：既然已经解引用了 p，p 就不可能是 NULL
+
+// 这不是 bug，是标准赋予编译器的自由</code></pre>
+
+    <p>这条知识在嵌入式里极其重要：<b>很多「只在 -O2 下出现」的诡异 bug，根源是 UB</b>。解法不是降优化级别，而是修掉 UB（用无符号、加判空、避免严格别名冲突）。</p>
+
+    <h2>4. volatile：只阻止一部分优化</h2>
+
+    <p><code>volatile</code> 只保证「每次访问都真的去读/写」，它<b>不保证原子性、不保证顺序、不保证与其他线程的可见性</b>。</p>
+
+    <table>
+      <thead><tr><th>场景</th><th>volatile 够吗</th><th>正确做法</th></tr></thead>
+      <tbody>
+        <tr><td>读写硬件寄存器</td><td>够</td><td><code>readl/writel</code>（内含 volatile + 屏障）</td></tr>
+        <tr><td>中断里改的标志位</td><td>基本够（单核）</td><td>多核要加 <code>smp_mb()</code> 或原子变量</td></tr>
+        <tr><td>多线程共享计数</td><td><b>不够</b></td><td><code>atomic_t</code> / 互斥锁</td></tr>
+      </tbody>
+    </table>
+
+    <p>「volatile 不等于线程安全」是嵌入式面试与实战里最常见的坑。</p>
+
+    <h2>5. 实验：自己看四个阶段</h2>
+
+    <pre><code>gcc -E t.c -o t.i        # 只看预处理（宏展开后，往往几万行）
+gcc -S t.c -o t.s        # 只看汇编
+gcc -c t.s -o t.o        # 只到目标文件
+gcc t.o -o t             # 链接
+
+# 看符号表与重定位
+nm t.o
+readelf -r t.o
+objdump -d t.o
+
+# 三个优化级别对比
+for o in 0 1 2 s; do
+  gcc -O$o -S t.c -o t_O$o.s
+  echo "=== -O$o 行数: $(wc -l &lt; t_O$o.s)"
+done</code></pre>
+
+    <p>跑完你会看到：<code>-O0</code> 的汇编往往有 100 多行，<code>-O2</code> 可能只有 10 行。<b>这个行数差，就是「编译器替你做了多少事」的量化证据。</b></p>
+
+    <h2>6. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于编译的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["-O2 只是「跑得快一点」，代码逻辑不变","volatile 保证线程安全","编译器报错说明我写错了；不报错说明没问题"]},"good":{"t":"实际","items":["-O2 会改算法、改数据结构、删代码，逻辑等价但不逐句对应","volatile 只管「不被优化掉」，不管原子性与顺序","UB 不报错，但会被「合法地」优化成你想不到的结果"]},"note":"所以工程上有一个铁律：不要靠「降优化级别」掩盖 bug。UB 在 -O0 下碰巧能跑，换个编译器/平台就炸。"}'></div>
+
+    <h2>7. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>undefined reference 是哪个阶段的错误？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>链接阶段（ld）。编译阶段只知道「有个外部符号」，链接时找不到定义才报。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>为什么 -O0 下每个变量都在栈上？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>为了保证调试时每个变量都有确定的内存地址、可被 gdb 修改；寄存器变量无法稳定映射到源码行。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p><code>x + 1 &gt; x</code> 被优化成恒真，为什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>有符号溢出是 UB，编译器可假设不发生溢出，于是 x+1 必然大于 x。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>volatile 保证了什么，没保证什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>保证每次访问都真实发生；不保证原子性、不保证内存序、不保证多核可见性。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>-Os 与 -O2 的核心差别？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>-Os 以体积为优先，关闭部分增大代码的优化（如激进内联、展开），适合 Flash 受限的 MCU。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>用四个阶段命令跑一遍，记录每个中间文件的大小。</li>
+        <li>把 <code>sum_to</code> 在 -O0/-O2/-Os 下对比行数与指令数。</li>
+        <li>写一个 UB 例子，观察 -O0 与 -O2 的行为差异。</li>
+        <li>用 <code>readelf -r</code> 看一个 .o 的重定位表，找出它引用了哪些外部符号。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      .o 文件里符号还没定地址，可执行文件里才有。第 19 课讲链接：段、符号、重定位、静态与动态库，以及为什么嵌入式里「-static 常常是正确选择」。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="switch" data-iviz="1" data-json='{"title":"同一行 C，两级优化两种代码","hint":"切换优化等级","note":"编译器没有「变聪明」，它只是把你的代码翻译得更贴近硬件的真实成本。-O2 之后你在调试器里看不到变量，不是 bug，是它把变量放进了寄存器。","views":[{"b":"-O0","items":[{"t":"每个变量都落在栈上","d":"每次读写都 ldr/str 一趟内存，语句边界清晰，单步调试所见即所得。"},{"t":"代码量大、慢","d":"一条 a+b 可能拆成四条指令：两个装载、一个加、一个存储。"}]},{"b":"-O2","items":[{"t":"变量进寄存器，循环被展开","d":"常见的地址计算被提到循环外，重复的装载被合并，边界检查可能被删掉。"},{"t":"代价是可调试性","d":"断点位置会跳，变量可能显示 optimized out。看反汇编才是唯一可靠的核对方式。"}]}]}'></div>
+  </main>
+</div>
+<script src="assets/cnav.js"></script>
+<script src="assets/viz.js"></script>
+<script src="assets/iviz.js"></script>
+<script src="assets/anime.iife.min.js"></script>
+<script src="assets/anim2.js"></script>
+<script src="assets/cpu3.js"></script>
+</body>
+</html>

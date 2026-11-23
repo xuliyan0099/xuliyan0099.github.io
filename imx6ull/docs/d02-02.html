@@ -1,0 +1,169 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>静态库与动态链接：PLT / GOT / PIC 全链路 · 卷 02 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j02.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 02 · 编译与运行</div>
+<ol><li><a href="course-19.html">
+  <span class="no">01</span><span>从源码到可执行<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-ch07.html">
+  <span class="no">02</span><span>交叉编译与工程构建<span class="sub">约 12 小时</span></span></a></li>
+<li><a href="course-th17.html">
+  <span class="no">03</span><span>交叉编译与工具链原理<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="d02-01.html">
+  <span class="no">04</span><span>ELF 与链接重定位：从符号表到 .rel.text<span class="sub">约 3 小时</span></span></a></li>
+<li><a href="d02-02.html" class="active">
+  <span class="no">05</span><span>静态库与动态链接：PLT / GOT / PIC 全链路<span class="sub">约 3 小时 · 当前</span></span></a></li>
+<li><a href="d02-03.html">
+  <span class="no">06</span><span>程序加载与内存布局：段、栈、堆、core dump<span class="sub">约 2 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j01.html">← 卷 01</a>
+  <a href="../juan/j03.html">卷 03 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 02<span>·</span>编译与运行<span>·</span>第 05 篇</div>
+  <h1>静态库与动态链接：PLT / GOT / PIC 全链路</h1>
+  
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 3 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+<p class="lead">上一篇的坑，是链接时填的。这一篇讲另一种坑：<strong>链接时只留一张「欠条」，等程序跑起来才还</strong>。动态链接的全部魔法——<code>.so</code>、<code>PLT</code>、<code>GOT</code>、<code>-fPIC</code>——都是为这件事服务的。</p>
+
+<p>先给结论：动态链接不是「把库放进去」，而是「把库的名字写进去，并在代码里留一个能被改写的跳板」。跳板叫 PLT，欠条叫 GOT。</p>
+
+<h2 id="s1">先玩一下：第一次调用 printf，走了五步</h2>
+
+<p>点「下一步」。注意第一步之后 GOT 里存的还不是 printf，而是「解析器」的地址——这就是懒绑定（lazy binding）。</p>
+
+<div class="ikit" data-type="seq" data-json='{"title":"懒绑定：printf 的第一次调用","badge":"seq","speed":1,
+"actors":[{"name":"调用方 main","start":"运行中"},{"name":"ld.so / 解析器","start":"待命"}],
+"steps":[
+{"label":"call printf@plt","states":["进入 PLT","待命"],"note":"编译器把对 printf 的调用编译成跳到 PLT 里的一小段跳板，而不是直接跳到 libc。","dir":"r"},
+{"label":"PLT: ldr pc, [GOT+off]","states":["查 GOT","待命"],"note":"GOT 这一项此时指向「PLT0」，也就是解析器的入口，并非 printf。","dir":"r"},
+{"label":"PLT0: push link_map; jmp GOT[2]","states":["压参数","被唤醒"],"note":"把「我是谁」（link_map）和「要哪个符号」（重定位下标）交给解析器。"},
+{"label":"_dl_runtime_resolve 查符号表","states":["等待结果","解析中"],"note":"在 libc.so 的 .dynsym 里找到 printf 的真实地址，还要考虑符号版本。"},
+{"label":"回填 GOT[printf] = 真实地址","states":["回填完成","回到待命"],"note":"从此这一项就是真地址，第二次调用只需一次间接跳转。"},
+{"label":"再次执行 printf","states":["进入 libc","待命"],"note":"后续调用不再进解析器，开销等同于普通间接调用。"}]}'></div>
+
+<p>关键的一步是「回填」。GOT 必须放在<strong>可写</strong>的数据段（<code>.got.plt</code>），而代码段保持只读——这既是安全设计，也是 <code>-fPIC</code> 存在的根本原因。</p>
+
+<h2 id="s2">一、静态库：把 .o 打包，用多少抽多少</h2>
+
+<p><code>.a</code> 文件本质是一个 <code>ar</code> 归档：里面是一堆 <code>.o</code>，外加一个符号索引。链接器遇到 <code>-lfoo</code> 时并不会把整个库塞进你的程序，而是<strong>按需抽取</strong>：哪个 <code>.o</code> 定义了当前未解析的符号，就把那个 <code>.o</code> 拉进来。</p>
+
+<ul>
+  <li>好处：产出一个自包含的可执行文件，不依赖目标机上的库版本，调试时符号齐全。</li>
+  <li>代价：体积随用量线性增长；库升级必须重新链接、重新发布。</li>
+  <li>坑：<strong>库的顺序</strong>。链接器从左到右扫一遍，被依赖的库要放在依赖者后面（<code>gcc main.o -lfoo</code>，不要反过来），否则符号还没出现就扫过去了。</li>
+</ul>
+
+<h2 id="s3">二、动态库：只写名字，运行时再找</h2>
+
+<p><code>.so</code> 是 ELF 的 <code>ET_DYN</code> 类型——它没有固定加载地址，可以映射到进程地址空间的任意位置。你的可执行文件里只留下三样东西：</p>
+
+<div class="layers">
+  <div class="ly"><b>DT_NEEDED</b><span>「我需要 libfoo.so.1」。注意是 SONAME，带主版本号，不是文件路径。</span></div>
+  <div class="ly"><b>.dynsym</b><span>导入/导出符号表：我用到哪些符号、我提供哪些符号。strip 不会删它。</span></div>
+  <div class="ly hi"><b>.plt + .got.plt</b><span>每个外部函数一个跳板项，每个跳板项对应 GOT 里的一个可写槽位。</span></div>
+</div>
+
+<p>运行时由 <code>ld.so</code>（动态链接器）接手：读 <code>DT_NEEDED</code> → 在 <code>/etc/ld.so.cache</code> 里查路径（这个缓存由 <code>ldconfig</code> 生成）→ <code>mmap</code> 库 → 处理它自己的依赖（递归）→ 执行初始化函数 → 最后跳到你的 <code>_start</code>。</p>
+
+<p>所以在板子上遇到「<code>error while loading shared libraries: libxxx.so.1: cannot open shared object file</code>」，原因永远是这一条链上的某一环：库没拷进 rootfs、没跑 <code>ldconfig</code>、或者 <code>SONAME</code> 对不上。<code>LD_LIBRARY_PATH</code> 能救急，但不该出现在产品里。</p>
+
+<div class="ikit" data-type="hop" data-json='{"title":"一次跨模块调用，经过哪几个「人」","badge":"hop","packet":"call",
+"nodes":[{"n":"main","s":"调用点"},{"n":"PLT","s":"跳板"},{"n":"GOT","s":"可写槽位"},{"n":"ld.so","s":"解析器"},{"n":"libc","s":"printf"}],
+"hops":[
+{"at":"main","pkt":"call","label":"跳到 printf@plt","note":"指令里写的是 PLT 的地址，不是 libc 的地址。"},
+{"at":"PLT","pkt":"ldr pc,[got]","label":"读 GOT 槽位","note":"首次调用时这个槽位指向 PLT0。"},
+{"at":"GOT","pkt":"resolver","label":"转到解析器","note":"若已解析过，这一步直接跳进 libc，不再经过后两人。"},
+{"at":"ld.so","pkt":"printf","label":"查 .dynsym 回填","note":"找到真实地址，写回 GOT 槽位。"},
+{"at":"libc","pkt":"printf()","label":"真正执行","note":"之后的每次调用都是一次间接跳转。"}]}'></div>
+
+<h2 id="s4">三、PIC：为什么代码里不能写死地址</h2>
+
+<p>动态库要能被<strong>多个进程共享同一份物理页</strong>，前提是它的代码段在所有进程里长得一模一样。<strong>只要代码里出现一个绝对地址，这个前提就破了</strong>：进程 A 把库映射到 0xB6F00000，进程 B 映射到 0xB7A00000，同一份代码不可能同时满足两个地址。</p>
+
+<p>解决方式是把所有「需要地址」的地方改成「相对于 GOT 的偏移」，GOT 是每进程私有的（写时复制），代码段保持只读共享。这就是 <code>-fPIC</code>（Position Independent Code）。</p>
+
+<table>
+<thead><tr><th>写法</th><th>编译选项</th><th>代码段能否共享</th><th>典型用途</th></tr></thead>
+<tbody>
+<tr><td>绝对地址</td><td>默认（非 PIC）</td><td>不能</td><td>静态链接、固定地址的裸机程序</td></tr>
+<tr><td>GOT 间接</td><td><code>-fPIC</code></td><td>能</td><td>共享库 <code>.so</code>，必需</td></tr>
+<tr><td>GOT + 可执行也随机化</td><td><code>-fPIE -pie</code></td><td>能</td><td>现代发行版的默认主程序，配合 ASLR</td></tr>
+</tbody></table>
+
+<div class="cal warn"><span class="h">常见误解：-fPIC 会让程序变慢很多</span>一次额外的间接跳转、多占一个寄存器存 GOT 基址，在现代 CPU 上通常只有百分之几。真正的代价常来自「为了 PIC 而放弃某些内联/常量折叠」。对性能敏感的库，正确做法是测，而不是猜。</div>
+
+<h2 id="s5">四、懒绑定、立刻绑定与 RELRO</h2>
+
+<p>懒绑定的好处是启动快：程序启动时不解析任何符号，用到才算。坏处是<strong>第一次调用的延迟不可预测</strong>，而且 GOT 必须一直可写。</p>
+
+<p>反过来，<code>-Wl,-z,now</code>（立刻绑定）+ <code>-Wl,-z,relro,-z,now</code>（完全 RELRO）会在启动时解析所有符号，然后把 GOT 标记为只读。代价是启动变慢一点，收益是攻击者没法改写 GOT 来劫持控制流。产品固件通常选后者。</p>
+
+<div class="cal tip"><span class="h">怎么验证你的库到底依赖了什么</span><code>readelf -d ./app | grep NEEDED</code> 看依赖；<code>ldd ./app</code> 看实际解析到哪个路径（交叉编译的程序在 PC 上跑 ldd 会报错，正常）；<code>objdump -d -j .plt ./app</code> 看跳板。三件事一起看，动态链接就没有黑箱了。</div>
+
+<h2 id="s6">动手（可选）：亲手制造一次「找不到库」</h2>
+
+<div class="cal q"><span class="h">只在 🔧 实作模式展开</span>目标：不是修好它，而是看清报错从哪来。</div>
+
+<ol>
+  <li><code>gcc -shared -fPIC -Wl,-soname,libhello.so.1 -o libhello.so.1.0 hello.c</code>，再 <code>ln -s libhello.so.1.0 libhello.so.1</code>。</li>
+  <li>编译主程序 <code>gcc main.c -L. -lhello</code>（注意 <code>-lhello</code> 找的是 <code>libhello.so</code>，所以还要建一个 <code>libhello.so</code> 的软链或直接给全路径）。</li>
+  <li>直接运行，会报 <code>cannot open shared object file</code>；<code>LD_LIBRARY_PATH=.</code> 再跑就好了。<code>readelf -d</code> 里能看到 <code>NEEDED: libhello.so.1</code>——这就是 SONAME 的作用。</li>
+  <li>把 <code>-soname</code> 去掉重新编库，再链接主程序，你会发现 <code>NEEDED</code> 变成文件名本身。这解释了「为什么升级库必须保留 SONAME 链接」。</li>
+</ol>
+
+<h2 id="s7">离开这一篇，你应该能</h2>
+
+<ul class="qa">
+  <li>说清 <code>.a</code> 与 <code>.so</code> 在「链接时」和「运行时」分别发生了什么。</li>
+  <li>解释 GOT 里存的到底是什么，谁在什么时候填它。</li>
+  <li>回答「为什么 <code>.so</code> 必须用 <code>-fPIC</code> 编译」，并说出不加会怎样。</li>
+</ul>
+
+<p>下一篇换一个视角：不管静态还是动态，可执行文件最终都要被「搬进内存」。段、栈、堆、core dump，是怎么排布的。</p>
+
+
+<nav class="pager">
+  <a href="d02-01.html"><span>← 上一篇</span><b>ELF 与链接重定位：从符号表到 .rel.text</b></a>
+  <a class="nx" href="d02-03.html"><span>下一篇 →</span><b>程序加载与内存布局：段、栈、堆、core dump</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

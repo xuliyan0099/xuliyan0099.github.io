@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第 07 章 · 八个坑，和一张速查 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<link rel="stylesheet" href="../assets/asm.css">
+</head><body style="--acc:#8b7bff">
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../index.html">☰ 六个入口</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">看懂一份芯片手册 · 8 篇</div>
+    <ol>
+      <li><a href="index.html"><span class="no">⌂</span><span>路口目录<span class="sub">篇目总览与读法</span></span></a></li>
+      <li><a href="m0.html"><span class="no">00</span><span>六份文档，别拿错<span class="sub">Datasheet / RM / AN / 勘误 / 原理图 / dts 各管什么</span></span></a></li>
+      <li><a href="m1.html"><span class="no">01</span><span>拿到手册，先做四件事<span class="sub">建索引、画内存图、找时钟树、贴引脚表</span></span></a></li>
+      <li><a href="m2.html"><span class="no">02</span><span>Datasheet 怎么读：只读五处<span class="sub">订货型号、绝对最大额定、电气特性、引脚定义、封装</span></span></a></li>
+      <li><a href="m3.html"><span class="no">03</span><span>Reference Manual 一章的固定骨架<span class="sub">概述 → 功能 → 外部信号 → 时钟 → 寄存器 → 初始化流程</span></span></a></li>
+      <li><a href="m4.html"><span class="no">04</span><span>寄存器表怎么逐列读<span class="sub">偏移、位域、Reserved、R/W、W1C、复位值</span></span></a></li>
+      <li><a href="m5.html"><span class="no">05</span><span>四个真实例子：从手册到代码<span class="sub">CCM、IOMUXC、UART、GPIO 各走一遍</span></span></a></li>
+      <li><a href="m6.html"><span class="no">06</span><span>从板子上的一个脚，查到 dts 一行<span class="sub">原理图 → 引脚名 → 复用功能 → 设备树节点</span></span></a></li>
+      <li><a href="m7.html" class="active"><span class="no">07</span><span>八个坑，和一张速查<span class="sub">页码对不上、复位值不算、W1C 写 1 才清…</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="../hardware/index.html">硬件入口</a><a href="../juan/index.html">十四卷总览</a></div>
+  </aside>
+  <main class="doc">
+    <div class="doc-kicker">芯片手册研读 · i.MX6ULL <span>·</span> 第 07 章</div>
+    <div class="ch-head">
+      <h1>八个坑，和一张速查</h1>
+      <div class="ch-meta"><span class="hot">第 07 章</span><span>约 20 分钟</span><span>★ 必读</span></div>
+    </div>
+<h2 id="s1">八个坑，每一个都真实发生过</h2>
+<p><b>坑 1：页码对不上。</b> 你按 AN 笔记里的「第 1234 页」翻，结果那一页是别的模块。原因：不同版本的 RM 页码会变（勘误、增补）。<b>对策：只记「章名 + 表名 + 寄存器名」，不记页码。</b></p>
+<p><b>坑 2：把 Reserved 写 1。</b> 手册说「Reserved」，你整写寄存器时把它写成了 1。轻则被忽略，重则触发未公开行为。<b>对策：只在需要的字段上读改写。</b></p>
+<p><b>坑 3：以为复位值是 0。</b> 表里 <code>Reset value</code> 有具体数值，你假设 0 直接整写。<b>对策：初始化时把「你关心的每一位」显式写一遍，别依赖默认值。</b></p>
+<p><b>坑 4：W1C 上做读改写。</b> 读—清位—写回，标志清不掉。<b>对策：W1C 只能写掩码，<code>writel(mask, ISR)</code>。</b></p>
+<p><b>坑 5：模块名对，实例号错。</b> 你调 <code>UART3</code>，dts 里是 <code>uart2</code>。现象：完全没输出，代码看起来全对。<b>对策：<code>dmesg | grep -i uart</code> 看实际注册了哪几个。</b></p>
+<p><b>坑 6：MUX 配了，PAD 没配。</b> 引脚通了但驱动太弱/输入悬空。现象：输出波形幅度不够、输入偶发误触发。<b>对策：两组寄存器一起配，别只写 MUX。</b></p>
+<p><b>坑 7：<code>DR</code> 当 <code>PSR</code> 用。</b> 输入模式下读 <code>DR</code> 永远是旧值。现象：按键永远「按着」或永远「没按」。<b>对策：输入读 <code>PSR</code>，只在输出时用 <code>DR</code>。</b></p>
+<p><b>坑 8：把手册读成小说。</b> 从第 1 页开始读，三天读到第 200 页，遇到问题还是不会查。<b>对策：只查不读。问题驱动，查完立刻合上。</b></p>
+<h2 id="s2">一张速查表</h2>
+<table class="regtbl"><thead><tr><th>问题</th><th>先查</th><th>关键词</th></tr></thead><tbody><tr><td class="nm">这个模块的寄存器在哪</td><td>Memory Map</td><td>模块名 + <code>Base Address</code></td></tr><tr><td class="nm">这个脚能当什么用</td><td>Signal Multiplexing</td><td>引脚名 + ALT</td></tr><tr><td class="nm">模块的时钟从哪来</td><td>CCM 章时钟树</td><td>模块名 + <code>clock</code></td></tr><tr><td class="nm">为什么写进去没反应</td><td>门控 + 复位</td><td class="nm"><code>CCGR</code> / <code>Reset</code></td></tr><tr><td class="nm">这个位能写吗</td><td>Access type</td><td class="nm"><code>W1C</code> / <code>RO</code></td></tr><tr><td class="nm">为什么清不掉标志</td><td>Note 段</td><td class="nm"><code>writing 1 clears</code></td></tr><tr><td class="nm">引脚配了但没用</td><td class="nm"><code>pinmux-pins</code></td><td>归属/参数</td></tr><tr><td class="nm">波特率算不对</td><td>Functional 里的发生器</td><td class="nm"><code>UBIR</code> / <code>UBMR</code></td></tr><tr><td class="nm">时序能跑多快</td><td>Datasheet AC 表</td><td class="nm"><code>Setup</code> / <code>Hold</code></td></tr><tr><td class="nm">芯片有没有已知缺陷</td><td>Errata</td><td>模块名 + revision</td></tr></tbody></table>
+<h2 id="s3">三种「看起来是软件问题，其实是手册没读对」</h2>
+<ol>
+<li><b>「寄存器读回全 0」</b>：时钟没开（坑 3 的变体）。手册在 CCM 章写着「未开时钟时访问返回 0」。</li>
+<li><b>「偶发数据错」</b>：时序参数超了（Datasheet AC 表）。软件层看是「偶发」，硬件层是「建立时间不够」。</li>
+<li><b>「第一次能跑，重启不行」</b>：依赖了复位默认值（坑 3）。第一次是上电冷启动，第二次是 warm reset 留下的旧状态。</li>
+</ol>
+<h2 id="s4">读手册的三条习惯</h2>
+<ul>
+<li><b>边读边抄</b>：每查一次，往自己的摘要里加一行（「模块 / 基址 / 关键位 / 坑」）。三次之后你就不需要手册了。</li>
+<li><b>对照源码</b>：手册里的「Recommended initialization」与内核驱动的 <code>probe</code> 顺序对照着看，能发现官方 BSP 为什么那么写。</li>
+<li><b>留疑点清单</b>：读不懂的位、看不懂的联动，写进一张「疑点」表。等真正调试到它时再回来——<b>带着问题回读，效率是通读的十倍。</b></li>
+</ul>
+<h2 id="s5">本篇验收</h2>
+<ul>
+<li>能说出「页码对不上」的原因，并给出对策。</li>
+<li>能列举三个「把寄存器读成 0」的原因。</li>
+<li>能解释「第一次能跑重启不行」背后的复位类型问题。</li>
+<li>手上有一份自己的摘要（至少十行），每行都注了出处。</li>
+</ul>
+<h2 id="s6">回到路口</h2>
+<p>手册研读八篇到此为止。下一步有两条路：往下钻寄存器细节，去 <code>asm</code> 路口练位操作与裸机；或者回到板子上，用硬件基础课把电路层面的直觉补齐。</p>
+<div class="pager">
+      <a href="m6.html"><span>上一篇</span><b>← 06 从板子上的一个脚，查到 dts 一行</b></a>
+      <a href="index.html"><span>目录</span><b>篇目总览</b></a>
+      <a class="nx" href="../asm/index.html"><span>继续</span><b>汇编练习 → →</b></a>
+    </div>
+  </main>
+</div>
+<script src="../assets/asm-tools.js"></script>
+</body>
+</html>

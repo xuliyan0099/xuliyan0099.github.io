@@ -1,0 +1,195 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ELF 与链接重定位：从符号表到 .rel.text · 卷 02 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j02.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 02 · 编译与运行</div>
+<ol><li><a href="course-19.html">
+  <span class="no">01</span><span>从源码到可执行<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-ch07.html">
+  <span class="no">02</span><span>交叉编译与工程构建<span class="sub">约 12 小时</span></span></a></li>
+<li><a href="course-th17.html">
+  <span class="no">03</span><span>交叉编译与工具链原理<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="d02-01.html" class="active">
+  <span class="no">04</span><span>ELF 与链接重定位：从符号表到 .rel.text<span class="sub">约 3 小时 · 当前</span></span></a></li>
+<li><a href="d02-02.html">
+  <span class="no">05</span><span>静态库与动态链接：PLT / GOT / PIC 全链路<span class="sub">约 3 小时</span></span></a></li>
+<li><a href="d02-03.html">
+  <span class="no">06</span><span>程序加载与内存布局：段、栈、堆、core dump<span class="sub">约 2 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j01.html">← 卷 01</a>
+  <a href="../juan/j03.html">卷 03 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 02<span>·</span>编译与运行<span>·</span>第 04 篇</div>
+  <h1>ELF 与链接重定位：从符号表到 .rel.text</h1>
+  
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 3 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+<p class="lead">你一定见过这种报错：<code>undefined reference to 'foo'</code>。它出现在<em>链接</em>阶段，而不是编译阶段。为什么编译器不早说？因为编译器只对自己的这一份 <code>.o</code> 负责，它只知道「这里需要一个叫 foo 的东西」，至于 foo 到底在哪，是链接器的事。</p>
+
+<p>这一篇就讲这一个动作：<strong>留坑，然后填坑</strong>。理解了它，<code>.o</code>、符号表、重定位表、<code>readelf -r</code> 的输出，全都会变成同一件事的不同侧面。</p>
+
+<h2 id="s1">先玩一下：链接器改写的是哪几个字节</h2>
+
+<p>下面这段代码调用了一个「还不知道地址」的函数。点「单步」，看指令字怎么被链接器改掉——注意右侧 <code>PC</code> 与 <code>R0</code> 的变化，它模拟的是 <code>R_ARM_CALL</code> 这一类重定位的填坑过程。</p>
+
+<div class="ikit" data-type="code" data-json='{"title":"链接器如何改写一条 call","badge":"code",
+"regs":[{"n":"PC","v":"0x0000_8000"},{"n":"R0","v":"0x0000_0000"},{"n":"LR","v":"0x0000_8010"}],
+"lines":[
+{"c":"bl  foo            ; 编译时 foo 地址未知，先填 0","set":{"R0":"0x0000_0000"},"note":"汇编器在 .text 里留一个 4 字节的坑，并把「这里要填 foo」记进 .rel.text。"},
+{"c":"ld 解析符号 foo → 0x0001_2040","set":{"R0":"0x0001_2040"},"note":"链接器在符号表里找到 foo 的最终地址（含 addend 修正）。"},
+{"c":"改写 bl 的 imm24：PC+8 相对偏移","set":{"R0":"0x0000_A03C"},"note":"ARM 的 B/BL 是相对跳转，所以填进去的是「目标 - (PC+8)」的偏移，不是绝对地址。"},
+{"c":"bl  0x0001_2040   ; 坑已填好","set":{"PC":"0x0000_8000"},"note":"运行时 CPU 只看见一条正常的 bl，它不知道曾经有过一个坑。"}]}'></div>
+
+<p>这里有一个容易忽略的点：<strong>填进去的往往不是地址本身</strong>。ARM 的 <code>bl</code> 编码里只有 24 位立即数，表示的是相对偏移；<code>R_ARM_ABS32</code> 才是往一个 32 位字里写绝对地址。所以「重定位类型」这个字段是必须的——不同的坑，填法不一样。</p>
+
+<h2 id="s2">一、为什么必须留坑</h2>
+
+<p>编译一个 <code>.c</code> 时，编译器是单独工作的。它不知道 <code>foo</code> 在哪个文件、最终会被放在哪个地址。它能确定的事情只有三件：</p>
+
+<ul>
+  <li>这条指令/这个数据位置<strong>需要</strong>一个外部符号；</li>
+  <li>这个坑在段内的<strong>偏移</strong>是多少；</li>
+  <li>坑周围还有没有额外修正（比如「再加 4」这种加数）。</li>
+</ul>
+
+<p>于是它把这三件事写进两个表，剩下的交给链接器。这也解释了一个现象：<code>.o</code> 文件里的地址几乎全是 0 或者很小的偏移，因为此时还<strong>没有分配最终地址</strong>。</p>
+
+<div class="layers">
+  <div class="ly"><b>符号表 .symtab</b><span>每个符号一行：名字、值（地址或偏移）、大小、类型（FUNC / OBJECT / SECTION）、绑定（GLOBAL / LOCAL / WEAK）、以及它属于哪个段。</span></div>
+  <div class="ly"><b>重定位表 .rel.text</b><span>每个坑一行：坑在哪（r_offset）、要用哪个符号+哪种填法（r_info）、有没有加数（r_addend）。</span></div>
+  <div class="ly hi"><b>字符串表 .strtab</b><span>符号名不是直接存在符号表里的，只存一个下标，名字本体在这张表里——省空间的老办法。</span></div>
+</div>
+
+<p>三张表的关系可以用一句话记住：<strong>符号表回答「这个符号是谁」，重定位表回答「哪里需要它」</strong>。</p>
+
+<h2 id="s3">二、把 .o 摊开看</h2>
+
+<p>不需要板子，PC 上就能做。这是纯读也能看懂的版本——命令只是为了让输出现身，你不必真的敲。</p>
+
+<pre data-lang="bash"><code># 1. 只编译，不链接
+arm-linux-gnueabihf-gcc -c -O0 add.c -o add.o
+
+# 2. 看段和符号
+arm-linux-gnueabihf-readelf -S add.o      # 段表：.text .data .bss .rel.text ...
+arm-linux-gnueabihf-readelf -s add.o      # 符号表：Bind / Type / Ndx / Value / Size
+
+# 3. 看坑
+arm-linux-gnueabihf-readelf -r add.o      # 重定位表：Offset / Info / Type / Sym
+arm-linux-gnueabihf-objdump -dr add.o     # 反汇编 + 每条指令对应的重定位</code></pre>
+
+<p>典型的输出长这样（节选，数值是示意）：</p>
+
+<table>
+<thead><tr><th>Offset</th><th>Info</th><th>Type</th><th>Symbol</th><th>读法</th></tr></thead>
+<tbody>
+<tr><td>0x1c</td><td>0x0b01</td><td>R_ARM_CALL</td><td>foo</td><td>0x1c 处那条 bl 要跳去 foo，用相对偏移填</td></tr>
+<tr><td>0x20</td><td>0x0b02</td><td>R_ARM_ABS32</td><td>counter</td><td>0x20 处一个字要写 counter 的绝对地址</td></tr>
+<tr><td>0x24</td><td>0x0b03</td><td>R_ARM_ABS32</td><td>.rodata + 0</td><td>指向只读段里的字符串常量</td></tr>
+</tbody></table>
+
+<p>注意第三行：符号不一定是函数，也可能是「某个段 + 偏移」。C 里写 <code>puts("hello")</code>，字符串进 <code>.rodata</code>，代码里留下的是<strong>指向它的地址</strong>，于是产生一条针对该段的绝对重定位。</p>
+
+<h2 id="s4">三、链接器按顺序做五件事</h2>
+
+<div class="ikit" data-type="drag" data-json='{"title":"链接器的五步：把顺序拖对","badge":"drag",
+"items":[{"id":"read","text":"读入所有 .o 与库，建立全局符号表"},{"id":"merge","text":"合并同名段：多个 .text 拼成一个"},{"id":"layout","text":"按链接脚本分配地址（VMA / LMA）"},{"id":"resolve","text":"解析符号：未定义 → 找定义，找不到就报错"},{"id":"reloc","text":"应用重定位，逐条填坑，再写出 ELF"}],
+"answer":["read","merge","layout","resolve","reloc"],
+"explain":"先认识彼此（符号表），再排座位（合并+分配地址），然后才敢报「找不到」，最后填坑。顺序反了就会得到错误的地址。"}'></div>
+
+<p>第三步容易被低估。<code>layout</code> 不是「随便排一下」，它由链接脚本决定，还要满足对齐：<code>.text</code> 通常按 4 或 16 字节对齐，页对齐的段要按 4 KB 对齐。你在 <code>.o</code> 里看到的偏移是「段内偏移」，经过这一步才变成「虚拟地址」——这是后面讲程序加载时 <code>PT_LOAD</code> 的前提。</p>
+
+<div class="ikit" data-type="stack" data-json='{"title":"合并段：三个 .o 的 .text 变成一段","badge":"stack",
+"layers":[{"name":"a.o 的 .text","header":"add 函数","hint":"段内偏移 0x00","color":"#5ff1ef"},{"name":"b.o 的 .text","header":"main 函数","hint":"段内偏移 0x00","color":"#fbbf24"},{"name":"libc 的 .text","header":"printf","hint":"段内偏移 0x00","color":"#a78bfa"}],
+"notes":["链接器把同名段首尾相接，每个 .o 的起始偏移被记录下来。","于是三个互不相干的小地址空间，变成一段连续的地址。","合并之后，跨文件的 bl 才有可能算出正确的相对偏移。"],
+"note0":"三份独立的 .text 各自从偏移 0 开始，此时谁也不知道自己会被放到哪。",
+"payload":"a.o + b.o + libc"}'></div>
+
+<h2 id="s5">四、四种你会遇到的重定位</h2>
+
+<table>
+<thead><tr><th>类型</th><th>用在哪</th><th>怎么填</th><th>常见报错</th></tr></thead>
+<tbody>
+<tr><td><b>R_ARM_ABS32</b></td><td>函数指针、全局变量地址、字符串地址</td><td>直接写 32 位绝对地址（+addend）</td><td>—</td></tr>
+<tr><td><b>R_ARM_CALL / JUMP24</b></td><td><code>bl</code> / <code>b</code> 指令</td><td>写 PC 相对偏移，范围约 ±32 MB</td><td><code>relocation truncated to fit</code></td></tr>
+<tr><td><b>R_ARM_PREL31</b></td><td>异常处理表（.ARM.exidx）</td><td>写 31 位相对偏移</td><td>—</td></tr>
+<tr><td><b>R_ARM_REL32</b></td><td>调试信息、部分 PIC 引用</td><td>写「符号 - 当前位置」</td><td>—</td></tr>
+</tbody></table>
+
+<p><code>relocation truncated to fit</code> 这条报错值得单独记：它说明目标地址离得太远，24 位相对偏移装不下。解决办法通常是让链接脚本把相关段排近一点，或者改用绝对跳转的长调用序列（<code>-mlong-calls</code>）。</p>
+
+<h2 id="s6">五、三个常见误解</h2>
+
+<div class="cal warn"><span class="h">误解一：反汇编里 call 的目标是 0，说明编译器坏了</span>没有坏。那是还没填的坑。用 <code>objdump -dr</code>（带 <code>-r</code>）才能同时看到指令和它对应的重定位项；只看 <code>-d</code> 就像看一张还没写答案的卷子。</div>
+
+<div class="cal warn"><span class="h">误解二：strip 之后符号表没了，程序就找不到函数了</span>链接完成后符号表对运行没有作用（动态符号表 <code>.dynsym</code> 是另一张，strip 不会删它）。strip 删掉的是「给人看」的调试信息，填坑早已完成。</div>
+
+<div class="cal warn"><span class="h">误解三：重定位是运行时做的</span>静态链接的重定位在链接时完成，运行时一个字节都不会改。运行时才填坑的是动态链接的 GOT——那是下一篇的主角。</div>
+
+<h2 id="s7">动手（可选）：自己造一个坑</h2>
+
+<div class="cal q"><span class="h">只在 🔧 实作模式展开</span>需要：一台 Ubuntu（或 WSL），装 <code>gcc-arm-linux-gnueabihf</code> 或直接用本机 gcc。目的不是编译成功，而是<em>看见</em>重定位项。</div>
+
+<ol>
+  <li>写两个文件：<code>add.c</code> 里定义 <code>int counter; int add(int a,int b){counter++;return a+b;}</code>；<code>main.c</code> 里 <code>extern int add(int,int);</code> 并调用它。</li>
+  <li><code>gcc -c add.c main.c</code>，分别 <code>readelf -r</code>。你会看到 <code>main.o</code> 里有 <code>R_ARM_CALL add</code>，<code>add.o</code> 里没有针对 add 的重定位（它就是定义者）。</li>
+  <li>把 <code>add.c</code> 改名成 <code>add2.c</code> 但函数名不改，再链接 <code>main.o add2.o</code>——应该能过。这证明链接器只认符号名，不认文件名。</li>
+  <li>把函数名改成 <code>add2</code>，再链接，你会得到 <code>undefined reference to 'add'</code>。这条报错的来源就是「重定位表里有一个坑，符号表里找不到对应的定义」。</li>
+</ol>
+
+<p>预期与失败对照：如果 <code>readelf -r</code> 输出为空，通常是<strong>开了优化</strong>把调用内联掉了，或者函数被声明成 <code>static</code>（那就变成段内重定位，甚至完全消失）。这不是工具坏了，是坑根本不存在。</p>
+
+<h2 id="s8">离开这一篇，你应该能</h2>
+
+<ul class="qa">
+  <li>说出符号表与重定位表各自回答什么问题，以及 <code>.o</code> 里为什么地址几乎都是 0。</li>
+  <li>拿到一行 <code>R_ARM_CALL foo</code>，解释「填进去的是相对偏移而不是地址」。</li>
+  <li>解释 <code>undefined reference</code> 为什么属于链接错误，而不是编译错误。</li>
+</ul>
+
+<p>下一篇顺着「填坑」往下走：如果这个坑要等到<em>程序跑起来</em>才填，会发生什么？那就是静态库、动态库、PLT 与 GOT 的故事。</p>
+
+
+<nav class="pager">
+  <a href="course-th17.html"><span>← 上一篇</span><b>交叉编译与工具链原理</b></a>
+  <a class="nx" href="d02-02.html"><span>下一篇 →</span><b>静态库与动态链接：PLT / GOT / PIC 全链路</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

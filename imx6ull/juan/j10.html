@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>卷 10 · 用户态 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<style>
+main.doc table{width:100%;border-collapse:collapse;margin:14px 0 8px;font-size:14px}
+main.doc th,main.doc td{border-bottom:1px solid rgba(110,168,254,.14);padding:9px 10px;text-align:left;vertical-align:top}
+main.doc th{color:#93a9cf;font-weight:600;font-size:13px;background:rgba(12,18,30,.5)}
+main.doc td.sn{white-space:nowrap;font-variant-numeric:tabular-nums;width:56px}
+main.doc td.nm{color:#eafdff}
+main.doc td.kk{color:#93a4c4;font-size:13px;white-space:nowrap}
+main.doc tbody tr:hover{background:rgba(110,168,254,.05)}
+main.doc ul.acc{margin:10px 0 20px;padding-left:22px;color:#c8d6ec}
+main.doc ul.acc li{margin:0 0 8px}
+@media(max-width:900px){main.doc td.kk{display:none}}
+</style>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="index.html">☰ 十四卷总览</a>
+  <a class="home hide-sm" href="../viz/index.html">互动台</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+<div class="vol-h">卷 10 · 用户态</div>
+<ol>
+<li><a href="../docs/d10-01.html" class="active">
+  <span class="no">01</span><span>文件 IO 与 mmap：从 read 到直接映射寄存器<span class="sub">深读 · 待补动手</span></span></a></li>
+<li><a href="../docs/d10-02.html">
+  <span class="no">02</span><span>多线程与锁：pthread、条件变量、常见死锁<span class="sub">深读 · 待补动手</span></span></a></li>
+<li><a href="../docs/d10-03.html">
+  <span class="no">03</span><span>socket 与 epoll：一个能扛住千连接的事件循环<span class="sub">深读 · 待补动手</span></span></a></li>
+<li><a href="../docs/d10-04.html">
+  <span class="no">04</span><span>进程间通信：管道、共享内存、消息队列、信号<span class="sub">深读 · 待补动手</span></span></a></li>
+</ol>
+<div class="vol-nav"><a href="index.html">☰ 总览</a><a href="j11.html">卷 11 →</a></div>
+  </aside>
+  <main class="doc">
+
+    <div class="doc-kicker"><span>卷 10 / 13</span><span>·</span><span>4 篇</span><span>·</span><span>读 8h + 做 24h</span></div>
+    <h1>卷 10 · 用户态</h1>
+    <p class="lede">做产品靠这一层：文件、线程、socket、事件循环、进程间通信。四篇都是深读，纯读即可。</p>
+    <div class="doc-chips"><span class="hot">4 篇</span><span>难度 ★◆</span><span>读 8h</span><span>做 24h</span></div>
+
+    <h2>这一卷要回答的问题</h2>
+    <ul class="qa">
+<li>mmap 为什么能让用户态直接操作寄存器</li>
+<li>多线程共享什么、各有什么私有</li>
+<li>epoll 比 select 强在哪，边沿触发为什么要读干净</li>
+<li>共享内存为什么要配信号量</li>
+    </ul>
+
+    <h2>篇目（4 篇）</h2>
+    <p>左栏和这张表是同一套链接，点哪个都行。「深读 · 带互动组件」的篇里嵌了能点能拖的组件。</p>
+    <table>
+      <thead><tr><th>序</th><th>标题</th><th>类型</th></tr></thead>
+      <tbody>
+<tr>
+  <td class="sn">01</td>
+  <td class="nm"><a href="../docs/d10-01.html">文件 IO 与 mmap：从 read 到直接映射寄存器</a></td>
+  <td class="kk">深读 · 待补动手</td>
+</tr>
+<tr>
+  <td class="sn">02</td>
+  <td class="nm"><a href="../docs/d10-02.html">多线程与锁：pthread、条件变量、常见死锁</a></td>
+  <td class="kk">深读 · 待补动手</td>
+</tr>
+<tr>
+  <td class="sn">03</td>
+  <td class="nm"><a href="../docs/d10-03.html">socket 与 epoll：一个能扛住千连接的事件循环</a></td>
+  <td class="kk">深读 · 待补动手</td>
+</tr>
+<tr>
+  <td class="sn">04</td>
+  <td class="nm"><a href="../docs/d10-04.html">进程间通信：管道、共享内存、消息队列、信号</a></td>
+  <td class="kk">深读 · 待补动手</td>
+</tr>
+      </tbody>
+    </table>
+
+    <h2>读完这一卷要能做到</h2>
+    <ul class="acc">
+<li>用 mmap 在板子上不写驱动就点亮一个 LED</li>
+<li>写出一个 epoll 边沿触发的服务端并解释为什么不会丢事件</li>
+<li>说出共享内存 + 信号量与管道的取舍</li>
+    </ul>
+
+    <nav class="pager">
+      <a href="j09.html"><span>上一卷</span><b>卷 09 · 驱动体系</b></a>
+      <a class="nx" href="j11.html"><span>下一卷</span><b>卷 11 · 调试与可观测 →</b></a>
+    </nav>
+    <div class="doc-foot">卷 10 · 4 篇 · 侧栏是本卷全部篇目 · 本页由 build-hub.js 生成</div>
+  </main>
+</div>
+<script src="../assets/anime.iife.min.js"></script>
+<script src="../assets/viz.js"></script>
+<script src="../assets/iviz.js"></script>
+<script src="../assets/anim2.js"></script>
+<script src="../assets/anim.js"></script>
+<script src="../assets/cpu3.js"></script>
+<script src="../assets/ikit.js"></script>
+</body></html>

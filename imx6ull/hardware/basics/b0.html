@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第 00 章 · 先修：怎么学才算学会 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/doc-compat.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+<link rel="stylesheet" href="../../assets/asm.css">
+</head><body style="--acc:#ffb545">
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../../index.html">☰ 六个入口</a>
+  <a class="home hide-sm" href="../../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">硬件是怎么工作的 · 9 篇</div>
+    <ol>
+      <li><a href="index.html"><span class="no">⌂</span><span>路口目录<span class="sub">篇目总览与读法</span></span></a></li>
+      <li><a href="b0.html" class="active"><span class="no">00</span><span>先修：怎么学才算学会<span class="sub">三条判断标准，和一条错的路径</span></span></a></li>
+      <li><a href="b1.html"><span class="no">01</span><span>电的四个字：电压、电流、电阻、功率<span class="sub">欧姆定律、串并联、LED 限流实算</span></span></a></li>
+      <li><a href="b2.html"><span class="no">02</span><span>无源五件套：电阻、电容、电感、二极管、晶振<span class="sub">每个元件都在解决一个具体问题</span></span></a></li>
+      <li><a href="b3.html"><span class="no">03</span><span>有源器件：三极管与 MOS 管<span class="sub">为什么一个「开关」需要三个脚</span></span></a></li>
+      <li><a href="b4.html"><span class="no">04</span><span>数字电路的骨架：电平、门、组合、时序<span class="sub">五种门、真值表、加法器、触发器</span></span></a></li>
+      <li><a href="b5.html"><span class="no">05</span><span>时间：时钟、建立保持、抖动、消抖<span class="sub">为什么电路需要「等一会儿」</span></span></a></li>
+      <li><a href="b6.html"><span class="no">06</span><span>总线到底是什么<span class="sub">地址、数据、控制，与片选、时序</span></span></a></li>
+      <li><a href="b7.html"><span class="no">07</span><span>回到这块板子：元件对号入座<span class="sub">电源树、晶振、DDR、eMMC、按键、LED</span></span></a></li>
+      <li><a href="b8.html"><span class="no">08</span><span>工具与六个实验<span class="sub">万用表、示波器、逻辑分析仪怎么用</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="../index.html">硬件入口</a><a href="../../juan/index.html">十四卷总览</a></div>
+  </aside>
+  <main class="doc">
+    <div class="doc-kicker">硬件基础课 · 从一颗电阻开始 <span>·</span> 第 00 章</div>
+    <div class="ch-head">
+      <h1>先修：怎么学才算学会</h1>
+      <div class="ch-meta"><span class="hot">第 00 章</span><span>约 12 分钟</span><span>★ 必读</span></div>
+    </div>
+<h2 id="s1">三条标准：什么算「学会了硬件」</h2>
+<p>不是「能背出五个元件名」，而是这三条：</p>
+<ol>
+<li><b>看到一根线，能说出它为什么存在。</b> 比如 DDR 数据线旁边为什么有一串电阻、I2C 的两根线为什么都要上拉。</li>
+<li><b>看到一个数值，能判断它合不合理。</b> 比如 3.3V 直接接 LED 行不行、上拉用 10k 还是 1k。</li>
+<li><b>看到一个现象，能提出两个可能原因，并知道先量哪个。</b> 比如「灯不亮」：先量电压还是先量电流？</li>
+</ol>
+<p>三条都能做到，你在板子前面就不是瞎猜了。</p>
+<h2 id="s2">一条走错的路：从「芯片」开始学</h2>
+<p>大多数人的路径是：先买板子 → 先跑例程 → 灯亮了 → 觉得自己会了 → 一改外设就崩 → 回头补基础 → 发现基础比想象中简单，只是没人讲过。</p>
+<p>正确的顺序反过来：</p>
+<pre class="asm"><code>物理（电是什么）→ 元件（它们各自解决什么问题）→ 电路（连起来干什么）
+   → 数字（怎么表示 0/1）→ 时序（为什么要等）→ 总线（怎么传数据）→ 芯片</code></pre>
+<p>这个顺序的每一层，都在解释下一层里「看起来玄学」的那部分。<b>跳过任何一层，下一层就只能靠背。</b></p>
+<h2 id="s3">硬件与软件的分界线在哪</h2>
+<p>很多人以为分界线是「会不会写驱动」。实际的分界线是<b>「你能不能判断问题在软件还是在硬件」</b>。</p>
+<p>三个抓手就够区分：</p>
+<table class="regtbl"><thead><tr><th>抓手</th><th>判断</th></tr></thead><tbody><tr><td class="nm">电压对不对</td><td>该 3.3V 的地方量到 0V → 硬件</td></tr><tr><td class="nm">时序对不对</td><td>波形有了但采样点不对 → 硬件/参数</td></tr><tr><td class="nm">状态对不对</td><td>寄存器说发了，引脚没波形 → 复用/时钟（软件配错）</td></tr></tbody></table>
+<p><b>绝大多数「硬件坏了」其实是「软件没配对」</b>，而绝大多数「软件有 bug」其实是「电气条件不满足」。这两句是这门课的主线。</p>
+<h2 id="s4">你需要的工具，只有三样</h2>
+<ul>
+<li><b>万用表</b>（几十块就行）：量电压、量通断、量电阻。这是使用频率最高的工具，占 80% 的诊断工作。</li>
+<li><b>逻辑分析仪</b>（几十到几百块）：看数字波形、解 I2C/SPI/UART。看不到波形时它是唯一证据。</li>
+<li><b>示波器</b>（可选）：看模拟波形、看上升沿、看毛刺。前两样解决不了再上它。</li>
+</ul>
+<p>不需要热风枪、不需要显微镜、不需要自己画板。<b>修板子和设计板子是两件事，这门课只做前者。</b></p>
+<h2 id="s5">学完你能做到什么</h2>
+<ul>
+<li>拿到一块不亮的板子，能按「电源 → 时钟 → 复位 → 引脚 → 通信」的顺序量下去。</li>
+<li>看懂原理图上的每一类符号，并知道哪些是「可调」的、哪些是「固定」的。</li>
+<li>能读 Datasheet 的电气表，判断「这个器件能不能直接接在这颗芯片上」。</li>
+<li>能解释「为什么这里要加个电容」「为什么这里要串个电阻」，而不是照抄参考设计。</li>
+</ul>
+<h2 id="s6">本篇验收</h2>
+<ul>
+<li>能说出三条「学会」的判断标准，并举一个自己的例子。</li>
+<li>能画出「物理 → 元件 → 电路 → 数字 → 时序 → 总线 → 芯片」这条路径。</li>
+<li>能用三个抓手区分「软件问题」与「硬件问题」。</li>
+<li>说清万用表、逻辑分析仪、示波器各自解决什么问题。</li>
+</ul>
+<h2 id="s7">下一篇</h2>
+<p>从最小的东西开始：电压、电流、电阻、功率这四个字。01 篇会用一颗 LED 把四个字全部用一遍——这是硬件里唯一一个「算错了会真的烧掉」的入门实验。</p>
+<div class="pager">
+      <a href="index.html"><span>返回</span><b>← 路口目录</b></a>
+      <a href="index.html"><span>目录</span><b>篇目总览</b></a>
+      <a class="nx" href="b1.html"><span>下一篇</span><b>01 电的四个字：电压、电流、电阻、功率 →</b></a>
+    </div>
+  </main>
+</div>
+<script src="../../assets/hw-tools.js"></script>
+</body>
+</html>

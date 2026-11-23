@@ -1,0 +1,242 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>从半加器到全加器 · 卷 01 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j01.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 01 · 机器与指令</div>
+<ol><li><a href="course-00.html">
+  <span class="no">01</span><span>计算机只是一台会照抄指令的机器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-01.html">
+  <span class="no">02</span><span>为什么偏偏是二进制<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-02.html">
+  <span class="no">03</span><span>一个字节能装什么<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-03.html">
+  <span class="no">04</span><span>从按键到屏幕<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-04.html">
+  <span class="no">05</span><span>一个开关能做什么<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-05.html">
+  <span class="no">06</span><span>与、或、非<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-06.html" class="active">
+  <span class="no">07</span><span>从半加器到全加器<span class="sub">◆ · 约 1 小时 · 当前</span></span></a></li>
+<li><a href="course-07.html">
+  <span class="no">08</span><span>补码与减法器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-08.html">
+  <span class="no">09</span><span>时钟与触发器<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-09.html">
+  <span class="no">10</span><span>冯诺依曼五件事<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-10.html">
+  <span class="no">11</span><span>PC 与指令寄存器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-11.html">
+  <span class="no">12</span><span>ALU 与标志位<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-12.html">
+  <span class="no">13</span><span>一条指令的完整旅程<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-13.html">
+  <span class="no">14</span><span>流水线<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-14.html">
+  <span class="no">15</span><span>机器码的位段<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-15.html">
+  <span class="no">16</span><span>九种寻址方式<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-16.html">
+  <span class="no">17</span><span>汇编只有四类动作<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-17.html">
+  <span class="no">18</span><span>函数调用与 ABI<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-18.html">
+  <span class="no">19</span><span>从 C 到汇编<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th18.html">
+  <span class="no">20</span><span>CPU 是怎么执行一行代码的（详解）<span class="sub">约 3 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j00.html">← 卷 00</a>
+  <a href="../juan/j02.html">卷 02 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 01<span>·</span>机器与指令<span>·</span>第 07 篇</div>
+  <h1>从半加器到全加器</h1>
+  <p class="lede">CPU 里最忙的部件是加法器。一条 add 指令、一次地址计算、一次循环变量自增、一次指针偏移，背后都是它。这一课从「两个比特相加」一路搭到 32 位加法器，顺便看清一个关键工程矛盾：进位是串行的，串得越长越慢——这正是主频上限的来源之一。</p>
+  <div class="doc-chips">
+    <span class="hot">◆ 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+
+    <div class="anim2" data-json='{"title":"从半加器到全加器：CPU 的心脏","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"2 输入 XOR / AND"},{"k":"半加器"},{"k":"全加器"},{"k":"32 位行波加法器"},{"k":"ALU"}],"frames":[{"i":0,"d":"4~6 个管子"},{"i":1,"d":"S 与 C 两个输出"},{"i":2,"d":"2 个半加器 + 1 个或门"},{"i":3,"d":"32 个全加器串联"},{"i":4,"d":"加法器 + 逻辑单元 + 移位器 + 选择器"}]}'></div>
+
+    <div class="viz" data-kind="bits" data-title="8 位行波进位加法器：进位像波浪一样传过去" data-sub="每一位必须等右边的进位到达，才能算出自己的结果" data-json='{"w":8,"fields":[{"n":"b7","lo":7,"hi":7,"c":"rd","t":"最高位，最后才稳定；它的进位就是 C 标志"},{"n":"b6","lo":6,"hi":6,"c":"or","t":"等 b5 的进位"},{"n":"b5","lo":5,"hi":5,"c":"or","t":"等 b4 的进位"},{"n":"b4","lo":4,"hi":4,"c":"vi","t":"等 b3 的进位"},{"n":"b3","lo":3,"hi":3,"c":"vi","t":"等 b2 的进位"},{"n":"b2","lo":2,"hi":2,"c":"cy","t":"等 b1 的进位"},{"n":"b1","lo":1,"hi":1,"c":"cy","t":"等 b0 的进位"},{"n":"b0","lo":0,"hi":0,"c":"gr","t":"最先算完的一位"}],"note":"关键路径 = 8 级全加器延迟。这就是「行波进位」这个名字的由来：进位从低位「波」到高位。32 位就是 32 级串联。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 两个比特相加，为什么需要两个输出？② 全加器比半加器多了什么？③ 8 位加法器最坏延迟是几级？④「超前进位」怎么绕开串联？⑤ CPU 的 C/V/Z/N 标志位是加法器的哪个副产物？</p>
+    </div>
+
+    <h2 id="s1">1. 直觉：小学竖式</h2>
+
+    <p>算 <code>27 + 35</code>：先算个位 7+5=12，写 2 进 1；再算十位 2+3+1=6。这个「进位」就是数字电路的 <code>carry</code>。每一位的运算都需要知道右边传来的进位，所以必须从右往左串行。</p>
+
+    <p><b>失效处</b>：人手算可以跳着来，电路不行。电路里所有位同时工作，但必须「等」进位稳定，这个「等」就是延迟。</p>
+
+    <h2 id="s2">2. 硬件上：半加器 → 全加器</h2>
+
+    <pre><code>半加器（Half Adder）：只加 A、B，不考虑进位输入
+  S = A XOR B        （和）
+  C = A AND B        （进位）
+
+全加器（Full Adder）：加 A、B、Cin
+  S    = A XOR B XOR Cin
+  Cout = (A AND B) OR (Cin AND (A XOR B))</code></pre>
+
+    <p>全加器可以由「两个半加器 + 一个或门」拼出：第一个半加器算 A+B 得 S1、C1；第二个把 S1 与 Cin 相加得 S、C2；最后 <code>Cout = C1 OR C2</code>。总共约 5 个门、3 级延迟。</p>
+
+    <p>32 位加法器就是 32 个全加器串联。<b>最坏情况一次 32 级门延迟</b>——这就是为什么老式 CPU 一条加法指令要花好几个周期。</p>
+
+    <div class="viz" data-kind="flow" data-title="从零件到 CPU 的算术单元" data-sub="五级放大，每一步只多一点点复杂度" data-json='{"steps":[{"n":"2 输入 XOR / AND","d":"4~6 个管子"},{"n":"半加器","d":"S 与 C 两个输出"},{"n":"全加器","d":"2 个半加器 + 1 个或门"},{"n":"32 位行波加法器","d":"32 个全加器串联"},{"n":"ALU","d":"加法器 + 逻辑单元 + 移位器 + 选择器"}],"note":"ALU 不是只有加法：它把加、减、与、或、异或、移位、比较都做出来，再用一个多路选择器按指令的 opcode 位选一个结果输出——这就是第 11 课要讲的。"}'></div>
+
+    <h2 id="s3">3. 超前进位：把「等」变成「并行猜」</h2>
+
+    <p>观察每一位：进位什么时候产生？两种情况——</p>
+
+    <ul>
+      <li><b>生成（Generate）</b>：<code>G = A AND B</code>。这一位自己就产生进位，不管输入进位是什么。</li>
+      <li><b>传播（Propagate）</b>：<code>P = A XOR B</code>。这一位会把输入进位原样传下去。</li>
+    </ul>
+
+    <p>于是进位可以写成：<code>C(i+1) = G(i) OR (P(i) AND C(i))</code>。把代入展开，<b>第 4 位进位可以直接用 A3..A0、B3..B0 算出来，不需要等 <code>C3</code> 稳定</b>。4 位一组做 CLA，再组间再 CLA，就成了树形结构——延迟从 O(n) 降到 O(log n)。</p>
+
+    <p>代价是门数暴涨（每个进位都要一整套与或树）。所以真实设计在「长度」上折中：通常 4~8 位一组。ARM 的加法器就是这类结构。</p>
+
+    <div class="viz" data-kind="bars" data-title="关键路径对比：串行 vs 超前进位（32 位）" data-sub="单位：等效门延迟级数，只是量级示意" data-json='{"items":[{"n":"行波进位 32 位","v":32,"c":"rd"},{"n":"4 位一组 CLA","v":13,"c":"or"},{"n":"8 位一组 CLA","v":9,"c":"cy"},{"n":"树形（log2）","v":5,"c":"gr"}],"unit":"级","max":32,"note":"数字不必精确，趋势才重要：进位链的长度直接决定加法延迟，而加法延迟又在乘法、地址计算、分支比较的关键路径上——所以它是主频上限的重要一环。"}'></div>
+
+    <h2 id="s4">4. 一个加法器如何产出五个标志位</h2>
+
+    <p>ARM 的每条数据处理指令执行完，都会更新 CPSR 里的条件标志。它们全部是加法器的「副产物」：</p>
+
+    <table>
+      <thead><tr><th>标志</th><th>含义</th><th>从哪里来</th></tr></thead>
+      <tbody>
+        <tr><td><b>N</b>（Negative）</td><td>结果为负</td><td>结果最高位（第 31 位）</td></tr>
+        <tr><td><b>Z</b>（Zero）</td><td>结果为零</td><td>所有结果位 NOR 起来（全 0 则为 1）</td></tr>
+        <tr><td><b>C</b>（Carry）</td><td>无符号进位/借位</td><td>加法器最高位的进位输出</td></tr>
+        <tr><td><b>V</b>（Overflow）</td><td>有符号溢出</td><td>最高位进位 XOR 次高位进位（符号位被「顶翻」）</td></tr>
+        <tr><td><b>Q</b>（Saturation）</td><td>饱和（DSP 扩展）</td><td>饱和运算是否发生</td></tr>
+      </tbody>
+    </table>
+
+    <p>这个表格解释了一个非常实际的调试现象：<b>比较指令 <code>cmp</code> 其实就是 <code>subs</code>（减法并更新标志），分支指令 <code>bne</code> 只是去看 Z 位</b>。CPU 不会「真的比较」，它只是做减法、看标志。第 07 课会把这条链路彻底打通。</p>
+
+    <h2 id="s5">5. 实验：用位运算模拟行波加法器</h2>
+
+    <pre><code>def ripple_add(a, b, bits=8):
+    print("a=%s b=%s" % (bin(a), bin(b)))
+    carry, out = 0, 0
+    for i in range(bits):
+        ai = (a >> i) & 1
+        bi = (b >> i) & 1
+        s = ai ^ bi ^ carry          # 和位
+        new_carry = (ai & bi) | (carry & (ai ^ bi))
+        print(" bit%d: a=%d b=%d cin=%d -> s=%d cout=%d"
+              % (i, ai, bi, carry, s, new_carry))
+        out |= s << i
+        carry = new_carry
+    print("结果=%d 最终进位=%d" % (out, carry))
+    return out, carry
+
+ripple_add(0b10110101, 0b01101111)
+
+# 观察：8 位无符号 181+111=292，超出 255 → 结果 36，进位 1
+# 这就是 C 标志：无符号溢出
+
+# 再看有符号：-75 + 111 = 36，不溢出，V=0
+# 同一个加法，C 和 V 的结论完全不同——这就是「有符号/无符号只看你怎么解释」</code></pre>
+
+    <p>跑到这里你应该能自己回答：<b>为什么 181+111 的 C=1 而 V=0？</b>因为无符号视角下 292 超出 8 位；有符号视角下 -75+111=36 完全合法。硬件只管算位，解释权在软件。</p>
+
+    <h2 id="s6">6. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于加法器的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["加法器就是加，减法要用另一个减法器","32 位加法器就是 32 个门并联，一次算完","溢出是一个错误，硬件会拦住"]},"good":{"t":"实际","items":["减法 = 加补码取反（第 07 课），同一个加法器复用","进位必须串行传播，最坏 32 级延迟；CLA 才做得到近似并行","硬件只置标志位，不拦截；是否溢出由软件决定要不要处理"]},"note":"ARM 的 ADD/SUB 用同一个数据通路；x86 也一样。这就是「复用」在硬件里的意义：省面积、省功耗，代价是控制逻辑变复杂。"}'></div>
+
+    <h2 id="s7">7. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>半加器为什么不能直接串成多位加法器？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>半加器没有进位输入端口，只能处理最低位；其余位必须能接收低位传来的进位，所以需要全加器。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>全加器的 Cout 表达式为什么是 <code>(A&B) OR (Cin&(A^B))</code>？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>两种情况会产生进位：A、B 都为 1（自己生成），或者 A、B 只有一个为 1（A^B=1）且 Cin 为 1（把进位传下去）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>C 和 V 有什么区别？举一个 C=1、V=0 的例子。</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>C 是无符号视角的进位；V 是有符号视角的溢出（符号位被顶翻）。8 位下 181+111：C=1，V=0。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>超前进位为什么要引入 G 和 P？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>为了把「等进位」变成「用输入直接算出进位」：G 表示本位必然产生进位，P 表示本位会传递进位，于是进位可以由输入并行计算。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>Z 标志在硬件上怎么算？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>把 32 个结果位全部 NOR（或非）：任一为 1 则输出 0，全为 0 则输出 1。通常用一棵或树 + 取反，比 32 输入或门更快。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>跑上面的 Python，把 181+111 的每一位打印出来，标出进位在哪一位停住。</li>
+        <li>用 Python 改 bits=4，试 7+9，观察 C 与 V 的不同结论。</li>
+        <li>手画 4 位 CLA 的 G/P 生成逻辑（只看第 3 位）。</li>
+        <li>在板子上跑 <code>objdump -d</code> 看一条 <code>add</code> 的机器码，找到它用了哪几个寄存器。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      加法器只会加，可 CPU 还得会减。第 07 课用「补码」这件事告诉你：<b>减法根本不需要减法器</b>——把减数取反加一，加法器直接算。这是整个计算机体系里最优雅的一个技巧。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="slider" data-iviz="1" data-json='{"title":"拖动 A，看和与进位怎么跳","hint":"B 固定为 5","label":"A 的值（4 位）","unit":"","min":0,"max":15,"step":1,"value":10,"presets":[{"t":"10 + 5","v":10},{"t":"11 + 5（进位）","v":11},{"t":"15 + 5","v":15}],"note":"把 A 从 10 拖到 11：结果从 15 跳到 0，进位从 0 跳到 1。4 位加法器只认 4 位，多出来的那一位必须单独接出去。","out":[{"k":"A + 5","expr":"v + 5"},{"k":"4 位和","expr":"(v + 5) % 16"},{"k":"进位 C","expr":"(v + 5) >= 16 ? 1 : 0"}]}'></div>
+  
+
+<nav class="pager">
+  <a href="course-05.html"><span>← 上一篇</span><b>与、或、非</b></a>
+  <a class="nx" href="course-07.html"><span>下一篇 →</span><b>补码与减法器</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

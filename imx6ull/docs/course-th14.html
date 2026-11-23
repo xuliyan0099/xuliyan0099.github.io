@@ -1,0 +1,399 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>内存管理进阶：分页、回收与 OOM · 卷 03 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j03.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 03 · 存储与地址</div>
+<ol><li><a href="course-20.html">
+  <span class="no">01</span><span>存储层次<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-21.html">
+  <span class="no">02</span><span>Cache 三参数<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-22.html">
+  <span class="no">03</span><span>内存墙与局部性<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-23.html">
+  <span class="no">04</span><span>用 perf 量化<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="course-24.html">
+  <span class="no">05</span><span>虚拟地址是什么<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-25.html">
+  <span class="no">06</span><span>页表与 MMU<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-26.html">
+  <span class="no">07</span><span>缺页与换页<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th03.html">
+  <span class="no">08</span><span>虚拟内存与地址翻译（详解）<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="course-th14.html" class="active">
+  <span class="no">09</span><span>内存管理进阶：分页、回收与 OOM<span class="sub">◆ · 约 5 小时 · 当前</span></span></a></li>
+<li><a href="viz-mmu.html">
+  <span class="no">10</span><span>互动台：MMU 页表翻译<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="viz-cache.html">
+  <span class="no">11</span><span>互动台：Cache 层次与命中<span class="sub">💻 · 约 1 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j02.html">← 卷 02</a>
+  <a href="../juan/j04.html">卷 04 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 03<span>·</span>存储与地址<span>·</span>第 09 篇</div>
+  <h1>内存管理进阶：分页、回收与 OOM</h1>
+  <p class="lede">T03 讲清了「为什么要有页表」。这一章往下钻一层：一次访存失败之后，内核到底做了哪 12 件事；物理页怎么按「伙伴」凑块；内存不够时谁先被杀。看得懂这一章，你就能回答嵌入式面试里 80% 的内存问题。</p>
+  <div class="doc-chips">
+    <span class="hot">◆ 一读</span>
+    <span>纯读约 5 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+    <div class="viz" data-kind="map" data-title="一个进程眼里的 4GB 虚拟空间" data-sub="地址旁边标的是它真正在哪儿" data-json='{"rows":[{"segs":[{"n":"内核空间 3GB-4GB","size":3,"c":"vi","d":"所有进程共用同一份"},{"n":"栈","size":1,"c":"or","d":"向下长"},{"n":"文件映射 / 堆","size":2,"c":"gr","d":"向上长"},{"n":"代码与数据","size":2,"c":"cy","d":"ELF 装载区"}],"from":"0x00000000","to":"0xC0000000","ptr":0.05}],"note":"每个进程都以为自己独占 4GB，其实是同一张页表模板。栈和堆相向生长，中间的空洞一旦被撞上，就是「栈溢出」或「堆越界」。"}'></div>
+
+
+    <div class="card">
+      <h4>本章要解决的问题</h4>
+      <p>① 一个虚拟地址到物理地址，中间究竟经过几次查表、谁会失败；② malloc 返回成功但第一次写就崩，为什么；③ 内核怎么知道哪块内存该回收；④ OOM killer 凭什么选中某个进程；⑤ kmalloc 与 vmalloc 到底差在哪。</p>
+    </div>
+
+    <div class="card">
+      <h4>读完你应该能回答</h4>
+      <ul>
+        <li>ARMv7 的 L1 段描述符与 L2 页描述符，各是哪几位决定属性？</li>
+        <li>缺页中断由谁接手，要走哪几步才能回到用户态继续执行？</li>
+        <li>伙伴系统的 order 是什么，为什么它能防外部碎片？</li>
+        <li>水位 watermark 的 min/low/high 三级分别触发什么行为？</li>
+        <li>OOM 分数 oom_score 由什么构成，怎么保护关键进程？</li>
+      </ul>
+    </div>
+
+    <div class="anim2" data-json='{"title":"内存不够时内核按这个顺序动手","hint":"从快到慢，最后才杀进程","nodes":[{"k":"缺页异常","s":"访问未映射"},{"k":"空闲页","s":"直接给"},{"k":"回收缓存","s":"丢干净页"},{"k":"swap","s":"换出匿名页"},{"k":"OOM","s":"杀进程"}],"frames":[{"i":0,"d":"访问一个还没映射或没加载的页，MMU 报 data abort，缺页处理接手。"},{"i":1,"d":"空闲链表还有页就直接给——程序的页本来就是按需才分配，这一步最常发生。"},{"i":2,"d":"空闲不够了，先丢 page cache 里的干净页（硬盘上有备份），脏页则先写回。"},{"i":3,"d":"还不够就把栈、堆这些匿名页写进 swap 腾出内存，从这里开始明显变卡。"},{"i":4,"d":"实在腾不出来，OOM killer 按占用打分杀一个进程。系统活着，你的程序没了。"}],"kind":"flow"}'></div>
+
+    <h2 id="s1">1. 为什么必须分页</h2>
+
+    <p>不分页的世界是这样的：进程 A 认为自己从 0 地址开始，进程 B 也认为自己从 0 地址开始，两个 0 指向同一块物理内存，立刻互相覆盖。分页解决的就是这个矛盾：<b>每个进程一套独立的虚拟地址空间，由页表翻译到各自的物理页</b>。</p>
+
+    <p>分页带来的四个能力，每一个都不可替代：</p>
+
+    <ul>
+      <li><b>隔离</b>：进程 A 写不到 B 的内存，因为页表里根本没映射。</li>
+      <li><b>按需分配</b>：申请 1MB 不必立刻给 1MB 物理页，第一次写才给。</li>
+      <li><b>可换出</b>：不常用的页可以写到磁盘/swap，腾出物理内存。</li>
+      <li><b>共享</b>：多个进程的同一虚拟页可以指向同一物理页（如 libc 的代码段）。</li>
+    </ul>
+
+    <div class="note">
+      <b>代价也要说清</b>
+      每次访存多一次（或两次）内存访问来查页表，所以必须有 TLB 缓存；页表本身也要占内存（1GB 空间用 4KB 页要 1MB 页表）。分页不是免费的，是用「硬件复杂度 + 内存开销」换「隔离 + 灵活性」。
+    </div>
+
+    <h2 id="s2">2. 一次地址翻译的全过程</h2>
+
+    <p>ARMv7（Cortex-A7）用两级页表：</p>
+
+    <div class="flow">
+      <span>虚拟地址</span><span>→</span><span>TTBR0/TTBR1 选基址</span><span>→</span><span>L1 表（16KB 对齐）</span><span>→</span><span>L2 表（1KB 对齐）</span><span>→</span><span>物理地址</span>
+    </div>
+
+    <p>32 位虚拟地址被切成三段，位段划分决定了表的大小：</p>
+
+    <table>
+      <thead><tr><th>位段</th><th>位宽</th><th>含多少项</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td>[31:20]</td><td>12 位</td><td>4096 项</td><td>L1 索引（每项 4 字节 → 表 16KB）</td></tr>
+        <tr><td>[19:12]</td><td>8 位</td><td>256 项</td><td>L2 索引（每项 4 字节 → 表 1KB）</td></tr>
+        <tr><td>[11:0]</td><td>12 位</td><td>4096 字节</td><td>页内偏移，不参与翻译</td></tr>
+      </tbody>
+    </table>
+
+    <p>两级描述符里，属性位藏在固定位置。这是必须背下来的：</p>
+
+    <table>
+      <thead><tr><th>位</th><th>字段</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td>[1:0]</td><td>类型</td><td><code>0b10</code> = 段/页描述符，<code>0b00</code> = 无效，<code>0b01</code> = 粗页表</td></tr>
+        <tr><td>[11:10]</td><td>AP</td><td>访问权限：00 只内核、01 内核读写/用户读、11 全可读写</td></tr>
+        <tr><td>[3]</td><td>C</td><td>可 cache（write-back）</td></tr>
+        <tr><td>[2]</td><td>B</td><td>可 buffer（write-through）</td></tr>
+        <tr><td>[0]（L2 的 bit0）</td><td>XN</td><td>禁止执行，置 1 则该页不可取指</td></tr>
+        <tr><td>[11]（L1 段）</td><td>nG</td><td>非全局，切换进程时刷新 TLB 项</td></tr>
+      </tbody>
+    </table>
+
+    <div class="calc">
+      <h5>算一笔：一次访存的开销</h5>
+      <div class="line">TLB 命中：查 TLB 约 1 个周期，直接得到物理地址</div>
+      <div class="line">TLB 未命中：L1 查表 1 次内存访问 + L2 查表 1 次内存访问 = <b>多花 2 次内存访问</b></div>
+      <div class="line">主存延迟按 100 周期算，未命中一次的成本 ≈ 200 周期</div>
+      <div class="line">所以 TLB 覆盖率极其关键：4KB 页的 TLB 覆盖范围小，2MB 大页能把覆盖范围放大 512 倍</div>
+    </div>
+    <h2 id="s3">3. 用户空间与内核空间</h2>
+    <div class="viz" data-kind="flow" data-title="一次缺页，内核要跑完整条链" data-sub="看起来「免费」的内存，其实是这时候付钱" data-json='{"steps":[{"n":"① 异常","d":"MMU 查不到 PTE → abort"},{"n":"② 找 vma","d":"这个地址属于哪段？"},{"n":"③ 判断类型","d":"匿名/文件/栈/非法"},{"n":"④ 分配页","d":"buddy 取页、清零或读盘"},{"n":"⑤ 建映射","d":"写 PTE、刷 TLB"},{"n":"⑥ 返回","d":"重新执行那条指令"}],"note":"第②步找不到 vma 就是 SIGSEGV；找到了但没权限（写只读页）就是 COW 或权限错误——两条路完全不同。"}'></div>
+
+
+    <p>32 位 Linux 把虚拟地址空间按 3:1 劈开：<b>0x0000_0000–0xBFFF_FFFF 给用户，0xC000_0000–0xFFFF_FFFF 给内核</b>。这条分界线由 TTBR0（用户页表基址）与 TTBR1（内核页表基址）两个寄存器实现——切换进程只改 TTBR0，内核映射不动。</p>
+
+    <table>
+      <thead><tr><th>区域</th><th>典型内容</th><th>谁有权访问</th></tr></thead>
+      <tbody>
+        <tr><td>用户区低端</td><td>代码段、数据段、堆（向上长）</td><td>仅该进程</td></tr>
+        <tr><td>用户区高端</td><td>栈（向下长）、mmap 区、共享库</td><td>仅该进程</td></tr>
+        <tr><td>内核区</td><td>直接映射区（物理内存线性映射）、vmalloc 区、内核栈</td><td>仅内核态（用户态访问立刻异常）</td></tr>
+      </tbody>
+    </table>
+
+    <div class="reg">// 一次「用户态访问内核地址」会发生什么
+用户态执行 LDR r0, [0xC0000000]
+  → MMU 查到该页 AP 位为「仅内核」
+  → 触发 Data Abort（权限错误）
+  → 内核 do_page_fault 判定为非法访问
+  → 给进程发 SIGSEGV（段错误）
+  → 进程被终止，dmesg 里打印 segfault 与出错地址</div>
+
+    <p>这就是为什么「段错误」几乎总是「指针指向了不该指的地方」，而不是「内存不够」。内存不够的表现是 malloc 返回 NULL 或 OOM 杀进程，不是 SIGSEGV。</p>
+
+    <h2 id="s4">4. 缺页：内存是「用的时候才给」</h2>
+
+    <p>进程 malloc 1MB 时，内核只做两件事：在 VMA（虚拟内存区域）链表里加一条记录，返回一个虚拟地址。<b>物理页一个都没给</b>。真正给页是在第一次访问时——这就是缺页（page fault）。</p>
+
+    <p>缺页的完整路径（这是本章最该记住的一张流程图）：</p>
+
+    <div class="flow">
+      <span>CPU 访存失败</span><span>→</span><span>Data Abort 异常</span><span>→</span><span>保存现场，进内核</span><span>→</span><span>读 DFSR/DFAR 判断原因</span><span>→</span><span>查 VMA 是否合法</span><span>→</span><span>handle_mm_fault</span><span>→</span><span>分配页或读文件或换入</span><span>→</span><span>填页表</span><span>→</span><span>刷 TLB</span><span>→</span><span>返回用户态重试指令</span>
+    </div>
+
+    <p>三种缺页，处理方式完全不同：</p>
+
+    <table>
+      <thead><tr><th>类型</th><th>触发场景</th><th>内核动作</th><th>成本</th></tr></thead>
+      <tbody>
+        <tr><td><b>匿名页缺页</b></td><td>第一次写 malloc 的内存</td><td>从 buddy 取一页，清零，填入页表</td><td>低（微秒级）</td></tr>
+        <tr><td><b>文件页缺页</b></td><td>第一次读 mmap 的文件/可执行文件</td><td>从页缓存取，没有则读磁盘</td><td>可能很高（要等 IO）</td></tr>
+        <tr><td><b>写时复制（COW）</b></td><td>fork 后子进程写共享页</td><td>复制一页，改子进程页表指向新页</td><td>中等</td></tr>
+        <tr><td><b>交换缺页</b></td><td>访问已被换出的页</td><td>从 swap 读回</td><td>很高</td></tr>
+      </tbody>
+    </table>
+
+    <div class="calc">
+      <h5>算一笔：为什么 fork 很快，写却变慢</h5>
+      <div class="line">父进程 100MB，fork 后子进程页表全部指向同一批物理页（只读）</div>
+      <div class="line">fork 本身成本：复制页表项，约 100MB/4KB = 25,600 项，几毫秒</div>
+      <div class="line">子进程写其中 1MB：触发 256 次 COW 缺页，每次复制 4KB</div>
+      <div class="line">结论：fork 的成本被推迟到「真正写」的时候，这就是 COW 的全部意义</div>
+    </div>
+
+    <h2 id="s5">5. 内存不够时：回收与 OOM</h2>
+
+    <p>内核手里有一条水位线（watermark），它决定「什么时候开始着急」：</p>
+
+    <table>
+      <thead><tr><th>水位</th><th>含义</th><th>触发行为</th></tr></thead>
+      <tbody>
+        <tr><td><b>high</b></td><td>富余线</td><td>kswapd 停止回收，恢复正常</td></tr>
+        <tr><td><b>low</b></td><td>警戒线</td><td>唤醒 kswapd 后台回收</td></tr>
+        <tr><td><b>min</b></td><td>红线</td><td>分配者自己同步回收（direct reclaim），进程被卡住</td></tr>
+      </tbody>
+    </table>
+
+    <p>回收的优先级由 LRU 链表决定：内核把页分成 active 与 inactive 两条链，<b>先在 inactive 尾部找「最近没被访问」的页</b>。回收顺序是：</p>
+
+    <div class="steps">
+      <ol>
+        <li>丢弃干净的文件页（有副本在磁盘上，直接扔，零成本）。</li>
+        <li>把脏文件页写回磁盘后再丢（有 IO 成本）。</li>
+        <li>把匿名页写到 swap 后再丢（有 IO 成本，且嵌入式常无 swap）。</li>
+        <li>以上都不够 → 触发 OOM killer。</li>
+      </ol>
+    </div>
+
+    <p>OOM killer 选谁杀，靠 <code>oom_score</code>：</p>
+
+    <table>
+      <thead><tr><th>因素</th><th>影响</th></tr></thead>
+      <tbody>
+        <tr><td>占用内存（RSS + swap）越大</td><td>分数越高，越容易被杀</td></tr>
+        <tr><td><code>oom_score_adj</code>（-1000 ~ 1000）</td><td>手工调节，-1000 表示永不杀</td></tr>
+        <tr><td>是否 root / 是否有 CAP_SYS_ADMIN</td><td>有特权则分数下调</td></tr>
+        <tr><td>运行时间长短</td><td>刚启动的进程更容易被选中</td></tr>
+      </tbody>
+    </table>
+
+    <div class="tip">
+      <b>嵌入式设备的实用做法</b>
+      把关键服务（如通信守护进程）的 <code>oom_score_adj</code> 设为 −1000，把可能吃内存的业务设为正数。这样内存耗尽时，被杀的是业务进程而不是系统守护进程。
+    </div>
+    <h2 id="s6">6. 分配器：从整页到几字节</h2>
+    <div class="viz" data-kind="bars" data-title="三种分配器，管不同大小的粒度" data-sub="选错分配器，要么浪费要么慢" data-json='{"max":4096,"items":[{"n":"buddy（页）","v":4096,"unit":" 字节起","c":"cy"},{"n":"slab（对象）","v":32,"unit":" 字节起","c":"vi"},{"n":"vmalloc（大块）","v":1024,"unit":" 字节起，非连续","c":"or"},{"n":"kmalloc 上限","v":4096,"unit":" 字节之内","c":"gr"}],"note":"kmalloc 走 slab，物理连续；vmalloc 虚拟连续、物理可以不连续，但慢且有页表开销——DMA 缓冲区绝不能用 vmalloc。"}'></div>
+
+
+    <p>内核里有两层分配器，职责完全不同：</p>
+
+    <table>
+      <thead><tr><th>层</th><th>分配单位</th><th>解决的问题</th><th>典型接口</th></tr></thead>
+      <tbody>
+        <tr><td><b>伙伴系统</b>（buddy）</td><td>页（4KB）的 2 的幂</td><td>大块物理内存管理、防外部碎片</td><td><code>alloc_pages</code></td></tr>
+        <tr><td><b>SLUB / slab</b></td><td>几十字节到几 KB</td><td>小对象复用、防内部碎片</td><td><code>kmalloc</code>、<code>kmem_cache_alloc</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>6.1 伙伴系统：order 是关键</h3>
+
+    <p>物理页按 <code>2^order</code> 分组：order=0 是 1 页（4KB），order=1 是 2 页（8KB），order=10 是 1024 页（4MB）。分配时如果目标 order 没有空闲块，就<b>从更高 order 切一半下来</b>，另一半留在对应 order 的空闲链上——这就是「伙伴」的含义，合并时也只和这一半合并。</p>
+
+    <div class="calc">
+      <h5>算一笔：要 8KB，但只有 32KB 的块</h5>
+      <div class="line">目标 order=1（8KB），当前最大空闲块 order=3（32KB）</div>
+      <div class="line">32KB 切成 2 个 16KB → 一个给下级，一个留在 order=2</div>
+      <div class="line">16KB 再切成 2 个 8KB → 一个返回给调用者，一个留在 order=1</div>
+      <div class="line">释放时若 order=1 的伙伴也空闲 → 合并成 order=2，再逐级向上合并</div>
+    </div>
+
+    <p><code>cat /proc/buddyinfo</code> 能看到每个 order 的空闲块数。这一行数字是判断「内存碎片严重程度」的最直接证据：如果 order 高的块几乎全为 0，说明虽然总空闲内存不少，但已经<b>拿不出连续大块</b>了。</p>
+
+    <h3>6.2 SLUB：小对象怎么复用</h3>
+
+    <p>内核里大量对象是几十字节的（如 task_struct 外的各种小结构）。若每次都给一整页，浪费惊人。SLUB 的做法是：<b>从伙伴系统拿一页或多页，切成固定大小的槽位，同类对象共用</b>。</p>
+
+    <div class="calc">
+      <h5>算一笔：96 字节的对象一页能放几个</h5>
+      <div class="line">页 4096 B，对象 96 B → 4096 / 96 = 42.6</div>
+      <div class="line">减去 slab 管理头（约 32B）→ (4096 − 32) / 96 = 42 个</div>
+      <div class="line">利用率 42 × 96 / 4096 = <b>98.4%</b>，几乎无浪费</div>
+      <div class="line">若换成 100 字节对象：(4096−32)/100 = 40 个，浪费 64B，仍可接受</div>
+    </div>
+
+    <p><code>kmalloc</code> 的尺寸不是任意值，内核只提供固定档位（8、16、32、64、96、128、192、256、512、1024…）。申请 100 字节实际拿到 128 字节的槽——<b>所以 kmalloc 的实际占用总是比你要的多</b>。</p>
+
+    <h3>6.3 vmalloc 与 kmalloc 的区别</h3>
+
+    <table>
+      <thead><tr><th></th><th>kmalloc</th><th>vmalloc</th></tr></thead>
+      <tbody>
+        <tr><td>物理连续性</td><td>要求连续</td><td>不要求，靠页表拼出连续虚拟地址</td></tr>
+        <tr><td>大小上限</td><td>受 order 限制，通常几 MB 就难</td><td>可到几百 MB</td></tr>
+        <tr><td>性能</td><td>快，无额外页表开销</td><td>慢，要逐页建映射，且 TLB 压力大</td></tr>
+        <tr><td>可否给 DMA 用</td><td>可以（物理连续）</td><td><b>不可以</b>（物理不连续）</td></tr>
+        <tr><td>典型用途</td><td>驱动里的小缓冲、结构体</td><td>模块加载区、超大缓冲</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      <b>用户态的 malloc 是第三套东西</b>
+      glibc 的 malloc 在用户空间自己管内存：小的用 brk 扩展堆并按块切分，大的（>128KB）直接用 mmap。它和内核的 slab 没有关系，只是最终都会落到「缺页 → 内核给页」这一步。
+    </div>
+
+    <h2 id="s7">7. 常见误解</h2>
+
+    <table>
+      <thead><tr><th>误解</th><th>真相</th></tr></thead>
+      <tbody>
+        <tr><td>「malloc 成功就有内存了」</td><td>只是拿到了虚拟地址，物理页在第一次写时才给；这也是 Linux 允许 overcommit 的原因。</td></tr>
+        <tr><td>「内存不够会返回 NULL」</td><td>用户态可能因 overcommit 拿到地址，随后被 OOM killer 杀掉；内核态则可能直接 panic 或触发 OOM。</td></tr>
+        <tr><td>「段错误就是内存不足」</td><td>段错误是非法地址或权限错误，和内存余量无关。</td></tr>
+        <tr><td>「free 内存少就是内存泄漏」</td><td>Linux 会把空闲内存拿去做页缓存，free 少是正常的；要看 available 与 slab 增长。</td></tr>
+        <tr><td>「伙伴系统只按页分配，不会有碎片」</td><td>它能防外部碎片，但长期高低 order 混用后仍会出现「大块拿不出」。</td></tr>
+        <tr><td>「vmalloc 和 kmalloc 可以互换」</td><td>vmalloc 物理不连续，不能给 DMA；性能也差一截。</td></tr>
+        <tr><td>「大页一定更快」</td><td>大页省 TLB，但分配难、浪费大，小内存设备上反而更容易失败。</td></tr>
+        <tr><td>「OOM 杀的是占内存最多的」</td><td>是综合 oom_score，包含 adj、特权、运行时长等因素。</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s8">8. 自检：能答出来才算懂</h2>
+
+    <div class="q"><span class="n">1</span><p>ARMv7 两级页表，32 位地址的 [31:20]、[19:12]、[11:0] 分别做什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>[31:20] L1 索引（4096 项，表 16KB）；[19:12] L2 索引（256 项，表 1KB）；[11:0] 页内偏移，不参与翻译。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>L1 段描述符里 AP 位、C/B 位、XN 位各控制什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>AP[11:10] 控制访问权限（内核/用户可读可写）；C/B 控制 cache 与 buffer 策略；XN 置 1 表示该页不可取指。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>用户态读 0xC0000000 会发生什么，为什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>该地址属内核区，页表 AP 位标为仅内核访问 → Data Abort → 内核判为非法 → 给进程发 SIGSEGV。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>缺页处理的完整路径有哪几个关键步骤？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>访存失败 → Data Abort → 读 DFSR/DFAR → 查 VMA 合法性 → handle_mm_fault → 分配/读文件/换入 → 填页表 → 刷 TLB → 返回重试。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>fork 为什么快？子进程写内存时发生了什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>fork 只复制页表并全部标只读，物理页共享；子进程写时触发 COW 缺页，才真正复制对应的页。</p>
+    </div></details>
+
+    <div class="q"><span class="n">6</span><p>watermark 的 min/low/high 三级分别对应什么行为？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>high：kswapd 停止回收；low：唤醒 kswapd 后台回收；min：分配者自己同步回收（direct reclaim）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">7</span><p>只有 32KB 空闲块，要 8KB，伙伴系统会怎么切？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>32KB 切两半 16KB，留一半在 order=2；16KB 再切两半 8KB，返回一个、留一个在 order=1。</p>
+    </div></details>
+
+    <div class="q"><span class="n">8</span><p>kmalloc(100) 实际会占用多少，为什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>会落到 128 字节档位。因为 SLUB 只提供固定尺寸，按档位向上取整。</p>
+    </div></details>
+
+    <h2 id="s9">9. 这一章要动手的命令</h2>
+
+    <div class="steps">
+      <ol>
+        <li><code>cat /proc/buddyinfo</code> —— 看每个 order 的空闲块数，判断碎片程度。</li>
+        <li><code>cat /proc/meminfo</code> —— 看 MemFree、MemAvailable、Slab、SReclaimable、Cached 的差异。</li>
+        <li><code>cat /proc/pagetypeinfo</code> —— 看可迁移/不可迁移类型的分布。</li>
+        <li><code>slabtop</code> —— 实时看哪个内核对象占用最多。</li>
+        <li><code>cat /proc/&lt;pid&gt;/smaps | head -40</code> —— 看某进程各段的 VSS/RSS/PSS。</li>
+        <li><code>cat /proc/&lt;pid&gt;/oom_score</code> 与 <code>oom_score_adj</code> —— 验证第 5 节的评分规则。</li>
+        <li><code>dmesg | grep -i -E "oom|page allocation failure"</code> —— 查找历史的内存告急记录。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一章预告</b>
+      T15 换视角看全局：内核的六大子系统如何协作，一次 read 文件、一个网络包要穿过哪些层，以及怎么用 ftrace 看见它们。
+    </div>
+
+
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"内存不够时，内核按这个顺序动手","steps":[{"t":"① 缺页","d":"访问一个没映射或没加载的页，MMU 报 data abort，内核的缺页处理接手。"},{"t":"② 用空闲页","d":"空闲链表里还有页，直接给。这一步最快，也最常发生——程序的页本来就是按需才给的。"},{"t":"③ 回收缓存","d":"空闲页不够了，先把 page cache 里的干净页丢掉（它们硬盘上有备份），脏页先写回再丢。"},{"t":"④ 换出匿名页","d":"栈、堆这些没有硬盘备份的页，写进 swap 再腾出来。这一步开始变慢。"},{"t":"⑤ OOM","d":"实在腾不出来，OOM killer 按占用打分，杀一个进程换回内存。系统活着，但你的程序没了。"}],"note":"看到 available 很低不一定是坏事：Linux 会把空闲内存拿去做缓存，用到时才让出来。真正要看的是 swap 抖动和 OOM 记录。"}'></div>
+  
+
+<nav class="pager">
+  <a href="course-th03.html"><span>← 上一篇</span><b>虚拟内存与地址翻译（详解）</b></a>
+  <a class="nx" href="viz-mmu.html"><span>下一篇 →</span><b>互动台：MMU 页表翻译</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

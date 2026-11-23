@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=../docs/course-th08.html">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>理论 T08 · 从第一个字节开始：BootROM → SPL → U-Boot（详解） | i.MX6ULL Linux 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="../assets/viz.css">
+  <link rel="stylesheet" href="../assets/iviz.css">
+  <link rel="stylesheet" href="../assets/anim2.css">
+  <script src="../assets/readmode.js" defer></script>
+</head>
+<body data-page="th08">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>理论 T08 · 从第一个字节开始</h1>
+    <p class="lede">上电那一瞬间，CPU 的 PC 指向一个你不能改的地址——片内 BootROM。这一章把从那里到内核第一条指令的完整路径拆开：BootROM 怎么选启动设备、IVT 里有什么、DCD 为什么能初始化 DDR、U-Boot 怎么把控制权交给 Linux。</p>
+    <div class="viz" data-kind="map" data-title="IVT 与镜像在 SD 卡上的布局" data-sub="BootROM 只认这几个固定偏移" data-json='{"rows":[{"segs":[{"n":"保留 0x0000","size":1,"c":"gray","d":"BootROM 不用"},{"n":"IVT 头 0x0020","size":1,"c":"cy","d":"4 字节头+入口地址"},{"n":"Boot Data 0x002C","size":1,"c":"vi","d":"镜像长度与加载地址"},{"n":"DCD 0x0030","size":2,"c":"or","d":"DDR 初始化参数表"},{"n":"用户镜像 0x0800","size":4,"c":"gr","d":"U-Boot 或 SPL"}],"from":"0x00000000","to":"0x00003000","ptr":0.08}],"note":"BootROM 不会「扫描」卡找程序，它只读固定偏移 0x20 处的 IVT。所以镜像必须用专用工具烧到正确偏移——你 dd 到 0 地址是没用的。"}'></div>
+
+
+    <div class="card">
+      <h4>本章要解决的问题</h4>
+      <p>① 上电后 CPU 从哪取第一条指令；② BootROM 凭什么知道该从 SD 卡还是 eMMC 启动；③ 镜像头部的 IVT 和 DCD 各是什么；④ 为什么必须有 SPL 这一级；⑤ U-Boot 交给内核时，寄存器和内存必须是什么状态。</p>
+    </div>
+
+    <div class="card">
+      <h4>读完你应该能回答</h4>
+      <ul>
+        <li>IVT 在 SD 卡的哪个偏移？为什么是这个偏移？</li>
+        <li>DCD 的内容本质是什么？它为什么不能在内核里做？</li>
+        <li>SPL 和 U-Boot 的分工边界在哪？</li>
+        <li>U-Boot 启动内核时，r0/r1/r2 分别约定是什么？</li>
+        <li>为什么 U-Boot 启动内核前必须关 MMU 和 D cache？</li>
+      </ul>
+    </div>
+
+    <div class="anim2" data-json='{"title":"上电到登录：六个阶段接力","hint":"每段的地址空间都不一样","nodes":[{"k":"BootROM","s":"片内固化代码"},{"k":"IVT + DCD","s":"搬程序、初始化 DDR"},{"k":"SPL","s":"片内 SRAM 里跑"},{"k":"U-Boot","s":"DDR 里全功能"},{"k":"内核","s":"建页表开 MMU"},{"k":"rootfs","s":"挂载并起 init"}],"frames":[{"i":0,"d":"上电后 CPU 从 BootROM 起跑，按拨码开关去 SD、eMMC、USB 或串口找启动介质。"},{"i":1,"d":"读到 IVT 就知道程序该搬到哪、从哪开始执行；DCD 是一串寄存器写，把 DDR 训练好。"},{"i":2,"d":"SPL 在片内 128KB SRAM 里跑，任务只有一个：让 DDR 可用，然后把完整 U-Boot 搬进内存。"},{"i":3,"d":"U-Boot 有了内存和串口，能读分区、跑命令行、用 tftp 拉 zImage 与 dtb。"},{"i":4,"d":"内核解压、建页表、开 MMU、解析 dtb、初始化各子系统，最后去挂根文件系统。"},{"i":5,"d":"挂上 ext4 或 initramfs，跑 /sbin/init，起了 shell，串口交到你手上。"}],"kind":"chain"}'></div>
+
+    <h2>1. 五个阶段，一张表看清</h2>
+
+    <table>
+      <thead><tr><th>阶段</th><th>在哪运行</th><th>谁提供</th><th>核心任务</th><th>典型耗时</th></tr></thead>
+      <tbody>
+        <tr><td><b>① BootROM</b></td><td>片内 ROM（0x0000_0000）</td><td>NXP 出厂固化，不可改</td><td>选启动设备、读 IVT、执行 DCD、跳到用户代码</td><td>几十毫秒</td></tr>
+        <tr><td><b>② SPL</b>（可选）</td><td>片内 OCRAM（0x0090_0000）</td><td>你编译（U-Boot 的 SPL）</td><td>初始化 DDR/时钟/串口，把完整 U-Boot 搬进 DDR</td><td>十几毫秒</td></tr>
+        <tr><td><b>③ U-Boot</b></td><td>DDR</td><td>你编译</td><td>命令行、存储/网络/文件系统、加载内核与 dtb</td><td>100ms 级</td></tr>
+        <tr><td><b>④ 内核</b></td><td>DDR</td><td>你编译</td><td>解压自身、建页表、初始化子系统、挂根文件系统、启 init</td><td>1–2 秒</td></tr>
+        <tr><td><b>⑤ 用户空间</b></td><td>DDR</td><td>你的 rootfs</td><td>init/systemd 启动服务</td><td>数秒</td></tr>
+      </tbody>
+    </table>
+
+    <p>这张表的价值在于定位：<b>板子起不来时，先判断卡在哪一级</b>。串口有 BootROM 的输出说明①过了；有 SPL 输出说明②在跑；出现 U-Boot 提示符说明③成功；打印内核日志说明④接管了。每一级的证据都在串口上。</p>
+
+    <h2>2. BootROM：你不能改，但必须懂的那段代码</h2>
+
+    <p>复位后，CPU 的 PC 被硬件强制设为 0x0000_0000（或由引脚决定的别名地址），那里是片内 ROM。这段代码由 NXP 在流片时烧死，你一辈子改不了它，但它的行为决定了你镜像必须长什么样。</p>
+
+    <h3>2.1 它怎么知道从哪启动</h3>
+
+    <p>BootROM 读两类信息：<b>eFUSE 里烧死的启动配置</b>（量产时定），和<b>BOOT_MODE 引脚的电平</b>（开发板上常用拨码开关）。由此得到「启动设备列表」，然后按顺序尝试：</p>
+
+    <ul>
+      <li>SD/eMMC（通过 USDHC 接口读）</li>
+      <li>NAND / QSPI NOR</li>
+      <li>USB（进入下载模式，等主机传镜像——这就是「救砖」通道）</li>
+      <li>串口（极老式的下载协议）</li>
+    </ul>
+
+    <p>「按顺序尝试」这点很关键：如果 SD 卡里有合法镜像，它就用 SD 卡；SD 卡不合法就去试下一个设备。<b>所以插一张写好镜像的卡，往往能盖过板载 eMMC</b>——这是开发板调试的常用手段。</p>
+
+    <h3>2.2 从 SD 卡读什么：偏移 0x400 的 IVT</h3>
+
+    <p>BootROM 不会读整张卡，它只读固定位置的一小块：<b>SD 卡的 0x400 偏移处</b>（第 1 个扇区的第 1024 字节）。为什么是 0x400？因为 0x000–0x1FF 是 MBR（分区表），0x200–0x3FF 常留给引导扇区，i.MX 约定把镜像头放在 0x400。</p>
+
+    <p>它读的这 4KB 里最关键的是 <b>IVT（Image Vector Table）</b>，一个固定格式的结构：</p>
+
+    <table>
+      <thead><tr><th>偏移</th><th>字段</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td>0x00</td><td>header</td><td>魔数 <code>0x402000D1</code>（校验用，不对就认为不是合法镜像）</td></tr>
+        <tr><td>0x04</td><td>entry</td><td><b>用户代码入口地址</b>（BootROM 最后跳到这里）</td></tr>
+        <tr><td>0x08</td><td>reserved</td><td>保留</td></tr>
+        <tr><td>0x0C</td><td>dcd_ptr</td><td>DCD 数据在内存中的地址（0 表示没有）</td></tr>
+        <tr><td>0x10</td><td>boot_data_ptr</td><td>指向 boot_data 结构（镜像在内存的起始与大小）</td></tr>
+        <tr><td>0x14</td><td>self_ptr</td><td>IVT 自身在内存中的地址（自校验）</td></tr>
+        <tr><td>0x18</td><td>csf_ptr</td><td>签名/HAB 安全启动数据（不开安全启动时为 0）</td></tr>
+      </tbody>
+    </table>
+
+    <p>而 <b>boot_data</b> 只有三个字段：镜像在内存里的起始地址、总大小、是否 plugin 模式。BootROM 靠它知道「该把多少字节从卡搬到内存的哪里」。</p>
+
+    <p>所以流程是：读 0x400 的 IVT → 校验魔数 → 按 boot_data 把镜像从卡搬到内存 → 如果 dcd_ptr 非 0，执行 DCD → 跳到 entry。</p>
+
+    <h3>2.3 DCD：一段「寄存器写脚本」</h3>
+
+    <p>DCD（Device Configuration Data）不是代码，而是<b>一串命令</b>，BootROM 会逐条执行。命令就三种：</p>
+
+    <table>
+      <thead><tr><th>命令</th><th>tag</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td>写寄存器</td><td><code>0xCC</code></td><td>往指定地址写 4 字节值（可批量）</td></tr>
+        <tr><td>检查（poll）</td><td><code>0xCF</code></td><td>轮询某地址直到某位变化（等硬件就绪）</td></tr>
+        <tr><td>延时</td><td><code>0xC0</code></td><td>等若干微秒/毫秒（等电源稳定、等 PLL 锁定）</td></tr>
+      </tbody>
+    </table>
+
+    <p>它的典型内容：<b>初始化 DDR 控制器的几百个寄存器</b>、配置 IOMUX、通过 I2C 设置 PMIC 电压、打开必要时钟。这些必须「在镜像能装进 DDR 之前」完成——这就是 DCD 存在的唯一理由。</p>
+
+    <div class="note">
+      <b>为什么 DDR 参数这么麻烦</b>
+      DDR 是模拟电路 + 严格时序的集合：每一颗 DDR 芯片的行列地址位宽、刷新周期、CAS 延迟都不同，必须按芯片手册逐项写寄存器。所以 DCD 通常由 NXP 的 DDR 配置工具生成，<b>不要手抄别人的 DCD</b>——你的板子颗粒型号不同，抄来的参数会跑飞或随机丢数据。
+    </div>
+
+    <h2>3. 为什么还要有 SPL 这一级</h2>
+    <div class="viz" data-kind="timeline" data-title="五个阶段，每一级都在「给自己搭梯子」" data-sub="前一级的唯一任务是让后一级跑起来" data-json='{"items":[{"t":"①","n":"BootROM","d":"固化在芯片，选介质、验 IVT","c":"rd"},{"t":"②","n":"SPL","d":"128KB 内把 DDR 初始化","c":"or"},{"t":"③","n":"U-Boot","d":"命令、网络、加载内核","c":"vi"},{"t":"④","n":"内核","d":"解压自身、start_kernel","c":"cy"},{"t":"⑤","n":"rootfs+init","d":"挂 /，跑第一个进程","c":"gr"}],"note":"为什么必须有 SPL：BootROM 只搬 128KB 到 OCRAM，而 U-Boot 有几兆、还要在 DDR 里跑，DDR 又必须先初始化。"}'></div>
+
+
+    <p>既然 DCD 已经能把 DDR 初始化好，BootROM 为什么不直接把几 MB 的 U-Boot 搬进 DDR 跑完事？因为现实里有两类麻烦：</p>
+
+    <ul>
+      <li><b>初始化太复杂</b>：多路电源上电顺序、PMIC 通过 I2C 配电压、PLL 逐级锁定、DDR 训练。DCD 只能「写寄存器 + 延时 + 轮询」，做不了条件判断和循环。</li>
+      <li><b>镜像要加密 / 校验 / 多备份</b>：需要真正的代码来做选择与校验。</li>
+    </ul>
+
+    <p>SPL（Secondary Program Loader）就是「BootROM 之后、U-Boot 之前」的一小段代码，被 BootROM 搬进片内 OCRAM（128KB）执行。它的任务是：<b>初始化 DDR 与串口，然后把完整 U-Boot 从 SD/eMMC 搬进 DDR，跳过去。</b></p>
+
+    <table>
+      <thead><tr><th>方式</th><th>谁初始化 DDR</th><th>镜像大小限制</th><th>灵活性</th><th>典型场景</th></tr></thead>
+      <tbody>
+        <tr><td><b>DCD 直启</b></td><td>DCD 脚本（BootROM 执行）</td><td>BootROM 一次搬完，受 RAM 限制</td><td>低，只能顺序读写寄存器</td><td>简单开发板、快速验证</td></tr>
+        <tr><td><b>SPL 两级</b></td><td>SPL 代码</td><td>SPL 本身要 &lt; OCRAM（留余量约 64KB）</td><td>高，可判断、可重试、可加密</td><td>量产板、复杂电源、安全启动</td></tr>
+      </tbody>
+    </table>
+
+    <p>编译产物上看得更清楚：<code>u-boot-spl.bin</code> 是第一阶段，<code>u-boot.bin</code> 是第二阶段，两者用工具打包成一个 <code>u-boot-with-spl.imx</code>，烧到卡的 0x400 偏移处。BootROM 只认这个格式。</p>
+
+    <h2>4. U-Boot 自己的两阶段</h2>
+
+    <p>U-Boot 内部也分两段，源码里极其显眼（<code>board_init_f</code> / <code>board_init_r</code>），因为它必须解决一个物理问题：<b>刚启动时它跑在「只读、位置固定」的存储映射里，而它需要一块可写的大内存。</b></p>
+
+    <ol>
+      <li><b>board_init_f</b>：在重定位前运行。这时不能写全局变量（还在 ROM/低地址），只能用一个专门的 <code>gd</code> 结构（放 RAM）保存状态。它算出「RAM 怎么分」：给 U-Boot 自己留多少、给内核/设备树/根文件系统留多少。</li>
+      <li><b>relocate_code</b>：把 U-Boot 自身整体搬到 DDR 高地址（<code>gd-&gt;relocaddr</code>），并修正所有绝对地址引用。</li>
+      <li><b>board_init_r</b>：在新位置运行，这时才能自由使用全局变量、初始化外设、扫描存储、跑命令行。</li>
+    </ol>
+
+    <div class="calc">
+      <h5>算一笔：为什么重定位地址放在内存顶端</h5>
+      <div class="line">DDR 512MB：0x8000_0000 – 0x9FFF_FFFF</div>
+      <div class="line">U-Boot 通常放顶端往下：如 0x9FF0_0000 附近（给自己留几百 KB）</div>
+      <div class="line">内核与根文件系统从低端往上放：内核常在 0x8000_8000，dtb 在 0x8300_0000</div>
+      <div class="line">理由：U-Boot 尽量不占「将来要装内核」的区域，避免搬迁时压到内核</div>
+    </div>
+
+    <p>常用命令必须熟：<code>printenv</code> 看环境变量、<code>setenv bootargs ...</code> 设内核参数、<code>saveenv</code> 存到存储、<code>mmc dev 0</code> 选设备、<code>fatload mmc 0:1 0x80800000 zImage</code> 把文件读到内存、<code>bootz 0x80800000 0x83000000</code> 启动。其中 <code>bootargs</code> 里的 <code>console=ttymxc0,115200</code>、<code>root=/dev/mmcblk1p2</code> 直接决定内核行为。</p>
+
+    <h2>5. U-Boot 交给内核的那一瞬间：ARM 启动协议</h2>
+
+    <p>这一跳有严格约定，写错任何一条内核都会在启动早期静默死掉（串口什么都不打印）。ARM Linux 的启动要求：</p>
+
+    <table>
+      <thead><tr><th>项目</th><th>要求</th><th>为什么</th></tr></thead>
+      <tbody>
+        <tr><td><b>r0</b></td><td>必须是 0</td><td>历史约定，内核会检查</td></tr>
+        <tr><td><b>r1</b></td><td>machine id（老式 ATAGS）；用设备树时常为 0</td><td>用于匹配板级代码</td></tr>
+        <tr><td><b>r2</b></td><td>ATAGS 或 <b>DTB 的物理地址</b></td><td>内核对硬件描述的唯一来源</td></tr>
+        <tr><td><b>MMU</b></td><td>必须关闭</td><td>内核要自己建页表与映射，继承别人的映射必然冲突</td></tr>
+        <tr><td><b>D cache</b></td><td>必须关闭（或至少已 clean）</td><td>cache 里的脏数据会让内核看到「不一致的内存」</td></tr>
+        <tr><td><b>I cache</b></td><td>可开可关</td><td>不影响数据一致性</td></tr>
+        <tr><td><b>中断</b></td><td>必须关闭</td><td>内核还没装中断处理代码</td></tr>
+        <tr><td><b>CPU 模式</b></td><td>SVC</td><td>内核以特权态启动</td></tr>
+        <tr><td><b>PC</b></td><td>内核入口（zImage 的自解压入口）</td><td>U-Boot 用函数指针直接跳过去</td></tr>
+      </tbody>
+    </table>
+
+    <p>注意 r2 是<b>物理地址</b>：此刻 MMU 关着，CPU 眼里没有虚拟地址。这也是为什么你会看到 <code>bootz 0x80800000 0x83000000</code> 这种写法——两个数都是物理地址，前者是 zImage，后者是 dtb。</p>
+
+    <h2>6. zImage 为什么还要「自己解压自己」</h2>
+    <div class="viz" data-kind="matrix" data-title="U-Boot 交棒给内核时，寄存器里装了什么" data-sub="ARM 启动协议：三条约定决定内核能不能起" data-json='{"corner":"寄存器","cols":["约定值","错了会怎样"],"rows":[{"n":"r0","cells":[{"v":"0","c":"gray"},{"v":"一般不影响","c":"gray"}]},{"n":"r1","cells":[{"v":"machine id（或 0xFFFFFFFF）","c":"cy"},{"v":"匹配不上 → 直接挂","c":"rd"}]},{"n":"r2","cells":[{"v":"DTB 物理地址","c":"vi"},{"v":"地址错 → 解析不到设备树","c":"rd"}]},{"n":"PC","cells":[{"v":"内核入口","c":"or"},{"v":"跳错地方 → 无输出","c":"rd"}]},{"n":"MMU/DCache","cells":[{"v":"关闭","c":"gr"},{"v":"开着进内核 → 立即崩","c":"rd"}]}],"note":"所以 bootz 的参数顺序是「内核地址 内核大小 dtb地址」，少一个或顺序错，内核就在起跑线上摔倒。"}'></div>
+
+
+    <p>你烧进板子的是 <code>zImage</code>，但内核代码是压缩的（gzip / lzo / lz4）。它的开头是一小段<b>不压缩</b>的解压代码，U-Boot 跳到的就是这个入口：</p>
+
+    <div class="flow">
+      <span>U-Boot 跳入口</span><span>→</span><span>解压代码跑起来</span><span>→</span><span>把自己解到 0x80008000</span><span>→</span><span>跳过去</span><span>→</span><span>head.S 第一条指令</span>
+    </div>
+
+    <p>三种镜像格式的区别必须清楚，否则你会拿着错误的文件去烧：</p>
+
+    <table>
+      <thead><tr><th>文件</th><th>内容</th><th>谁认它</th></tr></thead>
+      <tbody>
+        <tr><td><code>Image</code></td><td>未压缩的内核（几十 MB）</td><td>U-Boot <code>booti</code> 直接启动</td></tr>
+        <tr><td><code>zImage</code></td><td>压缩内核 + 自解压头</td><td>U-Boot <code>bootz</code></td></tr>
+        <tr><td><code>uImage</code></td><td>zImage 再加 64 字节 U-Boot 头（含校验与加载地址）</td><td>老式 <code>bootm</code></td></tr>
+      </tbody>
+    </table>
+
+    <p>还有一个容易混的点：内核的<b>链接地址与运行地址不同</b>。内核被链接到虚拟地址 0xC000_8000（即 PAGE_OFFSET + 0x8000），而 zImage 解压到物理 0x8000_8000。这两个数之所以「对得上」，是因为内核启动早期建好页表后，用「物理 0x8000_0000 ↔ 虚拟 0xC000_0000」的直接映射把两者对齐。这是 T03 那个换算在启动阶段的第一次实战。</p>
+
+    <h2>7. 十个常见误解</h2>
+
+    <table>
+      <thead><tr><th>误解</th><th>真相</th></tr></thead>
+      <tbody>
+        <tr><td>「上电后跑的第一段代码是我的 U-Boot」</td><td>是片内 BootROM，出厂固化。你的镜像由它加载。</td></tr>
+        <tr><td>「U-Boot 是必需的」</td><td>不是。内核可由 BootROM 直接加载，U-Boot 提供的是「方便调试与加载」。</td></tr>
+        <tr><td>「DCD 是代码」</td><td>它是命令数据（写寄存器/轮询/延时三条命令），由 BootROM 解释执行。</td></tr>
+        <tr><td>「DCD 和 SPL 是一回事」</td><td>DCD 是数据脚本，SPL 是真代码。简单板用前者，复杂板用后者。</td></tr>
+        <tr><td>「镜像可以放在 SD 卡任意位置」</td><td>BootROM 只认固定偏移（SD 上 0x400），位置错了直接当无效镜像。</td></tr>
+        <tr><td>「U-Boot 直接把内核解压好再跳」</td><td>U-Boot 只跳到自解压入口，解压由 zImage 自己的头完成。</td></tr>
+        <tr><td>「传给内核的是虚拟地址」</td><td>MMU 此刻关闭，r2 必须是 DTB 的物理地址。</td></tr>
+        <tr><td>「U-Boot 里开着 MMU 也没关系」</td><td>进内核前必须关，否则内核建页表时会踩到已有映射。</td></tr>
+        <tr><td>「串口没输出就是硬件坏了」</td><td>更常见是：镜像格式不对、启动设备选错、DDR 参数错、控制台参数错。要按五阶段逐级定位。</td></tr>
+        <tr><td>「DDR 参数可以抄现成板子的」</td><td>颗粒型号、位宽、时序都不同，抄来的参数会随机丢数据，极难查。</td></tr>
+      </tbody>
+    </table>
+
+    <h2>8. 自检：能答出来才算懂</h2>
+
+    <div class="q"><span class="n">1</span><p>上电后 CPU 的第一条指令从哪来？能不能改？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>片内 BootROM（0x0000_0000 映射区），NXP 出厂固化，不可修改。它负责选启动设备、加载你的镜像。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>IVT 在 SD 卡的哪个偏移？里面最关键的两个字段是什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>0x400。最关键 <code>entry</code>（用户代码入口地址）与 <code>boot_data_ptr</code>（镜像在内存的起始地址和大小），另外 <code>dcd_ptr</code> 决定是否执行 DCD。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>DCD 的三类命令是什么？为什么它必须在 BootROM 阶段执行？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>写寄存器（0xCC）、轮询检查（0xCF）、延时（0xC0）。因为 DDR 还没初始化，镜像无法装进 DDR，必须先由它把 DDR 控制器配起来。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>SPL 解决了 DCD 解决不了的什么问题？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>复杂初始化（电源时序、PMIC、DDR 训练）、条件判断与重试、镜像校验与解密。DCD 只能顺序写寄存器，做不了这些。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>U-Boot 为什么要重定位？重定位前后代码有什么本质差别？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>因为启动初期它跑在只读、位置固定的存储映射里，不能写全局变量、也没有足够空间。重定位后搬到 DDR 高地址才能自由用内存与外设。差别：重定位前只能用 <code>gd</code> 结构保存状态。</p>
+    </div></details>
+
+    <div class="q"><span class="n">6</span><p>U-Boot 交给内核时，r0/r1/r2 各是什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>r0=0；r1=machine id（用 DT 时常为 0）；r2=DTB 或 ATAGS 的<b>物理地址</b>。</p>
+    </div></details>
+
+    <div class="q"><span class="n">7</span><p>为什么进内核前必须关 MMU 和 D cache？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>MMU：内核要自建页表，继承映射必然冲突。D cache：缓存里的脏数据会让内核看到不一致的内存。</p>
+    </div></details>
+
+    <div class="q"><span class="n">8</span><p>zImage、Image、uImage 有什么区别？分别怎么启动？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>Image 未压缩（booti）；zImage 压缩 + 自解压头（bootz）；uImage 是 zImage 再加 U-Boot 的 64 字节头（老式 bootm）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">9</span><p>内核被链接到 0xC000_8000，为什么能跑在物理 0x8000_8000？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>启动早期建立的直接映射把物理 0x8000_0000 映射到虚拟 0xC000_0000，偏移 0x8000 后正好对齐。链接地址是虚拟视角，运行地址是物理视角。</p>
+    </div></details>
+
+    <div class="q"><span class="n">10</span><p>板子串口完全没输出，怎么快速缩小范围？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>按五阶段定位：启动设备选择（拨码/eFUSE）→ 镜像是否烧在正确偏移（0x400）→ IVT 魔数与 boot_data → DDR 参数（换已知可用的镜像对比）→ 串口引脚与波特率。每一步都可以用「换一张已知可启动的卡」来二分。</p>
+    </div></details>
+
+    <h2>9. 这一章要动手的命令</h2>
+
+    <div class="steps">
+      <ol>
+        <li><code>hexdump -C u-boot.imx | head -20</code> —— 看到 0x400 前的填充与 IVT 魔数 <code>d1 00 20 40</code>。</li>
+        <li><code>hexdump -C zImage | head -5</code> —— 看 zImage 头部的魔数与自解压标识。</li>
+        <li>U-Boot 里 <code>printenv bootcmd bootargs</code> —— 看它到底怎么启动内核。</li>
+        <li>U-Boot 里 <code>mmc dev 0; mmc info</code> —— 确认设备与容量。</li>
+        <li>U-Boot 里 <code>bdinfo</code> —— 看内存布局与重定位地址。</li>
+        <li>内核启动后 <code>cat /proc/cmdline</code> —— 确认 bootargs 真的传进来了。</li>
+        <li>内核启动后 <code>dmesg | head -40</code> —— 看它早期打印的机器型号与内存大小。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一章预告</b>
+      T09 接着讲内核自己的第一段代码：head.S 做了什么、start_kernel 里那几十个初始化调用的顺序为什么不能乱、initcall 机制怎么把驱动挂上系统。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"从上电到 rootfs：六个阶段各自干什么","steps":[{"t":"① BootROM","d":"芯片内部固化的代码先跑。按拨码开关决定从 SD、eMMC、USB 还是串口找启动介质，找的是 IVT 表头。"},{"t":"② 读 IVT 与 DCD","d":"IVT 告诉你程序搬到哪、入口在哪；DCD 是一串寄存器写操作，用来把 DDR 初始化好——此时内存还不可用。"},{"t":"③ SPL / U-Boot 前半","d":"在片内 SRAM（约 128KB）里跑，先把 DDR 训好，再把完整的 U-Boot 搬进 DDR。"},{"t":"④ U-Boot","d":"有了内存和串口，就能读分区、跑命令行、从 SD 或网络加载内核镜像 zImage 与 dtb。"},{"t":"⑤ 内核","d":"解压、建页表、开 MMU、解析 dtb、初始化各子系统，最后去挂根文件系统。"},{"t":"⑥ rootfs 与 init","d":"挂上 ext4 或 initramfs，跑 /sbin/init，起了 shell，串口才交到你手上。"}],"note":"这条链任何一环断掉都表现为「串口没输出」。所以排障永远是从最后一句输出往回推，而不是猜。"}'></div>
+  </main>
+</div>
+<script src="../assets/nav.js"></script>
+<script src="../assets/viz.js"></script>
+<script src="../assets/iviz.js"></script>
+<script src="../assets/anime.iife.min.js"></script>
+<script src="../assets/anim2.js"></script>
+</body>
+</html>
+

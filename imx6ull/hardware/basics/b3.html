@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第 03 章 · 有源器件：三极管与 MOS 管 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/doc-compat.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+<link rel="stylesheet" href="../../assets/asm.css">
+</head><body style="--acc:#ffb545">
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../../index.html">☰ 六个入口</a>
+  <a class="home hide-sm" href="../../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">硬件是怎么工作的 · 9 篇</div>
+    <ol>
+      <li><a href="index.html"><span class="no">⌂</span><span>路口目录<span class="sub">篇目总览与读法</span></span></a></li>
+      <li><a href="b0.html"><span class="no">00</span><span>先修：怎么学才算学会<span class="sub">三条判断标准，和一条错的路径</span></span></a></li>
+      <li><a href="b1.html"><span class="no">01</span><span>电的四个字：电压、电流、电阻、功率<span class="sub">欧姆定律、串并联、LED 限流实算</span></span></a></li>
+      <li><a href="b2.html"><span class="no">02</span><span>无源五件套：电阻、电容、电感、二极管、晶振<span class="sub">每个元件都在解决一个具体问题</span></span></a></li>
+      <li><a href="b3.html" class="active"><span class="no">03</span><span>有源器件：三极管与 MOS 管<span class="sub">为什么一个「开关」需要三个脚</span></span></a></li>
+      <li><a href="b4.html"><span class="no">04</span><span>数字电路的骨架：电平、门、组合、时序<span class="sub">五种门、真值表、加法器、触发器</span></span></a></li>
+      <li><a href="b5.html"><span class="no">05</span><span>时间：时钟、建立保持、抖动、消抖<span class="sub">为什么电路需要「等一会儿」</span></span></a></li>
+      <li><a href="b6.html"><span class="no">06</span><span>总线到底是什么<span class="sub">地址、数据、控制，与片选、时序</span></span></a></li>
+      <li><a href="b7.html"><span class="no">07</span><span>回到这块板子：元件对号入座<span class="sub">电源树、晶振、DDR、eMMC、按键、LED</span></span></a></li>
+      <li><a href="b8.html"><span class="no">08</span><span>工具与六个实验<span class="sub">万用表、示波器、逻辑分析仪怎么用</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="../index.html">硬件入口</a><a href="../../juan/index.html">十四卷总览</a></div>
+  </aside>
+  <main class="doc">
+    <div class="doc-kicker">硬件基础课 · 从一颗电阻开始 <span>·</span> 第 03 章</div>
+    <div class="ch-head">
+      <h1>有源器件：三极管与 MOS 管</h1>
+      <div class="ch-meta"><span class="hot">第 03 章</span><span>约 24 分钟</span><span>★ 必读</span></div>
+    </div>
+<h2 id="s1">为什么需要第三个脚</h2>
+<p>无源器件只会「按欧姆定律响应」。要让一个「小信号」控制「大电流」，需要一个受控的阀门——这就是有源器件（三极管、MOS 管）的本质。</p>
+<p>它们的共同结构是<b>三个脚</b>：</p>
+<table class="regtbl"><thead><tr><th>器件</th><th>控制端</th><th>被控通道</th><th>类型</th></tr></thead><tbody><tr><td class="nm">BJT（双极型，NPN/PNP）</td><td>基极 B（电流控制）</td><td>集电极 C ↔ 发射极 E</td><td>电流控制电流</td></tr><tr><td class="nm">MOSFET（N 沟道 / P 沟道）</td><td>栅极 G（电压控制）</td><td>漏极 D ↔ 源极 S</td><td>电压控制电流</td></tr></tbody></table>
+<p>一句话区别：<b>三极管是「用电流控制电流」，MOS 是「用电压控制电流」。</b></p>
+<h2 id="s2">NPN：三个工作区</h2>
+<table class="regtbl"><thead><tr><th>区域</th><th>条件</th><th>行为</th></tr></thead><tbody><tr><td class="nm">截止</td><td>Vbe &lt; 0.7V</td><td>C-E 不通，像断开的开关</td></tr><tr><td class="nm">放大</td><td>Vbe ≈ 0.7V，Ic 未饱和</td><td>Ic = β·Ib，β 通常 100–300</td></tr><tr><td class="nm">饱和</td><td>Ib 足够大</td><td>C-E 几乎短路，Vce ≈ 0.2V</td></tr></tbody></table>
+<p><b>开关用途只关心两个：截止与饱和。</b> 放大区在这里不关心。</p>
+<p>作为开关的接法（NPN 低边开关）：</p>
+<pre class="asm"><code>负载（LED/继电器） → 集电极
+发射极 → GND
+基极 ← 电阻 ← GPIO</code></pre>
+<p>GPIO 输出高 → 基极有电流 → 三极管饱和 → 负载通。GPIO 输出低 → 截止。</p>
+<p><b>基极电阻必须算</b>：</p>
+<div class="fm">I<sub>b</sub> ≥ I<sub>c</sub> / β　　再留 2–3 倍余量保证饱和。</div>
+<p>例如驱动 20mA 负载、β=100：Ic/β = 0.2mA，取 1mA 更稳妥。GPIO 3.3V、Vbe 0.7V：</p>
+<div class="fm">R<sub>b</sub> = (3.3 − 0.7) / 0.001 = 2600 Ω　　取 2.2kΩ。</div>
+<p>不串这颗电阻，GPIO 会直接被 Vbe 钳在 0.7V，电流可能大到烧 IO。</p>
+<h2 id="s3">MOS 管：三个必须知道的点</h2>
+<p><b>① 栅极几乎不耗电，但有电容。</b></p>
+<p>栅极是绝缘的氧化层，静态电流极小（nA 级）——这是 MOS 优于三极管的地方（不消耗持续驱动电流）。但栅极本身是个小电容（几百 pF），开关瞬间要充放电荷。<b>因此高速开关时驱动能力仍然重要</b>，而且栅极悬空时电位不定，可能半开半关、发热烧掉。</p>
+<p><b>② 栅极电压要够（Vgs 阈值）。</b></p>
+<p>N 沟道 MOS 的 Vgs(th) 常见 1–3V。用 3.3V GPIO 直接驱动「逻辑电平 MOS」可以；驱动普通 MOS（Vgs(th) 4V 以上）就不够，会停在放大区、发热。<b>这就是「为什么有的板子要加一级三极管去推 MOS」。</b></p>
+<p><b>③ 低边与高边。</b></p>
+<ul>
+<li><b>低边开关</b>（N 沟道，源极接地）：常见、简单，但负载不再接地。</li>
+<li><b>高边开关</b>（P 沟道，源极接电源）：负载保持接地，但需要「栅极比源极低」才导通，驱动逻辑反相。</li>
+</ul>
+<p>板子上「控制一路 12V 电源」这类需求，常用高边 + P 沟道（或专用高边驱动芯片）。</p>
+<h2 id="s4">和 GPIO 的关系：为什么常常不直接用 GPIO 驱动</h2>
+<p>i.MX6ULL 的 GPIO 驱动能力有限（看 Datasheet 的驱动电流档位，常见是 mA 级）。超过它的负载必须外加器件：</p>
+<table class="regtbl"><thead><tr><th>负载</th><th>做法</th></tr></thead><tbody><tr><td class="nm">一颗指示 LED（几 mA）</td><td>GPIO 直接 + 限流电阻</td></tr><tr><td class="nm">多颗 LED / 大电流 LED</td><td>GPIO → 三极管/MOS 低边</td></tr><tr><td class="nm">继电器 / 电机</td><td>三极管/MOS + <b>续流二极管</b></td></tr><tr><td class="nm">另一路电源域</td><td>高边 MOS 或专用负载开关</td></tr></tbody></table>
+<p><b>继电器与电机必须加续流二极管</b>：感性负载断电瞬间会产生反向高压尖峰，没有泄放路径就会击穿驱动管。</p>
+<h2 id="s5">一个完整的例子：GPIO 控制 5V 蜂鸣器</h2>
+<p>需求：3.3V GPIO 控制 5V 有源蜂鸣器（约 30mA）。</p>
+<p>方案：NPN 低边开关。</p>
+<pre class="asm"><code>5V → 蜂鸣器 → 集电极
+发射极 → GND
+基极 → 2.2kΩ → GPIO</code></pre>
+<p>三点检查：</p>
+<ol>
+<li><b>Vce 饱和压降</b>：约 0.2V，蜂鸣器实际得到 4.8V，够。</li>
+<li><b>基极电流</b>：3.3V/2.2k ≈ 1.2mA，足够饱和。</li>
+<li><b>蜂鸣器是感性</b>：并一颗反向二极管（阴极接 5V，阳极接集电极）做续流。</li>
+</ol>
+<p>这三条检查就是「有源器件」这一章的全部实践价值。</p>
+<h2 id="s6">本篇验收</h2>
+<ul>
+<li>能说出三极管与 MOS 的控制方式差别（电流 vs 电压）。</li>
+<li>能画出 NPN 低边开关，并算出基极电阻。</li>
+<li>能解释「栅极不耗电」为什么仍然需要驱动能力。</li>
+<li>能区分低边与高边开关，并说出各自代价。</li>
+<li>能说出「感性负载必须加续流二极管」的原因。</li>
+</ul>
+<h2 id="s7">下一篇</h2>
+<p>单个器件讲完，进入数字世界：电平怎么表示 0/1，门电路怎么组成加法器，触发器怎么「记住」一位。04 篇是整门课的骨架。</p>
+<div class="pager">
+      <a href="b2.html"><span>上一篇</span><b>← 02 无源五件套：电阻、电容、电感、二极管、晶振</b></a>
+      <a href="index.html"><span>目录</span><b>篇目总览</b></a>
+      <a class="nx" href="b4.html"><span>下一篇</span><b>04 数字电路的骨架：电平、门、组合、时序 →</b></a>
+    </div>
+  </main>
+</div>
+<script src="../../assets/hw-tools.js"></script>
+</body>
+</html>

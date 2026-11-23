@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=../docs/course-13.html">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>13 · 流水线</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/viz.css">
+<link rel="stylesheet" href="assets/iviz.css">
+<link rel="stylesheet" href="assets/anim2.css">
+  <script src="assets/readmode.js" defer></script>
+</head>
+<body data-page="13">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>第 13 课 · 流水线：让五条指令同时在路上</h1>
+    <p class="lede">上一课一条指令要走五拍。如果老老实实排队，528MHz 也只能跑到 100MIPS 左右。流水线的想法极简单：<b>把五个阶段当成五道工序，让五条指令同时各占一道</b>。理想情况一拍出一条，速度提升接近 5 倍。但代价是三个新麻烦——这一课把它们讲透，因为<b>内核代码里一半的性能问题都能追到这三个冒险上</b>。</p>
+
+    <div class="viz" data-kind="pipe" data-title="五级流水：每一拍都有一条指令在完成" data-sub="稳态下，五个阶段各有一条指令，吞吐 = 1 条/拍" data-json='{"stages":[{"n":"IF","d":"取指","c":"cy"},{"n":"ID","d":"译码 + 读寄存器","c":"vi"},{"n":"EX","d":"执行","c":"or"},{"n":"MEM","d":"访存","c":"rd"},{"n":"WB","d":"写回","c":"gr"}],"note":"注意「吞吐」和「延迟」是两件事：吞吐接近 1 条/拍，但单条指令从进到出仍要 5 拍。这就是为什么流水越深，主频越高但分支惩罚越重。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 流水线为什么能提速，提速上限是多少？② 数据冒险是什么，旁路怎么救它？③ 为什么 load-use 冒险旁路救不了？④ 分支为什么会「打断流水」？⑤ 流水越深越好吗？</p>
+    </div>
+
+    <h2>1. 直觉：洗车</h2>
+
+    <p>洗车有五道工序：冲水、打泡、擦洗、冲净、擦干。如果一辆车从头做到尾再洗下一辆，一小时洗 3 辆；如果五个工位各管一道，车一辆接一辆往前挪，稳态下一小时能洗 15 辆。<b>单车时间没变，吞吐变了。</b></p>
+
+    <p><b>失效处</b>：如果某辆车的「擦洗」特别久，后面四辆都得等——这就是流水线的「木桶效应」，最慢阶段决定整体节拍。</p>
+
+    <h2>2. 硬件上：流水线寄存器</h2>
+
+    <p>阶段之间插入流水线寄存器（IF/ID、ID/EX、EX/MEM、MEM/WB），每一拍把「本阶段的结果 + 必要的控制信号」锁进去，交给下一阶段。第 08 课的触发器在这里派上用场。</p>
+
+    <p>所以流水线的本质是：<b>把一条指令的组合逻辑链切成 5 段，每段之间加寄存器隔离</b>。节拍由最长那段决定，主频因此可以提高约 5 倍。</p>
+
+    <h2>3. 三个冒险</h2>
+
+    <table>
+      <thead><tr><th>冒险</th><th>成因</th><th>解法</th><th>代价</th></tr></thead>
+      <tbody>
+        <tr><td><b>结构冒险</b></td><td>两条指令同时要用同一个部件（如单端口存储器）</td><td>分开 I/D 缓存、加端口、复制部件</td><td>面积</td></tr>
+        <tr><td><b>数据冒险</b></td><td>后一条要用前一条还没写回的结果</td><td>旁路（forwarding）、必要时停顿</td><td>额外布线 / 停顿周期</td></tr>
+        <tr><td><b>控制冒险</b></td><td>不知道下一条该取哪（分支/中断/异常）</td><td>分支预测、延迟槽、预测失败清空</td><td>惩罚周期</td></tr>
+      </tbody>
+    </table>
+
+    <div class="viz" data-kind="timeline" data-title="load-use 冒险：旁路救不了，必须停一拍" data-sub="因为数据在 MEM 阶段末尾才出来，EX 阶段已经来不及" data-json='{"items":[{"t":"T1","n":"ldr 在 EX","d":"算地址","c":"cy"},{"t":"T2","n":"ldr 在 MEM","d":"数据刚出来；下一条已经在 EX 等它","c":"rd"},{"t":"T3","n":"停顿一拍","d":"把后一条卡在 ID，等数据写回","c":"or"},{"t":"T4","n":"喂进 EX","d":"此时数据可用","c":"gr"}],"note":"这条「load-use 停一拍」是编译器调度的经典靶点：把不依赖 load 结果的指令提前插入空档，就能填掉这个气泡。gcc -O2 的指令调度就在干这个。"}'></div>
+
+    <p>普通算术的数据冒险，旁路能救：ALU 结果在 EX 末尾就有了，直接「抄近路」送回下一条的 EX 输入，不用等写回。但<b>load 的数据在 MEM 末尾才有</b>，下一条若紧接着要用，就只能停。</p>
+
+    <p>这条知识在写代码时非常有用：<b>把「取指针 → 用指针」拆开，中间插几条无关指令</b>，就能消掉停顿。这也是为什么链表遍历往往比数组慢——每步都是 load-use 依赖。</p>
+
+    <h2>4. 控制冒险：分支的代价</h2>
+
+    <p>取指阶段就要知道地址，但分支结果要等到 EX 甚至更晚才知道。于是流水线只能「猜」：猜对了继续，猜错了把已经取进来的指令全部作废。</p>
+
+    <div class="viz" data-kind="bars" data-title="分支惩罚：流水越深，猜错越贵" data-sub="单位：损失的周期数（示意）" data-json='{"items":[{"n":"3 级流水","v":2,"c":"gr"},{"n":"5 级流水","v":3,"c":"cy"},{"n":"8 级（A7）","v":8,"c":"or"},{"n":"20 级（深流水）","v":15,"c":"rd"}],"unit":"周期","max":15,"note":"所以「分支预测准确率」对性能影响巨大。现代 CPU 用历史表 + 模式识别做到 95% 以上；一旦预测失败，代价就是十几拍。"}'></div>
+
+    <p>ARM 从 ARMv8 起不再有「延迟槽」（MIPS 那种「分支后那条指令总执行」的怪设计），这让汇编更好写，但也意味着分支惩罚完全由硬件承担。</p>
+
+    <p>实际影响：<b>在热循环里，把最可能的分支放到「顺序执行」一侧</b>（即条件不成立时不跳），能显著提升预测命中率。这不是玄学，是编译器和你都能控制的事。</p>
+
+    <h2>5. 流水线与进程切换</h2>
+
+    <p>上下文切换时（第 32 课），流水线里可能正有五条指令在飞。切换必须让它们「安全落地」——保存的 PC 与寄存器状态要对应一条明确的指令边界，而不是半路。所以切换本身的代价不只是「保存 16 个寄存器」，还包括<b>流水线清空 + 缓存冷启动</b>。</p>
+
+    <pre><code>// 内核切换时的关键三行（简化）
+// 1) 保存当前任务的 callee-saved 寄存器到它的栈
+// 2) 切换栈指针到新任务
+// 3) 恢复新任务的寄存器，最后 mov pc, lr 返回
+// 每一步都会让流水线重新填充（几拍到几十拍）
+// 所以「线程切换开销」在 μs 量级，而不是 ns 量级
+
+// 实测（Ubuntu）：
+//   perf stat -e context-switches,cpu-migrations ./your_prog
+// 或用 cyclictest 看实时延迟抖动</code></pre>
+
+    <h2>6. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于流水线的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["流水线越深越快","流水线能让单条指令更快执行完","有旁路就不会有停顿"]},"good":{"t":"实际","items":["越深主频越高，但分支惩罚、功耗、面积都上升；存在最优深度","单条指令延迟反而变长（多了寄存器开销）","load-use 冒险旁路无效，必须停一拍"]},"note":"这也是为什么 Pentium 4 的 31 级流水线最终被放弃：主频上去了，但实际程序的分支密度让它跑不动。深度是一个工程折中，不是越大越好。"}'></div>
+
+    <h2>7. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>5 级流水，稳态吞吐是多少？单条延迟多少？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>吞吐约 1 条/拍，单条延迟 5 拍。两者是不同指标。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>旁路解决的是哪类冒险？为什么能「抄近路」？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>数据冒险。ALU 结果在 EX 末就有，从 EX/MEM 寄存器直接取回送到下一条的 EX 输入，不必等 WB 写进寄存器堆。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>为什么 load-use 无法靠旁路解决？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>load 的数据要等 MEM 阶段结束才拿到，而紧跟的下一条此时已经要进 EX——时间上倒挂了，只能停。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>分支预测失败时，硬件做了什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>清空已取进流水线的错误路径指令（flush），从正确地址重新取指——损失若干拍。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>为什么上下文切换的开销远大于「保存寄存器」本身？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>还要清空/填充流水线、切换地址空间（TLB 可能失效）、缓存冷启动（新任务的数据不在 L1）。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>画一条 5 级流水的时序表，标出「load 后紧跟使用」的位置与停顿拍。</li>
+        <li>写两段代码访问同一个数组：一段顺序、一段跨步，比较 CPI（第 23 课会用 perf）。</li>
+        <li>在板子上跑 <code>perf stat -e branch-misses</code>，看你的程序分支预测准确率。</li>
+        <li>查 A7 的流水级数（可信来源），算一下一次分支失败的纳秒成本。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      到现在为止，指令都是「概念上的」。第 14 课把它变成真正的 32 位二进制：cond、opcode、Rn、Rd、立即数各占几位，为什么这样切，以及「立即数为什么不能想放多大就放多大」。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="switch" data-iviz="1" data-json='{"title":"同一段代码，三种硬件的吞吐","hint":"切换流水深度","note":"流水线不缩短单条指令的时间，它提高的是「每周期完成几条」。深度越大，填满越慢，冒险越难处理。","views":[{"b":"单周期","items":[{"t":"每条指令 1 个周期，周期长由最慢那一步决定","d":"简单、可预测，但硬件利用率极低：取指时 ALU 闲，算的时候总线闲。"}]},{"b":"5 级流水","items":[{"t":"理想吞吐 1 条/周期","d":"取指、译码、执行、访存、写回各占一级。代价是数据冒险、控制冒险、结构冒险都要额外硬件处理。"}]},{"b":"8 级（i.MX6ULL 的 Cortex-A7）","items":[{"t":"主频能拉更高，分支惩罚也更大","d":"级数越多，每级做的事越少、频率越容易上去；但一次分支预测失败要冲刷的级数也越多，所以 A7 才需要分支预测和投机执行。"}]}]}'></div>
+  </main>
+</div>
+<script src="assets/cnav.js"></script>
+<script src="assets/viz.js"></script>
+<script src="assets/iviz.js"></script>
+<script src="assets/anime.iife.min.js"></script>
+<script src="assets/anim2.js"></script>
+</body>
+</html>

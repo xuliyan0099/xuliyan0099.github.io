@@ -1,0 +1,10 @@
+[
+  {"slug":"m0","no":"00","title":"六份文档，别拿错","sub":"Datasheet / RM / AN / 勘误 / 原理图 / dts 各管什么","read":"约 14 分钟","level":"★ 必读","tools":false},
+  {"slug":"m1","no":"01","title":"拿到手册，先做四件事","sub":"建索引、画内存图、找时钟树、贴引脚表","read":"约 18 分钟","level":"★ 必读","tools":false},
+  {"slug":"m2","no":"02","title":"Datasheet 怎么读：只读五处","sub":"订货型号、绝对最大额定、电气特性、引脚定义、封装","read":"约 22 分钟","level":"★ 必读","tools":false},
+  {"slug":"m3","no":"03","title":"Reference Manual 一章的固定骨架","sub":"概述 → 功能 → 外部信号 → 时钟 → 寄存器 → 初始化流程","read":"约 20 分钟","level":"★ 必读","tools":false},
+  {"slug":"m4","no":"04","title":"寄存器表怎么逐列读","sub":"偏移、位域、Reserved、R/W、W1C、复位值","read":"约 26 分钟","level":"★★ 核心","tools":true},
+  {"slug":"m5","no":"05","title":"四个真实例子：从手册到代码","sub":"CCM、IOMUXC、UART、GPIO 各走一遍","read":"约 32 分钟","level":"★★ 核心","tools":false},
+  {"slug":"m6","no":"06","title":"从板子上的一个脚，查到 dts 一行","sub":"原理图 → 引脚名 → 复用功能 → 设备树节点","read":"约 24 分钟","level":"★★ 核心","tools":false},
+  {"slug":"m7","no":"07","title":"八个坑，和一张速查","sub":"页码对不上、复位值不算、W1C 写 1 才清…","read":"约 20 分钟","level":"★ 必读","tools":false}
+]

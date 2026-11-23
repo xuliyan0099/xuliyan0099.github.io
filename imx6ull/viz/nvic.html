@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>中断优先级与抢占台 · i.MX6ULL</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0a0e17;color:#e6ecfa;font:15px/1.7 "Noto Sans SC","PingFang SC",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1040px;margin:0 auto;padding:34px 18px 70px}
+a.back{display:inline-block;margin:0 0 16px;padding:6px 12px;border:1px solid rgba(110,168,254,.28);border-radius:9px;color:#cfdcf7;text-decoration:none;font-size:12.5px}
+a.back:hover{border-color:#5ff1ef;color:#5ff1ef}
+h1{font-size:23px;margin:0 0 6px}
+p.sub{color:#8b9cbb;font-size:13px;margin:0 0 20px}
+.panel{border:1px solid rgba(110,168,254,.16);border-radius:12px;padding:14px;background:linear-gradient(180deg,rgba(16,22,36,.92),rgba(11,16,27,.94));margin:0 0 14px}
+.stage{border:1px solid rgba(110,168,254,.16);border-radius:12px;padding:14px;background:linear-gradient(180deg,rgba(16,22,36,.92),rgba(11,16,27,.94))}
+.lbl{font-size:12px;color:#8b9cbb;margin:0 0 8px}
+.row{display:flex;align-items:center;gap:12px;margin:0 0 10px;flex-wrap:wrap}
+.row .name{width:88px;font-size:13px;font-weight:600}
+.row .name i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:middle;font-style:normal}
+input[type=range]{-webkit-appearance:none;height:3px;background:#22344f;border-radius:2px;flex:1;min-width:120px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:#5ff1ef;border:2px solid #0a0e17;cursor:pointer}
+.tag{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:#7ee7ff;min-width:78px}
+.btn{padding:5px 9px;border:1px solid rgba(110,168,254,.24);border-radius:8px;background:transparent;color:#cddcf7;font-size:12px;cursor:pointer;font-family:inherit}
+.btn:hover{border-color:#5ff1ef;color:#5ff1ef}
+.btn.on{background:rgba(95,241,239,.14);border-color:#5ff1ef;color:#eafcff}
+.verdict{padding:10px 12px;border-radius:9px;font-size:13px;margin:10px 0 0;border:1px solid rgba(110,168,254,.2);color:#cfe0ff;background:rgba(110,168,254,.06);line-height:1.75}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:12px}
+th,td{padding:5px 8px;border-bottom:1px solid rgba(110,168,254,.1);text-align:left}
+th{color:#8b9cbb;font-weight:500;font-size:11.5px}
+td.reg{font-family:ui-monospace,Consolas,monospace;color:#9fd8ff;white-space:nowrap}
+td.val{font-family:ui-monospace,Consolas,monospace;color:#7ee7ff;text-align:right}
+.why{margin-top:16px;border-left:2px solid #ff6b8a;padding:2px 0 2px 12px;color:#a9bad8;font-size:13px;line-height:1.8}
+.why b{color:#e6ecfa}
+svg.tl{display:block;width:100%;height:auto}
+@media(max-width:720px){.row .name{width:76px}.tag{min-width:0}}
+</style></head>
+<body><div class="wrap">
+<a class="back" href="index.html">← 互动台目录</a>
+<h1>中断优先级与抢占台</h1>
+<p class="sub">三个中断按固定时刻到达：UART 先来、TIM 其次、GPIO 最后。改优先级，看谁打断谁、谁只能排队。</p>
+
+<div class="panel">
+  <p class="lbl">优先级分组（NVIC PRIGROUP）：抢占优先级占几位</p>
+  <div class="row" id="grp"></div>
+
+  <div class="row"><span class="name"><i style="background:#5ff1ef"></i>UART1</span>
+    <span style="font-size:12px;color:#8b9cbb">抢占</span><input type="range" id="pu" min="0" max="15" value="3" step="1"><span class="tag" id="tu"></span>
+    <span style="font-size:12px;color:#8b9cbb">子</span><input type="range" id="su" min="0" max="15" value="0" step="1"><span class="tag" id="tsu"></span>
+  </div>
+  <div class="row"><span class="name"><i style="background:#ffb85c"></i>TIM2</span>
+    <span style="font-size:12px;color:#8b9cbb">抢占</span><input type="range" id="pt" min="0" max="15" value="2" step="1"><span class="tag" id="tt"></span>
+    <span style="font-size:12px;color:#8b9cbb">子</span><input type="range" id="st" min="0" max="15" value="0" step="1"><span class="tag" id="tst"></span>
+  </div>
+  <div class="row"><span class="name"><i style="background:#ff6b8a"></i>GPIO1</span>
+    <span style="font-size:12px;color:#8b9cbb">抢占</span><input type="range" id="pg" min="0" max="15" value="1" step="1"><span class="tag" id="tg"></span>
+    <span style="font-size:12px;color:#8b9cbb">子</span><input type="range" id="sg" min="0" max="15" value="1" step="1"><span class="tag" id="tsg"></span>
+  </div>
+</div>
+
+<div class="stage">
+  <svg class="tl" id="tl" viewBox="0 0 920 240" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div class="verdict" id="verdict"></div>
+  <table>
+    <tr><th>寄存器</th><th>值</th><th style="width:46%">含义</th></tr>
+    <tr><td class="reg">NVIC_IPR0</td><td class="val" id="ipr0">0x00</td><td style="color:#8b9cbb">UART1 优先级字节</td></tr>
+    <tr><td class="reg">NVIC_IPR1</td><td class="val" id="ipr1">0x00</td><td style="color:#8b9cbb">TIM2 优先级字节</td></tr>
+    <tr><td class="reg">NVIC_IPR2</td><td class="val" id="ipr2">0x00</td><td style="color:#8b9cbb">GPIO1 优先级字节</td></tr>
+    <tr><td class="reg">AIRCR.PRIGROUP</td><td class="val" id="grpv">0x00</td><td style="color:#8b9cbb">分组：抢占位 / 子优先级位</td></tr>
+  </table>
+</div>
+
+<div class="why">
+<b>抢占优先级决定「能不能打断」，子优先级只决定「同时就绪谁先上」。</b>抢占值更小（更高优先级）才能打断正在跑的中断；子优先级再小也不能抢占，只能等对方跑完再排队。<br>
+<b>同一个抢占级里，中断号小的先执行。</b>子优先级和中断号都相同时，硬件按 IRQ 编号排队，跟代码里注册顺序无关。<br>
+<b>优先级分组一旦定下，所有中断的抢占/子优先级位宽就固定了。</b>生产代码通常在系统启动时设一次，别运行时改，否则正在跑的优先级会变。
+</div>
+</div>
+
+<script>
+(function(){
+  var IRQS = [
+    { id: 'uart', name: 'UART1', color: '#5ff1ef', at: 10, dur: 34, irq: 32, p: 3, s: 0 },
+    { id: 'tim',  name: 'TIM2',  color: '#ffb85c', at: 26, dur: 30, irq: 30, p: 2, s: 0 },
+    { id: 'gpio', name: 'GPIO1', color: '#ff6b8a', at: 44, dur: 22, irq: 34, p: 1, s: 1 }
+  ];
+  var preBits = 2;                 // 抢占位数
+  var T_END = 120;
+
+  function preMax(){ return (1 << preBits) - 1; }
+  function subMax(){ return (1 << (4 - preBits)) - 1; }
+
+  function el(id){ return document.getElementById(id); }
+
+  function drawGuide(){
+    var box = el('grp'); box.innerHTML = '';
+    [1, 2, 3, 4].forEach(function(k){
+      var b = document.createElement('button');
+      b.className = 'btn' + (k === preBits ? ' on' : '');
+      b.textContent = k + ' 位抢占 / ' + (4 - k) + ' 位子优先级';
+      b.onclick = function(){ preBits = k; clampAll(); render(); };
+      box.appendChild(b);
+    });
+  }
+
+  function clampAll(){
+    IRQS.forEach(function(q){
+      q.p = Math.min(q.p, preMax());
+      q.s = Math.min(q.s, subMax());
+    });
+  }
+
+  function better(a, b){                   // a 是否比 b 更优先
+    if (a.p !== b.p) return a.p < b.p;
+    if (a.s !== b.s) return a.s < b.s;
+    return a.irq < b.irq;
+  }
+
+  function simulate(){
+    var pend = [], stack = [], running = null, segs = [], t = 0, arrived = {};
+    IRQS.forEach(function(q){ q._doneAt = null; });
+    while (t < T_END - 0.5) {
+      IRQS.forEach(function(q){
+        if (!arrived[q.id] && q.at <= t) { arrived[q.id] = true; pend.push(q); }
+      });
+      // 抢占判断
+      if (running && pend.length) {
+        var top = pend.reduce(function(a, b){ return better(a, b) ? a : b; });
+        if (better(top, { p: running.p, s: running.s, irq: running.irq })) {
+          stack.push({ q: running.q, remain: running.remain });
+          segs.push({ id: running.q.id, from: t, to: t, cut: true });
+          running = null;
+        }
+      }
+      if (!running && pend.length) {
+        var nx = pend.reduce(function(a, b){ return better(a, b) ? a : b; });
+        pend = pend.filter(function(x){ return x !== nx; });
+        var back = null;
+        for (var i = stack.length - 1; i >= 0; i--) { if (stack[i].q === nx) { back = stack.splice(i, 1)[0]; break; } }
+        running = { q: nx, remain: back ? back.remain : nx.dur };
+      }
+      if (running) {
+        var s = segs[segs.length - 1];
+        if (s && s.id === running.q.id && !s.cut && s.to === t) { s.to = t + 0.5; }
+        else { segs.push({ id: running.q.id, from: t, to: t + 0.5 }); }
+        running.remain -= 0.5;
+        if (running.remain <= 0.001) { running = null; }
+      }
+      t += 0.5;
+    }
+    return segs;
+  }
+
+  function draw(segs){
+    var svg = el('tl');
+    var W = 920, L = 76, R = 900, top = 34, laneH = 52;
+    var scale = (R - L) / T_END;
+    var g = '';
+    g += '<g font-family="ui-monospace,Consolas,monospace" font-size="10.5" fill="#7f93b5">';
+    for (var m = 0; m <= T_END; m += 20) {
+      var x = L + m * scale;
+      g += '<line x1="' + x + '" y1="' + (top - 12) + '" x2="' + x + '" y2="' + (top + laneH * 3) + '" stroke="rgba(110,168,254,.12)"/>';
+      g += '<text x="' + x + '" y="' + (top - 18) + '" text-anchor="middle">' + m + '</text>';
+    }
+    IRQS.forEach(function(q, i){
+      var y = top + i * laneH;
+      g += '<text x="8" y="' + (y + 22) + '" fill="' + q.color + '">' + q.name + '</text>';
+      g += '<line x1="' + L + '" y1="' + (y + 18) + '" x2="' + R + '" y2="' + (y + 18) + '" stroke="rgba(110,168,254,.16)"/>';
+      g += '<circle cx="' + (L + q.at * scale) + '" cy="' + (y + 18) + '" r="3.5" fill="' + q.color + '"/>';
+    });
+    segs.forEach(function(s){
+      if (s.cut) return;
+      var q = IRQS.filter(function(x){ return x.id === s.id; })[0];
+      var i = IRQS.indexOf(q);
+      var y = top + i * laneH;
+      var x1 = L + s.from * scale, x2 = L + s.to * scale;
+      if (x2 - x1 < 1) return;
+      g += '<rect x="' + x1 + '" y="' + (y + 4) + '" width="' + (x2 - x1) + '" height="28" rx="4" fill="' + q.color + '" opacity="' + (0.28 + 0.16 * Math.min(1, (x2 - x1) / 40)) + '" stroke="' + q.color + '" stroke-width="1"/>';
+      if (x2 - x1 > 34) g += '<text x="' + ((x1 + x2) / 2) + '" y="' + (y + 23) + '" text-anchor="middle" fill="#eafcff" font-size="11">' + q.name + '</text>';
+    });
+    g += '</g>';
+    svg.innerHTML = g;
+  }
+
+  function render(){
+    drawGuide();
+    [['pu', 'tu', 'uart'], ['pt', 'tt', 'tim'], ['pg', 'tg', 'gpio']].forEach(function(x){
+      var q = IRQS.filter(function(y){ return y.id === x[2]; })[0];
+      var r = el(x[0]); r.max = preMax(); r.value = q.p;
+      el(x[1]).textContent = '抢占 ' + q.p + ' / 0–' + preMax();
+      r.oninput = function(){ q.p = +r.value; render(); };
+    });
+    [['su', 'tsu', 'uart'], ['st', 'tst', 'tim'], ['sg', 'tsg', 'gpio']].forEach(function(x){
+      var q = IRQS.filter(function(y){ return y.id === x[2]; })[0];
+      var r = el(x[0]); r.max = subMax(); r.value = q.s;
+      el(x[1]).textContent = '子 ' + q.s + ' / 0–' + subMax();
+      r.oninput = function(){ q.s = +r.value; render(); };
+    });
+
+    el('ipr0').textContent = '0x' + ((IRQS[0].p << 4 | IRQS[0].s) & 0xff).toString(16).toUpperCase().padStart(2, '0');
+    el('ipr1').textContent = '0x' + ((IRQS[1].p << 4 | IRQS[1].s) & 0xff).toString(16).toUpperCase().padStart(2, '0');
+    el('ipr2').textContent = '0x' + ((IRQS[2].p << 4 | IRQS[2].s) & 0xff).toString(16).toUpperCase().padStart(2, '0');
+    el('grpv').textContent = '0x' + ((7 - preBits) << 8).toString(16).toUpperCase().padStart(3, '0');
+
+    var segs = simulate();
+    draw(segs);
+
+    var u = IRQS[0], tt = IRQS[1], gg = IRQS[2];
+    var lines = [];
+    lines.push('UART1 跑到一半时 TIM2 到达：' + (better(tt, { p: u.p, s: u.s, irq: u.irq }) ? '抢占，UART1 被挂起，TIM2 先跑完再回来。' : '抢占优先级不高于 UART1，只能排队等它跑完（子优先级再小也没用）。'));
+    lines.push('GPIO1 到达时：' + (better(gg, { p: 0, s: 0, irq: 999 }) ? '' : '') +
+      (better(gg, { p: tt.p, s: tt.s, irq: tt.irq }) && better(gg, { p: u.p, s: u.s, irq: u.irq }) ? '它的抢占优先级最高，会打断正在跑的那个。'
+        : better(gg, { p: tt.p, s: tt.s, irq: tt.irq }) ? '它能打断 TIM2，但要等 UART1（如果 UART1 还在跑）。'
+        : '它最低，等前两个都跑完才轮到自己。'));
+    if (preBits === 1) lines.push('当前只有 1 位抢占：全系统只有两个抢占级，容易挤在一起。');
+    if (preBits === 4) lines.push('当前 4 位全给抢占：32 个中断能排 16 级，但同抢占级里只能靠中断号排队。');
+    el('verdict').innerHTML = lines.join('<br>');
+  }
+  render();
+})();
+</script>
+</body></html>

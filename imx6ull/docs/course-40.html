@@ -1,0 +1,211 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>存储与外设 · 卷 07 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j07.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 07 · 芯片与硬件底座</div>
+<ol><li><a href="course-th07.html">
+  <span class="no">01</span><span>ARM 架构与 Cortex-A7<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-35.html">
+  <span class="no">02</span><span>i.MX6ULL 最小系统<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th10.html">
+  <span class="no">03</span><span>总线体系：AXI / AHB / APB 与 I2C / SPI / CAN<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="course-th11.html">
+  <span class="no">04</span><span>时钟树、复位、电源域、RTC 与看门狗<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-th12.html">
+  <span class="no">05</span><span>最小系统必需外设（上）：DDR、中断、定时器、GPIO、UART<span class="sub">约 6 小时</span></span></a></li>
+<li><a href="course-th13.html">
+  <span class="no">06</span><span>最小系统必需外设（下）：存储、DMA、以太网、USB<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-37.html">
+  <span class="no">07</span><span>设备树<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th16.html">
+  <span class="no">08</span><span>BSP 与设备树原理<span class="sub">约 6 小时</span></span></a></li>
+<li><a href="course-38.html">
+  <span class="no">09</span><span>总线<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-39.html">
+  <span class="no">10</span><span>GIC 与定时器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-40.html" class="active">
+  <span class="no">11</span><span>存储与外设<span class="sub">约 1 小时 · 当前</span></span></a></li>
+<li><a href="viz-clock-tree.html">
+  <span class="no">12</span><span>互动台：时钟树与门控<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="viz-gpio.html">
+  <span class="no">13</span><span>互动台：GPIO 与 IOMUX 配置<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="viz-nvic.html">
+  <span class="no">14</span><span>互动台：中断优先级与抢占<span class="sub">💻 · 约 1 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j06.html">← 卷 06</a>
+  <a href="../juan/j08.html">卷 08 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 07<span>·</span>芯片与硬件底座<span>·</span>第 11 篇</div>
+  <h1>存储与外设</h1>
+  <p class="lede">前九部的原理在这里落地：eMMC 的块读、NAND 的坏块、LCD 的像素时序、I2C 的两根线、SPI 的四根线。这一课不是教你怎么写每个驱动，而是让你看到每个器件时，能立刻说出它挂在哪个总线、用什么协议、延迟大概是什么量级。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+
+    <div class="viz" data-kind="matrix" data-title="五类器件的性格对比" data-sub="选型与排障时先看这张表" data-json='{"corner":"器件","cols":["接口","延迟量级","典型坑"],"rows":[{"n":"eMMC","c":"cy","cells":["SDIO/MMC 8 线","百微秒","分区与启动区配置"]},{"n":"SD 卡","c":"or","cells":["SDIO 4 线","毫秒","热插拔、供电抖动"]},{"n":"NAND","c":"vi","cells":["并行/SPI","百微秒","坏块、ECC、需磨损均衡"]},{"n":"LCD","c":"gr","cells":["RGB 并口 / MIPI","按帧","像素时钟与背光时序"]},{"n":"I2C / SPI","c":"gray","cells":["2 线 / 4 线","几十~几百微秒","上拉、片选、时钟极性"]}],"note":"「延迟量级」这一列最有价值：它让你在做架构时就明白哪些操作不能放进中断、不能放进实时循环。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① eMMC 与 SD 卡的本质区别？② NAND 为什么必须做 ECC 与坏块管理？③ LCD 的像素时钟怎么算？④ I2C 为什么只需要两根线？⑤ 调试外设的第一步该做什么？</p>
+    </div>
+
+    <h2 id="s1">1. eMMC 与 SD 卡</h2>
+
+    <table>
+      <thead><tr><th></th><th>eMMC</th><th>SD 卡</th></tr></thead>
+      <tbody>
+        <tr><td>形态</td><td>焊在板上（BGA）</td><td>可插拔</td></tr>
+        <tr><td>接口</td><td>8 位数据 + 时钟 + 命令</td><td>4 位数据</td></tr>
+        <tr><td>可靠性</td><td>高（工业级可选）</td><td>较低，接触与供电易出问题</td></tr>
+        <tr><td>用途</td><td>量产产品的系统盘</td><td>开发阶段刷机、临时存储</td></tr>
+      </tbody>
+    </table>
+
+    <p>两者协议同源（都是 MMC/SD 协议），所以内核里常共用一套驱动框架。<b>但 SD 卡的「拔插」会带来一堆问题：挂载中的文件系统突然消失，内核只能报 IO 错误。</b>量产设备几乎都用 eMMC。</p>
+
+    <h2 id="s2">2. NAND：便宜但要「养」</h2>
+
+    <p>NAND 有三个先天缺陷，驱动必须处理：</p>
+
+    <ul>
+      <li><b>坏块</b>：出厂就有，且使用中会增加，需要坏块表。</li>
+      <li><b>位翻转</b>：读出来偶尔错一位，必须 ECC。</li>
+      <li><b>擦除寿命</b>：每块只能擦有限次，需要磨损均衡。</li>
+    </ul>
+
+    <p>所以 NAND 上不能直接放文件系统，要经过 UBI + UBIFS（或 YAFFS 等）。<b>这也是「为什么嵌入式常用 eMMC 而不是 NAND」——eMMC 内部已经把这三件事做好了。</b></p>
+
+    <h2 id="s3">3. LCD 的像素时钟</h2>
+
+    <pre><code>像素时钟 = (H 有效 + H 前后肩 + H 同步)
+         × (V 有效 + V 前后肩 + V 同步)
+         × 刷新率
+
+# 例：800×480 @60Hz，典型时序
+H: 800 + 40 + 40 + 48  = 928
+V: 480 + 13 + 29 + 3   = 525
+928 × 525 × 60 ≈ 29.2 MHz
+
+# 带宽需求（RGB565，每像素 2 字节）
+29.2M × 2 ≈ 58 MB/s  ← 这就是第 38 课算总线时要用的数</code></pre>
+
+    <p>算错时序的现象很具体：图像偏移、抖动、或者干脆黑屏。<b>屏幕点不亮时，先核对像素时钟与时序参数，再看背光与供电。</b></p>
+
+    <h2 id="s4">4. I2C 与 SPI：两根线与四根线</h2>
+
+    <div class="viz" data-kind="compare" data-title="I2C vs SPI：共享 vs 点对点" data-sub="选哪个取决于「挂几个器件、要多快」" data-json='{"bad":{"t":"I2C（SCL + SDA）","items":["两根线可挂几十个器件（靠地址区分）","开漏 + 上拉，速度 100k~1MHz","有应答机制，可靠性好","适合传感器、EEPROM、PMIC"]},"good":{"t":"SPI（SCLK/MOSI/MISO/CS）","items":["四根线，每个从设备一个片选","推挽，速度可到几十 MHz","无应答，靠协议自己保证","适合 Flash、LCD、高速 ADC"]},"note":"I2C 的「地址」是 7 位，所以同一总线最多 112 个可用地址。地址冲突是嵌入式里最常见的 I2C 故障——两个器件出厂地址相同。"}'></div>
+
+    <h2 id="s5">5. 调试外设的第一步</h2>
+
+    <pre><code># 1) 它有没有被识别？
+dmesg | grep -i "i2c\|spi\|mmc\|fb"
+ls /sys/bus/i2c/devices/
+ls /sys/class/mmc_host/
+
+# 2) 寄存器能不能读？
+i2cdetect -y 0            # I2C 扫描
+i2cget -y 0 0x50 0x00     # 读一个字节
+devmem 0x0209C000         # 直接读物理地址（busybox 常带）
+
+# 3) 时钟与引脚对不对？
+cat /sys/kernel/debug/clk/clk_summary
+cat /sys/kernel/debug/pinctrl/*/pinmux-pins</code></pre>
+
+    <p>这三步几乎能定位 80% 的外设问题：<b>没识别 → 看设备树与时钟；识别了但读写失败 → 看地址与上拉；都正常但数据错 → 看时序与电平。</b></p>
+
+    <h2 id="s6">6. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于外设的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["SD 卡和 U 盘一样，随便拔","NAND 用坏块是「运气不好」","I2C 挂的设备越多越方便，没有上限"]},"good":{"t":"实际","items":["挂载中拔卡会导致文件系统损坏，必须先 umount","坏块是必然现象，必须由 FTL/UBI 管理","受地址空间与总线电容限制，实际 8~10 个就要谨慎"]},"note":"第三条的物理原因：I2C 是开漏 + 上拉，挂太多器件会让上升沿变慢，最终通讯失败。这就是「加一个传感器就全挂」的原因。"}'></div>
+
+    <h2 id="s7">7. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>为什么量产设备偏好 eMMC？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>焊接固定、可靠性高、内部已做坏块与磨损管理，不怕振动与拔插。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>NAND 的三件「必须做的事」？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>坏块管理、ECC 纠错、磨损均衡；通常由 UBI/FTL 层完成。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>800×480@60Hz 的像素时钟大约多少？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>约 29MHz（含消隐区），带宽约 58MB/s。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>I2C 为什么需要上拉？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>开漏输出只能拉低，高电平靠上拉电阻；这也是它能「线与」共享的原因。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>外设没被识别，第一步查什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>dmesg 与设备树 status/compatible，再看时钟与引脚复用。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>用 <code>i2cdetect</code> 扫描板上的 I2C 总线，列出地址。</li>
+        <li>算你屏幕的像素时钟与带宽需求。</li>
+        <li>用 <code>devmem</code> 读一个 GPIO 寄存器，验证地址映射。</li>
+        <li>查 <code>/sys/class/mmc_host/</code>，找出 eMMC 与 SD 各自的设备。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      硬件与驱动都齐了，但系统要「能用」还需要一堆用户态程序。第 41 课讲根文件系统：为什么最小的能用系统只需要几个文件。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"五种外设，性格完全不同","hint":"点一个看特点","note":"选外设的第一问不是「快不快」，是「要几根线、要不要共享、能不能热插拔、有没有标准协议」。","items":[{"b":"GPIO","d":"一根线一个电平，最慢最笨，但最简单。按键、LED、片选、复位全靠它。"},{"b":"UART","d":"两根线（收发）异步通信，不需要时钟线。调试串口必备，缺点是没有多设备寻址。"},{"b":"I2C","d":"两根线（时钟 + 数据）挂一串设备，靠 7 位地址区分。速度慢但省引脚，传感器最爱。"},{"b":"SPI","d":"四根线，全双工，速度可以到几十 MHz。多个从设备靠各自片选线，速度快但费引脚。"},{"b":"eMMC / SD","d":"并行数据线加命令线，容量大、有块管理。启动介质和根文件系统通常放这里。"}]}'></div>
+  
+
+<nav class="pager">
+  <a href="course-39.html"><span>← 上一篇</span><b>GIC 与定时器</b></a>
+  <a class="nx" href="viz-clock-tree.html"><span>下一篇 →</span><b>互动台：时钟树与门控</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>手写 ARM 汇编 · 10 篇 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<link rel="stylesheet" href="../assets/asm.css">
+</head><body style="--acc:#03d6b4">
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../index.html">☰ 六个入口</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">手写 ARM 汇编 · 10 篇</div>
+    <ol>
+      <li><a href="index.html" class="active"><span class="no">⌂</span><span>路口目录<span class="sub">怎么读、读什么</span></span></a></li>
+      <li><a href="a0.html"><span class="no">00</span><span>为什么非写不可<span class="sub">三个真实场景，和一笔成本账</span></span></a></li>
+      <li><a href="a1.html"><span class="no">01</span><span>最小可跑：工具链与第一条指令<span class="sub">编、链接、反汇编，看到自己写的字节</span></span></a></li>
+      <li><a href="a2.html"><span class="no">02</span><span>寄存器与立即数：那道 8 位旋转墙<span class="sub">16 个寄存器、APSR、4096 种立即数</span></span></a></li>
+      <li><a href="a3.html"><span class="no">03</span><span>寻址与栈：地址是怎么算出来的<span class="sub">四种寻址、批量搬运、满递减栈</span></span></a></li>
+      <li><a href="a4.html"><span class="no">04</span><span>函数调用与 AAPCS：lr 为什么必须保<span class="sub">传参、返回、保存责任、栈帧布局</span></span></a></li>
+      <li><a href="a5.html"><span class="no">05</span><span>条件码与分支：两套门，别走错<span class="sub">cmp 的本质、14 个条件、IT 块</span></span></a></li>
+      <li><a href="a6.html"><span class="no">06</span><span>位操作：配置一个寄存器的标准三行<span class="sub">bic/orr/bfi，掩码怎么造出来</span></span></a></li>
+      <li><a href="a7.html"><span class="no">07</span><span>C 与汇编互调：四条约束和两个别省<span class="sub">内联汇编、volatile、memory clobber</span></span></a></li>
+      <li><a href="a8.html"><span class="no">08</span><span>裸机第一条：在这块板子上点灯<span class="sub">关狗、开钟、配脚、定方向</span></span></a></li>
+      <li><a href="a9.html"><span class="no">09</span><span>二十道练习清单<span class="sub">A/B/C 三档，每题都写了验收法</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="../hardware/index.html">硬件入口</a><a href="../manual/index.html">芯片手册研读</a></div>
+  </aside>
+
+  <main class="doc">
+    <div class="doc-kicker">汇编练习 · i.MX6ULL / Cortex-A7</div>
+    <h1>手写 ARM 汇编<br><em>让每条指令都看得见</em></h1>
+    <p class="lede">手写汇编不是为了写产品代码，而是为了三件事：读懂反汇编、读懂启动代码、看穿寄存器配置。这里是十篇独立的文章，从一条 mov 一直到这块板子上点灯。</p>
+
+    <div class="rt-hero">
+      <h2>一句话：C 会骗你，寄存器不会</h2>
+      <p>你在 C 里写 *p = 3，编译器可能把它改成一条 str、也可能整段优化掉；你写 delay() 循环，它可能被删。汇编里没有这些中间层——每条指令干了什么、动了哪个寄存器、标志位变成什么，都写在纸上。手写一遍，反汇编就变成可读的。</p>
+    </div>
+
+    <h2>10 篇的路线</h2>
+    <p>十篇按顺序读；每篇结尾都有「本篇验收」，做完再往下。工具在 01/02/05 三篇里，可以随手玩。</p>
+    <table class="chs">
+      <thead><tr><th>章</th><th>篇目</th><th class="m">用时</th></tr></thead>
+      <tbody>
+      <tr>
+        <td class="no">00</td>
+        <td class="ti"><a href="a0.html">为什么非写不可</a><span>三个真实场景，和一笔成本账</span></td>
+        <td class="m">约 18 分钟</td>
+      </tr>
+      <tr>
+        <td class="no">01</td>
+        <td class="ti"><a href="a1.html">最小可跑：工具链与第一条指令</a><span>编、链接、反汇编，看到自己写的字节</span></td>
+        <td class="m">约 22 分钟</td>
+      </tr>
+      <tr>
+        <td class="no">02</td>
+        <td class="ti"><a href="a2.html">寄存器与立即数：那道 8 位旋转墙</a><span>16 个寄存器、APSR、4096 种立即数</span></td>
+        <td class="m">约 25 分钟</td>
+      </tr>
+      <tr>
+        <td class="no">03</td>
+        <td class="ti"><a href="a3.html">寻址与栈：地址是怎么算出来的</a><span>四种寻址、批量搬运、满递减栈</span></td>
+        <td class="m">约 25 分钟</td>
+      </tr>
+      <tr>
+        <td class="no">04</td>
+        <td class="ti"><a href="a4.html">函数调用与 AAPCS：lr 为什么必须保</a><span>传参、返回、保存责任、栈帧布局</span></td>
+        <td class="m">约 28 分钟</td>
+      </tr>
+      <tr>
+        <td class="no">05</td>
+        <td class="ti"><a href="a5.html">条件码与分支：两套门，别走错</a><span>cmp 的本质、14 个条件、IT 块</span></td>
+        <td class="m">约 28 分钟</td>
+      </tr>
+      <tr>
+        <td class="no">06</td>
+        <td class="ti"><a href="a6.html">位操作：配置一个寄存器的标准三行</a><span>bic/orr/bfi，掩码怎么造出来</span></td>
+        <td class="m">约 26 分钟</td>
+      </tr>
+      <tr>
+        <td class="no">07</td>
+        <td class="ti"><a href="a7.html">C 与汇编互调：四条约束和两个别省</a><span>内联汇编、volatile、memory clobber</span></td>
+        <td class="m">约 24 分钟</td>
+      </tr>
+      <tr>
+        <td class="no">08</td>
+        <td class="ti"><a href="a8.html">裸机第一条：在这块板子上点灯</a><span>关狗、开钟、配脚、定方向</span></td>
+        <td class="m">约 30 分钟</td>
+      </tr>
+      <tr>
+        <td class="no">09</td>
+        <td class="ti"><a href="a9.html">二十道练习清单</a><span>A/B/C 三档，每题都写了验收法</span></td>
+        <td class="m">约 20 分钟</td>
+      </tr>
+      </tbody>
+    </table>
+
+    <h2>读完这个路口，你应该能</h2>
+    <ul>
+      <li>看到一段反汇编，能说出它在访问哪个结构体的第几个字段</li>
+      <li>能解释「为什么这个函数必须 push {lr}」</li>
+      <li>能自己写出不依赖任何库的点灯代码，并说明每一步为什么这个顺序</li>
+      <li>能判断一条 cmp 后面该跟 blt 还是 blo，并说清差在哪</li>
+    </ul>
+
+    <h2>配套工具与料</h2>
+    <div class="flow">
+      <div><b>寄存器单步台（01 / 04 篇）</b>六段程序单步走，每步高亮改动的寄存器、点亮 N/Z/C/V、显示栈与内存。看懂了它，反汇编就不用猜。</div>
+      <div><b>立即数检查器（02 篇）</b>任意常数扔进去，立刻知道能不能编进 mov；不能编就给你 movw/movt 或常量池两条替代写法。</div>
+      <div><b>条件码判断器（05 篇）</b>给两个数，14 个条件码逐个标成立/落空，并直接告诉你「有符号谁大、无符号谁大」。</div>
+    </div>
+
+    <div class="pager">
+      <a href="../hardware/index.html"><span>返回</span><b>← 硬件入口</b></a>
+      <a class="nx" href="a0.html"><span>开始</span><b>00 为什么非写不可 →</b></a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

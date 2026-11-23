@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=../docs/course-48.html">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>48 · 中断的上半部与下半部</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/viz.css">
+<link rel="stylesheet" href="assets/iviz.css">
+<link rel="stylesheet" href="assets/anim2.css">
+  <script src="assets/readmode.js" defer></script>
+</head>
+<body data-page="48">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>第 48 课 · 中断：上半部只做「最急的那一下」</h1>
+    <p class="lede">按键按下去，芯片的电平变了，可 CPU 不会自己知道——它要么不停轮询（浪费），要么等一个中断。中断处理有三条铁律：不能睡、要快、不能丢事件。这一课把「硬件触发 → GIC → 上半部 → 下半部 → 你的业务」这条链走一遍，并用一个带防抖的按键驱动收尾。</p>
+
+    <div class="anim2" data-json='{"title":"中断：上半部只做「最急的那一下」","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"① 电平跳变"},{"k":"② GIC 派发"},{"k":"③ 上半部"},{"k":"④ 下半部"},{"k":"⑤ 应用收到"}],"frames":[{"i":0,"d":"按键机械触点抖动，几十毫秒内电平会来回跳好几次——这一点决定了必须防抖。"},{"i":1,"d":"GPIO 控制器把中断号送进 GIC，CPU 响应，进向量表，此时中断是关着的。"},{"i":2,"d":"读状态寄存器、清中断标志，然后立刻返回。绝对不能睡眠、不能等、不能长时间循环。"},{"i":3,"d":"tasklet 或工作队列延后执行：去抖、换算键码、上报 input 事件。工作队列可以睡眠，tasklet 不行。"},{"i":4,"d":"应用 read 到事件。注意 /proc/interrupts 里的计数是「中断触发次数」，抖动会让它比实际按键次数多得多。"}]}'></div>
+
+    <div class="viz" data-kind="timeline" data-title="一次按键中断的时间轴" data-sub="上半部 microseconds，下半部可以 ms 级" data-json='{"items":[{"t":"t0","n":"电平跳变","d":"按键闭合，IRQ 线拉低","c":"rd"},{"t":"t1","n":"GIC 采样","d":"挂起位置 1，通知 CPU","c":"or"},{"t":"t2","n":"上半部","d":"读状态、清中断、唤醒下半部","c":"cy"},{"t":"t3","n":"下半部","d":"去抖、读键值、上报 input 事件","c":"vi"},{"t":"t4","n":"用户态","d":"read 返回，应用收到按键","c":"gr"}],"note":"上半部跑在关中断上下文，几十微秒就得返回；去抖要等 10–20ms，只能放在下半部——这就是「上半部/下半部」存在的原因。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 中断和异常有什么区别？② 为什么中断处理里不能睡眠？③ 上半部该做哪几件事、不该做哪几件？④ tasklet、工作队列、threaded IRQ 三者怎么选？⑤ 按键为什么会「按一次触发十几次」？</p>
+    </div>
+
+    <h2>1. 直觉：门铃与开门</h2>
+    <p>中断像门铃：按下去铃响，你去开门——不用一直站在门口看。但门铃响了不代表人还在（可能已经走了），所以开门这件事要「等一等再确认」，这个「等一等」就是下半部。</p>
+    <p><b>类比失效处</b>：门铃一次只响一下，中断会「攒」——如果你在开门时又按了三次，硬件可能只记一次（边沿触发丢事件）或记很多次（电平触发重复进入）。所以真实驱动必须处理「重复进入」与「漏掉」两种情况。</p>
+
+    <h2>2. 硬件：从引脚到向量表</h2>
+    <p>按键引脚配置成双边沿触发 → GIC 记录挂起 → CPU 在指令边界检查 IRQ 线 → 保存现场、跳到向量表 <code>IRQ</code> 入口 → 内核按中断号找到你 <code>request_irq</code> 时登记的那个函数。整个过程里，<b>中断号</b>是唯一的关键字：设备树里 <code>interrupts</code> 描述的号，必须和你 <code>request_irq</code> 用的号一致。</p>
+    <h2>3. 软件：一个带防抖的按键驱动</h2>
+<pre><code>#include &lt;linux/interrupt.h&gt;
+#include &lt;linux/input.h&gt;
+
+static irqreturn_t key_hard(int irq, void *dev)      /* 上半部 */
+{
+    struct key *k = dev;
+    /* 只做最急的：确认是自己的中断、把它清掉 */
+    disable_irq_nosync(irq);                          /* 暂时关掉，避免抖动洪泛 */
+    schedule_delayed_work(&amp;k-&gt;dwork, msecs_to_jiffies(20));
+    return IRQ_HANDLED;
+}
+
+static void key_soft(struct work_struct *w)          /* 下半部 */
+{
+    struct key *k = container_of(w, struct key, dwork.work);
+    int v = gpiod_get_value(k-&gt;gpio);
+    if (v == 0) {                                     /* 仍被按住，才算真按下 */
+        input_report_key(k-&gt;input, KEY_ENTER, 1);
+        input_report_key(k-&gt;input, KEY_ENTER, 0);
+        input_sync(k-&gt;input);
+    }
+    enable_irq(k-&gt;irq);
+}
+
+static int key_probe(struct platform_device *pdev)
+{
+    ...
+    ret = devm_request_irq(&amp;pdev-&gt;dev, irq, key_hard,
+            IRQF_TRIGGER_FALLING | IRQF_ONESHOT, "mykey", k);
+    ...
+}</code></pre>
+    <p>三处关键：<b><code>disable_irq_nosync</code></b> 在上半部立刻关中断，防住 20ms 内的十几次抖动；<b>20ms 后</b>再读电平，仍低才算有效按下；<b><code>IRQF_ONESHOT</b></code> 保证下半部跑完之前不放开这条中断。少了任何一处，你会看到「按一次出十个字符」。</p>
+
+    <div class="viz" data-kind="compare" data-title="三种下半部，怎么选" data-sub="按「能不能睡、要不要快」两个维度挑" data-json='{"bad":{"t":"不该用时硬用","items":["在 tasklet 里调 i2c_transfer 和 msleep","在工作队列里做微秒级的高频计数","用 threaded IRQ 处理纯内存搬运"]},"good":{"t":"正确选择","items":["要睡眠的 I2C/SPI 传输 → 工作队列或 threaded IRQ","极短、不能睡、高频 → tasklet 或直接在上半部做完","需要和上半部共享中断线 → threaded IRQ 配 IRQF_ONESHOT"]},"note":"判据只有一句：这段代码会不会睡。会睡就必须离开中断上下文。"}'></div>
+
+    <h2>4. 三条误解</h2>
+    <ul>
+      <li><b>「中断处理越短越好，所以什么都丢给下半部」</b>：上下半部之间也有调度延迟。把「清中断」这种必须立刻做的活丢到下半部，会导致中断源一直拉着线，形成中断风暴。</li>
+      <li><b>「<code>/proc/interrupts</code> 里的计数就是按键次数」</b>：那是「进入中断的次数」，抖动会让它一次按键涨十几。它是排障工具，不是业务计数。</li>
+      <li><b>「共享中断线可以随便挂」</b>：共享线上每个 handler 都会被调用，必须能判断「这次是不是我的」，否则会误报。</li>
+    </ul>
+
+    <h2>5. 五题自测</h2>
+    <div class="q"><span class="n">1</span><p>为什么中断处理函数里不能 <code>msleep</code>？</p></div>
+    <details class="ans"><summary>看答案</summary><p>中断上下文没有「当前任务」，调度器无法切走再切回；调用会直接报 <code>BUG: scheduling while atomic</code>，严重时整机卡死。</p></details>
+
+    <div class="q"><span class="n">2</span><p>边沿触发与电平触发，哪个更容易丢事件？为什么按键仍常用边沿？</p></div>
+    <details class="ans"><summary>看答案</summary><p>边沿触发在「中断被屏蔽期间又来一次」时会丢；但按键抖动会产生大量边沿，若用电平触发会持续重复进入。所以用「边沿 + 上半部关中断 + 延时确认」这套组合。</p></details>
+
+    <div class="q"><span class="n">3</span><p><code>IRQF_ONESHOT</code> 解决什么问题？</p></div>
+    <details class="ans"><summary>看答案</summary><p>它保证下半部执行完之前中断线保持屏蔽，避免同一次抖动反复进入上半部；threaded IRQ 必须带它。</p></details>
+
+    <div class="q"><span class="n">4</span><p><code>request_irq</code> 返回 <code>-EBUSY</code> 意味着什么？</p></div>
+    <details class="ans"><summary>看答案</summary><p>这条中断号已被别人占用且没标共享。要么换号，要么双方都加 <code>IRQF_SHARED</code> 并各自能识别自己的中断。</p></details>
+
+    <div class="q"><span class="n">5</span><p>驱动里忘了 <code>free_irq</code> 就卸载模块，会发生什么？</p></div>
+    <details class="ans"><summary>看答案</summary><p>中断表里还留着指向已卸载代码的指针，下一次中断直接 oops；正确做法是用 <code>devm_request_irq</code> 让内核自动回收。</p></details>
+
+    <h2>6. 动手（40 分钟）</h2>
+    <div class="steps">
+      <p>1. <code>cat /proc/interrupts</code> 找到按键那一行，按住键不放，看计数是否只涨 1（说明防抖有效）。</p>
+      <p>2. 把 20ms 改成 1ms，再按一次，观察「一次按键涨好几下」的现象。</p>
+      <p>3. 把下半部改成 tasklet 并在里面调用 <code>i2c_transfer</code>，看 dmesg 里的报错——亲手踩一次比背十条规则有用。</p>
+      <p>4. 用 <code>evtest</code> 查看上报的 KEY_ENTER 事件，确认从「电平变化」到「应用收到事件」的链路通了。</p>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      P9 四课到此收尾：字符设备、GPIO、I2C、中断拼起来，就是一个能跑的传感器节点。接下来回到第 44 课那张全链地图，把「按键 → 中断 → I2C 读数 → 字符设备输出」这十一层自己画一遍；画不顺的那一层，就是下一轮该补的地方。
+    </div>
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"一次按键中断，五步走完","hint":"注意上下半部的分工","note":"上半部只做「必须马上做、而且很快」的事，其余全部推给下半部。判断标准就一条：这段代码能不能睡眠？","steps":[{"t":"① 电平跳变","d":"按键机械触点抖动，几十毫秒内电平会来回跳好几次——这一点决定了必须防抖。"},{"t":"② GIC 派发","d":"GPIO 控制器把中断号送进 GIC，CPU 响应，进向量表，此时中断是关着的。"},{"t":"③ 上半部","d":"读状态寄存器、清中断标志，然后立刻返回。绝对不能睡眠、不能等、不能长时间循环。"},{"t":"④ 下半部","d":"tasklet 或工作队列延后执行：去抖、换算键码、上报 input 事件。工作队列可以睡眠，tasklet 不行。"},{"t":"⑤ 应用收到","d":"应用 read 到事件。注意 /proc/interrupts 里的计数是「中断触发次数」，抖动会让它比实际按键次数多得多。"}]}'></div>
+  </main>
+</div>
+<script src="assets/cnav.js"></script>
+<script src="assets/viz.js"></script>
+<script src="assets/iviz.js"></script>
+<script src="assets/anime.iife.min.js"></script>
+<script src="assets/anim2.js"></script>
+</body>
+</html>

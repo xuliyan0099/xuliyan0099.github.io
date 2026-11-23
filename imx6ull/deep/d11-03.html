@@ -1,0 +1,156 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ftrace / perf / eBPF：内核里的可观测四件套 · 卷 11 | i.MX6ULL</title>
+<meta name="description" content="不加一行 printk，也能知道谁调了谁、谁慢了 3 毫秒、谁在频繁分配内存。三种工具的分工，比会用命令更重要。">
+<link rel="stylesheet" href="../assets/deep.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/deep.js" defer></script>
+</head><body>
+<div class="dp-prog"><i></i></div>
+<div class="dp">
+<header class="dp-top">
+  <div class="dp-crumbs">
+    <a href="../../index.html">知识库</a><span>/</span>
+    <a href="../index.html">i.MX6ULL</a><span>/</span>
+    <a href="../juan/index.html">十四卷</a><span>/</span>
+    <a href="../juan/j11.html">卷 11</a>
+  </div>
+  <div class="dp-tools">
+    <a href="../juan/j11.html">☰ 卷 11 目录</a>
+    <a href="../juan/index.html">◫ 十四卷总览</a>
+  </div>
+</header>
+
+<div class="dp-hero">
+  <div class="dp-kicker">卷 11<span>·</span>第 11·05 篇</div>
+  <h1>ftrace / perf / eBPF：内核里的可观测四件套</h1>
+  <p class="dp-lede">不加一行 printk，也能知道谁调了谁、谁慢了 3 毫秒、谁在频繁分配内存。三种工具的分工，比会用命令更重要。</p>
+  <div class="dp-chips">
+    <span class="c hot">◆ 一读</span>
+    <span class="c">纯读约 4 小时</span>
+    <span class="c">理论为主 · 实作可跳</span>
+    <span class="c">配 3–4 个互动演示</span>
+  </div>
+</div>
+
+<aside class="dp-toc"><div class="dp-toc-h">本页目录</div><a href="#s1"><span>01</span>先玩一下：一次函数调用的耗时去哪了</a><a href="#s2"><span>02</span>一、ftrace：看调用路径</a><a href="#s3"><span>03</span>二、perf：看热点</a><a href="#s4"><span>04</span>三、eBPF：在内核里跑你的判断</a><a href="#s5"><span>05</span>动手（可选）：三板斧各跑一次</a><a href="#s6"><span>06</span>离开这一篇，你应该能</a></aside>
+<main class="dp-main">
+<p class="lead">不加一行 <code>printk</code>，也能知道「谁调了谁、谁慢了 3 毫秒、谁在疯狂分配内存」。这就是可观测工具的用处：<strong>它们读的是内核本来就在维护的信息</strong>。</p>
+
+<p>三种工具的分工可以用一句话记住：<b>ftrace 看「路径」，perf 看「热点」，eBPF 看「任意问题」</b>。</p>
+
+<h2 id="s1">先玩一下：一次函数调用的耗时去哪了</h2>
+
+<p>把采样频率拖到 1000 Hz，看开销怎么涨。这就是 perf 的取舍：频率越高越准，但越贵。</p>
+
+<div class="ikit" data-type="param" data-json='{"title":"采样频率 vs 开销","badge":"param",
+"fields":[{"k":"hz","label":"采样频率","min":1,"max":4000,"step":1,"val":99,"unit":"Hz"},
+{"k":"sec","label":"采样时长","min":1,"max":60,"step":1,"val":10,"unit":"s"},
+{"k":"cpu","label":"CPU 开销上限","min":1,"max":20,"step":1,"val":5,"unit":"%"}],
+"outs":[
+{"label":"总样本数","expr":"V.hz * V.sec","unit":" 个"},
+{"label":"每次采样开销（估）","expr":"2 + V.hz / 1000 * 3","unit":" µs"},
+{"label":"总开销占比","expr":"(V.hz * (2 + V.hz / 1000 * 3) / 1000000) * 100","unit":" %"},
+{"label":"按 5% 预算可用的最高频率","expr":"min(V.hz, 5 * 1000000 / (2 + V.hz / 1000 * 3) / V.sec)","unit":" Hz"}],
+"bar":{"expr":"min((V.hz * (2 + V.hz / 1000 * 3) / 1000000) * 100 * 20, 100)"},
+"verdict":{"expr":"(V.hz * (2 + V.hz / 1000 * 3) / 1000000) < 0.05","ok":"开销在预算内","bad":"频率过高：降到 99–400 Hz，或改用统计方式"},
+"note":"生产环境常用 99 Hz：既避开 100 Hz 的整周期采样混叠，又把开销压在 1% 以内。上面的数字是量级示意，实测为准。"}'></div>
+
+<h2 id="s2">一、ftrace：看调用路径</h2>
+
+<p>ftrace 挂在 <code>/sys/kernel/debug/tracing</code>（或 <code>/sys/kernel/tracing</code>）。最常用的三个开关：</p>
+
+<pre data-lang="bash"><code>cd /sys/kernel/debug/tracing
+echo function_graph &gt; current_tracer        # 记录每个函数的进出与耗时
+echo 'my_driver_*' &gt; set_ftrace_filter      # 只跟自己的函数，输出小得多
+echo 1 &gt; tracing_on; sleep 1; echo 0 &gt; tracing_on
+cat trace | head -50</code></pre>
+
+<p><code>function_graph</code> 的输出是一棵树：缩进表示调用深度，右侧是耗时。它最适合回答「这个 ioctl 里到底调了哪些函数、哪一段慢」。</p>
+
+<ul>
+  <li><b>function</b>：只记函数名，开销最小。</li>
+  <li><b>function_graph</b>：记进出与耗时，开销较大但信息最全。</li>
+  <li><b>事件（tracepoint）</b>：<code>events/</code> 下按子系统分类，如 <code>sched/sched_switch</code>、<code>irq/irq_handler_entry</code>。比函数级更语义化。</li>
+  <li><b>kprobe</b>：在任意地址插探针，连没有 tracepoint 的地方也能看。</li>
+  <li><b>trace_printk</b>：写进 trace 缓冲而不是串口，适合高频日志（但别留在产品里）。</li>
+</ul>
+
+<div class="ikit" data-type="code" data-json='{"title":"一次 ftrace 会话","badge":"code",
+"regs":[{"n":"tracer","v":"function_graph"},{"n":"filter","v":"my_read"},{"n":"lines","v":"0"}],
+"lines":[
+{"c":"echo 0 &gt; tracing_on","set":{"tracer":"nop"},"note":"先停止，避免旧数据混入。"},
+{"c":"echo function_graph &gt; current_tracer","set":{"tracer":"function_graph"},"note":"切换 tracer；写 nop 即关闭。"},
+{"c":"echo my_read &gt; set_ftrace_filter","set":{"filter":"my_read"},"note":"只跟关心的函数，输出从几万行降到几十行。"},
+{"c":"echo 1 &gt; tracing_on; cat /dev/xxx; echo 0 &gt; tracing_on","set":{"lines":"1"},"note":"用一次真实操作触发，比空跑更有意义。"},
+{"c":"cat trace","set":{"lines":"42"},"note":"缩进 = 调用深度，右侧 = 该函数耗时（微秒）。"}]}'></div>
+
+<p>输出里最值得看的是「耗时异常的那一层」：如果 <code>my_read</code> 总共 3 ms，而它调用的 <code>msleep</code> 占了 2.9 ms，那你不用再猜了。</p>
+
+<h2 id="s3">二、perf：看热点</h2>
+
+<p>perf 是采样型工具：每隔一段时间中断一次，记录当前 PC 与调用栈，最后统计「哪些函数出现得多」。它的强项是<strong>不需要预先知道问题在哪</strong>。</p>
+
+<pre data-lang="bash"><code>perf stat -a sleep 5                      # 总览：IPC、cache miss、上下文切换
+perf record -F 99 -g -a sleep 10          # 采样 10 秒，带调用栈
+perf report --stdio | head -40            # 按函数聚合
+perf top                                  # 实时看热点</code></pre>
+
+<p><code>-g</code> 记录调用栈，才能生成火焰图（flamegraph）：横轴是占比，纵轴是调用深度，宽条就是热点。火焰图最有用的一点是<strong>它显示的是「谁调用导致的」，而不是「谁自己耗时」</strong>。</p>
+
+<div class="cal tip"><span class="h">perf 在板子上的三个注意</span>1）需要 <code>CONFIG_PERF_EVENTS</code>；2）硬件 PMU 计数在虚拟化/容器里可能不可用，用 <code>-e cpu-clock</code> 代替；3）符号解析需要 <code>/proc/kallsyms</code> 与对应的 vmlinux，否则全是地址。</div>
+
+<h2 id="s4">三、eBPF：在内核里跑你的判断</h2>
+
+<p>eBPF 允许你把一小段程序挂到 kprobe/tracepoint 上，在内核里过滤、聚合，只把结果送回用户态。于是「抓一万次调用的延迟分布」不再需要把一万条记录拷出来。</p>
+
+<pre data-lang="bash"><code># bpftrace 一行看 tcp_sendmsg 的返回值分布
+bpftrace -e 'kretprobe:tcp_sendmsg { @bytes = hist(retval); }'
+
+# 看谁在调用 kmalloc，按进程统计
+bpftrace -e 'kprobe:kmalloc { @[comm] = count(); }'</code></pre>
+
+<p>但要注意版本：i.MX6ULL 常见的 4.19 内核里 eBPF 是可用的，<strong>但 CO-RE、BTF、部分 map 类型要 5.x 才成熟</strong>。在板子上跑 bpftrace 之前，先 <code>uname -r</code> 与 <code>ls /sys/kernel/btf/vmlinux</code> 确认，否则会花半天在编译依赖上。</p>
+
+<div class="ikit" data-type="hop" data-json='{"title":"ftrace 的数据怎么到你手里","badge":"hop","packet":"trace",
+"nodes":[{"n":"探针","s":"function/kprobe"},{"n":"环形缓冲","s":"per-CPU"},{"n":"tracefs","s":"cat trace"},{"n":"用户态","s":"分析"}],
+"hops":[
+{"at":"探针","pkt":"event","label":"命中函数入口","note":"写入的是「函数号 + 时间戳」，不是字符串，开销极小。"},
+{"at":"环形缓冲","pkt":"记录","label":"每 CPU 一份，无锁写","note":"所以高频下也不容易把系统锁死；写满就覆盖最旧的。"},
+{"at":"tracefs","pkt":"文本","label":"read() 时才格式化","note":"符号名与耗时是读出时拼出来的，记录阶段不做这些。"},
+{"at":"用户态","pkt":"报告","label":"grep / awk / 脚本","note":"分析放在用户态，内核只负责记。"}]}'></div>
+
+<div class="cal warn"><span class="h">误解：可观测工具可以随便开在生产上</span>ftrace 的 function_graph 在高压下有可观开销；perf 采样频率过高会拉高 CPU；eBPF 程序写错循环会拖死内核（老内核没有循环上限检查）。生产上先小范围、短时间、明确预算。</div>
+
+<div class="cal warn"><span class="h">误解：有火焰图就能定位 bug</span>火焰图解决「哪里热」，不解决「为什么错」。逻辑错误仍然要靠 oops、日志与代码。工具只回答它能回答的问题。</div>
+
+<h2 id="s5">动手（可选）：三板斧各跑一次</h2>
+
+<div class="cal q"><span class="h">只在 🔧 实作模式展开</span>PC 上即可；板子上需要内核配置支持。</div>
+
+<ol>
+  <li>挂载 tracefs，用 <code>function_graph</code> + filter 抓一次 <code>read</code> 的调用树。</li>
+  <li><code>perf record -F 99 -g -a sleep 5</code>，生成火焰图（<code>perf script | flamegraph.pl</code>）。</li>
+  <li>若有 bpftrace：<code>bpftrace -e 'tracepoint:syscalls:sys_enter_openat { @[comm]=count(); }'</code>，看谁在疯狂打开文件。</li>
+  <li>对比三者输出的「粒度」：ftrace 是全量、perf 是采样、eBPF 是自定义聚合——这就是选择依据。</li>
+</ol>
+
+<h2 id="s6">离开这一篇，你应该能</h2>
+
+<ul class="qa">
+  <li>说出 ftrace / perf / eBPF 各自回答什么问题，以及为什么不能互相替代。</li>
+  <li>用 <code>function_graph</code> + filter 定位一次慢调用。</li>
+  <li>解释采样频率与开销的取舍，以及 99 Hz 的由来。</li>
+</ul>
+
+<p>排障这一卷结束。最后一卷是「产品」：构建、升级、安全启动、稳定性——从能跑 demo 到能交付。</p>
+
+<nav class="dp-nav">
+  <a href="d11-02.html"><span>← 上一篇</span>JTAG 与 Ozone：停核、看页表、单步走启动链</a>
+  <a href="d12-01.html" class="nxt"><span>下一篇 →</span>Buildroot 到 Yocto：定制镜像、裁剪包、产出固件</a>
+</nav>
+<footer class="dp-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线。文中的「动手」段落只在 🔧 实作模式下展开，纯读可整篇跳过。</footer>
+</main>
+</div></body></html>

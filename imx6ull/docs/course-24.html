@@ -1,0 +1,205 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>虚拟地址是什么 · 卷 03 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j03.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 03 · 存储与地址</div>
+<ol><li><a href="course-20.html">
+  <span class="no">01</span><span>存储层次<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-21.html">
+  <span class="no">02</span><span>Cache 三参数<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-22.html">
+  <span class="no">03</span><span>内存墙与局部性<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-23.html">
+  <span class="no">04</span><span>用 perf 量化<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="course-24.html" class="active">
+  <span class="no">05</span><span>虚拟地址是什么<span class="sub">约 1 小时 · 当前</span></span></a></li>
+<li><a href="course-25.html">
+  <span class="no">06</span><span>页表与 MMU<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-26.html">
+  <span class="no">07</span><span>缺页与换页<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th03.html">
+  <span class="no">08</span><span>虚拟内存与地址翻译（详解）<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="course-th14.html">
+  <span class="no">09</span><span>内存管理进阶：分页、回收与 OOM<span class="sub">◆ · 约 5 小时</span></span></a></li>
+<li><a href="viz-mmu.html">
+  <span class="no">10</span><span>互动台：MMU 页表翻译<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="viz-cache.html">
+  <span class="no">11</span><span>互动台：Cache 层次与命中<span class="sub">💻 · 约 1 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j02.html">← 卷 02</a>
+  <a href="../juan/j04.html">卷 04 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 03<span>·</span>存储与地址<span>·</span>第 05 篇</div>
+  <h1>虚拟地址是什么</h1>
+  <p class="lede">每个 32 位进程都以为自己拥有整个 4GB 空间，起始地址是 0x00400000，栈在 0xBFFF_xxxx。但板上只有 512MB DDR，还同时跑着几十个进程。这中间的魔法叫 MMU：CPU 发出的每个地址都先被翻译一次，才落到物理内存上。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+
+    <div class="anim2" data-json='{"title":"虚拟地址是什么","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"① CPU 发出虚拟地址"},{"k":"② MMU 切分"},{"k":"③ 查页表"},{"k":"④ 拼出物理地址"},{"k":"⑤ 权限检查"}],"frames":[{"i":0,"d":"ldr 用到的地址，是编译器给的虚拟地址，CPU 并不知道它对应哪颗内存颗粒。"},{"i":1,"d":"按页大小（4KB）切成页号和页内偏移。偏移原样保留，页号拿去查表。"},{"i":2,"d":"用页表基址寄存器加页号找到表项，拿到物理页帧号。多级页表就是查好几次。"},{"i":3,"d":"物理页帧号 + 页内偏移，送到存储控制器。"},{"i":4,"d":"表项里还有可读、可写、可执行位。越权访问在 MMU 就拦下，变成段错误。"}]}'></div>
+
+    <div class="viz" data-kind="map" data-title="虚拟地址 → 物理地址：一次翻译" data-sub="左右两个世界，MMU 站中间" data-json='{"rows":[{"segs":[{"n":"0x0040_0000 .text","d":"进程 A 代码","c":"cy","size":2},{"n":"0x1000_0000 堆","d":"进程 A 堆","c":"vi","size":2}],"ptr":"进程 A 的虚拟空间"},{"segs":[{"n":"0x80A0_0000","d":"物理：A 的代码","c":"or","size":2},{"n":"0x8100_0000","d":"物理：B 的代码","c":"cy","size":2},{"n":"0x8200_0000","d":"物理：A 的堆","c":"vi","size":2},{"n":"0x8300_0000","d":"物理：B 的栈","c":"rd","size":2}],"ptr":"同一块 DDR，被切给多个进程"}],"note":"两个进程的代码都可能被链接到「虚拟地址 0x00400000」，但它们映射到不同的物理页——所以互不干扰，且程序不必关心自己实际在哪。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 为什么要虚拟地址？② MMU 怎么翻译？③ 页是多大？④ 内核空间在虚拟地址的哪里？⑤ 没有 MMU 的 MCU 怎么办？</p>
+    </div>
+
+    <h2 id="s1">1. 三个好处</h2>
+
+    <table>
+      <thead><tr><th>好处</th><th>没有 MMU 会怎样</th><th>有了 MMU</th></tr></thead>
+      <tbody>
+        <tr><td><b>隔离</b></td><td>一个程序写错地址就改到别人数据，甚至改内核</td><td>页权限挡住，越界直接 SIGSEGV</td></tr>
+        <tr><td><b>简化链接</b></td><td>每份程序必须知道自己的物理地址，加载到别处就得重定位</td><td>统一链接到固定虚拟地址，随便放</td></tr>
+        <tr><td><b>共享与节省</b></td><td>libc 在每个进程占一份物理内存</td><td>同一份物理页映射到多个进程</td></tr>
+      </tbody>
+    </table>
+
+    <p>再加一条：<b>按需分配</b>。malloc 100MB 不会立刻占 100MB 物理内存，只有第一次写才真分配（第 26 课）。</p>
+
+    <h2 id="s2">2. 翻译过程：一次查表</h2>
+
+    <p>32 位 ARM 常用两级页表，页大小 4KB：</p>
+
+    <div class="viz" data-kind="bits" data-title="虚拟地址被拆成三段" data-sub="一级索引 + 二级索引 + 页内偏移（4KB 页 = 12 位偏移）" data-json='{"w":32,"fields":[{"n":"L1 索引 31:20（12 位）","lo":20,"hi":31,"c":"cy","t":"选一级页表项（4096 项）"},{"n":"L2 索引 19:12（8 位）","lo":12,"hi":19,"c":"vi","t":"选二级页表项（256 项）"},{"n":"页内偏移 11:0","lo":0,"hi":11,"c":"or","t":"4KB = 2^12，直接用在物理页内"}],"note":"一次访问要读两级页表——这就是为什么 TLB 如此关键：把「最近用过的翻译」缓存起来，命中后只多花几个周期；未命中则要额外访问两次内存。"}'></div>
+
+    <p>MMU 里有个小表叫 <b>TLB</b>（Translation Lookaside Buffer），缓存最近翻译过的页。<b>TLB 未命中比 Cache 未命中更贵</b>——因为它要读页表，而页表本身可能又不在 Cache 里，形成「两次内存访问」。</p>
+
+    <h2 id="s3">3. Linux 的地址空间划分</h2>
+
+    <pre><code># 典型的 32 位 Linux 划分（3G/1G）
+0x0000_0000 - 0xBFFF_FFFF   用户空间（3GB）
+0xC000_0000 - 0xFFFF_FFFF   内核空间（1GB，所有进程共享）
+
+# 内核空间里：
+#   0xC000_0000  直接映射物理内存（线性映射，phys = virt - 0xC0000000）
+#   0xE000_0000  vmalloc 区
+#   0xF000_0000  外设寄存器（ioremap 之后映射到这里）
+
+# 查看当前布局：
+cat /proc/self/maps      # 用户态进程的映射
+cat /proc/vmallocinfo    # 内核 vmalloc 使用情况</code></pre>
+
+    <p>「内核空间所有进程共享」这一点很重要：进入内核态时不需要换页表（只改 ASID/权限），所以系统调用比进程切换便宜得多。</p>
+
+    <h2 id="s4">4. 一个具体的映射例子</h2>
+
+    <pre><code>// 用户态进程里，代码虚拟地址 0x0040_0000
+// 实际可能落在物理 0x80A0_0000
+// 你完全无法从用户态知道（也不需要知道）
+
+// 而访问外设要「绕过」这套映射：
+void __iomem *base = ioremap(0x0209C000, 4096);   // 内核里
+writel(1 &lt; 26, base + 0x04);</code></pre>
+
+    <p><code>ioremap</code> 做的事就是<b>在虚拟空间里新建一段映射，指向那段物理设备地址</b>，并标记为「不可缓存、不允许乱序」。</p>
+
+    <h2 id="s5">5. 没有 MMU 的 MCU</h2>
+
+    <p>STM32 这类 Cortex-M 通常没有 MMU（有 MPU，只能做区域保护，不能翻译）。所以：</p>
+
+    <ul>
+      <li>所有地址就是物理地址，程序必须链接到它真正要运行的地址。</li>
+      <li>没有进程隔离，只有「一个程序 + 中断」。</li>
+      <li>不能用 Linux（Linux 需要 MMU；有 uClinux 但限制很多）。</li>
+    </ul>
+
+    <p>i.MX6ULL 有 MMU，所以能跑完整 Linux——<b>这正是一块 SoC 能不能上 Linux 的第一道门槛</b>。</p>
+
+    <h2 id="s6">6. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于虚拟地址的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["虚拟地址只是「加了个偏移」","每个进程真的占用了 4GB 内存","用户态可以直接访问外设寄存器"]},"good":{"t":"实际","items":["是查页表得到的任意映射，可以完全不连续","只是「有 4GB 的编号空间」，物理只占实际用到的页","必须经 ioremap/驱动，直接访问会触发 SIGSEGV 或总线错误"]},"note":"第三条是新手最常见的失败：在用户态写 <code>*(int*)0x0209C000 = 1</code>，程序直接崩。原因不是「权限不够」，而是那个地址在当前进程的页表里根本没映射。"}'></div>
+
+    <h2 id="s7">7. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>虚拟地址的主要好处有哪三个？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>进程隔离（权限）、链接简化（统一地址）、共享与按需分配（同一物理页多映射）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>4KB 页的虚拟地址，页内偏移占几位？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>12 位（2^12 = 4096），剩下的 20 位用于页表索引。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>TLB 是干什么的？为什么重要？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>缓存虚拟页到物理页的翻译。命中只多几周期；未命中要读页表（可能再未命中），代价可达几十到上百周期。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>为什么系统调用比进程切换便宜？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>内核空间在所有进程间共享，进入内核不需要换页表；进程切换要换页表、刷 TLB、清流水线。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>用户态能直接写 0x0209C000 吗？为什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>不能。该地址在用户进程页表里没有映射，访问会触发缺页异常并被内核以 SIGSEGV 终止。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>在 Ubuntu 上 <code>cat /proc/self/maps</code>，找出代码段、堆、栈、共享库各在哪个虚拟区间。</li>
+        <li>用 <code>pmap &lt;pid&gt;</code> 看一个进程的物理占用，对比虚拟大小。</li>
+        <li>写一段 C 故意访问 0x0209C000，观察 SIGSEGV。</li>
+        <li>在驱动里用 ioremap 映射 GPIO，再读写验证。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      页表是 MMU 的「字典」。第 25 课讲它怎么组织、页表项里都有什么位、以及为什么 ARM 用 ASID 来避免每次切换都刷 TLB。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"一个虚拟地址，怎么变成物理地址","hint":"逐步走","note":"进程以为自己独占整片内存，其实每一页都可能落在物理内存的不同位置。隔离感来自这层翻译，不来自真实分配。","steps":[{"t":"① CPU 发出虚拟地址","d":"ldr 用到的地址，是编译器给的虚拟地址，CPU 并不知道它对应哪颗内存颗粒。"},{"t":"② MMU 切分","d":"按页大小（4KB）切成页号和页内偏移。偏移原样保留，页号拿去查表。"},{"t":"③ 查页表","d":"用页表基址寄存器加页号找到表项，拿到物理页帧号。多级页表就是查好几次。"},{"t":"④ 拼出物理地址","d":"物理页帧号 + 页内偏移，送到存储控制器。"},{"t":"⑤ 权限检查","d":"表项里还有可读、可写、可执行位。越权访问在 MMU 就拦下，变成段错误。"}]}'></div>
+  
+
+<nav class="pager">
+  <a href="course-23.html"><span>← 上一篇</span><b>用 perf 量化</b></a>
+  <a class="nx" href="course-25.html"><span>下一篇 →</span><b>页表与 MMU</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=../docs/course-36.html">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>36 · 启动链</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/viz.css">
+<link rel="stylesheet" href="assets/iviz.css">
+<link rel="stylesheet" href="assets/anim2.css">
+  <script src="assets/readmode.js" defer></script>
+</head>
+<body data-page="36">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>第 36 课 · 启动链：四段接力</h1>
+    <p class="lede">从「按下电源」到「看到 shell 提示符」，中间有四段代码依次接力：片内 Boot ROM、u-boot、内核、init。每一段只做一件事，然后把下一段叫起来。<b>理解这条链，你就能定位「卡在哪一段」。</b></p>
+
+    <div class="anim2" data-json='{"title":"启动链：四段接力","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"Boot ROM"},{"k":"SPL"},{"k":"u-boot"},{"k":"kernel"},{"k":"init（PID 1）"}],"frames":[{"i":0,"d":"片内固化，读启动引脚，从 SD/eMMC 读镜像头"},{"i":1,"d":"在片内 SRAM 初始化 DDR，搬完整 uboot"},{"i":2,"d":"驱动外设、读环境变量、加载内核与 dtb"},{"i":3,"d":"解压、建页表、初始化子系统、挂 rootfs"},{"i":4,"d":"读配置，拉起服务与 shell"}]}'></div>
+
+    <div class="viz" data-kind="flow" data-title="四段接力：每一段都以「跳」结束" data-sub="前一段负责把后一段搬到内存并给它准备环境" data-json='{"steps":[{"n":"Boot ROM","d":"片内固化，读启动引脚，从 SD/eMMC 读镜像头"},{"n":"SPL","d":"在片内 SRAM 初始化 DDR，搬完整 uboot"},{"n":"u-boot","d":"驱动外设、读环境变量、加载内核与 dtb"},{"n":"kernel","d":"解压、建页表、初始化子系统、挂 rootfs"},{"n":"init（PID 1）","d":"读配置，拉起服务与 shell"}],"note":"第一段只读一小段：Boot ROM 很小，先把 SPL 读进片内 SRAM，再由 SPL 初始化 DDR 并搬完整 uboot。这就是「两阶段 bootloader」的由来。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 四段各做什么？② 为什么要分 SPL 与完整 u-boot？③ bootargs 从哪来、传给谁？④ 卡在某一段怎么定位？</p>
+    </div>
+
+    <h2>1. 各段职责与失败现象</h2>
+
+    <table>
+      <thead><tr><th>阶段</th><th>在哪运行</th><th>关键动作</th><th>失败现象</th></tr></thead>
+      <tbody>
+        <tr><td>Boot ROM</td><td>片内 SRAM</td><td>采样启动引脚、读镜像头、校验</td><td>串口完全无输出</td></tr>
+        <tr><td>SPL</td><td>片内 SRAM</td><td>初始化 DDR、搬完整 u-boot</td><td>打一两行后停住</td></tr>
+        <tr><td>u-boot</td><td>DDR</td><td>驱动外设、读环境、加载内核与 dtb</td><td>停在 <code>=&gt;</code> 提示符</td></tr>
+        <tr><td>kernel</td><td>DDR</td><td>建页表、初始化子系统、挂 rootfs</td><td>启动日志停在某一行</td></tr>
+        <tr><td>init</td><td>用户态</td><td>启动服务、开 shell</td><td>日志完整但没有 shell</td></tr>
+      </tbody>
+    </table>
+
+    <p><b>这张表就是排障地图</b>：先看串口停在哪，再对照该阶段在做什么，范围立刻缩小到几件事。</p>
+
+    <h2>2. SPL 为什么必须存在</h2>
+
+    <p>Boot ROM 只能用片内 SRAM（i.MX6ULL 约 128KB），装不下完整 u-boot（通常几百 KB）。而 u-boot 又要用 DDR 才能跑起来，DDR 却还没初始化——死循环。</p>
+
+    <p>解法：把「初始化 DDR」这件最小的事切成 SPL（几十 KB），先在 SRAM 里跑，把 DDR 弄好，再读完整 u-boot 进 DDR。</p>
+
+    <pre><code># 编译产物
+u-boot.imx        # 含 IVT/DCD，Boot ROM 直接识别的格式
+u-boot-spl.bin    # 早期阶段（部分板子合并进 imx 镜像）
+zImage            # 压缩的内核
+xxx.dtb           # 设备树（第 37 课）</code></pre>
+
+    <h2>3. bootargs：内核的命令行</h2>
+
+    <pre><code># u-boot 环境变量（printenv 可见）
+bootargs=console=ttymxc0,115200 root=/dev/mmcblk1p2 rootwait rw
+bootcmd=load mmc 1:1 0x80800000 zImage; load mmc 1:1 0x83000000 dtb; bootz ...
+
+# 关键几项
+console=ttymxc0    # 内核往哪个串口打印
+root=/dev/mmcblk1p2# 根文件系统在哪个分区
+rootwait           # 等设备就绪再挂
+rw                 # 可读写挂载
+init=/bin/sh       # 应急：不进 init，直接给 shell</code></pre>
+
+    <p><code>init=/bin/sh</code> 是救砖利器：rootfs 坏了但内核能起来时，可以直接进一个最小 shell 去修。这个参数值得记牢。</p>
+
+    <h2>4. 卡住时的定位方法</h2>
+
+    <pre><code># 卡在 Boot ROM 之前
+#   → 电源、晶振、启动引脚（第 35 课）
+
+# 卡在 SPL
+#   → DDR 参数不对（用错板子的 ddr_init）、DDR 供电
+
+# 停在 u-boot 提示符但 bootcmd 不跑
+#   → printenv 看 bootcmd/bootargs 是否被改坏
+
+# 内核日志停在 "Starting kernel ..."
+#   → 内核没解压成功、dtb 不匹配、early console 没配
+
+# 内核日志停在 "Waiting for root device"
+#   → 根分区名错、驱动没编进去、eMMC 未识别
+
+# 日志完整但没有 shell
+#   → init 程序不存在/不可执行，或 inittab 配错</code></pre>
+
+    <p>这几条几乎覆盖了 90% 的启动失败。建议抄在纸上贴在工位——<b>每次卡住，先对号入座，别急着改代码。</b></p>
+
+    <h2>5. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于启动链的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["u-boot 挂了就整块板子没救，要重新烧片","内核启动就是「跑 main 函数」","改了设备树不用重新编译内核"]},"good":{"t":"实际","items":["Boot ROM 支持 USB/串口下载（Serial Download 模式），可救砖","从解压、建页表、到 start_kernel，中间有大量架构相关代码","dtb 是独立文件，只需重编 dtb 并替换，不必动内核"]},"note":"第三条是嵌入式开发效率的关键：调硬件参数 90% 只改 dts，重新编译 dtb（几秒）比编译内核（几十分钟）快得多。"}'></div>
+
+    <h2>6. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>为什么要两阶段 bootloader？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>片内 SRAM 装不下完整 u-boot；SPL 先初始化 DDR，再搬完整版。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p><code>init=/bin/sh</code> 有什么用？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>跳过 init 直接给一个 shell，用于 rootfs 异常时的应急修复。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>日志停在 "Waiting for root device" 通常是什么原因？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>根分区名不对、存储驱动没编进内核、或 eMMC/SD 未被识别。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>改了设备树要重编内核吗？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>不用。dtb 是独立文件，重新编译并替换即可。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>卡在 SPL 最可能是哪件事？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>DDR 初始化参数与板上颗粒不匹配；其次是供电或时钟问题。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>上电并完整记录串口输出，标出四段的分界点。</li>
+        <li>在 u-boot 里 <code>printenv</code>，抄下 bootargs 与 bootcmd。</li>
+        <li>用 <code>init=/bin/sh</code> 启动一次，体验应急 shell。</li>
+        <li>故意改坏 root= 参数，观察内核报的错。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      u-boot 怎么知道「这块板上有哪些外设、地址是多少」？答案不在代码里，在一个文本文件里。第 37 课讲设备树。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"从上电到 init，六级跳板","hint":"逐步走","note":"启动链的本质是「每一级都只会一点点，所以要接力」：BootROM 只会读固定位置，SPL 只会初始化 DDR，U-Boot 才会读文件系统。","steps":[{"t":"① BootROM","d":"芯片内固化的代码，只认启动介质上固定偏移的那段头（IVT），校验后跳到 SPL。"},{"t":"② IVT + DCD","d":"头部里写着「代码放哪、多大」，DCD 里是一串寄存器写操作，专门用来初始化 DDR。"},{"t":"③ SPL","d":"在只有内部 SRAM 的极小空间里跑，任务只有一件：按 DCD 把 DDR 点亮。"},{"t":"④ U-Boot","d":"完整引导程序：串口、网卡、存储、环境变量、命令行，最后把内核和设备树搬进内存。"},{"t":"⑤ 内核","d":"解压、建页表、初始化各子系统，解析设备树，挂载根文件系统。"},{"t":"⑥ init","d":"内核跑完第一个用户态程序，之后的一切都由它拉起：shell、服务、你的驱动 insmod。"}]}'></div>
+  </main>
+</div>
+<script src="assets/cnav.js"></script>
+<script src="assets/viz.js"></script>
+<script src="assets/iviz.js"></script>
+<script src="assets/anime.iife.min.js"></script>
+<script src="assets/anim2.js"></script>
+</body>
+</html>

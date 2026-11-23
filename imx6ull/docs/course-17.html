@@ -1,0 +1,251 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>函数调用与 ABI · 卷 01 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j01.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 01 · 机器与指令</div>
+<ol><li><a href="course-00.html">
+  <span class="no">01</span><span>计算机只是一台会照抄指令的机器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-01.html">
+  <span class="no">02</span><span>为什么偏偏是二进制<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-02.html">
+  <span class="no">03</span><span>一个字节能装什么<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-03.html">
+  <span class="no">04</span><span>从按键到屏幕<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-04.html">
+  <span class="no">05</span><span>一个开关能做什么<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-05.html">
+  <span class="no">06</span><span>与、或、非<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-06.html">
+  <span class="no">07</span><span>从半加器到全加器<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-07.html">
+  <span class="no">08</span><span>补码与减法器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-08.html">
+  <span class="no">09</span><span>时钟与触发器<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-09.html">
+  <span class="no">10</span><span>冯诺依曼五件事<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-10.html">
+  <span class="no">11</span><span>PC 与指令寄存器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-11.html">
+  <span class="no">12</span><span>ALU 与标志位<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-12.html">
+  <span class="no">13</span><span>一条指令的完整旅程<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-13.html">
+  <span class="no">14</span><span>流水线<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-14.html">
+  <span class="no">15</span><span>机器码的位段<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-15.html">
+  <span class="no">16</span><span>九种寻址方式<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-16.html">
+  <span class="no">17</span><span>汇编只有四类动作<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-17.html" class="active">
+  <span class="no">18</span><span>函数调用与 ABI<span class="sub">约 1 小时 · 当前</span></span></a></li>
+<li><a href="course-18.html">
+  <span class="no">19</span><span>从 C 到汇编<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th18.html">
+  <span class="no">20</span><span>CPU 是怎么执行一行代码的（详解）<span class="sub">约 3 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j00.html">← 卷 00</a>
+  <a href="../juan/j02.html">卷 02 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 01<span>·</span>机器与指令<span>·</span>第 18 篇</div>
+  <h1>函数调用与 ABI</h1>
+  <p class="lede">函数调用看起来是「跳过去再跳回来」，但参数怎么传、返回地址存哪、哪些寄存器能随便改、局部变量放哪——这些都要有一份约定。ARM Linux 用 AAPCS，同一套规则贯穿用户态程序、内核、汇编代码。这一课讲清它，你就能看懂任何一份崩溃栈。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+
+    <div class="anim2" data-json='{"title":"函数调用与 ABI：栈是怎么长出来的","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"caller 放参数"},{"k":"bl 跳转"},{"k":"callee 建帧"},{"k":"函数体执行"},{"k":"返回值放 r0"},{"k":"pop {..., pc}"}],"frames":[{"i":0,"d":"r0-r3 + 栈"},{"i":1,"d":"lr = 返回地址"},{"i":2,"d":"push + sub sp"},{"i":3,"d":"用 r4-r11 做局部变量"},{"i":4,"d":"约定所在"},{"i":5,"d":"恢复并返回"}]}'></div>
+
+    <div class="viz" data-kind="stack" data-title="一个函数的栈帧：从上往下长" data-sub="sp 指向栈顶，压栈是 sp 减小" data-json='{"frames":[{"n":"调用者的局部变量","d":"属于 caller，被调用函数不能碰","sp":"高地址"},{"n":"参数 5..N","d":"超过 r0-r3 的那部分压在这里","sp":"↓"},{"n":"返回地址 LR","d":"push {lr} 存进来"},{"n":"保存的 r4-r11","d":"callee-saved，必须原样恢复"},{"n":"本函数的局部变量","d":"sub sp, sp, #N 一次腾出"},{"n":"sp →","d":"当前栈顶","sp":"低地址"}],"spHint":"栈向低地址增长：push 让 sp 减小，pop 让 sp 增大","note":"记住两个名字：caller（调用者）与 callee（被调用者）。ABI 的核心问题就一句：callee 必须原样归还哪些资源？答案是 r4-r11、sp、以及它自己压进去的东西。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 前 4 个参数放哪，第 5 个呢？② 返回值从哪出？③ caller-saved 与 callee-saved 差什么？④ 为什么叶子函数可以不建栈帧？⑤ 崩溃栈是怎么回溯出来的？</p>
+    </div>
+
+    <h2 id="s1">1. AAPCS 的寄存器分配表</h2>
+
+    <div class="viz" data-kind="matrix" data-title="16 个寄存器的分工，一张表说尽" data-sub="ARM EABI 的通用寄存器约定" data-json='{"corner":"寄存器","cols":["角色","谁负责保存","说明"],"rows":[{"n":"r0-r3","c":"cy","cells":["参数 / 返回值","caller","前 4 个参数；r0 兼返回值"]},{"n":"r4-r8","c":"or","cells":["局部变量","callee","被调用者必须恢复"]},{"n":"r9","c":"vi","cells":["平台相关","callee","Linux 里常用作 sb / TLS"]},{"n":"r10","c":"or","cells":["局部变量 / sl","callee","部分平台用作栈限制"]},{"n":"r11","c":"or","cells":["帧指针 fp","callee","开启 -fno-omit-frame-pointer 时用"]},{"n":"r12","c":"gray","cells":["临时 ip","caller","过程间调用暂存"]},{"n":"r13 sp","c":"rd","cells":["栈指针","特殊","必须始终对齐 8 字节"]},{"n":"r14 lr","c":"rd","cells":["返回地址","特殊","bl 自动写，函数里常需 push"]},{"n":"r15 pc","c":"rd","cells":["程序计数器","特殊","改它即跳转"]}],"note":"「caller 保存」意思是：调用者如果还想用这些寄存器，得自己先存起来；「callee 保存」意思是：被调用者必须保证返回时值和进来时一样。前者省被调者的事，后者省调用者的事。"}'></div>
+
+<h2 id="s2">2. 一次调用的完整动作</h2>
+
+    <pre><code>; caller: 调用 func(a, b, c, d, e)
+    mov  r0, a
+    mov  r1, b
+    mov  r2, c
+    mov  r3, d
+    push {r0-r3}        ; 也可只压 e（第 5 个参数），保持 8 字节对齐
+    str  e, [sp, #-4]!  ; 第 5 个参数入栈
+    bl   func           ; 跳并保存返回地址到 lr
+    add  sp, sp, #8     ; 回收参数空间
+
+; callee: func 开头
+func:
+    push {r4-r11, lr}   ; 保存 callee-saved 与返回地址
+    sub  sp, sp, #32    ; 腾出局部变量空间
+    ...                 ; 函数体
+    mov  r0, result     ; 返回值放 r0
+    add  sp, sp, #32
+    pop  {r4-r11, pc}   ; 恢复并把返回地址直接装回 PC</code></pre>
+
+    <p>注意最后一行：<code>pop {..., pc}</code> —— 把返回地址直接弹进 PC，等价于「恢复 + 返回」，一条指令完成两件事。这是 ARM 汇编里非常经典的收尾写法。</p>
+
+    <div class="viz" data-kind="flow" data-title="调用 → 执行 → 返回：控制权与数据的双向流动" data-sub="参数向下流，返回值向上出" data-json='{"steps":[{"n":"caller 放参数","d":"r0-r3 + 栈"},{"n":"bl 跳转","d":"lr = 返回地址"},{"n":"callee 建帧","d":"push + sub sp"},{"n":"函数体执行","d":"用 r4-r11 做局部变量"},{"n":"返回值放 r0","d":"约定所在"},{"n":"pop {..., pc}","d":"恢复并返回"}],"note":"如果 callee 又调用了别的函数，lr 会被覆盖 —— 所以必须在开头 push lr。这就是「为什么函数开头总在压栈」的准确原因。"}'></div>
+
+    <h2 id="s3">3. 叶子函数优化：不建帧</h2>
+
+    <p>如果一个函数<b>不再调用别人</b>（叶子函数）、且局部变量少，它完全可以不建栈帧：</p>
+
+    <pre><code>int add3(int a, int b, int c) { return a + b + c; }
+
+; 编译结果（无栈操作！）
+add3:
+    add r0, r0, r1
+    add r0, r0, r2
+    bx  lr</code></pre>
+
+    <p>三条指令、零内存访问。这是编译器最有效的优化之一。<b>反过来说：如果你在崩溃栈里看到一个函数没有帧，不代表它没执行，只是它太简单。</b></p>
+
+    <h2 id="s4">4. 崩溃栈是怎么回溯的</h2>
+
+    <p>两种方式：</p>
+
+    <ul>
+      <li><b>帧指针回溯</b>：每个帧开头存着「上一帧的 fp」和「返回地址」，沿着 fp 链一路往上走。<code>gcc -fno-omit-frame-pointer</code> 保证这一点，代价是占一个寄存器、多几条指令。</li>
+      <li><b>展开表（unwind table）</b>：编译器生成 <code>.ARM.exidx</code> 段，记录「在某个 PC 处，栈上哪些位置存着哪些寄存器」。<code>gcc -funwind-tables</code>（默认开启）。这种方式不占寄存器，但需要额外查表。</li>
+    </ul>
+
+    <p>内核的 <code>panic()</code> 打印调用栈、<code>perf</code> 采样火焰图，用的都是第二种。<b>你在嵌入式里看到「栈回溯只有两级就断了」，通常是因为编译时去掉了 unwind 信息。</b></p>
+
+    <h2 id="s5">5. 与 Linux 的接缝：内核栈只有 8KB</h2>
+
+    <pre><code>// 内核栈很小（ARM 上通常 8KB，THREAD_SIZE）
+// 所以内核代码绝不能放大数组：
+void bad(void) {
+    char buf[4096];   // 危险！加上调用链很容易栈溢出
+}
+
+// 正确做法：用 kmalloc / vmalloc
+void good(void) {
+    char *buf = kmalloc(4096, GFP_KERNEL);
+    ...
+    kfree(buf);
+}
+
+// 查看当前栈使用：
+cat /proc/<pid>/stack        // 内核栈回溯
+echo t > /proc/sysrq-trigger // 打印所有任务栈</code></pre>
+
+    <p>这个限制解释了内核编程里一个反复出现的规范：<b>大缓冲区一律动态分配</b>。用户态进程的栈有 8MB（可调），内核栈只有 8KB——600 倍的差距。</p>
+
+    <h2 id="s6">6. 实验：看清一次调用的栈</h2>
+
+    <pre><code>// gdb 里最实用的三条
+// 1) 看帧
+(gdb) bt
+(gdb) info frame
+// 2) 看参数寄存器
+(gdb) info registers r0 r1 r2 r3 sp lr pc
+// 3) 断在函数入口，看栈刚建好时的样子
+(gdb) break func
+(gdb) run
+(gdb) x/16wx $sp</code></pre>
+
+    <p>在板子上可以用 <code>gdb-multiarch</code> + <code>gdbserver</code> 做同样的事。看一次真实的栈内容，比读十页文档有用。</p>
+
+    <h2 id="s7">7. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于 ABI 与栈的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["参数都是压栈传的","局部变量一定在栈上","栈溢出只发生在递归很深的程序"]},"good":{"t":"实际","items":["前 4 个参数走寄存器（快得多），第 5 个起才入栈","编译器会把局部变量尽量放在寄存器里；-O2 下很多变量根本不占栈","一个大数组 + 一层调用就能溢出 8KB 内核栈，与递归深度无关"]},"note":"「参数走寄存器」是 ARM 比早期 x86 快的一大原因。也解释了为什么超过 4 个参数的函数明显更慢——多了一次内存往返。"}'></div>
+
+    <h2 id="s8">8. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>第 5 个参数怎么传？为什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>压栈。因为只有 r0-r3 四个参数寄存器，多出的按顺序放栈上，且要保持 8 字节对齐。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>callee-saved 有哪几个？为什么必须保存？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>r4-r11（以及 sp）。调用者可能正用它们存着重要值，callee 若要用必须先存、返回前恢复。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>为什么函数开头要 <code>push {lr}</code>？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p><code>bl</code> 会覆盖 lr；若本函数还要调用别人，就必须先把 lr 存起来，返回前恢复。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p><code>pop {..., pc}</code> 为什么能返回？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>它把栈里的返回地址直接装进 PC，等于「恢复现场 + 跳回」，一条指令完成。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>内核栈为什么不能放大数组？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>内核栈通常只有 8KB，一个 4KB 数组加调用链就会溢出；应使用 kmalloc 等动态分配。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>写一个 5 参数的函数，<code>-O2 -S</code> 看第 5 个参数是否在栈上。</li>
+        <li>用 gdb 断在函数入口，<code>x/16wx $sp</code> 找出保存的 lr。</li>
+        <li>编译时加 <code>-fno-omit-frame-pointer</code>，对比帧指针链。</li>
+        <li>写一个内核模块，故意用大数组，观察栈溢出或警告。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      到这里你已经能手写汇编了。但真实工作里 99% 的代码是 C。第 18 课把一段 C 与它的汇编一一对照，讲清编译器到底做了什么、以及为什么 <code>-O2</code> 常常比你手写更快。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"一次函数调用，六步走完","hint":"看栈帧怎么长出来","note":"「调用约定」不是礼貌问题，是硬件层面必须约定好：参数放哪、返回值放哪、谁负责恢复现场。","steps":[{"t":"① 传参","d":"前四个参数放 r0–r3，多出来的压栈。这一步由调用者做。"},{"t":"② 保存返回地址","d":"bl 指令把下一条指令的地址写进 lr，然后跳到函数入口。"},{"t":"③ 建栈帧","d":"被调者先 push {fp, lr}，再调整 sp 给局部变量留空间。"},{"t":"④ 干活","d":"函数体执行，可能再调用别的函数，栈继续往下长。"},{"t":"⑤ 返回值","d":"结果放 r0（64 位放 r0:r1），调用者从这里取。"},{"t":"⑥ 恢复现场","d":"pop 回 fp 和 lr，bx lr 跳回调用点。栈指针必须回到进来时的位置，否则下一步就崩。"}]}'></div>
+  
+
+<nav class="pager">
+  <a href="course-16.html"><span>← 上一篇</span><b>汇编只有四类动作</b></a>
+  <a class="nx" href="course-18.html"><span>下一篇 →</span><b>从 C 到汇编</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

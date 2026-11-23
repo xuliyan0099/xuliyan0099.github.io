@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=../docs/course-th07.html">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>理论 T07 · ARM 架构与 Cortex-A7（详解） | i.MX6ULL Linux 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="../assets/viz.css">
+  <link rel="stylesheet" href="../assets/iviz.css">
+  <link rel="stylesheet" href="../assets/anim2.css">
+  <script src="../assets/readmode.js" defer></script>
+</head>
+<body data-page="th07">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>理论 T07 · ARM 架构与 Cortex-A7</h1>
+    <p class="lede">读启动代码时，你会看到一堆 <code>mcr p15</code>、<code>movs pc, lr</code>、<code>dsb</code> 这样的指令。它们不是玄学，每一条都对应一个明确的硬件动作。这一章把 Cortex-A7 的寄存器、异常、协处理器、缓存与内存映射讲透，之后 T08 的启动链路就能一句一句读懂。</p>
+    <div class="viz" data-kind="bits" data-title="ARM CPSR 状态寄存器的关键位" data-sub="控制模式、中断开关、运算标志" data-json='{"w":32,"fields":[{"n":"N Z C V","lo":28,"hi":31,"c":"or","t":"运算结果标志：负/零/进位/溢出"},{"n":"Q","lo":27,"hi":27,"c":"gray","t":"饱和运算标志"},{"n":"IT","lo":25,"hi":26,"c":"gray","t":"Thumb 条件执行"},{"n":"M[4:0]","lo":0,"hi":4,"c":"cy","t":"运行模式：0x13=用户态，0x13/0xD3=管理模式"},{"n":"T","lo":5,"hi":5,"c":"vi","t":"1=Thumb 指令集"},{"n":"F","lo":6,"hi":6,"c":"gr","t":"1=屏蔽 FIQ"},{"n":"I","lo":7,"hi":7,"c":"rd","t":"1=屏蔽 IRQ"},{"n":"A","lo":8,"hi":8,"c":"gray","t":"1=屏蔽异步中止"}],"note":"内核里那句 local_irq_disable() 改的就是第 7 位。用户态和内核态的差别，本质就是 M[4:0] 这五位不一样——不是一个抽象概念。"}'></div>
+
+
+    <div class="card">
+      <h4>本章要解决的问题</h4>
+      <p>① Cortex-A7 到底有哪些寄存器、哪些是每个模式私有的；② 七种异常怎么进入、怎么返回；③ <code>mcr p15</code> 在配什么；④ 缓存与 DMA 为什么会打架；⑤ 三种屏障指令各管什么。</p>
+    </div>
+
+    <div class="card">
+      <h4>读完你应该能回答</h4>
+      <ul>
+        <li>为什么 IRQ 返回要用 <code>subs pc, lr, #4</code> 而不是 <code>movs pc, lr</code>？</li>
+        <li>SCTLR 的 M 位和 I 位分别控制什么？打开它们的顺序有讲究吗？</li>
+        <li>一条 cache line 多少字节？DMA 收完数据为什么要 invalidate？</li>
+        <li>DMB、DSB、ISB 三者最核心的区别是什么？</li>
+        <li>i.MX6ULL 的 DDR 从哪个物理地址开始，内核把它映射到哪个虚拟地址？</li>
+      </ul>
+    </div>
+
+    <div class="anim2" data-json='{"title":"一条 ldr 指令穿过五级流水","hint":"吞吐不是延迟","nodes":[{"k":"取指 IF","s":"PC → I-Cache"},{"k":"译码 ID","s":"拆位段"},{"k":"执行 EX","s":"算地址"},{"k":"访存 MEM","s":"D-Cache / DDR"},{"k":"写回 WB","s":"写寄存器"}],"frames":[{"i":0,"d":"PC 指向的地址送进指令 Cache，命中 1 个周期，不命中要等内存。"},{"i":1,"d":"32 位机器码被拆成条件码、操作码、基址寄存器、目标寄存器、偏移量。"},{"i":2,"d":"ALU 把基址寄存器与偏移相加得到有效地址，标志位在这一步更新。"},{"i":3,"d":"地址经 MMU 翻译后访问 D-Cache：命中几个周期，不命中就要等 DDR 的上百个周期。"},{"i":4,"d":"数据写回寄存器堆。与此同时后面的指令早就在取指、译码——所以单条 5 周期，吞吐却接近 1 周期一条。"}],"kind":"stack"}'></div>
+
+    <h2>1. 为什么不能跳过硬件细节</h2>
+    <div class="key">
+      <b>CPU 视角（配合 T18 读）</b>
+      本章讲 CPSR 与异常向量，那张位段图在 T18 有逐位拆解。 想看清每条指令的位段、流水线与寄存器实际变化，跳 <a href="th18.html">T18 · CPU 是怎么执行一行代码的</a> 第 2、8 节（机器码位段、异常进入的三件事）。
+    </div>
+
+
+    <p>裸机/内核启动代码里有几类东西，不懂硬件就完全读不下去：</p>
+
+    <table>
+      <thead><tr><th>代码里看到的</th><th>背后的硬件概念</th><th>在哪一章会用到</th></tr></thead>
+      <tbody>
+        <tr><td><code>mcr p15, 0, r0, c1, c0, 0</code></td><td>写 CP15 的 SCTLR，开 MMU/cache</td><td>T08 启动、T03 页表</td></tr>
+        <tr><td><code>msr cpsr_c, #0xD3</code></td><td>切到 SVC 模式并关中断</td><td>T08 head.S</td></tr>
+        <tr><td><code>ldr sp, =0x...</code></td><td>给当前模式的栈指针赋值</td><td>T08 启动</td></tr>
+        <tr><td><code>dsb / isb</code></td><td>等内存访问完成 / 清流水线</td><td>T03、T06、驱动</td></tr>
+        <tr><td><code>b vector</code></td><td>异常向量表</td><td>T06、T08</td></tr>
+      </tbody>
+    </table>
+
+    <p>所以这一章不是「补充知识」，而是<b>后面三章的前置条件</b>。</p>
+
+    <h2>2. Cortex-A7 是什么水平的一颗核</h2>
+
+    <p>i.MX6ULL 里是<b>单核 Cortex-A7</b>（A7 本身支持多核簇，但这颗芯片只放了一个）。它的关键参数：</p>
+
+    <table>
+      <thead><tr><th>项目</th><th>规格</th><th>工程含义</th></tr></thead>
+      <tbody>
+        <tr><td>架构</td><td>ARMv7-A，32 位</td><td>虚拟地址 4GB，两级页表（无 LPAE 时）</td></tr>
+        <tr><td>流水线</td><td>8 级，顺序双发射</td><td>分支误预测代价大，代码布局影响性能</td></tr>
+        <tr><td>主频</td><td>i.MX6ULL 常见 528MHz（可超到 800+）</td><td>算力有限，别指望跑重负载</td></tr>
+        <tr><td>L1 缓存</td><td>32KB 指令 + 32KB 数据，4 路组相联</td><td>cache line 64 字节</td></tr>
+        <tr><td>L2 缓存</td><td>i.MX6ULL 集成 128KB</td><td>多核共享（此处单核）</td></tr>
+        <tr><td>NEON</td><td>有（SIMD/FPU）</td><td>可做向量运算，但要注意上下文保存开销</td></tr>
+        <tr><td>MMU</td><td>有，支持 4KB/64KB/1MB 页</td><td>T03 讲的页表就基于它</td></tr>
+      </tbody>
+    </table>
+
+    <p>「顺序双发射」意味着它不能像 A15/A72 那样乱序执行多条指令，所以<b>依赖链和 cache miss 的代价更直接地反映在性能上</b>。这也是为什么在 A7 上「把热数据放一起、少用指针追逐」这类优化效果特别明显。</p>
+
+    <h2>3. 寄存器组：16 个通用 + 状态寄存器 + 影子寄存器</h2>
+    <div class="viz" data-kind="matrix" data-title="16 个通用寄存器，各有分工" data-sub="AAPCS 约定的调用规范，比寄存器名字重要" data-json='{"corner":"寄存器","cols":["别名","谁负责保存","用途"],"rows":[{"n":"r0–r3","cells":[{"v":"a1–a4","c":"cy"},{"v":"调用者","c":"or"},{"v":"函数参数/返回值","c":"gray"}]},{"n":"r4–r11","cells":[{"v":"v1–v8","c":"vi"},{"v":"被调用者","c":"gr"},{"v":"局部变量，跨调用保持","c":"gray"}]},{"n":"r13","cells":[{"v":"sp","c":"or"},{"v":"—","c":"gray"},{"v":"栈顶，永远 8 字节对齐","c":"gray"}]},{"n":"r14","cells":[{"v":"lr","c":"rd"},{"v":"—","c":"gray"},{"v":"返回地址，异常时被改写","c":"gray"}]},{"n":"r15","cells":[{"v":"pc","c":"cy"},{"v":"—","c":"gray"},{"v":"取指地址，读出来是「当前+8」","c":"gray"}]}],"note":"r0–r3 调用完就作废，所以写汇编时参数一进函数就得先搬走；这就是中断入口要额外保存 r0–r3 的原因。"}'></div>
+
+
+    <p>ARMv7-A 有 16 个 32 位通用寄存器（r0–r15）和两个状态寄存器（CPSR、SPSR）。其中几个有特殊身份：</p>
+
+    <table>
+      <thead><tr><th>寄存器</th><th>别名</th><th>特殊用途</th></tr></thead>
+      <tbody>
+        <tr><td>r13</td><td><b>SP</b></td><td>栈指针，<b>每个模式各有一个</b></td></tr>
+        <tr><td>r14</td><td><b>LR</b></td><td>链接寄存器，存返回地址，异常进入时硬件写它</td></tr>
+        <tr><td>r15</td><td><b>PC</b></td><td>程序计数器（读它得到的是当前指令地址 + 8，这是流水线造成的）</td></tr>
+        <tr><td>r7</td><td>—</td><td>ARM EABI 里专门放系统调用号（见 T01）</td></tr>
+        <tr><td>r11</td><td>FP</td><td>帧指针（编译器可选）</td></tr>
+      </tbody>
+    </table>
+
+    <p><b>「影子寄存器」（banked registers）</b>是 ARM 的一个精巧设计：不同模式下，<b>同一编号的寄存器指向不同的物理寄存器</b>。比如 SVC 模式有自己的一份 r13/r14，IRQ 模式也有自己的一份。这样异常进入时，硬件只要切换模式，SP 和 LR 自动就是「这个模式专用的」，不需要软件保存——这是 ARM 能快速响应中断的关键。</p>
+
+    <div class="reg">User 模式：    r0..r12, sp_usr, lr_usr, pc, cpsr
+SVC 模式：     r0..r12, sp_svc, lr_svc, pc, cpsr, spsr_svc
+IRQ 模式：     r0..r12, sp_irq, lr_irq, pc, cpsr, spsr_irq
+FIQ 模式：     r8..r12 也有私有副本（共 5 个额外影子寄存器，响应最快）</div>
+
+    <p>注意 FIQ 特殊在哪：它除了 sp/lr，还有 <b>r8–r12 的私有副本</b>。所以 FIQ 处理函数几乎不用保存寄存器，延迟可以做到极低。代价是它能用的寄存器少、且通常只给一个中断源用。</p>
+
+    <p>CPSR 的关键位（记住这几位就够用）：</p>
+
+    <table>
+      <thead><tr><th>位</th><th>名字</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td>[4:0]</td><td>M</td><td>当前模式（0x10=User、0x13=SVC、0x12=IRQ…）</td></tr>
+        <tr><td>[7]</td><td><b>I</b></td><td>IRQ 屏蔽位，1 = 关</td></tr>
+        <tr><td>[6]</td><td><b>F</b></td><td>FIQ 屏蔽位，1 = 关</td></tr>
+        <tr><td>[9]</td><td>A</td><td>非对齐访问陷阱（调试用）</td></tr>
+        <tr><td>[28:31]</td><td>N/Z/C/V</td><td>条件标志，比较与跳转依赖它们</td></tr>
+      </tbody>
+    </table>
+
+    <h2>4. 七种异常：进入、返回，以及为什么返回要减 4</h2>
+
+    <p>ARM 把「打断正常执行、跳到固定地址」的所有情况统称异常。七种，向量表里占八项（第 8 项保留）：</p>
+
+    <table>
+      <thead><tr><th>异常</th><th>向量偏移</th><th>触发原因</th><th>进入时 LR 保存的是</th><th>返回指令</th></tr></thead>
+      <tbody>
+        <tr><td>Reset</td><td>0x00</td><td>上电 / 复位</td><td>无（不需要返回）</td><td>—</td></tr>
+        <tr><td>Undefined</td><td>0x04</td><td>执行了非法指令</td><td>非法指令的<b>下一条</b>地址</td><td><code>movs pc, lr</code></td></tr>
+        <tr><td>SVC</td><td>0x08</td><td><code>svc</code> 指令（系统调用）</td><td>svc 的下一条</td><td><code>movs pc, lr</code></td></tr>
+        <tr><td>Prefetch Abort</td><td>0x0C</td><td>取指时 MMU 拒绝（代码页不可执行/未映射）</td><td>出错指令的下一条</td><td><code>subs pc, lr, #4</code></td></tr>
+        <tr><td>Data Abort</td><td>0x10</td><td>读/写数据时 MMU 拒绝（缺页、越权）</td><td>出错指令的<b>下下条</b>（+8）</td><td><code>subs pc, lr, #8</code></td></tr>
+        <tr><td><b>IRQ</b></td><td>0x18</td><td>普通中断</td><td>被打断指令的下一条</td><td><code>subs pc, lr, #4</code></td></tr>
+        <tr><td><b>FIQ</b></td><td>0x1C</td><td>快速中断</td><td>同上</td><td><code>subs pc, lr, #4</code></td></tr>
+      </tbody>
+    </table>
+
+    <p><b>为什么 IRQ 返回要 <code>subs pc, lr, #4</code>？</b> 因为中断可能在任意一条指令执行到一半时到来（实际上是在指令边界，但「边界」指的是<b>取下一条指令之前</b>）。硬件存的 LR 是「被打断那条指令的下一条」，而我们想回去执行的是「被打断的那一条」。所以返回时要减 4（一条 ARM 指令 4 字节）。</p>
+
+    <p><b>为什么 Data Abort 要减 8？</b> 因为 ARM 的流水线预取了指令，Data Abort 发生时 PC 已经跑到出错指令之后两条的位置，硬件存 LR 时又加了一层偏移。这是历史包袱，<b>记住结论就行</b>：Data Abort 用 <code>subs pc, lr, #8</code>，Prefetch Abort 与 IRQ/FIQ 用 <code>#4</code>，SVC/Undefined 直接 <code>movs pc, lr</code>。</p>
+
+    <p><code>movs pc, lr</code> 那一串 <code>s</code>（suffix）是关键：它不只是「跳回」，还会把 <code>SPSR</code> 恢复到 <code>CPSR</code>，也就是<b>把模式从异常模式切回原来的模式</b>。所以异常返回一条指令就完成了「恢复状态 + 跳转」两件事。</p>
+
+    <p>向量表本身很小，每项只有 4 字节，放不下处理代码，所以通常写成「跳转」：</p>
+
+    <div class="reg">_vectors:
+    b   reset_handler         @ 0x00
+    b   undef_handler         @ 0x04
+    b   svc_handler           @ 0x08
+    b   prefetch_handler      @ 0x0C
+    b   data_handler          @ 0x10
+    b   reserved              @ 0x14（ARMv7 保留）
+    b   irq_handler           @ 0x18
+    b   fiq_handler           @ 0x1C</div>
+
+    <p>这张表放在哪由 <code>SCTLR.V</code>（bit13）或 <code>VBAR</code>（CP15 c12）决定：老方式是 <code>V=0</code> 放 0x0000_0000、<code>V=1</code> 放 0xFFFF_0000；Cortex-A7 支持 <code>VBAR</code>，可以放任意对齐地址。Linux 启动早期就靠它把向量表迁到高地址。</p>
+
+    <h2>5. CP15：配 MMU、缓存、向量表的那个协处理器</h2>
+
+    <p>协处理器 15（CP15）是 ARM 的「系统控制单元」。它的寄存器不叫 r0–r15，而是用 <code>cN</code> 编号，访问必须用两条指令：</p>
+
+    <div class="reg">MRC p15, opc1, Rt, CRn, CRm, opc2     @ 读 CP15 到通用寄存器
+MCR p15, opc1, Rt, CRn, CRm, opc2     @ 写通用寄存器到 CP15
+
+@ 例：读 SCTLR 到 r0
+MRC p15, 0, r0, c1, c0, 0
+@ 例：把 r0 写进 SCTLR（比如开 MMU）
+MCR p15, 0, r0, c1, c0, 0</div>
+
+    <p>起名规律：<b>MCR 是「从处理器（r）到协处理器（c）」，MRC 反过来</b>。记不住就记「MCR = Move to Coprocessor Register」。</p>
+
+    <p>最关键的几个寄存器：</p>
+
+    <table>
+      <thead><tr><th>寄存器</th><th>名字</th><th>管什么</th></tr></thead>
+      <tbody>
+        <tr><td><code>c1</code></td><td><b>SCTLR</b></td><td>总开关：MMU、D cache、I cache、对齐检查、向量表基址模式</td></tr>
+        <tr><td><code>c2</code></td><td><b>TTBR0 / TTBR1</b></td><td>两张页表的物理基址（低地址/高地址），含 ASID</td></tr>
+        <tr><td><code>c3</code></td><td><b>DACR</b></td><td>域访问控制（Linux 用它管理页的访问权限）</td></tr>
+        <tr><td><code>c12</code></td><td>VBAR</td><td>异常向量表基址（Cortex-A7 支持）</td></tr>
+        <tr><td><code>c13</code></td><td>FCSE / ASID</td><td>进程地址空间标识</td></tr>
+        <tr><td><code>c15</code></td><td>CBAR</td><td>告诉软件「GIC 在这个地址」，Linux 用它找中断控制器</td></tr>
+      </tbody>
+    </table>
+
+    <p><code>SCTLR</code>（c1）的关键位，看启动代码时会反复遇到：</p>
+
+    <table>
+      <thead><tr><th>位</th><th>名字</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td>[0]</td><td><b>M</b></td><td>MMU 总开关，1 = 开</td></tr>
+        <tr><td>[1]</td><td>A</td><td>地址对齐检查</td></tr>
+        <tr><td>[2]</td><td><b>C</b></td><td>数据缓存（D cache）开关</td></tr>
+        <tr><td>[12]</td><td><b>I</b></td><td>指令缓存（I cache）开关</td></tr>
+        <tr><td>[13]</td><td>V</td><td>向量表基址：0 = 0x0000_0000，1 = 0xFFFF_0000</td></tr>
+        <tr><td>[23]</td><td>XP</td><td>扩展页表（用于 TEX 重映射）</td></tr>
+        <tr><td>[28]</td><td>TRE</td><td>TEX 重映射使能</td></tr>
+      </tbody>
+    </table>
+
+    <div class="reg">/* 打开 MMU 的标准顺序（顺序错了会当场死机） */
+1. 建好页表，把页表物理基址写入 TTBR0
+2. 写 DACR（通常先全 client 权限）
+3. 无效化 TLB 与 cache（TLB 里可能还留着旧映射）
+4. DSB + ISB（确保写操作真的生效）
+5. 读 SCTLR → 置位 M=1、I=1、C=1 → 写回
+6. ISB（清流水线，下一条指令就用新映射取指）</div>
+
+    <p>第 4 步和第 6 步为什么必须有？因为 ARM 是流水线 + 缓存架构：<b>你写进去的配置值不一定立刻生效，正在预取的指令也可能是旧地址的</b>。没有这两条屏障，你会遇到「MMU 明明开了，但跑到某条指令就飞」这类最折磨人的问题。</p>
+
+    <h2>6. 缓存与 DMA：为什么会读到旧数据</h2>
+    <div class="viz" data-kind="map" data-title="i.MX6ULL 的关键地址，记这四个就够开工" data-sub="datasheet 上的地址是总线地址" data-json='{"rows":[{"segs":[{"n":"DDR","d":"0x8000_0000","size":4,"c":"gr"},{"n":"OCRAM","d":"0x0090_0000","size":1,"c":"cy"},{"n":"CCM 时钟","d":"0x020C_4000","size":1,"c":"or"},{"n":"GPIO1","d":"0x0209_C000","size":1,"c":"vi"},{"n":"UART1","d":"0x0202_0000","size":2,"c":"cy"}],"from":"0x0000_0000","to":"0xFFFF_FFFF"}],"note":"外设全在 0x0200_0000 附近，DDR 在 0x8000_0000。写驱动前先确认这三个：时钟开没开、复位放了没、地址是不是这个。"}'></div>
+
+
+    <p>Cortex-A7 的 L1 数据缓存是 32KB、4 路组相联，<b>cache line 为 64 字节</b>。CPU 的每次读写都先经过 cache：读到就命中（极快），没读到就整行（64 字节）从内存搬进来。</p>
+
+    <p>问题在于：<b>DMA 引擎和外设不经过 CPU 的 cache</b>，它们直接读写物理内存。于是两个方向都可能出错：</p>
+
+    <table>
+      <thead><tr><th>方向</th><th>发生了什么</th><th>症状</th><th>正确操作</th></tr></thead>
+      <tbody>
+        <tr><td><b>设备写内存</b>（收数据）</td><td>cache 里还留着这块内存的旧副本，设备已经更新了内存</td><td>CPU 读到的永远是旧数据</td><td><b>invalidate</b>（丢弃 cache line，强制下次从内存读）</td></tr>
+        <tr><td><b>设备读内存</b>（发数据）</td><td>CPU 写的数据还在 cache 里（脏行），没落到内存</td><td>设备读到的是旧内容</td><td><b>clean</b>（把脏行写回内存）</td></tr>
+      </tbody>
+    </table>
+
+    <div class="calc">
+      <h5>一个真实的踩坑：串口 DMA 收到乱码</h5>
+      <div class="line">① 驱动准备缓冲 buf[256]，先 memset 清零 → 这 256 字节进了 cache</div>
+      <div class="line">② 启动 DMA 接收，CPU 去干别的</div>
+      <div class="line">③ DMA 把收到的 20 字节直接写进内存，但 cache 里的旧副本还是 0</div>
+      <div class="line">④ CPU 读 buf → 命中 cache → 读到全 0，看起来「什么都没收到」</div>
+      <div class="line">正确做法：DMA 启动前对 buf 做 <b>clean + invalidate</b>；DMA 完成后对 buf 做 <b>invalidate</b>（或用内核的 dma_map/dma_sync API）</div>
+    </div>
+
+    <p>要强调一个陷阱：<b>缓存操作的最小单位是 cache line（64 字节），不是字节</b>。如果你的 DMA 缓冲只有 20 字节，而它和别的变量共享同一条 64 字节 cache line，那么一次 invalidate 会把相邻变量的缓存也丢掉（数据本身没坏，但可能丢掉了未写回的脏数据）。所以 <b>DMA 缓冲必须按 cache line 对齐，并独占整条 line</b>。这也是内核 <code>dma_alloc_coherent()</code> 会返回对齐内存的原因。</p>
+
+    <p>在 Linux 驱动里，<b>不要自己写 <code>mcr p15</code> 来管 cache</b>，要用 DMA API：<code>dma_map_single()</code>（准备给设备用）、<code>dma_sync_single_for_cpu()</code>（拿回给 CPU 用）、<code>dma_unmap_single()</code>（用完解映射）。这些 API 在带 cache 的 ARM 上会插入正确的 clean/invalidate，在没有 cache 一致性问题或带 IOMMU 的平台上则自动退化为空操作。</p>
+
+    <h2>7. 三种屏障：DMB、DSB、ISB</h2>
+
+    <p>这是 ARM 上最抽象的一组指令，但它们的用途可以用一句话区分：</p>
+
+    <table>
+      <thead><tr><th>指令</th><th>保证什么</th><th>不保证什么</th><th>典型场景</th></tr></thead>
+      <tbody>
+        <tr><td><b>DMB</b></td><td>它前后的内存访问，<b>在别的观察者看来顺序正确</b></td><td>不保证前面的访问已经完成</td><td>多核共享数据、DMA 描述符发布</td></tr>
+        <tr><td><b>DSB</b></td><td>前面的所有内存访问<b>已真正完成</b>（对系统可见）</td><td>不清流水线</td><td>写外设寄存器后必须等它生效；改页表后</td></tr>
+        <tr><td><b>ISB</b></td><td><b>清空流水线</b>，让后面的指令按新状态取指</td><td>不等内存完成</td><td>改完 CP15 配置、改完代码、切换 MMU</td></tr>
+      </tbody>
+    </table>
+
+    <p>三条记忆锚点：</p>
+
+    <ul>
+      <li><b>DSB 最重</b>：它真的「等」，代价最大，只在必须确认硬件收到时才用。</li>
+      <li><b>DMB 管顺序</b>：写两个变量，想让另一个核看到时「先 A 后 B」，就在中间插 DMB。</li>
+      <li><b>ISB 管代码</b>：只要「我改的东西会影响后面指令的执行」（配置寄存器、自修改代码、MMU），就必须 ISB。</li>
+    </ul>
+
+    <p>启动代码里最常见的组合是 <code>DSB</code> 紧跟 <code>ISB</code>：<b>先确保配置写进去了（DSB），再清流水线让新配置生效（ISB）</b>。这个组合在 T08 的 MMU 使能、cache 使能处会反复出现。</p>
+
+    <h2>8. i.MX6ULL 的内存映射</h2>
+
+    <table>
+      <thead><tr><th>物理地址</th><th>大小</th><th>内容</th><th>备注</th></tr></thead>
+      <tbody>
+        <tr><td>0x0000_0000</td><td>—</td><td>BootROM</td><td>复位后第一条指令在这里</td></tr>
+        <tr><td>0x0090_0000</td><td>128KB</td><td>OCRAM（片内 SRAM）</td><td>U-Boot 常用作栈/临时数据</td></tr>
+        <tr><td>0x00A0_0000</td><td>—</td><td>GIC-400 中断控制器</td><td>分发器 0x00A0_1000</td></tr>
+        <tr><td>0x0200_0000</td><td>—</td><td>AIPS1 外设总线</td><td>UART、I2C、GPIO 等都在这一带</td></tr>
+        <tr><td>0x0209_C000</td><td>16KB</td><td>GPIO1</td><td>LED/按键最常接这里</td></tr>
+        <tr><td>0x020C_4000</td><td>—</td><td>CCM 时钟控制模块</td><td>T11 的主角</td></tr>
+        <tr><td>0x8000_0000</td><td>512MB</td><td>DDR</td><td>到 0x9FFF_FFFF</td></tr>
+      </tbody>
+    </table>
+
+    <p>内核启动后建立的「直接映射」把 DDR 从物理 0x8000_0000 映射到虚拟 0xC000_0000 起，所以有 <code>virt = phys - 0x80000000 + 0xC0000000</code> 这个换算（见 T03）。而外设区（0x0200_0000 一带）<b>不在直接映射里</b>，必须 <code>ioremap</code> 才能访问。</p>
+
+    <div class="note">
+      <b>提醒</b>
+      上表的地址请以你手上的《i.MX6ULL 参考手册》第 2 章 Memory Map 为准。不同封装/型号的地址会有差异，尤其是 GPIO5、UART 编号与 OCRAM 大小。写驱动前先抄手册，不要抄博客。
+    </div>
+
+    <h2>9. 十个常见误解</h2>
+
+    <table>
+      <thead><tr><th>误解</th><th>真相</th></tr></thead>
+      <tbody>
+        <tr><td>「ARM 是精简指令集，所以每条指令都一样快」</td><td>流水线、cache、分支预测都会造成差异；load/store、cache miss 的代价远高于算术指令。</td></tr>
+        <tr><td>「r15 读出来就是当前指令地址」</td><td>读到的是「当前指令 + 8」（流水线预取），写 PC 才是跳转。</td></tr>
+        <tr><td>「所有模式的 r13 是同一个」</td><td>每个异常模式有独立的影子 SP/LR，这正是异常能快速进入的原因。</td></tr>
+        <tr><td>「异常返回就是普通跳转」</td><td><code>movs pc, lr</code> 同时恢复 SPSR 到 CPSR，即切回原模式。</td></tr>
+        <tr><td>「IRQ 返回不用减 4」</td><td>必须减，否则会跳过一条指令（或重复执行错位）。</td></tr>
+        <tr><td>「MMU 和 cache 可以一起开」</td><td>要按顺序：页表 → DACR → 无效化 TLB → DSB/ISB → SCTLR → ISB。顺序错会死机。</td></tr>
+        <tr><td>「cache 一致性由硬件自动保证」</td><td>Cortex-A7 不维护与 DMA 的自动一致，必须手动 clean/invalidate 或用 DMA API。</td></tr>
+        <tr><td>「DMB 就是等所有操作完成」</td><td>那是 DSB。DMB 只保证顺序可见。</td></tr>
+        <tr><td>「cache line 是 32 字节」</td><td>A7 是 64 字节。算 DMA 对齐时用错会踩相邻数据。</td></tr>
+        <tr><td>「FIQ 只是更快的 IRQ」</td><td>它有独立寄存器组（r8–r12 影子），几乎不用保存现场，是为极低延迟设计的。</td></tr>
+      </tbody>
+    </table>
+
+    <h2>10. 自检：能答出来才算懂</h2>
+
+    <div class="q"><span class="n">1</span><p>IRQ 进入时硬件保存了哪两个寄存器？为什么返回要 <code>subs pc, lr, #4</code>？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>保存 CPSR→SPSR_irq、PC+4→LR_irq。LR 存的是「被打断指令的下一条」，而要回去执行的是被打断的那条，所以减 4。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>为什么每个模式有自己的 SP？这对异常响应有什么好处？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>影子寄存器让异常一进入就自动拥有独立的栈指针，不需要软件先把用户 SP 存起来再换栈，省掉了关键的前几条指令，缩短响应延迟。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>SCTLR 的 M、C、I 三位各是什么？打开顺序有讲究吗？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>M=MMU、C=D cache、I=I cache。必须先建页表并写 TTBR0、清 TLB、DSB/ISB，再一起置位；顺序颠倒会在「MMU 开了但页表没准备好」时立刻取指失败。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>DMA 往内存写数据后，CPU 读到旧值，该做 clean 还是 invalidate？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>invalidate（丢弃 cache line）。clean 是把 CPU 的脏数据写回内存，方向相反。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>DMB、DSB、ISB 各保证什么？各举一个使用场景。</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>DMB 保证顺序（多核共享数据发布）；DSB 保证完成（写外设寄存器后等生效）；ISB 清流水线（改 CP15 配置或改代码后）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">6</span><p>cache line 多大？为什么 DMA 缓冲要独占一条 line？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>A7 上是 64 字节。缓存操作以整行为单位，若缓冲与别的变量共享一行，invalidate 会连带丢弃对方的缓存内容（可能丢脏数据）。所以要按 64 字节对齐并独占。</p>
+    </div></details>
+
+    <div class="q"><span class="n">7</span><p><code>MRC p15, 0, r0, c1, c0, 0</code> 在做什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>把 CP15 的 c1（SCTLR，系统控制寄存器）读进 r0。这是「先读出来、改几位、再写回」这种配置方式的第一步。</p>
+    </div></details>
+
+    <div class="q"><span class="n">8</span><p>向量表可以放在哪？由谁决定？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>老方式由 SCTLR.V 决定（0x0000_0000 或 0xFFFF_0000）；Cortex-A7 支持 VBAR（CP15 c12），可放任意对齐地址，Linux 启动早期会把它迁到内核空间。</p>
+    </div></details>
+
+    <div class="q"><span class="n">9</span><p>为什么 <code>movs pc, lr</code> 能同时「跳回」和「切模式」？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>因为 <code>s</code> 后缀让它把 SPSR 恢复到 CPSR。CPSR 里有模式位，所以模式随之切回，而 PC 被写入 lr 完成跳转。</p>
+    </div></details>
+
+    <div class="q"><span class="n">10</span><p>i.MX6ULL 的 DDR 物理地址与内核虚拟地址怎么换算？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>物理 0x8000_0000 对应虚拟 0xC000_0000，所以 <code>virt = phys - 0x80000000 + 0xC0000000</code>，即 <code>__va/__pa</code>。只适用于直接映射区，外设区要走 ioremap。</p>
+    </div></details>
+
+    <h2>11. 这一章要动手的命令</h2>
+
+    <div class="steps">
+      <ol>
+        <li>写一段裸机（或 U-Boot 里）读 SCTLR 的代码：<code>MRC p15,0,r0,c1,c0,0</code>，打印出来对照第 5 节的位表。</li>
+        <li>反汇编任意一个 ARM 程序：<code>arm-linux-gnueabihf-objdump -d demo</code>，找 <code>svc</code>、<code>push {r4,lr}</code>，理解调用约定。</li>
+        <li><code>cat /proc/cpuinfo</code> —— 看 processor/Features，确认你的板子实际开了哪些特性。</li>
+        <li><code>dmesg | grep -i -E "cache|mmu|Memory"</code> —— 看内核启动时报告的 cache 与内存布局。</li>
+        <li><code>cat /proc/iomem</code> —— 看内核视角的物理地址分配表，对照第 8 节。</li>
+        <li>在驱动里故意省掉 DMA 前的 clean，观察数据错乱（理解第 6 节）。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一章预告</b>
+      T08 讲从复位向量开始的第一段代码：BootROM 怎么决定从哪启动、IVT 与 DCD 是什么、SPL 为什么要存在、U-Boot 如何把内核拉起来。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="slider" data-iviz="1" data-json='{"title":"主频决定一个周期有多长","label":"CPU 主频","unit":" MHz","min":24,"max":800,"step":8,"value":528,"out":[{"k":"一个时钟周期","expr":"1000/(v)","unit":" ns"},{"k":"每秒理论指令数（按 IPC=1）","expr":"v","unit":" M"},{"k":"一条 3 周期指令耗时","expr":"3000/v","unit":" ns"}],"presets":[{"v":24,"t":"24 MHz 晶振"},{"v":528,"t":"528 MHz 默认"},{"v":792,"t":"792 MHz 超频"}],"note":"i.MX6ULL 的 Cortex-A7 出厂 528 MHz，手册里还有 696 与 792 档。频率翻倍不等于程序快一倍：访存要等 DDR，那才是真正的瓶颈。"}'></div>
+  </main>
+</div>
+<script src="../assets/nav.js"></script>
+<script src="../assets/viz.js"></script>
+<script src="../assets/iviz.js"></script>
+<script src="../assets/anime.iife.min.js"></script>
+<script src="../assets/anim2.js"></script>
+</body>
+</html>

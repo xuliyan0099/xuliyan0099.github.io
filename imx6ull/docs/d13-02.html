@@ -1,0 +1,160 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>xv6 或自制一个最小 OS：把操作系统造一遍 · 卷 13 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j13.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 13 · 拔高</div>
+<ol><li><a href="course-44.html">
+  <span class="no">01</span><span>总复盘<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="d13-01.html">
+  <span class="no">02</span><span>AArch64 / RISC-V / x86：三套体系横向对照<span class="sub">● · 约 4 小时</span></span></a></li>
+<li><a href="d13-02.html" class="active">
+  <span class="no">03</span><span>xv6 或自制一个最小 OS：把操作系统造一遍<span class="sub">● · 约 8 小时 · 当前</span></span></a></li>
+<li><a href="d13-03.html">
+  <span class="no">04</span><span>虚拟化与 KVM：ARM 上的 EL2 与 stage-2 页表<span class="sub">● · 约 4 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j12.html">← 卷 12</a>
+  
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 13<span>·</span>拔高<span>·</span>第 03 篇</div>
+  <h1>xv6 或自制一个最小 OS：把操作系统造一遍</h1>
+  
+  <div class="doc-chips">
+    <span class="hot">● 一读</span>
+    <span>纯读约 8 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+<p class="lead">读一百篇讲调度的文章，不如自己写一次 <code>swtch</code>。xv6 只有几千行，却把进程、页表、中断、系统调用全串起来了。</p>
+
+<p>它是 MIT 的教学 OS，现在的主流版本跑在 RISC-V 上。你不需要板子，QEMU 里就能把它跑起来、改坏、再修好。</p>
+
+<h2 id="s1">先玩一下：xv6 的进程状态</h2>
+
+<p>xv6 的 <code>struct proc</code> 里有一个 <code>state</code> 字段。点事件，看它怎么转——和 Linux 的 <code>task_struct</code> 是同一套逻辑，只是字段少得多。</p>
+
+<div class="ikit" data-type="machine" data-json='{"title":"xv6 进程状态","badge":"machine",
+"states":[{"id":"UNUSED","x":10,"y":44},{"id":"USED","x":32,"y":14},{"id":"RUNNABLE","x":62,"y":18},{"id":"RUNNING","x":66,"y":52},{"id":"SLEEPING","x":26,"y":84},{"id":"ZOMBIE","x":88,"y":84}],
+"edges":[
+{"from":"UNUSED","to":"USED","label":"allocproc","event":"创建"},
+{"from":"USED","to":"RUNNABLE","label":"初始化完成","event":"就绪"},
+{"from":"RUNNABLE","to":"RUNNING","label":"scheduler 选中","event":"被调度"},
+{"from":"RUNNING","to":"RUNNABLE","label":"yield / 时间片","event":"让出 CPU"},
+{"from":"RUNNING","to":"SLEEPING","label":"sleep(chan)","event":"sleep","lt":0.28,"lp":44},
+{"from":"SLEEPING","to":"RUNNABLE","label":"wakeup(chan)","event":"wakeup","lt":0.62,"lp":40},
+{"from":"RUNNING","to":"ZOMBIE","label":"exit","event":"exit"},
+{"from":"ZOMBIE","to":"UNUSED","label":"wait 回收","event":"wait","lt":0.45,"lp":-30}],
+"script":[0,1,2,3,2,4,5],
+"stateNotes":{
+"UNUSED":"空闲槽位。proc 表是固定大小数组（NPROC=64），这是教学 OS 的简化。",
+"USED":"已分配，页表与 trapframe 已建，但还没进入调度。",
+"RUNNABLE":"就绪，等 scheduler 挑中。",
+"RUNNING":"正在 CPU 上。单核时最多一个。",
+"SLEEPING":"睡在某个 chan 上，wakeup 必须指定同一个 chan。",
+"ZOMBIE":"已 exit，等父进程 wait 回收 trapframe 与页表。"}}'></div>
+
+<h2 id="s2">一、swtch：上下文切换的全部秘密</h2>
+
+<p>切换不是「保存所有寄存器」，而是<strong>只保存调用者保存寄存器（callee-saved）</strong>。因为切换发生在函数调用语境里，调用者保存寄存器已经由编译器负责了。</p>
+
+<div class="ikit" data-type="code" data-json='{"title":"xv6 的 swtch（RISC-V）","badge":"code",
+"regs":[{"n":"ra","v":"0x8000_1234"},{"n":"sp","v":"0x3F00_0000"},{"n":"s0","v":"0x0000_0001"}],
+"lines":[
+{"c":"swtch(struct context **old, struct context *new)","set":{"sp":"0x3F00_0000"},"note":"old 指向「旧线程的 context 指针」，new 是「要切换到的 context」。"},
+{"c":"  sd ra, 0(a0); sd sp, 8(a0); sd s0, 16(a0) ...","set":{"ra":"0x8000_1234"},"note":"保存 ra/sp/s0–s11：这些是 callee-saved，必须由被调用者保存。"},
+{"c":"  ld ra, 0(a1); ld sp, 8(a1); ld s0, 16(a1) ...","set":{"sp":"0x3F00_1000"},"note":"从新 context 恢复。执行完这条，栈已经是新线程的了。"},
+{"c":"  ret","set":{"ra":"0x8000_5000"},"note":"ret 跳到新线程上次 swtch 的返回点——于是「切换」看起来像一次普通函数返回。"},
+{"c":"/* 关键：两次 swtch 各自返回到不同的地方 */","set":{"ra":"0x8000_5000"},"note":"这就是协作式切换的全部机制，没有魔法。"}]}'></div>
+
+<p>注意最后一行：<code>swtch</code> 返回时，CPU 已经在另一个栈上、跳到另一个函数的「返回点」。这正是「上下文切换」最反直觉的地方——它不需要特殊的硬件指令，靠的就是保存/恢复栈指针与返回地址。</p>
+
+<h2 id="s3">二、内核地址空间与 trampoline</h2>
+
+<div class="ikit" data-type="mem" data-json='{"title":"xv6 的用户地址空间（简化）","badge":"mem",
+"segments":[
+{"name":"text","len":18,"color":"rgba(95,241,239,.4)","addr":"0x0","note":"用户代码，只读可执行。"},
+{"name":"data","len":14,"color":"rgba(251,191,36,.38)","addr":"紧随 text","note":"已初始化数据 + bss。"},
+{"name":"guard","len":4,"color":"rgba(251,113,133,.4)","addr":"1 页","note":"无效页，栈溢出时立刻触发缺页而不是悄悄踩坏数据。"},
+{"name":"stack","len":12,"color":"rgba(255,255,255,.18)","addr":"顶部向下","note":"用户栈，一页，溢出即 fault。"},
+{"name":"trapframe","len":10,"color":"rgba(167,139,250,.34)","addr":"独立页","note":"保存 32 个寄存器；内核从这里恢复用户态。"},
+{"name":"heap","len":20,"color":"rgba(52,211,153,.3)","addr":"sbrk 向上","note":"xv6 用 sbrk 扩展，没有复杂的分配器。"}]}'></div>
+
+<p>xv6 的页表里还有一个特殊的 <code>trampoline</code> 页：它<strong>同时映射在用户页表和内核页表的同一个虚拟地址</strong>，且可执行。这样在切换页表（satp）的那一瞬间，代码还在原地，不会因为「换了页表就找不到下一条指令」而崩。这个技巧在所有 OS 里都有，名字不同而已。</p>
+
+<h2 id="s4">三、和你手里的 i.MX6ULL 怎么对上</h2>
+
+<table>
+<thead><tr><th>xv6（RISC-V）</th><th>i.MX6ULL（ARMv7 + Linux）</th><th>共同点</th></th></tr></thead>
+<tbody>
+<tr><td><code>entry.S</code> 设栈、跳 <code>start()</code></td><td>BootROM → SPL → U-Boot → <code>head.S</code></td><td>都要先有栈、先有关掉 MMU 的物理地址阶段</td></tr>
+<tr><td><code>start()</code> 配时钟中断、开页表</td><td><code>start_kernel()</code> 里的 <code>paging_init</code></td><td>「开 MMU」是内核真正变成内核的那一刻</td></tr>
+<tr><td><code>main()</code> 初始化各子系统，<code>userinit()</code></td><td><code>kernel_init</code> → <code>init</code> 进程</td><td>第一个用户进程由内核亲手造出来</td></tr>
+<tr><td><code>usertrap()</code> 处理 ecall/中断</td><td>异常向量表 + <code>do_IRQ</code></td><td>用户态进内核的唯一入口是异常</td></tr>
+<tr><td><code>swtch</code> 协作式切换</td><td><code>context_switch</code> + 抢占</td><td>都是保存 callee-saved + 换栈</td></tr>
+</tbody></table>
+
+<div class="cal tip"><span class="h">最高效的学法</span>不要通读。选一条路径走完：<code>initcode</code> 怎么执行第一条指令 → 怎么进 <code>exec</code> → 怎么跑到 shell。走通这一条，整本书就活了。</div>
+
+<div class="cal warn"><span class="h">误解：xv6 太简单，学了没用</span>它省掉的是「性能与兼容性」，保留的是「机制」。你在这几千行里看到的每个结构，Linux 里都有对应物，只是多了锁、RCU、cgroup、namespace 这些工程复杂度。</div>
+
+<h2 id="s5">动手（可选）：在 QEMU 里跑起来并改坏它</h2>
+
+<div class="cal q"><span class="h">只在 🔧 实作模式展开</span>PC 上即可，10 分钟。</div>
+
+<ol>
+  <li><code>git clone</code> xv6-riscv，<code>make qemu</code>，看到 <code>xv6 kernel is booting</code> 与 shell。</li>
+  <li>在 <code>sys_write</code> 里加一句 <code>printf</code>，观察每次 <code>echo</code> 都打印——你就摸到了系统调用入口。</li>
+  <li>把 <code>NPROC</code> 改成 8，跑并发程序，看 <code>fork</code> 何时返回 -1。</li>
+  <li>在 <code>swtch</code> 里故意不保存 <code>s0</code>，观察程序出现随机错误——这就是「上下文没保存全」的后果。</li>
+</ol>
+
+<h2 id="s6">离开这一篇，你应该能</h2>
+
+<ul class="qa">
+  <li>解释 <code>swtch</code> 为什么只保存 callee-saved 寄存器，以及「切换像函数返回」是什么意思。</li>
+  <li>说出 trampoline 页的作用，以及不用它会怎样。</li>
+  <li>把 xv6 的启动路径与 i.MX6ULL 的五级启动链一一对应。</li>
+</ul>
+
+<p>最后一步往外走：如果一台机器要同时跑多个操作系统，硬件需要多给什么？那就是虚拟化与 KVM。</p>
+
+
+<nav class="pager">
+  <a href="d13-01.html"><span>← 上一篇</span><b>AArch64 / RISC-V / x86：三套体系横向对照</b></a>
+  <a class="nx" href="d13-03.html"><span>下一篇 →</span><b>虚拟化与 KVM：ARM 上的 EL2 与 stage-2 页表</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

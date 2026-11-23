@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>从零学计算机 · 49 课总览</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/viz.css">
+<link rel="stylesheet" href="assets/iviz.css">
+  <script src="assets/readmode.js" defer></script>
+</head>
+<body data-page="index">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>从零学计算机 · 49 课</h1>
+    <p class="lede">这套课只有一个目标：让你从「不知道 0 和 1 是什么」开始，一路走到「能看懂 CPU 在执行什么、能解释软件为什么这样跑、能在自己的板子上跑起自己写的驱动」。每一课都回答一个具体问题，每一课都留一个能跑的实验。</p>
+
+    <div class="card" style="border-color:rgba(61,219,217,.30);background:linear-gradient(135deg,rgba(61,219,217,.10),rgba(139,123,255,.06))">
+      <h4>这套课与参考卷的关系</h4>
+      <p>参考卷（理论 T01–T18 / 实践 C01–C14，34 页）是与本课程<b>并行</b>的一套：讲得更深、成体系，按「理论卷 / 实践卷」并列编排，适合按章查细节、按章照着做。本课程是<b>主线</b>：按「一个现象 → 一个硬件机制 → 一个可跑实验」的因果链重排，49 课、约 168 小时。遇到需要更深细节的地方，课内会直接给参考卷的链接，不重复写。</p>
+    </div>
+
+    <div class="viz" data-kind="flow" data-title="每一课都是同一个结构" data-sub="八节骨架 + 三件必做，任何一课都不例外" data-json='{"steps":[{"n":"问题","d":"这一课要回答什么（一句话）"},{"n":"直觉","d":"用生活类比建立第一印象"},{"n":"硬件","d":"电路/寄存器层面到底怎么发生"},{"n":"软件","d":"代码/内核里对应的现象"},{"n":"图","d":"一张能背下来的结构图"},{"n":"实验","d":"必须亲手跑，能贴出输出"},{"n":"误解","d":"三个最常见的错法"},{"n":"自测","d":"五道题，答不出就回去重读"}],"note":"这个结构是强制的。写课的人（也是学的人）最容易犯的错是「懂了就跳过实验」——所以每课都把实验放在自测之前，跑不出输出就不许往下走。"}'></div>
+
+    <h2>1. 为什么这样排：三层描述，一条因果链</h2>
+
+    <p>同一个对象（比如「a + b」这行 C 代码），可以从三层描述：</p>
+
+    <div class="viz" data-kind="layers" data-title="三层描述：同一个 a+b" data-sub="学完一课，三层都要能说一句，缺一层就是没懂透" data-json='{"items":[{"n":"物理层：两个电平进入加法器","d":"开关导通/截止，电流走哪条路","c":"gray"},{"n":"逻辑层：全加器的真值表与进位","d":"布尔代数变成门，门变成结果","c":"cy"},{"n":"机器层：一条 add 指令的位段","d":"cond/opcode/Rn/Rd，32 位里分段","c":"vi"},{"n":"语言层：C 的表达式与类型","d":"编译器决定用哪个寄存器、要不要溢出检查","c":"or"},{"n":"系统层：进程在用户态跑，结果写回栈","d":"页表、Cache、调度都在背后工作","c":"gr"}],"note":"教材通常只讲其中一两层，于是学生学完「知道有 Cache」但说不出「为什么我这段代码慢」。三层都过一遍，才有解释力。"}'></div>
+
+    <h2>2. 十部 · 四十九课（完整目录）</h2>
+
+    <p>时长按「读懂 + 做完实验」计，不含额外查资料。全课合计约 <b>168 小时</b>，按每周 6–8 小时算是半年；按每天 2 小时算是两个半月。</p>
+
+    <table>
+      <thead><tr><th>课</th><th>标题</th><th>这一课回答</th><th>时长</th></tr></thead>
+      <tbody>
+        <tr><td colspan="4" style="background:rgba(61,219,217,.08)"><b>P0 起点：计算机是什么</b>（8h）</td></tr>
+        <tr><td><a href="../docs/course-00.html">00</a></td><td>计算机只是一台会照抄指令的机器</td><td>它到底在干什么？为什么不需要「理解」</td><td>2h</td></tr>
+        <tr><td><a href="../docs/course-01.html">01</a></td><td>为什么偏偏是二进制</td><td>电平、噪声、为什么不用十进制</td><td>2h</td></tr>
+        <tr><td><a href="../docs/course-02.html">02</a></td><td>一个字节能装什么</td><td>位/字节/字、补码、溢出</td><td>2h</td></tr>
+        <tr><td><a href="../docs/course-03.html">03</a></td><td>从按键到屏幕</td><td>一次 I/O 走完哪些层</td><td>2h</td></tr>
+
+        <tr><td colspan="4" style="background:rgba(139,123,255,.08)"><b>P1 从开关到加法器</b>（16h）</td></tr>
+        <tr><td><a href="../docs/course-04.html">04</a></td><td>一个开关能做什么</td><td>MOS、上拉下拉、反相器</td><td>3h</td></tr>
+        <tr><td><a href="../docs/course-05.html">05</a></td><td>与或非：布尔代数变成电路</td><td>真值表怎么变成门</td><td>3h</td></tr>
+        <tr><td><a href="../docs/course-06.html">06</a></td><td>从半加器到全加器</td><td>进位怎么传、4 位加法器</td><td>3h</td></tr>
+        <tr><td><a href="../docs/course-07.html">07</a></td><td>补码与减法器</td><td>为什么 a−b = a+(−b)</td><td>3h</td></tr>
+        <tr><td><a href="../docs/course-08.html">08</a></td><td>时钟与触发器</td><td>怎么「记住」一个值</td><td>4h</td></tr>
+
+        <tr><td colspan="4" style="background:rgba(255,179,92,.10)"><b>P2 CPU 骨架</b>（17h）</td></tr>
+        <tr><td><a href="../docs/course-09.html">09</a></td><td>冯诺依曼的五件事</td><td>取指/译码/执行/访存/写回</td><td>3h</td></tr>
+        <tr><td><a href="../docs/course-10.html">10</a></td><td>PC 与指令寄存器</td><td>程序为什么是一串地址</td><td>3h</td></tr>
+        <tr><td><a href="../docs/course-11.html">11</a></td><td>ALU 与标志位</td><td>N/Z/C/V 从哪来、接回 CPSR</td><td>3h</td></tr>
+        <tr><td><a href="../docs/course-12.html">12</a></td><td>一条指令的完整旅程</td><td>单周期模型的数据通路</td><td>4h</td></tr>
+        <tr><td><a href="../docs/course-13.html">13</a></td><td>流水线</td><td>8 级、冒险、前递、分支预测</td><td>4h</td></tr>
+
+        <tr><td colspan="4" style="background:rgba(92,225,160,.09)"><b>P3 指令集与语言的落差</b>（22h）</td></tr>
+        <tr><td><a href="../docs/course-14.html">14</a></td><td>机器码的位段</td><td>32 位怎么分工</td><td>3h</td></tr>
+        <tr><td><a href="../docs/course-15.html">15</a></td><td>九种寻址方式</td><td>ldr/str 的所有玩法</td><td>3h</td></tr>
+        <tr><td><a href="../docs/course-16.html">16</a></td><td>汇编只有四类动作</td><td>搬、算、跳、特权</td><td>3h</td></tr>
+        <tr><td><a href="../docs/course-17.html">17</a></td><td>函数调用与 ABI</td><td>bl/lr/栈帧/r0–r3 的约定</td><td>4h</td></tr>
+        <tr><td><a href="../docs/course-18.html">18</a></td><td>从 C 到汇编</td><td>编译器到底做了什么</td><td>4h</td></tr>
+        <tr><td><a href="../docs/course-19.html">19</a></td><td>从源码到可执行</td><td>四步编译、链接、ELF、加载</td><td>4h</td></tr>
+
+        <tr><td colspan="4" style="background:rgba(255,107,129,.09)"><b>P4 存储与性能</b>（14h）</td></tr>
+        <tr><td><a href="../docs/course-20.html">20</a></td><td>存储层次</td><td>1 周期到 1 毫秒的四层</td><td>3h</td></tr>
+        <tr><td><a href="../docs/course-21.html">21</a></td><td>Cache 三参数</td><td>line、组相联、写回</td><td>4h</td></tr>
+        <tr><td><a href="../docs/course-22.html">22</a></td><td>内存墙与局部性</td><td>遍历顺序为什么决定快慢</td><td>3h</td></tr>
+        <tr><td><a href="../docs/course-23.html">23</a></td><td>用 perf 量化</td><td>七条命令看懂程序性能</td><td>4h</td></tr>
+
+        <tr><td colspan="4" style="background:rgba(61,219,217,.08)"><b>P5 地址空间与进程</b>（19h）</td></tr>
+        <tr><td><a href="../docs/course-24.html">24</a></td><td>虚拟地址是什么</td><td>为什么不能直接摸物理内存</td><td>3h</td></tr>
+        <tr><td><a href="../docs/course-25.html">25</a></td><td>页表与 MMU</td><td>两级表、TLB、页表遍历</td><td>4h</td></tr>
+        <tr><td><a href="../docs/course-26.html">26</a></td><td>缺页与换页</td><td>一次 page fault 的全链路</td><td>4h</td></tr>
+        <tr><td><a href="../docs/course-27.html">27</a></td><td>进程、线程与 task_struct</td><td>隔离靠的到底是什么</td><td>4h</td></tr>
+        <tr><td><a href="../docs/course-28.html">28</a></td><td>fork 与 exec</td><td>COW、新进程怎么诞生</td><td>4h</td></tr>
+
+        <tr><td colspan="4" style="background:rgba(139,123,255,.08)"><b>P6 内核机制</b>（23h）</td></tr>
+        <tr><td><a href="../docs/course-29.html">29</a></td><td>特权级与异常</td><td>svc 进内核的三步</td><td>3h</td></tr>
+        <tr><td><a href="../docs/course-30.html">30</a></td><td>中断</td><td>GIC → handler、上下半部</td><td>4h</td></tr>
+        <tr><td><a href="../docs/course-31.html">31</a></td><td>调度</td><td>CFS、vruntime、时间片</td><td>4h</td></tr>
+        <tr><td><a href="../docs/course-32.html">32</a></td><td>上下文切换</td><td>switch_to 五行逐行读</td><td>4h</td></tr>
+        <tr><td><a href="../docs/course-33.html">33</a></td><td>同步</td><td>原子、自旋、信号量、屏障</td><td>4h</td></tr>
+        <tr><td><a href="../docs/course-34.html">34</a></td><td>文件与设备</td><td>VFS、inode、字符设备</td><td>4h</td></tr>
+
+        <tr><td colspan="4" style="background:rgba(255,179,92,.10)"><b>P7 上板</b>（24h）</td></tr>
+        <tr><td><a href="../docs/course-35.html">35</a></td><td>i.MX6ULL 最小系统</td><td>电源、时钟、复位、DDR</td><td>3h</td></tr>
+        <tr><td><a href="../docs/course-36.html">36</a></td><td>启动链</td><td>BootROM→IVT/DCD→SPL→U-Boot</td><td>4h</td></tr>
+        <tr><td><a href="../docs/course-37.html">37</a></td><td>设备树</td><td>dts/dtb、compatible、pinctrl</td><td>4h</td></tr>
+        <tr><td><a href="../docs/course-38.html">38</a></td><td>总线</td><td>AXI/AHB/APB、寄存器时序</td><td>3h</td></tr>
+        <tr><td><a href="../docs/course-39.html">39</a></td><td>GIC 与定时器</td><td>中断号、GPT、tick</td><td>3h</td></tr>
+        <tr><td><a href="../docs/course-40.html">40</a></td><td>存储与外设</td><td>eMMC、UART、I2C、SPI</td><td>4h</td></tr>
+        <tr><td><a href="../docs/course-41.html">41</a></td><td>根文件系统</td><td>BusyBox、Buildroot、启动参数</td><td>3h</td></tr>
+
+        <tr><td colspan="4" style="background:rgba(92,225,160,.09)"><b>P8 综合与验收</b>（9h）</td></tr>
+        <tr><td><a href="../docs/course-42.html">42</a></td><td>从零做出一个能跑的系统</td><td>十步综合实战</td><td>4h</td></tr>
+        <tr><td><a href="../docs/course-43.html">43</a></td><td>排障方法论</td><td>五级日志与三件套证据链</td><td>3h</td></tr>
+        <tr><td><a href="../docs/course-44.html">44</a></td><td>总复盘：一条从头到尾的链</td><td>20 行对账、能力验收</td><td>2h</td></tr>
+        <tr><td colspan="4" style="background:rgba(61,219,217,.08)"><b>P9 驱动实操</b>（16h）</td></tr>
+        <tr><td><a href="../docs/course-45.html">45</a></td><td>写一个字符设备</td><td>register_chrdev / cdev / copy_to_user</td><td>4h</td></tr>
+        <tr><td><a href="../docs/course-46.html">46</a></td><td>pinctrl 与 GPIO</td><td>pinmux / pinconf / gpiod 三道关</td><td>4h</td></tr>
+        <tr><td><a href="../docs/course-47.html">47</a></td><td>I2C 设备驱动</td><td>i2c_client / regmap / i2cdetect</td><td>4h</td></tr>
+        <tr><td><a href="../docs/course-48.html">48</a></td><td>中断的上半部与下半部</td><td>request_irq / tasklet / 防抖</td><td>4h</td></tr>
+      </tbody>
+    </table>
+
+    <h2>3. 学习节奏：四件事，一个循环</h2>
+
+    <div class="viz" data-kind="flow" data-title="每课的四件事" data-sub="读 3 份、拆 3 份、做 2 份、讲 1 份，比例固定" data-json='{"steps":[{"n":"读","d":"只看骨架：问题 + 直觉 + 图"},{"n":"拆","d":"把硬件动作逐条写出来（寄存器级）"},{"n":"做","d":"跑实验，必须有输出可以贴"},{"n":"讲","d":"写 200 字讲给不懂的人听"}],"note":"「讲」这一步是唯一能证明你真的懂了的动作。写不出来通常不是表达问题，是理解还停在「认识这些词」的层面。"}'></div>
+
+    <div class="viz" data-kind="bars" data-title="各部时长（小时）" data-sub="合计 168h；P0–P6 打基础，P7–P9 上系统" data-json='{"items":[{"n":"P0 起点","v":8,"unit":"h","c":"cy"},{"n":"P1 电路","v":16,"unit":"h","c":"cy"},{"n":"P2 CPU","v":17,"unit":"h","c":"vi"},{"n":"P3 指令集","v":22,"unit":"h","c":"vi"},{"n":"P4 存储","v":14,"unit":"h","c":"or"},{"n":"P5 地址空间","v":19,"unit":"h","c":"or"},{"n":"P6 内核","v":23,"unit":"h","c":"gr"},{"n":"P7 上板","v":24,"unit":"h","c":"gr"},{"n":"P8 综合","v":9,"unit":"h","c":"gray"},{"n":"P9 驱动","v":16,"unit":"h","c":"gr"}],"note":"板子只在 P7 真正需要。P0–P6 全部可以只在一台 Ubuntu 虚拟机 + QEMU 上完成，这是刻意的设计：先把原理在没有硬件差异干扰的环境里吃透。"}'></div>
+
+    <h2>4. 每课的固定规格（写课与验收都按这个）</h2>
+
+    <table>
+      <thead><tr><th>板块</th><th>必须包含</th><th>验收方式</th></tr></thead>
+      <tbody>
+        <tr><td>问题</td><td>一句话疑问句标题；本章要解决的问题清单</td><td>能背下这一课要回答什么</td></tr>
+        <tr><td>直觉</td><td>一个生活类比，且必须注明「类比在哪里失效」</td><td>能说出类比的边界</td></tr>
+        <tr><td>硬件</td><td>寄存器/门/时序级别的动作，不写「大概是这样」</td><td>能画出时序或数据通路</td></tr>
+        <tr><td>软件</td><td>对应的 Linux 现象 + 可观察的位置（文件或命令）</td><td>能在自己机器上指出那个位置</td></tr>
+        <tr><td>图</td><td>1–3 个可视化块（结构图、时序、对照）</td><td>不看文字能讲出图的意思</td></tr>
+        <tr><td>实验</td><td>可直接复制的命令，有无板都能做的版本</td><td>输出能贴出来，与预期一致</td></tr>
+        <tr><td>误解</td><td>三条常见错误说法 + 正确说法</td><td>能指出别人的错在哪</td></tr>
+        <tr><td>自测/预告</td><td>五题 + 下一课的钩子</td><td>五题至少答对四题</td></tr>
+      </tbody>
+    </table>
+
+    <h2>5. 里程碑：十次交付</h2>
+
+    <table>
+      <thead><tr><th>里程碑</th><th>覆盖</th><th>达标的样子</th></tr></thead>
+      <tbody>
+        <tr><td>M1</td><td>00–03</td><td>能用自己的话解释「CPU 只会照抄指令」，能把一个数转成二进制并说出补码溢出</td></tr>
+        <tr><td>M2</td><td>04–08</td><td>纸上搭出 4 位加法器，解释时钟为什么必须有</td></tr>
+        <tr><td>M3</td><td>09–13</td><td>画出单周期数据通路，说清流水线为什么快、为什么会停顿</td></tr>
+        <tr><td>M4</td><td>14–19</td><td>手写 30 行汇编，拆任意机器码，说清 C 编译成什么</td></tr>
+        <tr><td>M5</td><td>20–23</td><td>用 perf 解释一次 3 倍以上性能差异</td></tr>
+        <tr><td>M6</td><td>24–28</td><td>画出「变量地址→页表→物理页」，说清 fork 的 COW</td></tr>
+        <tr><td>M7</td><td>29–34</td><td>逐行讲 switch_to，写出可读写字符设备</td></tr>
+        <tr><td>M8</td><td>35–41</td><td>板子从串口第一行日志跑起自己的内核与 rootfs</td></tr>
+        <tr><td>M9</td><td>42–44</td><td>完整系统 + 一份自己的排障报告 + 20 行对账表</td></tr>
+        <tr><td>M10</td><td>45–48</td><td>四个驱动全部在自己的板子上跑通：字符设备、LED、I2C 传感器、按键中断</td></tr>
+      </tbody>
+    </table>
+
+    <h2>6. 三条硬规矩</h2>
+
+    <ol>
+      <li><b>不许跳过实验。</b>每课都设计成「不做就答不出自测题」，这是防自欺的唯一机制。</li>
+      <li><b>不许跳课。</b>课程是单链因果：07 的补码要用 06 的加法器，32 的切换要用 29 的异常。</li>
+      <li><b>不许只读不写。</b>每课结束必须留 200 字的「讲给自己听」，写不出来就是没懂。</li>
+    </ol>
+
+    <div class="note">
+      <b>现在从这里开始</b>
+      <a href="../docs/course-00.html">第 00 课 · 计算机只是一台会照抄指令的机器</a>。它不要求任何前置知识，只要求你会开机。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"你从哪开始？四个入口","hint":"按自己的底子选","note":"不要按顺序硬啃。先选一个入口跑通一节，比读完十节更有用。","items":[{"b":"完全零基础","d":"从 00 开始，一课一课走。前 13 课只在一台 Ubuntu 虚拟机上做，不需要板子，也不用装交叉编译工具链。"},{"b":"会写 C，不懂硬件","d":"从 04 开始补电路与门，再跳到 09 看 CPU 骨架。你会突然明白为什么 volatile 和内存屏障是必须的。"},{"b":"做过单片机，想学 Linux","d":"从 24 虚拟地址开始，重点看 25 页表、26 缺页、34 文件与设备，最后直接进 P9 的四课驱动。"},{"b":"只想快点让板子跑起来","d":"直接读 35 最小系统、36 启动链、42 综合实战，再回头补 37 设备树。但要有心理准备：跳过因果链，出错时会完全不知道该查哪一层。"}]}'></div>
+  </main>
+</div>
+<script src="assets/cnav.js"></script>
+<script src="assets/viz.js"></script>
+<script src="assets/iviz.js"></script>
+</body>
+</html>

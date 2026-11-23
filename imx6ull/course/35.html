@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=../docs/course-35.html">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>35 · i.MX6ULL 最小系统</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/viz.css">
+<link rel="stylesheet" href="assets/iviz.css">
+<link rel="stylesheet" href="assets/anim2.css">
+  <script src="assets/readmode.js" defer></script>
+</head>
+<body data-page="35">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>第 35 课 · i.MX6ULL 最小系统</h1>
+    <p class="lede">软件讲完了，回到硬件。一块 SoC 不是插上电就能跑：需要多路电源按正确顺序上电、一颗晶振提供时钟、复位信号保持足够长、启动模式引脚选对启动源、串口能输出第一行字。这五件事任何一件不对，板子就是「死的」——<b>而且往往没有任何提示。</b></p>
+
+    <div class="viz" data-kind="layers" data-title="最小系统的六件事" data-sub="从下往上看，缺一层都起不来" data-json='{"items":[{"n":"电源","d":"多路：内核、DDR、IO、SNVS（常供电）","c":"rd"},{"n":"时钟","d":"24MHz 主晶振 + 32.768kHz RTC 晶振","c":"or"},{"n":"复位","d":"POR 电路或复位芯片，保持足够时长","c":"vi"},{"n":"启动模式","d":"引脚电平决定从 eMMC/SD/NAND/USB 启动","c":"cy"},{"n":"DDR","d":"由 bootloader 初始化的外部内存","c":"gr"},{"n":"调试串口","d":"UART1，115200，唯一的「语言」","c":"gray"}],"note":"调试串口排最后却最重要：前面五项对不对，你唯一能观察到的就是「串口有没有输出」。所以「先看串口」永远是嵌入式排障的第一步。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 电源为什么分多路、按序上电？② 晶振坏了有什么现象？③ 复位要多久？④ 启动模式引脚怎么选启动源？⑤ DDR 为什么必须由软件初始化？</p>
+    </div>
+
+    <h2>1. 电源：不只是「3.3V」</h2>
+
+    <table>
+      <thead><tr><th>电源域</th><th>典型电压</th><th>供给</th><th>注意</th></tr></thead>
+      <tbody>
+        <tr><td>VDD_SNVS</td><td>3.0~3.6V</td><td>RTC、唤醒逻辑</td><td>必须常供，主电源断开也要在</td></tr>
+        <tr><td>NVCC_ARM</td><td>1.2~1.3V</td><td>CPU 内核</td><td>降频时要同步降压（DVFS）</td></tr>
+        <tr><td>NVCC_DDR</td><td>1.35V（DDR3L）</td><td>DDR IO</td><td>与颗粒规格严格匹配</td></tr>
+        <tr><td>NVCC_IO</td><td>3.3V / 1.8V</td><td>GPIO、外设 IO</td><td>决定 IO 电平，接错会烧外设</td></tr>
+      </tbody>
+    </table>
+
+    <p>上电有顺序要求（通常 SNVS → 内核 → DDR → IO），否则可能闩锁或初始化失败。查数据手册的 Power-Up Sequence，<b>不要凭经验猜。</b></p>
+
+    <h2>2. 时钟与复位</h2>
+
+    <pre><code># 时钟
+24MHz 主晶振 → 内部 PLL → 528MHz 内核 / 各外设时钟
+32.768kHz    → RTC（走时、低功耗唤醒）
+
+# 现象对照
+# 晶振不起振：完全无输出，或串口乱码
+# 晶振频率偏：波特率偏差，通讯不稳
+
+# 复位
+POR 需保持毫秒级，让电源稳定；
+外部复位芯片（如 MAX809）比 RC 电路可靠得多</code></pre>
+
+    <p>「串口乱码」几乎总是时钟或波特率问题。<b>先确认晶振频率与 PLL 配置，再怀疑串口线。</b></p>
+
+    <h2>3. 启动模式：最容易被忽略的「不启动」原因</h2>
+
+    <div class="viz" data-kind="matrix" data-title="i.MX6ULL 启动源由引脚电平决定" data-sub="上电时采样，之后不再变" data-json='{"corner":"BOOT_MODE","cols":["启动源","启动方式","典型场景"],"rows":[{"n":"00","c":"cy","cells":["内部 Boot ROM","从 eFUSE 指定的设备","量产板"]},{"n":"01","c":"or","cells":["eMMC / SD","从分区读 u-boot","最常见"]},{"n":"10","c":"vi","cells":["NAND / NOR","并行或 SPI","老式板"]},{"n":"11","c":"rd","cells":["Serial Download","USB 灌入（mfgtool）","救砖、首次烧写"]}],"note":"板子上通常有拨码开关或 eFUSE 决定这些电平。如果你改了代码却「完全没反应」，先看拨码开关——这比查代码快得多。"}'></div>
+
+    <h2>4. DDR 为什么必须由软件初始化</h2>
+
+    <p>DDR3 颗粒上电后处于未知状态，必须先配置控制器（时序参数、刷新率、ODT、驱动强度），再做一次「训练」（写入读回校准）。<b>这个流程只能是软件做</b>，而且必须在 Boot ROM 之后的 bootloader 里完成。</p>
+
+    <p>所以 i.MX6ULL 的启动链是：Boot ROM（在片内 SRAM 跑）→ 读 bootloader 到 OCRAM → bootloader 初始化 DDR → 搬自己到 DDR → 继续。</p>
+
+    <p>不同板子的 DDR 参数不同，所以 uboot 的 <code>board/freescale/mx6ull_xxx/</code> 目录里会有一个 <code>ddr_init.c</code> 或 <code>MX6ULL_xxx_ddr3_*.inc</code>。<b>用错了别人的 DDR 参数，板子会在 DDR 初始化阶段静默挂死。</b></p>
+
+    <h2>5. 实验：接上第一根线</h2>
+
+    <pre><code># 硬件侧
+# 1) 万用表量各路电源（尤其 NVCC_ARM 是否 1.2~1.3V）
+# 2) 示波器看 24MHz 晶振是否起振
+# 3) 确认复位引脚在启动后为高
+
+# 软件侧（USB-TTL 转串口，接 UART1）
+picocom -b 115200 /dev/ttyUSB0
+# 或
+minicom -D /dev/ttyUSB0 -b 115200
+
+# 上电瞬间应看到 Boot ROM 的打印（若 uboot 未烧写，可能只有一行乱码）</code></pre>
+
+    <p>第一次上板，建议顺序是：<b>先只供电、不接任何外设 → 量电压 → 接串口 → 上电看是否有输出</b>。每加一步都确认，比一次接齐后排查快得多。</p>
+
+    <h2>6. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于最小系统的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["板子不启动就是软件写错了","DDR 频率越高越好","USB 转串口随便接哪个 UART 都行"]},"good":{"t":"实际","items":["先查电源、晶振、启动引脚——硬件原因占一半以上","频率越高越难训练，稳定性下降；要按颗粒规格选","调试口是固定的 UART（i.MX6ULL 常为 UART1），接错就没有任何输出"]},"note":"第二条在自制定制板时很常见：为了「性能好」把 DDR 拉到 800MHz，结果低温下批量启动失败。稳，比快重要。"}'></div>
+
+    <h2>7. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>VDD_SNVS 为什么必须常供？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>它供 RTC 与唤醒逻辑，主电源断开后仍需走时与保存状态。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>串口乱码最可能的原因？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>时钟频率不对（晶振或 PLL 配置错）导致波特率偏差；其次是接线/电平不匹配。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>启动模式引脚什么时候被采样？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>上电复位时由 Boot ROM 采样一次，之后运行期改变无效。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>DDR 初始化为什么不能省？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>颗粒上电状态未知，必须配置时序、刷新并做训练，否则读写全错。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>板子「完全没反应」时的排查顺序？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>电源电压 → 晶振起振 → 复位电平 → 启动模式引脚 → 调试串口接线 → 最后才怀疑镜像。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>用万用表量你板子的各路电源，记录实测值。</li>
+        <li>用示波器（或逻辑分析仪）看 24MHz 晶振波形。</li>
+        <li>找到启动模式拨码开关，改成 SD 卡启动并验证。</li>
+        <li>接串口，上电，记录第一屏输出。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      板子起来了，接下来看它「怎么起来」的：第 36 课讲启动链——从 Boot ROM 到 uboot 到内核到根文件系统，四段接力。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"最小系统，五样缺一不可","hint":"点一样看后果","note":"上板调不通，八成不是软件问题，是这五样里少了哪样。先用万用表和示波器把这一层确认掉，再谈代码。","items":[{"b":"电源","d":"内核电压、IO 电压、DDR 参考电压各有各的时序要求，上电顺序错了芯片根本不启动。"},{"b":"时钟","d":"外部晶振给 24MHz，内部 PLL 倍频到几百 MHz 再分频给各总线。晶振不起振，一切免谈。"},{"b":"复位","d":"复位引脚要拉够时间，还要保证复位释放时电源和时钟已经稳定，否则进入未定义状态。"},{"b":"DDR","d":"布线、时序参数、刷新率都极其敏感。DDR 训练失败表现为「跑到一半随机死机」。"},{"b":"启动介质","d":"i.MX6ULL 靠 BOOT_MODE 引脚决定从 eMMC、SD、NAND 还是 USB 启动，拨码错了就是「什么都没发生」。"}]}'></div>
+  </main>
+</div>
+<script src="assets/cnav.js"></script>
+<script src="assets/viz.js"></script>
+<script src="assets/iviz.js"></script>
+<script src="assets/anime.iife.min.js"></script>
+<script src="assets/anim2.js"></script>
+</body>
+</html>

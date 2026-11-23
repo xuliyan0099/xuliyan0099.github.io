@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第 04 章 · 函数调用与 AAPCS：lr 为什么必须保 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<link rel="stylesheet" href="../assets/asm.css">
+</head><body style="--acc:#03d6b4">
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../index.html">☰ 六个入口</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">手写 ARM 汇编 · 10 篇</div>
+    <ol>
+      <li><a href="index.html"><span class="no">⌂</span><span>路口目录<span class="sub">篇目总览与读法</span></span></a></li>
+      <li><a href="a0.html"><span class="no">00</span><span>为什么非写不可<span class="sub">三个真实场景，和一笔成本账</span></span></a></li>
+      <li><a href="a1.html"><span class="no">01</span><span>最小可跑：工具链与第一条指令<span class="sub">编、链接、反汇编，看到自己写的字节</span></span></a></li>
+      <li><a href="a2.html"><span class="no">02</span><span>寄存器与立即数：那道 8 位旋转墙<span class="sub">16 个寄存器、APSR、4096 种立即数</span></span></a></li>
+      <li><a href="a3.html"><span class="no">03</span><span>寻址与栈：地址是怎么算出来的<span class="sub">四种寻址、批量搬运、满递减栈</span></span></a></li>
+      <li><a href="a4.html" class="active"><span class="no">04</span><span>函数调用与 AAPCS：lr 为什么必须保<span class="sub">传参、返回、保存责任、栈帧布局</span></span></a></li>
+      <li><a href="a5.html"><span class="no">05</span><span>条件码与分支：两套门，别走错<span class="sub">cmp 的本质、14 个条件、IT 块</span></span></a></li>
+      <li><a href="a6.html"><span class="no">06</span><span>位操作：配置一个寄存器的标准三行<span class="sub">bic/orr/bfi，掩码怎么造出来</span></span></a></li>
+      <li><a href="a7.html"><span class="no">07</span><span>C 与汇编互调：四条约束和两个别省<span class="sub">内联汇编、volatile、memory clobber</span></span></a></li>
+      <li><a href="a8.html"><span class="no">08</span><span>裸机第一条：在这块板子上点灯<span class="sub">关狗、开钟、配脚、定方向</span></span></a></li>
+      <li><a href="a9.html"><span class="no">09</span><span>二十道练习清单<span class="sub">A/B/C 三档，每题都写了验收法</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="../hardware/index.html">硬件入口</a><a href="../juan/index.html">十四卷总览</a></div>
+  </aside>
+  <main class="doc">
+    <div class="doc-kicker">汇编练习 · i.MX6ULL / Cortex-A7 <span>·</span> 第 04 章</div>
+    <div class="ch-head">
+      <h1>函数调用与 AAPCS：lr 为什么必须保</h1>
+      <div class="ch-meta"><span class="hot">第 04 章</span><span>约 28 分钟</span><span>★ 必读</span><span>含互动工具</span></div>
+    </div>
+<h2 id="s1">一条 <code>bl</code> 只够一层</h2>
+<p><code>bl label</code> 做两件事：把「下一条指令的地址」写进 <code>lr</code>，然后跳到 <code>label</code>。函数末尾 <code>bx lr</code> 跳回来。</p>
+<p>问题在「只有一个 <code>lr</code>」。你在函数 A 里 <code>bl B</code>，<code>lr = A 的返回点</code>；B 里又 <code>bl C</code>，<code>lr</code> 被覆盖成 <code>B 的返回点</code>——A 的返回点永久丢了。这就是「跑飞」：<code>bx lr</code> 跳到某个随机地址，取到随机指令，然后 HardFault 或者死循环。</p>
+<p><b>解决办法只有一条：进函数时把 <code>lr</code> 存到栈上。</b></p>
+<pre class="asm"><code><span class="c">@ 叶子函数：自己不再调别人，lr 没人踩 —— 不存也行</span>
+add3:
+    <span class="k">add</span>  r0, r0, r1
+    <span class="k">add</span>  r0, r0, r2
+    <span class="k">bx</span>   lr
+
+<span class="c">@ 非叶子函数：内部还有 bl —— 必须存</span>
+blink:
+    <span class="k">push</span> {r4, lr}<span class="c">        @ ← 这一条是命</span>
+    <span class="k">mov</span>  r4, r0
+    <span class="k">bl</span>   delay
+    <span class="k">mov</span>  r0, r4
+    <span class="k">pop</span>  {r4, lr}
+    <span class="k">bx</span>   lr</code></pre>
+<p>判断标准很简单：<b>这个函数体里有没有第二条 <code>bl</code>？有就必须 push。</b> 更稳妥的做法是「只要不是明显的叶子就一律 push <code>{lr}</code>」，多两条指令换成不会跑飞，划算。</p>
+<h2 id="s2">AAPCS：ARM 的函数调用约定</h2>
+<p>AAPCS（ARM Architecture Procedure Call Standard）就六条，背下来就能读所有反汇编：</p>
+<table class="regtbl"><thead><tr><th>规矩</th><th>内容</th></tr></thead><tbody><tr><td class="nm">传参</td><td>第 1–4 个参数放 <code>r0</code>–<code>r3</code>；第 5 个起放栈上（调用者准备）</td></tr><tr><td class="nm">返回</td><td>返回值在 <code>r0</code>；64 位返回值用 <code>r0:r1</code></td></tr><tr><td class="nm">调用者保存</td><td class="nm"><code>r0</code>–<code>r3</code>、<code>r12</code>：被调函数可以随便毁，调用者自己负责</td></tr><tr><td class="nm">被调用者保存</td><td class="nm"><code>r4</code>–<code>r11</code>、<code>sp</code>：被调函数要用就先 push，退出前恢复</td></tr><tr><td class="nm">栈对齐</td><td>公开接口处 <code>sp</code> 必须 8 字节对齐</td></tr><tr><td class="nm">结构体返回</td><td>调用者传一块内存指针在 <code>r0</code>（隐藏参数），函数把结果写进去</td></tr></tbody></table>
+<p>「调用者保存」这四个字最容易误读：它说的是<b>责任在被调函数那边</b>——<code>r4</code>–<code>r11</code> 被调函数不许乱改；<code>r0</code>–<code>r3</code> 被调函数不用负责，返回时里面是什么垃圾都行。所以你在调用前放在 <code>r0</code>–<code>r3</code> 里的值，调用后不要指望还在。</p>
+<h2 id="s3">为什么 <code>push {r4, lr}</code> 常常写成 <code>push {r4-r6, lr}</code></h2>
+<p>因为这涉及 8 字节对齐。算一下：</p>
+<ul>
+<li><code>push {lr}</code> = 4 字节 → <code>sp</code> 变 4 mod 8，<b>破了对齐</b>。</li>
+<li><code>push {r4, lr}</code> = 8 字节 → 保持对齐 ✓</li>
+<li><code>push {r4-r6, lr}</code> = 16 字节 → 保持对齐 ✓</li>
+<li><code>push {r4-r5, lr}</code> = 12 字节 → 破了 ✗</li>
+</ul>
+<p>所以编译器会凑成偶数个寄存器（必要时塞一个没用的 <code>r7</code> 进来当填充）。你在反汇编里看到「为什么莫名其妙 push 了 r7」——那就是对齐填充。</p>
+<h2 id="s4">超过 4 个参数怎么取</h2>
+<pre class="asm"><code><span class="c">@ void f(int a, int b, int c, int d, int e)</span>
+<span class="c">@ 调用者：a→r0, b→r1, c→r2, d→r3, e→[sp]</span>
+caller:
+    <span class="k">push</span> {r4, lr}<span class="c">        @ 16 字节对齐</span>
+    <span class="k">mov</span>  r0, <span class="hl">#1</span>
+    <span class="k">mov</span>  r1, <span class="hl">#2</span>
+    <span class="k">mov</span>  r2, <span class="hl">#3</span>
+    <span class="k">mov</span>  r3, <span class="hl">#4</span>
+    <span class="k">mov</span>  r4, <span class="hl">#5</span>
+    <span class="k">push</span> {r4}<span class="c">            @ e 放栈上（注意：这里会破坏对齐，实际编译器会凑两次 push）</span>
+    <span class="k">bl</span>   f</code></pre>
+<p>被调函数里怎么取 <code>e</code>？关键在「我自己 push 了多少」：</p>
+<pre class="asm"><code>f:
+    <span class="k">push</span> {r4, lr}<span class="c">        @ sp -= 8</span>
+    <span class="k">ldr</span>  r0, [sp, <span class="hl">#8</span>]<span class="c">    @ 第 5 个参数：8（我 push 的）+ 0（调用者放的位置）</span></code></pre>
+<p>如果函数体里又 push 了 3 个寄存器（12 字节），偏移就变成 <code>12 + 0</code>。<b>每次改 push 的数量，所有 <code>[sp, #N]</code> 都要重算</b>——这是手写汇编里最容易出错的一处，编译器则完全不会错。</p>
+<h2 id="s5">返回值：不只是 r0</h2>
+<ul>
+<li>32 位：<code>r0</code></li>
+<li>64 位（<code>long long</code>）：<code>r0</code> 低、<code>r1</code> 高</li>
+<li>小结构体（≤ 4 字节）：<code>r0</code></li>
+<li>大结构体：<b>隐藏参数</b>——调用者在 <code>r0</code> 里传目标地址，函数把结果写到那块内存，返回时 <code>r0</code> 再带回这个地址（方便链式）</li>
+</ul>
+<p>反汇编里看到「函数一进来就 <code>str r1, [r0]</code>，然后各种往 <code>[r0+4]</code> 写」，那基本就是在构造一个返回值结构体。</p>
+<h2 id="s6">可变参数：<code>va_list</code> 就是「栈上指针 + 偏移」</h2>
+<pre class="asm"><code>int printf(const char *fmt, ...);</code></pre>
+<p>实现细节：<code>r0</code> 是 fmt，<code>r1</code>–<code>r3</code> 是前三个可变参数，第 4 个起在栈上。<code>va_start</code> 大概做两件事：把 <code>r1</code>–<code>r3</code> 先「倒」进一块连续内存（因为它们在寄存器里，不连续），再记下栈上参数的起始地址。之后 <code>va_arg</code> 就是「按类型宽度往后挪指针」。</p>
+<p>所以 <b><code>printf</code> 用错格式符（<code>%d</code> 却传了 <code>long long</code>）会读到错位的数据</b>——不是玄学，而是指针挪错了宽度。</p>
+<h2 id="s7">工具：把调用过程一步步走完</h2>
+<div class="tool">
+  <h4>单步台 · 选 C「函数调用与栈」，专门盯 lr 和 sp</h4>
+  <div class="sim-row">
+    <select id="simProg"></select>
+    <button class="tbtn" id="simStep">单步执行 →</button>
+    <button class="tbtn" id="simRun">执行到底</button>
+    <button class="tbtn" id="simReset">重置</button>
+  </div>
+  <div class="sim-body">
+    <div class="sim-code" id="simCode"></div>
+    <div>
+      <div class="regs" id="simRegs"></div>
+      <div class="flags" id="simFlags"></div>
+      <div class="mem" id="simMem"></div>
+    </div>
+  </div>
+  <div class="sim-note" id="simNote">选 C 段程序，点单步：注意 bl 把 lr 写成 0x0000000C，push 把 lr 存到栈上（sp 变 0x1FFC），pop 恢复，bx lr 跳回去。</div>
+</div>
+<p>看三件事：</p>
+<ol>
+<li><code>bl add3</code> 执行后，<code>lr</code> 变成 <code>0x0000000C</code>（第 4 条指令的地址）——这就是返回点。</li>
+<li><code>push {lr}</code> 执行后，<code>sp</code> 从 <code>0x2000</code> 变 <code>0x1FFC</code>，<code>mem[0x1FFC]</code> 出现 <code>0x0000000C</code>。</li>
+<li>走完全程，<code>sp</code> 回到 <code>0x2000</code>（<b>栈必须平衡</b>），<code>r0 = 7</code>。</li>
+</ol>
+<p>如果这个函数里没有 <code>push {lr}</code>，那么第二次 <code>bl</code> 会把 <code>lr</code> 覆盖，最后 <code>bx lr</code> 跳到别处——模拟器里你能直接看到 pc 跑到一个没有指令的位置。</p>
+<h2 id="s8">本篇验收</h2>
+<ul>
+<li>能判断任意一段汇编「这个函数必须 push lr 吗」，并说明理由。</li>
+<li>能解释 <code>push {r4, lr}</code> 为什么常被写成 8 或 16 字节（对齐）。</li>
+<li>能算出「函数 push 了 3 个寄存器时，第 5 个参数在 <code>[sp, #12]</code>」。</li>
+<li>能说出结构体返回值走隐藏指针，<code>r0</code> 一进来里装的是什么。</li>
+<li>单步台里 C 程序跑完，<code>sp</code> 必须回到起始值、<code>r0</code> 必须是 7。</li>
+</ul>
+<h2 id="s9">下一篇</h2>
+<p><code>lr</code> 管的是「回得去」，05 篇管的是「往哪走」：<code>cmp</code> 之后到底该用 <code>blt</code> 还是 <code>blo</code>，这一条判断错了，数组就越界了，而且崩溃现场往往看不出原因。</p>
+<div class="pager">
+      <a href="a3.html"><span>上一篇</span><b>← 03 寻址与栈：地址是怎么算出来的</b></a>
+      <a href="index.html"><span>目录</span><b>篇目总览</b></a>
+      <a class="nx" href="a5.html"><span>下一篇</span><b>05 条件码与分支：两套门，别走错 →</b></a>
+    </div>
+  </main>
+</div>
+<script src="../assets/asm-tools.js"></script>
+</body>
+</html>

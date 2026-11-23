@@ -1,0 +1,176 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SPI 子系统：控制器驱动与设备驱动 · 卷 09 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j09.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 09 · 驱动体系</div>
+<ol><li><a href="course-th05.html">
+  <span class="no">01</span><span>设备模型与驱动框架<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="course-45.html">
+  <span class="no">02</span><span>写一个字符设备<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-46.html">
+  <span class="no">03</span><span>pinctrl 与 GPIO<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-47.html">
+  <span class="no">04</span><span>I2C 设备驱动<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-48.html">
+  <span class="no">05</span><span>中断的上半部与下半部<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-ch12.html">
+  <span class="no">06</span><span>驱动开发入门<span class="sub">约 20 小时</span></span></a></li>
+<li><a href="d09-01.html">
+  <span class="no">07</span><span>platform 总线模型：probe、匹配、资源与设备树<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="d09-02.html">
+  <span class="no">08</span><span>阻塞 IO 与等待队列：poll / select / epoll 的驱动侧<span class="sub">约 3 小时</span></span></a></li>
+<li><a href="d09-03.html" class="active">
+  <span class="no">09</span><span>SPI 子系统：控制器驱动与设备驱动<span class="sub">◆ · 约 3 小时 · 当前</span></span></a></li>
+<li><a href="d09-04.html">
+  <span class="no">10</span><span>块设备与 eMMC：gendisk、请求队列与分区<span class="sub">◆ · 约 4 小时</span></span></a></li>
+<li><a href="d09-05.html">
+  <span class="no">11</span><span>DMA 与 Cache 一致性：谁负责 flush，谁负责 invalidate<span class="sub">◆ · 约 3 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j08.html">← 卷 08</a>
+  <a href="../juan/j10.html">卷 10 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 09<span>·</span>驱动体系<span>·</span>第 09 篇</div>
+  <h1>SPI 子系统：控制器驱动与设备驱动</h1>
+  
+  <div class="doc-chips">
+    <span class="hot">◆ 一读</span>
+    <span>纯读约 3 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+<p class="lead">SPI 只有四根线：<code>SCLK</code>、<code>MOSI</code>、<code>MISO</code>、<code>CS</code>。没有地址线，也没有应答——所以「怎么知道从设备在说什么」全靠**时钟极性与相位**约定，也就是 mode 0–3。</p>
+
+<p>Linux 把这类同步串行总线抽象成三层：<strong>控制器驱动</strong>（搬字节）、<strong>协议核心</strong>（排队与加锁）、<strong>设备驱动</strong>（懂具体芯片的寄存器）。</p>
+
+<h2 id="s1">先玩一下：一次 SPI 读取的时序</h2>
+
+<p>这就是你在逻辑分析仪上会看到的东西。注意 CS 在整个 message 期间保持低电平，中间可以有多个 transfer。</p>
+
+<div class="ikit" data-type="seq" data-json='{"title":"读一个 SPI 传感器寄存器","badge":"seq",
+"actors":[{"name":"主机（SoC）","start":"空闲"},{"name":"从机（传感器）","start":"等待 CS"}],
+"steps":[
+{"label":"CS ↓ 选中从机","states":["选中","等待"],"note":"同一总线上的其他从设备必须释放 MISO（高阻），否则会打架。"},
+{"label":"MOSI: 0x80|reg  (读命令)","states":["发送命令","接收中"],"note":"命令字节的位在 SCLK 的哪个边沿被采样，由 CPHA 决定。","dir":"r"},
+{"label":"MOSI: 0x00 (哑字节)","states":["等待数据","准备数据"],"note":"主机必须继续给时钟，从机才有机会把数据推上来。","dir":"r"},
+{"label":"MISO: 0x5A (寄存器值)","states":["接收数据","发送中"],"note":"全双工：发和收同时发生，两个 shift register 首尾相接。","dir":"l"},
+{"label":"CS ↑ 释放总线","states":["空闲","等待 CS"],"note":"CS 拉高后从机复位内部状态机，一次事务结束。"}]}'></div>
+
+<p>注意第 3 步：读的时候主机也得「发」点什么。因为 SPI 是移位寄存器环，时钟一动，主机的位就从 MOSI 出去、从机的位从 MISO 进来。所谓「哑字节」只是内容无意义，作用就是提供时钟。</p>
+
+<h2 id="s2">一、三层结构与两个结构体</h2>
+
+<div class="layers">
+  <div class="ly"><b>spi_controller</b><span>控制器。提供 <code>transfer_one</b></code> / <code>transfer_one_message</code>、CS 控制、时钟分频。i.MX6ULL 上是 <code>spi-imx</code>（ECSPI）。</span></div>
+  <div class="ly"><b>spi_device</b><span>一个从设备：<code>mode</code>、<code>max_speed_hz</code>、<code>chip_select</code>、<code>bits_per_word</code>。来自设备树子节点。</span></div>
+  <div class="ly hi"><b>spi_message + spi_transfer</b><span>一次原子事务：message 里挂 1..n 个 transfer，全部执行期间 CS 一直有效，中间不释放总线。</span></div>
+</div>
+
+<p>设备树里长这样：</p>
+
+<pre data-lang="dts"><code>&amp;ecspi2 {
+    status = "okay";
+    cs-gpios = &lt;&amp;gpio1 20 GPIO_ACTIVE_LOW&gt;;
+    sensor@0 {
+        compatible = "demo,sensor";
+        reg = &lt;0&gt;;                    /* 片选编号 */
+        spi-max-frequency = &lt;10000000&gt;; /* 10 MHz */
+        spi-cpha;                      /* mode 1 或 3 的一半信息 */
+        spi-cpol;                      /* 与上一条组合出 mode 3 */
+    };
+};</code></pre>
+
+<h2 id="s3">二、spi_sync 做了什么</h2>
+
+<div class="ikit" data-type="code" data-json='{"title":"驱动侧：一次寄存器读","badge":"code",
+"regs":[{"n":"ret","v":"0"},{"n":"mode","v":"SPI_MODE_3"},{"n":"hz","v":"10 MHz"}],
+"lines":[
+{"c":"struct spi_transfer x[2] = { {.tx_buf=cmd, .len=1}, {.rx_buf=val, .len=1} };","set":{"ret":"0"},"note":"两个 transfer，一次 CS 内完成：先发命令，再收数据。"},
+{"c":"struct spi_message msg; spi_message_init(&amp;msg);","set":{"ret":"0"},"note":"message 是栈上对象，用完即弃，不需要释放。"},
+{"c":"spi_message_add_tail(&amp;x[0], &amp;msg); spi_message_add_tail(&amp;x[1], &amp;msg);","set":{"ret":"0"},"note":"顺序执行，中间不释放 CS。"},
+{"c":"ret = spi_sync(spi, &amp;msg);","set":{"ret":"0"},"note":"同步接口：内部会 sleep 等完成，因此不能在中断上下文调用。"},
+{"c":"if (ret) return ret;  /* -ETIMEDOUT / -EIO */","set":{"ret":"-EIO"},"note":"超时通常意味着从设备没响应，或 CS/时钟没配对。"},
+{"c":"return val[0];","set":{"ret":"0x5A"},"note":"拿到的就是 MISO 上的字节。"}]}'></div>
+
+<p>如果一次要搬几百字节，用 <code>spi_async</code> 或让控制器走 DMA；<code>spi_sync</code> 在大数据量下会让出 CPU 等完成，但依然是「一个一个字节移位」，吞吐上限由 SCLK 决定。</p>
+
+<h2 id="s4">三、频率与时间的算术</h2>
+
+<div class="ikit" data-type="param" data-json='{"title":"SCLK 与传输时间","badge":"param",
+"fields":[{"k":"hz","label":"SCLK 频率","min":100,"max":50000,"step":100,"val":10000,"unit":"kHz"},
+{"k":"bytes","label":"每次事务字节","min":1,"max":512,"step":1,"val":4,"unit":"B"},
+{"k":"n","label":"每秒事务数","min":1,"max":10000,"step":1,"val":200,"unit":"次"}],
+"outs":[
+{"label":"单次事务时间","expr":"V.bytes * 8 / (V.hz * 1000) * 1000000","unit":" µs"},
+{"label":"总线占用率","expr":"V.n * V.bytes * 8 / (V.hz * 1000) * 100","unit":" %"},
+{"label":"每秒可传字节上限","expr":"V.hz * 1000 / 8","unit":" B/s"},
+{"label":"剩余时间片","expr":"1000 / V.n - V.bytes * 8 / (V.hz * 1000) * 1000000","unit":" µs"}],
+"bar":{"expr":"min(V.n * V.bytes * 8 / (V.hz * 1000) * 100, 100)"},
+"verdict":{"expr":"V.n * V.bytes * 8 / (V.hz * 1000) <= 0.5","ok":"总线还有余量","bad":"总线接近饱和：降采样率、合并事务或提高 SCLK"},
+"note":"10 MHz、每次 4 字节、每秒 200 次，占用率不到 1%。这就是为什么很多传感器用 SPI 而不是 I2C：它真的快。"}'></div>
+
+<div class="cal warn"><span class="h">误解：spi-max-frequency 写多大就跑多大</span>实际频率由控制器分频器取「不超过该值」的最接近档位，还会受板级走线、从设备时序限制。<code>spi_sync</code> 成功不代表数据对——时序不对时，读回来的是 0x00 或 0xFF，而不是报错。</div>
+
+<div class="cal tip"><span class="h">调试顺序</span>先用逻辑分析仪看 CS 是否真的拉低、SCLK 是否有 8/16 个脉冲、MOSI 的命令字节对不对。三者都对而数据错，才轮到怀疑 mode（CPOL/CPHA）或位宽。</div>
+
+<h2 id="s5">动手（可选）：用 spidev 先验证硬件</h2>
+
+<div class="cal q"><span class="h">只在 🔧 实作模式展开</span>需要板子；没有板子也能读懂流程。</div>
+
+<ol>
+  <li>设备树给 <code>spidev</code> 兼容，启动后出现 <code>/dev/spidev2.0</code>。</li>
+  <li>用 <code>spi-config</code> 或一段 C 代码设 mode、bits、speed，做 <code>SPI_IOC_MESSAGE</code> 传输。</li>
+  <li>先读写一个确定存在的寄存器（WHO_AM_I），拿到固定 ID 才算通了。</li>
+  <li>再换到自己的驱动：把同样的 transfer 搬进 <code>spi_sync</code>，对比用户态与内核态的结果。</li>
+</ol>
+
+<h2 id="s6">离开这一篇，你应该能</h2>
+
+<ul class="qa">
+  <li>说出 SPI 四根线的作用，以及为什么读操作也要发数据。</li>
+  <li>解释 message 与 transfer 的区别，以及 CS 在什么时候释放。</li>
+  <li>给定 SCLK、字节数、频率，算出一次事务的时间与总线占用率。</li>
+</ul>
+
+<p>SPI 是「小数据、快节奏」。下一类设备完全相反：一次要搬 512 字节以上，还要排队、合并、重排——块设备。</p>
+
+
+<nav class="pager">
+  <a href="d09-02.html"><span>← 上一篇</span><b>阻塞 IO 与等待队列：poll / select / epoll 的驱动侧</b></a>
+  <a class="nx" href="d09-04.html"><span>下一篇 →</span><b>块设备与 eMMC：gendisk、请求队列与分区</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

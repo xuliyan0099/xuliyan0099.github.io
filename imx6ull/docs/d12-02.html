@@ -1,0 +1,172 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>分区与双 Bank OTA：A/B 切换、回滚与校验 · 卷 12 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j12.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 12 · 产品化</div>
+<ol><li><a href="course-ch14.html">
+  <span class="no">01</span><span>综合实战项目<span class="sub">约 16 小时</span></span></a></li>
+<li><a href="d12-01.html">
+  <span class="no">02</span><span>Buildroot 到 Yocto：定制镜像、裁剪包、产出固件<span class="sub">约 6 小时</span></span></a></li>
+<li><a href="d12-02.html" class="active">
+  <span class="no">03</span><span>分区与双 Bank OTA：A/B 切换、回滚与校验<span class="sub">约 6 小时 · 当前</span></span></a></li>
+<li><a href="d12-03.html">
+  <span class="no">04</span><span>HAB 安全启动：签名、验签、失败现象<span class="sub">◆ · 约 4 小时</span></span></a></li>
+<li><a href="d12-04.html">
+  <span class="no">05</span><span>看门狗、电源管理与长时间稳定性测试<span class="sub">◆ · 约 4 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j11.html">← 卷 11</a>
+  <a href="../juan/j13.html">卷 13 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 12<span>·</span>产品化<span>·</span>第 03 篇</div>
+  <h1>分区与双 Bank OTA：A/B 切换、回滚与校验</h1>
+  
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 6 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+<p class="lead">升级最大的风险不是「刷失败」，而是<strong>刷到一半断电</strong>。双 Bank（A/B）的全部设计，都是为了这个瞬间：无论何时断电，设备都必须还能启动。</p>
+
+<p>核心思路只有一句：<strong>永远不要覆盖正在运行的那一份</strong>。新的写到另一份，校验通过后再切换「从哪一份启动」。</p>
+
+<h2 id="s1">先玩一下：A/B 切换的状态机</h2>
+
+<p>点「按剧本巡演」。注意 <code>TRIAL</code> 与 <code>ROLLBACK</code>：新系统要先「试运行」，确认能起来并标记成功，才算真的升级完成。</p>
+
+<div class="ikit" data-type="machine" data-json='{"title":"A/B 升级状态机","badge":"machine",
+"states":[{"id":"A","x":18,"y":20},{"id":"UPG","x":44,"y":14},{"id":"BOK","x":68,"y":20},{"id":"TRIAL","x":70,"y":56},{"id":"OK","x":86,"y":76},{"id":"RB","x":34,"y":60}],
+"edges":[
+{"from":"A","to":"UPG","label":"收到升级包","event":"开始升级"},
+{"from":"UPG","to":"BOK","label":"写入 B + 校验通过","event":"写入完成"},
+{"from":"BOK","to":"TRIAL","label":"切 boot 槽，重启","event":"切槽重启"},
+{"from":"TRIAL","to":"OK","label":"新系统标记成功","event":"标记成功"},
+{"from":"TRIAL","to":"RB","label":"启动失败/bootcount 超限","event":"启动失败"},
+{"from":"RB","to":"A","label":"切回 A","event":"回滚"},
+{"from":"A","to":"BOK","label":"B 已是备用槽","event":"待下次升级"}],
+"script":[0,1,2,3],
+"stateNotes":{
+"A":"当前从 A 启动，B 是备用槽（可能为空或旧版本）。",
+"UPG":"下载、解压、写 B。此时系统仍在 A 上正常运行。",
+"BOK":"B 已写完并通过 hash/签名校验，可以尝试启动。",
+"TRIAL":"bootloader 把启动槽切到 B，并设置 bootcount=1。新系统第一次启动。",
+"OK":"新系统里的升级代理确认服务可用，写「成功」标记，清 bootcount。",
+"RB":"bootcount 超过上限或启动检测失败，bootloader 自动切回 A。"}}'></div>
+
+<p>这条状态机里最关键的是 <code>TRIAL</code>：没有它，一个「能启动但服务起不来」的坏镜像会被永久留在设备里，用户只会觉得「升级之后就用不了了」。</p>
+
+<h2 id="s2">一、分区怎么划</h2>
+
+<div class="ikit" data-type="mem" data-json='{"title":"i.MX6ULL 上的双 Bank 布局","badge":"mem",
+"segments":[
+{"name":"boot0","len":8,"color":"rgba(251,191,36,.35)","addr":"eMMC 硬件区","note":"SPL（可能双份：boot0/boot1）"},
+{"name":"U-Boot","len":8,"color":"rgba(251,191,36,.25)","addr":"p1","note":"U-Boot 本体，通常不做双份（要刷也先刷这里）"},
+{"name":"misc","len":6,"color":"rgba(255,255,255,.16)","addr":"p2","note":"启动控制块：当前槽、bootcount、成功标记"},
+{"name":"boot A","len":12,"color":"rgba(110,168,254,.34)","addr":"p3","note":"内核 + dtb + 启动脚本"},
+{"name":"boot B","len":12,"color":"rgba(110,168,254,.22)","addr":"p4","note":"与 A 对称"},
+{"name":"rootfs A","len":22,"color":"rgba(52,211,153,.32)","addr":"p5","note":"只读根文件系统，可加 dm-verity"},
+{"name":"rootfs B","len":22,"color":"rgba(52,211,153,.22)","addr":"p6","note":"升级写入目标"},
+{"name":"data","len":10,"color":"rgba(251,113,133,.3)","addr":"p7","note":"可写数据，升级时不动"}]}'></div>
+
+<p>两个细节决定可靠性：<strong>misc 分区必须能被 bootloader 与系统同时读</strong>（否则切槽信息无处存放）；<strong>data 分区绝不参与升级</strong>（否则「升级」等于「恢复出厂」）。</p>
+
+<h2 id="s3">二、掉电点分析</h2>
+
+<p>把升级拆成原子步骤，逐个问「此刻断电会怎样」：</p>
+
+<table>
+<thead><tr><th>断电时机</th><th>设备状态</th><th>恢复方式</th></th></tr></thead>
+<tbody>
+<tr><td>下载中</td><td>A 正常，B 未动</td><td>重启回 A，重试升级</td></tr>
+<tr><td>写 B 的中途</td><td>A 正常，B 不完整</td><td>重启回 A；B 的校验失败，不会被选为启动槽</td></tr>
+<tr><td>写完 B、未切槽</td><td>A 正常，B 完整</td><td>重启回 A，下次再切</td></tr>
+<tr><td>切槽后、新系统未标记成功</td><td>bootcount=1，仍能回 A</td><td>bootloader 计数超限后自动回 A</td></tr>
+<tr><td>标记成功的中途</td><td>可能「成功」写了一半</td><td>用带校验的结构（CRC/双份）避免半写</td></tr>
+</tbody></table>
+
+<p>你会发现真正的保护来自两条独立的机制：<strong>写入前校验</strong>（不合格的镜像永远不会被选中）与<strong>启动计数</strong>（能启动但没标记成功的镜像会被回滚）。只做第一条，遇到「能启动但坏」的镜像就完了。</p>
+
+<div class="cal warn"><span class="h">误解：双 Bank 需要双份 U-Boot</span>如果 U-Boot 本身刷坏了，两个 rootfs 都救不了。所以高端方案会把 U-Boot 也做双份（甚至放在 eMMC boot0/boot1 两个硬件分区），并让 BootROM 的启动顺序可切换。i.MX6ULL 的 BootROM 支持从多个介质尝试启动，这也是「变砖还能救」的最后一道门。</div>
+
+<h2 id="s4">三、校验：hash、签名、dm-verity</h2>
+
+<ul>
+  <li><b>SHA-256</b>：保证「下载的东西没坏」，防传输错误，不防恶意篡改。</li>
+  <li><b>签名（HAB / 自定义）</b>：保证「来源可信」。下一篇细讲。</li>
+  <li><b>dm-verity</b>：把整个只读分区做成一棵 hash 树，运行时每次读页都校验。它保证「运行中的 rootfs 未被改」，代价是需要预生成 hash 树并单独存放。</li>
+</ul>
+
+<div class="ikit" data-type="seq" data-json='{"title":"一次 OTA 的六个阶段","badge":"seq",
+"actors":[{"name":"升级代理","start":"运行在 A"},{"name":"bootloader","start":"待命"}],
+"steps":[
+{"label":"下载到 data 分区","states":["下载中","待命"],"note":"先落盘到临时目录，避免边下边写目标分区。"},
+{"label":"校验 SHA-256 与签名","states":["校验中","待命"],"note":"不合格直接丢弃，绝不写 B。"},
+{"label":"写 B 分区（rootfs + boot）","states":["写入 B","待命"],"note":"此时 A 完全不受影响，设备可正常服务。"},
+{"label":"写 misc：next_slot=B, bootcount=1","states":["已切槽","下次从 B"],"note":"这一步是唯一的「切换点」，必须原子。"},
+{"label":"重启进 B，启动服务","states":["试运行","已启动"],"note":"bootloader 读 misc 决定从哪启动。"},
+{"label":"标记成功，bootcount=0","states":["完成","下次从 B"],"note":"若服务起不来，就不标记，等回滚。"}]}'></div>
+
+<div class="cal tip"><span class="h">现成工具</span>SWUpdate、RAUC、ostree 都实现了这套逻辑，差别在传输方式与签名体系。自研不是不行，但要先把「掉电点表」写出来，再写代码。</div>
+
+<h2 id="s5">动手（可选）：手工演练一次切槽</h2>
+
+<div class="cal q"><span class="h">只在 🔧 实作模式展开</span>需要板子；没有板子可只读状态机。</div>
+
+<ol>
+  <li>在 misc 分区里放一个结构：<code>{magic, active_slot, bootcount, success}</code>，带 CRC。</li>
+  <li>U-Boot 脚本读它，按 <code>active_slot</code> 设置 <code>root=/dev/mmcblk0p5</code> 或 <code>p6</code>。</li>
+  <li>手动把 <code>active_slot</code> 改成 B、<code>bootcount=1</code>，重启，确认从 B 启动。</li>
+  <li>让 B 的系统故意不标记成功，重启两次，观察 bootloader 自动切回 A。</li>
+</ol>
+
+<h2 id="s6">离开这一篇，你应该能</h2>
+
+<ul class="qa">
+  <li>画出 A/B 状态机，并指出唯一的「切换点」在哪。</li>
+  <li>列出五个断电点与各自的恢复方式。</li>
+  <li>区分 hash、签名、dm-verity 各自防什么。</li>
+</ul>
+
+<p>升级解决「换得安全」，安全启动解决「只许跑我签过的」。下一篇讲 HAB。</p>
+
+
+<nav class="pager">
+  <a href="d12-01.html"><span>← 上一篇</span><b>Buildroot 到 Yocto：定制镜像、裁剪包、产出固件</b></a>
+  <a class="nx" href="d12-03.html"><span>下一篇 →</span><b>HAB 安全启动：签名、验签、失败现象</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=../docs/course-23.html">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>23 · 用 perf 量化</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/viz.css">
+<link rel="stylesheet" href="assets/iviz.css">
+<link rel="stylesheet" href="assets/anim2.css">
+  <script src="assets/readmode.js" defer></script>
+</head>
+<body data-page="23">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>第 23 课 · 用 perf 量化：先测，再改</h1>
+    <p class="lede">性能优化最大的坑是「凭感觉改」。你以为是 CPU 算得慢，其实是内存没命中。这一课用 perf 建立一条硬规矩：<b>先量出瓶颈属于哪类资源，再动手</b>。这条习惯比任何技巧都值钱。</p>
+
+    <div class="anim2" data-json='{"title":"用 perf 量化：先测，再改","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"perf stat ./prog"},{"k":"判断瓶颈类型"},{"k":"perf record -g"},{"k":"perf report / 火焰图"},{"k":"改一处，再测"}],"frames":[{"i":0,"d":"看 CPI、未命中率、分支失败率"},{"i":1,"d":"CPU-bound？内存-bound？分支-bound？"},{"i":2,"d":"采样并记录调用栈"},{"i":3,"d":"定位到函数与代码行"},{"i":4,"d":"一次只改一个变量"}]}'></div>
+
+    <div class="viz" data-kind="flow" data-title="perf 工作流：五个动作" data-sub="从「感觉慢」到「定位到某一行」" data-json='{"steps":[{"n":"perf stat ./prog","d":"看 CPI、未命中率、分支失败率"},{"n":"判断瓶颈类型","d":"CPU-bound？内存-bound？分支-bound？"},{"n":"perf record -g","d":"采样并记录调用栈"},{"n":"perf report / 火焰图","d":"定位到函数与代码行"},{"n":"改一处，再测","d":"一次只改一个变量"}],"note":"最后一条是关键：一次改多个地方，你无法知道哪个改动有效。工程上这叫「控制变量」，在性能优化里比在实验物理里还重要。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 六个核心指标各说明什么？② CPI 高说明什么？③ 怎么区分 CPU 慢与内存慢？④ 火焰图怎么看？⑤ 板子上 perf 跑不起来怎么办？</p>
+    </div>
+
+    <h2>1. 六个指标，一张判据表</h2>
+
+    <table>
+      <thead><tr><th>指标</th><th>含义</th><th>异常时的解读</th></tr></thead>
+      <tbody>
+        <tr><td><b>cycles</b></td><td>消耗的时钟周期</td><td>基线，用来算 CPI</td></tr>
+        <tr><td><b>instructions</b></td><td>执行的指令数</td><td>与 cycles 之比即 IPC</td></tr>
+        <tr><td><b>IPC</b></td><td>instructions / cycles</td><td>低于 1 一般有停顿；高于 1 说明多发射生效</td></tr>
+        <tr><td><b>cache-misses</b></td><td>缓存未命中</td><td>高 → 访问模式差或工作集大</td></tr>
+        <tr><td><b>branch-misses</b></td><td>分支预测失败</td><td>高 → 分支密集、模式随机</td></tr>
+        <tr><td><b>context-switches</b></td><td>上下文切换</td><td>高 → 锁竞争或调度频繁</td></tr>
+      </tbody>
+    </table>
+
+    <div class="viz" data-kind="bars" data-title="同一程序优化前后的指标（示意）" data-sub="优化手段只有一个：把列访问改成行访问" data-json='{"items":[{"n":"cycles 前","v":100,"c":"rd"},{"n":"cycles 后","v":22,"c":"gr"},{"n":"cache-miss 前","v":90,"c":"or"},{"n":"cache-miss 后","v":8,"c":"cy"}],"unit":"相对值","max":100,"note":"注意：指令数几乎没变（甚至略增），周期数却大幅下降——瓶颈是「等内存」而不是「算得多」。这就是不能只看指令数的原因。"}'></div>
+
+<h2>2. 判据：三步定性</h2>
+
+    <pre><code># 第一步：看整体
+perf stat -e cycles,instructions,cache-misses,branch-misses ./prog
+
+# 判据
+#   IPC &lt; 0.5 且 cache-miss 高   → 内存 bound
+#   IPC &lt; 1   且 branch-miss 高  → 分支 bound
+#   IPC 1~2   且 cycles 高       → CPU bound（该优化算法了）
+#   IPC 低但 miss 都低            → 依赖链 / 停顿
+
+# 第二步：采样，找热点函数
+perf record -g -F 999 ./prog
+perf report --stdio | head -40
+
+# 第三步：定位到行
+perf annotate --stdio</code></pre>
+
+    <p>第四行「IPC 低但 miss 都低」常被忽略，实际很常见：连续 <code>a = a * b + c</code> 形成长依赖链，每步都在等上一步，CPU 的并行能力用不上。</p>
+
+    <h2>3. 火焰图：时间花在哪个调用栈上</h2>
+
+    <pre><code>perf record -F 99 -g -- sleep 30
+perf script > out.perf
+# 用 FlameGraph 工具折叠并生成 SVG
+./stackcollapse-perf.pl out.perf &gt; out.folded
+./flamegraph.pl out.folded &gt; flame.svg</code></pre>
+
+    <p>读法：横轴是「出现次数占比」（不是时间轴），纵向是调用栈。<b>最宽的那一条就是热点</b>；如果一条很宽的栈却对应很浅的函数，说明它自己就慢；如果宽在底部而顶部很窄，说明时间分散在很多小函数里。</p>
+
+    <h2>4. 板子上 perf 起不来怎么办</h2>
+
+    <p>嵌入式内核常没开 <code>CONFIG_PERF_EVENTS</code>，或没有 PMU 支持。三条替代路径：</p>
+
+    <ul>
+      <li><b>ftrace</b>：<code>echo function &gt; /sys/kernel/debug/tracing/current_tracer</code>，看函数调用。</li>
+      <li><b>trace-cmd / kernelshark</b>：ftrace 的友好前端。</li>
+      <li><b>自己打点</b>：用 <code>ktime_get()</code> 取时间戳，做粗粒度测量——有时比全套工具更实用。</li>
+    </ul>
+
+    <p>另外，很多工程师会用 <code>cyclictest</code> 测实时延迟抖动，用 <code>lmbench</code> 测内存带宽——这些是嵌入式性能的两个常用基准。</p>
+
+    <h2>5. 实验：一次完整的优化闭环</h2>
+
+    <pre><code># 1) 基线
+perf stat -e cycles,instructions,cache-misses ./matmul_naive
+
+# 2) 记录基线 /tmp/base.txt
+# 3) 只改一处：把列遍历改行遍历
+# 4) 再测，写入 /tmp/opt.txt
+# 5) diff 两个文件，确认只有目标指标变化
+
+# 6) 如果收益不明显，回退，换下一个假设
+#    绝不保留「看起来可能有用的改动」</code></pre>
+
+    <p>这个闭环做三遍，你就会形成「假设 → 测量 → 结论」的肌肉记忆。<b>以后遇到「程序变慢了」，你不会再盲改。</b></p>
+
+    <h2>6. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于性能测量的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["程序慢一定是 CPU 不够快","优化后指令数变少就一定会变快","测一次的结果可信"]},"good":{"t":"实际","items":["多数「慢」是内存或 IO 等待，而不是算力","减少指令可能增加未命中（例如多绕一层间接）","性能数据抖动大，要多次运行取中位数，且固定频率与环境"]},"note":"第三条在嵌入式上尤其重要：CPU 调频、温度、SD 卡缓存都会让一次测量完全失真。做对比测试前先固定频率（performance governor）。"}'></div>
+
+    <h2>7. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>IPC = 0.3、cache-misses 很高，瓶颈在哪？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>内存 bound：CPU 大部分时间在等数据。方向是改访问模式、分块、缩小工作集。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>IPC 很高（如 2.0）说明什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>多发射/超标量生效，CPU 并行度用得好；此时再优化要靠减少指令数或 SIMD。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>火焰图横轴代表什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>采样占比（相当于「时间比例」），不是时间顺序。最宽的一列就是最耗时的路径。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>板子上没有 perf，可以用什么替代？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>ftrace / trace-cmd 看函数级耗时；或用 ktime_get 自己打点；也可用 cyclictest 测延迟。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>为什么对比测试要固定 CPU 频率？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>DVFS 会让同一次运行跑在不同频率上，周期数与耗时都会漂移，比较失去意义。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>对一个程序跑 baseline，记录六个指标。</li>
+        <li>只改一处（访问顺序），再跑一次，比较差异。</li>
+        <li>生成一张火焰图并指出最宽的一条栈。</li>
+        <li>在板子上用 ftrace 看一次函数调用序列。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      P4 部讲完了「快慢」。P5 部进入地址空间：第 24 课回答一个根本问题——为什么每个进程都以为自己独占 4GB 内存，而物理内存其实只有 512MB。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"七条命令，各有各的用途","hint":"点一条看什么时候用","note":"先测再改。没有量化之前，所有「我觉得这里慢」都是猜。","items":[{"b":"perf stat","d":"给出总数：周期数、指令数、IPC、分支失败率、Cache 未命中率。先看这个定位大类。"},{"b":"perf top","d":"实时看哪个函数在吃 CPU，像 top 但是函数级的。找热点第一眼用它。"},{"b":"perf record / report","d":"采样后离线分析，带调用栈。能看清热点是被谁调起来的。"},{"b":"perf annotate","d":"把采样落到汇编行上，能看出是哪个指令慢（常见是访存或除法）。"},{"b":"perf trace","d":"跟踪系统调用，判断时间花在用户态还是内核态。"},{"b":"perf mem","d":"记录访存地址与层级，专门查 Cache 未命中。"},{"b":"perf c2c","d":"查伪共享：两个核改同一 Cache line 的不同变量，互相把对方的行打失效。"}]}'></div>
+  </main>
+</div>
+<script src="assets/cnav.js"></script>
+<script src="assets/viz.js"></script>
+<script src="assets/iviz.js"></script>
+<script src="assets/anime.iife.min.js"></script>
+<script src="assets/anim2.js"></script>
+</body>
+</html>

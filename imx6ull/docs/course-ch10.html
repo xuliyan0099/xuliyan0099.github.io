@@ -1,0 +1,256 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>内核裁剪与设备树 · 卷 08 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j08.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 08 · 启动链</div>
+<ol><li><a href="course-th08.html">
+  <span class="no">01</span><span>从第一个字节开始：BootROM → SPL → U-Boot<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-36.html">
+  <span class="no">02</span><span>启动链<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-ch08.html">
+  <span class="no">03</span><span>i.MX6ULL 与启动链路<span class="sub">约 10 小时</span></span></a></li>
+<li><a href="course-th09.html">
+  <span class="no">04</span><span>内核怎么起来：head.S → start_kernel → init<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-ch09.html">
+  <span class="no">05</span><span>U-Boot 与烧写<span class="sub">约 12 小时</span></span></a></li>
+<li><a href="course-ch10.html" class="active">
+  <span class="no">06</span><span>内核裁剪与设备树<span class="sub">约 18 小时 · 当前</span></span></a></li>
+<li><a href="course-41.html">
+  <span class="no">07</span><span>根文件系统<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-ch11.html">
+  <span class="no">08</span><span>根文件系统构建<span class="sub">约 14 小时</span></span></a></li>
+<li><a href="course-42.html">
+  <span class="no">09</span><span>做出一块能跑的系统<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="viz-boot.html">
+  <span class="no">10</span><span>互动台：启动链路逐级点亮<span class="sub">💻 · 约 1 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j07.html">← 卷 07</a>
+  <a href="../juan/j09.html">卷 09 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 08<span>·</span>启动链<span>·</span>第 06 篇</div>
+  <h1>内核裁剪与设备树</h1>
+  <p class="lede">一个内核镜像里面装着几千个驱动，但你的板子只需要几十个。裁剪是减法；设备树是「告诉内核这块板子上到底有什么」的那份说明书。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 18 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+    <div class="viz" data-kind="tree" data-title="menuconfig 的三层菜单" data-sub="裁剪的本质是「少编进一堆用不到的东西」" data-json='{"nodes":[{"n":"General setup","d":"内核基本行为、压缩方式","c":"cy","ch":[{"n":"System Type","d":"选 SoC 家族，i.MX6ULL 在这里","c":"vi"},{"n":"Kernel Features","d":"SMP、抢占、内存模型","c":"or"},{"n":"Device Drivers","d":"最大的一层，按需勾选","c":"gr","ch":[{"n":"字符设备","d":"Serial、GPIO、I2C 都在这里"},{"n":"存储","d":"MMC/SD、MTD、文件系统"},{"n":"网络","d":"协议栈与网卡驱动"}]}]},{"n":"File systems","d":"ext4、ubifs、nfs、proc","c":"or"}],"note":"裁剪的正确做法不是「把不认识的都关掉」，而是「先留着，跑起来，再一项项关，每次开机验证」。一次关十项，出问题你根本不知道是哪一项。"}'></div>
+
+
+    <div class="card">
+      <h4>本章目标</h4>
+      <p>① 会配置、编译内核并产出 zImage；② 知道 defconfig / menuconfig / .config 的关系；③ 读懂 .dts 的节点与属性；④ 能改设备树点亮一个 LED；⑤ 会用 dtc 反编译现成的 .dtb。</p>
+    </div>
+
+    <div class="anim2" data-json='{"title":"裁剪内核：从全量到够用","hint":"编译通过不等于能启动","nodes":[{"k":"menuconfig","s":"选配置"},{"k":"关无关驱动","s":"省的最大"},{"k":"编译","s":"出 zImage"},{"k":"更小镜像","s":"启动更快"}],"frames":[{"i":0,"d":"menuconfig 里按板子的实际硬件逐项取舍，先关掉明确不用的子系统。"},{"i":1,"d":"没有 CAN、没有无线，就都关掉；这部分收益最大。"},{"i":2,"d":"关 CONFIG_DEBUG_INFO 能小一大截，但之后没法用 gdb 看变量。"},{"i":3,"d":"镜像小了、启动快了，但必须在真板子上跑一遍完整启动才算过。"}],"kind":"flow"}'></div>
+
+    <h2 id="s1">10.1 内核源码长什么样</h2>
+
+    <table>
+      <thead><tr><th>目录</th><th>内容</th><th>你会碰到的场景</th></tr></thead>
+      <tbody>
+        <tr><td><code>arch/arm/</code></td><td>ARM 架构相关代码、<code>boot/dts/</code> 设备树、<code>configs/</code> 默认配置</td><td><b>改 dts、选 defconfig</b></td></tr>
+        <tr><td><code>drivers/</code></td><td>所有驱动：<code>gpio</code>、<code>leds</code>、<code>mmc</code>、<code>net</code>、<code>tty</code></td><td>第 12 章写驱动</td></tr>
+        <tr><td><code>fs/</code></td><td>文件系统实现：ext4、nfs、ubifs</td><td>挂根文件系统</td></tr>
+        <tr><td><code>kernel/</code></td><td>进程调度、时间、中断</td><td>后期深挖</td></tr>
+        <tr><td><code>mm/</code></td><td>内存管理</td><td>后期深挖</td></tr>
+        <tr><td><code>init/</code></td><td>启动入口 <code>main.c</code>，<code>start_kernel</code> 在这</td><td>想看启动流程</td></tr>
+        <tr><td><code>net/</code></td><td>TCP/IP 协议栈</td><td>网络问题</td></tr>
+        <tr><td><code>Documentation/</code></td><td>官方文档，含设备树绑定说明</td><td><b>查 compatible 怎么写</b></td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s2">10.2 配置：三件套的关系</h2>
+
+    <pre><code>arch/arm/configs/imx6ull_defconfig   ← 厂商给的「默认配置模板」
+                ↓ make imx6ull_defconfig
+              .config                ← 当前生效的完整配置（几千项）
+                ↓ make menuconfig
+              .config 被修改         ← 你勾选/取消的每一项都写在这
+                ↓ make zImage
+        arch/arm/boot/zImage         ← 最终产物</code></pre>
+
+    <p><code>make savedefconfig</code> 可以把你改过的 .config 精简回一个 defconfig 文件，方便保存和复用——<strong>这是团队协作里最该有的习惯</strong>，而不是把 .config 直接发给别人。</p>
+
+    <h2 id="s3">10.3 编译内核</h2>
+    <div class="viz" data-kind="flow" data-title="内核配置三件套，一条链" data-sub="defconfig → .config → 编译产物" data-json='{"steps":[{"n":"defconfig","d":"arch/arm/configs/imx6ull_defconfig"},{"n":"make …_defconfig","d":"生成 .config"},{"n":"menuconfig","d":"逐项增删"},{"n":"make zImage","d":"产出 arch/arm/boot/zImage"},{"n":"make dtbs","d":"产出 imx6ull-*.dtb"}],"note":"改完 .config 至少重跑一次 make，别直接拷旧 zImage——内核版本和配置不匹配时能起但行为诡异。"}'></div>
+
+
+    <pre><code>$ export ARCH=arm
+$ export CROSS_COMPILE=arm-linux-gnueabihf-
+$ make imx6ull_defconfig        <span class="c"># 载入默认配置（名字以 arch/arm/configs/ 下实际文件为准）</span>
+$ make menuconfig               <span class="c"># 图形化勾选，可选</span>
+$ make zImage -j4               <span class="c"># 编内核</span>
+$ make dtbs                     <span class="c"># 编设备树</span>
+$ make modules                  <span class="c"># 编模块（写驱动用）</span></code></pre>
+
+    <table>
+      <thead><tr><th>产物</th><th>路径</th></tr></thead>
+      <tbody>
+        <tr><td>内核镜像</td><td><code>arch/arm/boot/zImage</code></td></tr>
+        <tr><td>设备树</td><td><code>arch/arm/boot/dts/xxx.dtb</code></td></tr>
+        <tr><td>模块</td><td>散落在各驱动目录下的 <code>.ko</code></td></tr>
+        <tr><td>符号表</td><td><code>vmlinux</code>、<code>System.map</code>（调试用）</td></tr>
+      </tbody>
+    </table>
+
+    <div class="warn">
+      <b>编不过的三大原因</b>
+      ① 工具链版本太新（换厂商那套）；② 缺依赖包（<code>bison flex libssl-dev bc libncurses-dev</code>）；③ 源码目录含中文或空格。第三点最隐蔽，<b>路径一律用英文</b>。
+    </div>
+
+    <h2 id="s4">10.4 设备树：一句话讲清</h2>
+
+    <p>老内核把板子信息硬编码在 C 里，一块板子一份代码，几百份重复。设备树把这些信息抽成一个<strong>文本文件（.dts）</strong>，编译成二进制 <strong>.dtb</strong>，启动时交给内核解析。<strong>同一个内核 + 不同 dtb = 支持不同板子。</strong></p>
+
+    <pre><code>/ {                                  /* 根节点 */
+    model = "Freescale i.MX6ULL 14x14 EVK";
+    compatible = "fsl,imx6ull-14x14-evk", "fsl,imx6ull";
+
+    memory@80000000 {                 /* 内存：起始 0x80000000，长度 512MB */
+        device_type = "memory";
+        reg = &lt;0x80000000 0x20000000&gt;;  /* 起始地址 长度 */
+    };
+
+    chosen {
+        bootargs = "console=ttymxc0,115200";
+    };
+};
+
+&amp;iomuxc {                           /* 引用已有节点，往里加内容 */
+    pinctrl_led: ledgrp {
+        fsl,pins = &lt;
+            MX6UL_PAD_GPIO1_IO03__GPIO1_IO03  0x10B0
+        &gt;;
+    };
+};
+
+leds {
+    compatible = "gpio-leds";
+    led0 {
+        label = "sys-led";
+        gpios = &lt;&amp;gpio1 3 GPIO_ACTIVE_LOW&gt;;
+        pinctrl-0 = &lt;&amp;pinctrl_led&gt;;
+        default-state = "on";
+    };
+};</code></pre>
+
+    <table>
+      <thead><tr><th>概念</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td>节点 <code>node { }</code></td><td>一个设备或一组配置</td></tr>
+        <tr><td><code>compatible</code></td><td><b>最关键的属性</b>：驱动靠它匹配设备。格式是 <code>"厂商,型号"</code></td></tr>
+        <tr><td><code>reg</code></td><td>地址与长度，<code>&lt;起始 长度&gt;</code></td></tr>
+        <tr><td><code>status</code></td><td><code>"okay"</code> 启用 / <code>"disabled"</code> 关闭</td></tr>
+        <tr><td><code>&amp;节点名</code></td><td>引用别处定义的节点（label 引用）</td></tr>
+        <tr><td><code>pinctrl-0</code></td><td>指定这组引脚怎么复用、电气参数如何</td></tr>
+        <tr><td><code>gpios = &lt;&amp;gpio1 3 ...&gt;</code></td><td>用 gpio1 控制器的第 3 号引脚</td></tr>
+      </tbody>
+    </table>
+
+    <div class="key">
+      <b>引脚复用是硬件的地基</b>
+      一个引脚可能同时是 UART_TX、PWM、GPIO。给哪个功能用，由 IOMUXC 寄存器决定，设备树里通过 <code>fsl,pins</code> 配置。<b>配错了，代码再对也没反应</b>——这是第 12 章最常见的「驱动加载成功但灯不亮」。
+    </div>
+
+    <h2 id="s5">10.5 dtc：编译与反编译</h2>
+
+    <pre><code><span class="c"># .dts → .dtb（内核 make dtbs 会自动做，也可手工）</span>
+$ dtc -I dts -O dtb -o my.dtb my.dts
+
+<span class="c"># .dtb → .dts（<b>拿到板子/别人的 dtb 时，反编译看里面到底写了什么</b>）</span>
+$ dtc -I dtb -O dts -o dump.dts /boot/xxx.dtb
+
+<span class="c"># 板子上直接看当前生效的设备树</span>
+# ls /proc/device-tree/
+# cat /proc/device-tree/model
+# find /proc/device-tree -name compatible</code></pre>
+
+    <div class="tip">
+      <b>调试设备树最快的办法</b>
+      板子起来后 <code>cat /proc/device-tree/model</code>，确认内核用的是不是你编的那份 dtb。<b>「我改了 dts 却没效果」90% 是因为板子加载的是旧 dtb。</b>
+    </div>
+
+    <h2 id="s6">10.6 改设备树点亮 LED 的完整流程</h2>
+    <div class="viz" data-kind="matrix" data-title="改设备树点亮 LED：五个检查点" data-sub="每一步都能单独验证" data-json='{"corner":"步骤","cols":["做什么","怎么验证"],"rows":[{"n":"① 找节点","cells":[{"v":"&iomuxc / &gpio1","c":"cy"},{"v":"grep 节点名","c":"gray"}]},{"n":"② 加 pinctrl","cells":[{"v":"MX6UL_PAD_…__GPIO1_IO03","c":"vi"},{"v":"dtc 编译无警告","c":"gray"}]},{"n":"③ 加 gpio-leds","cells":[{"v":"compatible=gpio-leds","c":"gr"},{"v":"/sys/class/leds 出现节点","c":"gray"}]},{"n":"④ 编译替换","cells":[{"v":"make dtbs + 拷到板子","c":"or"},{"v":"串口看 dtb 加载地址","c":"gray"}]},{"n":"⑤ 验证","cells":[{"v":"echo 1 > brightness","c":"rd"},{"v":"灯亮 / 万用表量电平","c":"gray"}]}],"note":"灯不亮时按顺序回退：引脚复用对不对 → 供电/极性对不对 → 节点有没有被解析（/proc/device-tree）。"}'></div>
+
+
+    <ul class="steps">
+      <li>在原理图上找到 LED 接的引脚（如 GPIO1_IO03），记下网络名和有效电平（高亮还是低亮）。</li>
+      <li>在 <code>arch/arm/boot/dts/</code> 找到你板子的 dts，在 <code>&amp;iomuxc</code> 里加一组 pinctrl。</li>
+      <li>加一个 <code>gpio-leds</code> 节点，写 <code>gpios</code>、<code>pinctrl-0</code>、<code>default-state</code>。</li>
+      <li><code>make dtbs</code>，把新 dtb 传到板子（或 NFS/TFTP），改 bootargs 让它加载新 dtb。</li>
+      <li>启动后看 <code>/sys/class/leds/</code> 下有没有你的 label；<code>echo 1 &gt; brightness</code> 测试。</li>
+      <li>没反应就 <code>dmesg | grep -i led</code>，看驱动是否匹配失败。</li>
+    </ul>
+
+    <h2 id="s7">10.7 动手任务</h2>
+    <ul class="steps">
+      <li>编一次内核，记录从 <code>make</code> 开始到结束的耗时和产物大小。</li>
+      <li>用 <code>menuconfig</code> 关掉一个明显用不到的功能（如某个文件系统），重编，对比 zImage 体积变化。</li>
+      <li>把板子上现成的 .dtb 反编译成 .dts，找出 <code>memory</code>、<code>chosen</code>、<code>leds</code> 三个节点。</li>
+      <li>按 10.6 的流程改 dts，让一个 LED 开机常亮，再改成常灭，各验证一次。</li>
+      <li>故意把 <code>gpios</code> 里的引脚号改错，观察 <code>dmesg</code> 报什么错，再改回来。</li>
+    </ul>
+
+    <h2 id="s8">10.8 验收标准</h2>
+    <ul class="checklist">
+      <li>能独立配置并编译出 zImage 与 dtb</li>
+      <li>能解释 defconfig、.config、menuconfig 三者关系</li>
+      <li>能读懂一个 dts 节点，说出 compatible、reg、status 的作用</li>
+      <li>能用 dtc 反编译 dtb 并找到关键节点</li>
+      <li>能改设备树控制一个 LED，并知道失败时怎么查</li>
+      <li>能说出 pinctrl 配错会导致什么现象</li>
+    </ul>
+
+    <footer id="pager"></footer>
+  
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"裁剪内核的四把刀","items":[{"b":"去掉不用的驱动","d":"菜单里关掉无关的子系统与驱动，收益最大。你的板子没有 CAN，就别编 CAN。"},{"b":"去调试信息","d":"关 CONFIG_DEBUG_INFO，镜像能小一大截。但之后没法用 gdb 看变量，发布版才做。"},{"b":"换压缩方式","d":"zImage 用 gzip，也可以换 lz4 换更快的解压。解压时间也算启动时间。"},{"b":"模块化","d":"把不常用的驱动编成模块，用时 insmod。省内存也省启动，但要多管一套文件。"}],"note":"裁剪后一定要在真板子上跑一遍完整启动。编译通过不代表能启动：漏掉的驱动常常在挂 rootfs 时才暴露。"}'></div>
+  
+
+<nav class="pager">
+  <a href="course-ch09.html"><span>← 上一篇</span><b>U-Boot 与烧写</b></a>
+  <a class="nx" href="course-41.html"><span>下一篇 →</span><b>根文件系统</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

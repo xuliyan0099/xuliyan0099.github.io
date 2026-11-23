@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第 02 章 · Datasheet 怎么读：只读五处 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<link rel="stylesheet" href="../assets/asm.css">
+</head><body style="--acc:#8b7bff">
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../index.html">☰ 六个入口</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">看懂一份芯片手册 · 8 篇</div>
+    <ol>
+      <li><a href="index.html"><span class="no">⌂</span><span>路口目录<span class="sub">篇目总览与读法</span></span></a></li>
+      <li><a href="m0.html"><span class="no">00</span><span>六份文档，别拿错<span class="sub">Datasheet / RM / AN / 勘误 / 原理图 / dts 各管什么</span></span></a></li>
+      <li><a href="m1.html"><span class="no">01</span><span>拿到手册，先做四件事<span class="sub">建索引、画内存图、找时钟树、贴引脚表</span></span></a></li>
+      <li><a href="m2.html" class="active"><span class="no">02</span><span>Datasheet 怎么读：只读五处<span class="sub">订货型号、绝对最大额定、电气特性、引脚定义、封装</span></span></a></li>
+      <li><a href="m3.html"><span class="no">03</span><span>Reference Manual 一章的固定骨架<span class="sub">概述 → 功能 → 外部信号 → 时钟 → 寄存器 → 初始化流程</span></span></a></li>
+      <li><a href="m4.html"><span class="no">04</span><span>寄存器表怎么逐列读<span class="sub">偏移、位域、Reserved、R/W、W1C、复位值</span></span></a></li>
+      <li><a href="m5.html"><span class="no">05</span><span>四个真实例子：从手册到代码<span class="sub">CCM、IOMUXC、UART、GPIO 各走一遍</span></span></a></li>
+      <li><a href="m6.html"><span class="no">06</span><span>从板子上的一个脚，查到 dts 一行<span class="sub">原理图 → 引脚名 → 复用功能 → 设备树节点</span></span></a></li>
+      <li><a href="m7.html"><span class="no">07</span><span>八个坑，和一张速查<span class="sub">页码对不上、复位值不算、W1C 写 1 才清…</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="../hardware/index.html">硬件入口</a><a href="../juan/index.html">十四卷总览</a></div>
+  </aside>
+  <main class="doc">
+    <div class="doc-kicker">芯片手册研读 · i.MX6ULL <span>·</span> 第 02 章</div>
+    <div class="ch-head">
+      <h1>Datasheet 怎么读：只读五处</h1>
+      <div class="ch-meta"><span class="hot">第 02 章</span><span>约 22 分钟</span><span>★ 必读</span></div>
+    </div>
+<h2 id="s1">Datasheet 只值得读五处</h2>
+<p>它比 RM 短得多（几十页到一百多页），但里面真正对「写代码的人」有用的只有五处。其余（封装尺寸、回流焊曲线、卷带包装）是给生产和画板用的。</p>
+<table class="regtbl"><thead><tr><th>#</th><th>章节</th><th>对写代码的人有什么用</th></tr></thead><tbody><tr><td class="nm">①</td><td>Ordering Information</td><td>确认手上这颗是什么料号，主频/温度/封装</td></tr><tr><td class="nm">②</td><td>Absolute Maximum Ratings</td><td>知道「超了会烧」，用来判断硬件是否被误接</td></tr><tr><td class="nm">③</td><td>Electrical Characteristics（DC/AC）</td><td>电平门限、驱动电流、时序参数</td></tr><tr><td class="nm">④</td><td>Signal Multiplexing / Pin Descriptions</td><td>引脚有哪些功能（完整表在 RM）</td></tr><tr><td class="nm">⑤</td><td>Package / Ball Map</td><td>定位球号，与原理图对照</td></tr></tbody></table>
+<h2 id="s2">① Ordering Information：先确认「你手上是哪颗」</h2>
+<p>料号后缀通常编码三件事：<b>温度等级、封装、最高主频</b>。比如同一家族里，「工业级 + BGA + 528MHz」与「消费级 + BGA + 528MHz」是两个不同料号，Datasheet 的电气参数也可能略有差别（主要是温度范围）。</p>
+<p>为什么这对写代码重要：<b>主频不同，你在裸机里算的延时循环次数就不同</b>；温度等级不同，某些模块的最高频率限制也不同（DDR 时钟尤其明显）。写死一个循环次数然后换板子，现象就是「延时长了 20%」。</p>
+<h2 id="s3">② Absolute Maximum Ratings：只读，不设计</h2>
+<p>这一节给的是「超过就可能永久损坏」的极限值，不是工作范围。典型项目：每路电源的极限电压、IO 的极限输入电压、存储温度、ESD 等级。</p>
+<p><b>它是排查硬件损伤的第一依据</b>：一个脚被误接 5V（而它的绝对最大是 3.6V），即使当时还能用，也可能已经击穿了 ESD 结构——表现是「这个脚读出来一直是 1」或「驱动能力明显变弱」。这类故障软件层面无法修，只能换片子。</p>
+<h2 id="s4">③ Electrical Characteristics：三个必看参数</h2>
+<p><b>（a）输入电平门限 VIH / VIL</b></p>
+<p>这是判断「什么算高电平」的唯一依据。i.MX6ULL 的 IO 多为 3.3V 域，典型 VIH 约为 0.7×VDD_IO、VIL 约为 0.3×VDD_IO（<b>具体数值以 Datasheet 表格为准，不同 IO 域可能不同</b>）。它的直接后果：</p>
+<ul>
+<li>你用 1.8V 的器件去驱动 3.3V 域的输入，可能<b>永远读不到 1</b>（达不到 VIH）。</li>
+<li>反过来 3.3V 输出驱动 1.8V 器件，可能超过对方的绝对最大。</li>
+</ul>
+<p>所以做电平转换不是「加个电阻就行」，得看两边门限。</p>
+<p><b>（b）输出驱动能力 / VOH / VOL</b></p>
+<p><code>VOH</code> 是「输出高电平时至少能到多少伏」，且是在某个负载电流下标定的。含义：<b>驱动电流越大，输出电压越往下掉</b>。这就是为什么 LED 要串限流电阻、为什么长排线要加缓冲器——不是「信号不够强」，是「电压被拉下来了」。</p>
+<p><b>（c）AC 时序参数</b></p>
+<p>总线（I2C、SPI、SD/eMMC）都有一张时序表：上升沿到采样沿要多久、数据保持多久。<b>这份表决定了你在驱动里能把时钟设多快。</b> 内核里那些 <code>max-frequency</code> 属性就是从这里推出来的。</p>
+<h2 id="s5">④ Signal Multiplexing：只看「这个脚有没有我要的功能」</h2>
+<p>Datasheet 里的引脚表通常只给「球号 → 引脚名 → 默认功能」，完整的复用列表在 RM 的 IOMUXC 章。读法：</p>
+<ol>
+<li>先在原理图找到网络名 → 对应球号。</li>
+<li>用球号在 Datasheet 的 ball map 找到引脚名（如 <code>GPIO1_IO03</code>）。</li>
+<li>回 RM 的 Signal Multiplexing 表，看这一行的 ALT0–ALT7 各是什么，选你要的那个 ALT 号。</li>
+<li>那个 ALT 号就是要写进 <code>MUX_MODE</code> 的值。</li>
+</ol>
+<p>一个常见误区：<b>以为 ALT 号越小越好</b>。不是，ALT0 通常是最「普通」的功能（比如 GPIO 往往在 ALT5），没有优先级，只看你要哪个。</p>
+<h2 id="s6">⑤ Ball Map：唯一的作用是对号</h2>
+<p>画板的人用它布线上；你用它做一件事：<b>确认「原理图上标的球号，和你以为的那个脚是同一个」</b>。</p>
+<p>这一步经常救命。板子上标 <code>GPIO1_IO03</code>，但实际连的是球 <code>A15</code>，而 <code>A15</code> 在封装上对应的引脚名可能是另一个——如果厂商的原理图符号标错了（这种情况真实存在），你写的代码会打在空处。</p>
+<h2 id="s7">一个完整的「Datasheet 五处」查法示例</h2>
+<p>场景：板子上一个按键，按下去没反应。</p>
+<ol>
+<li><b>Ordering</b>：确认板子是 i.MX6ULL 哪个料号（不影响本次，但先确认）。</li>
+<li><b>Ball map</b>：按键网络名 → 球号 → 引脚名，比如 <code>GPIO1_IO05</code>。</li>
+<li><b>Signal Multiplexing</b>（在 RM）：确认这个脚的 ALT 里有 GPIO 功能，记下 ALT 号。</li>
+<li><b>Electrical</b>：确认按键那一路有上拉（否则悬空读到的值是随机的，表现为「有时好有时坏」）。</li>
+<li><b>Absolute max</b>：确认按键直接接 3.3V 而没有串电阻时，是否还在极限内（短接到地时是靠内部上拉限流，不是靠电阻）。</li>
+</ol>
+<p>这五步里有四步都在 Datasheet/RM 之间来回，这就是为什么 01 篇要求先把「引脚四名字表」建好。</p>
+<h2 id="s8">本篇验收</h2>
+<ul>
+<li>能说出 Datasheet 里哪五处对写代码有用，其余为什么可以跳过。</li>
+<li>能解释 VIH/VIL 为什么会让「1.8V 驱动 3.3V」失败。</li>
+<li>能解释 VOH 是在什么条件下标定的，以及它和「串限流电阻」的关系。</li>
+<li>能给一个具体场景（比如按键无反应），走完五处查法。</li>
+</ul>
+<h2 id="s9">下一篇</h2>
+<p>Datasheet 读完，进入正题：RM。03 篇先讲「每一章都长同一个样子」——认清这个骨架，你读任何一章都不用从头读。</p>
+<div class="pager">
+      <a href="m1.html"><span>上一篇</span><b>← 01 拿到手册，先做四件事</b></a>
+      <a href="index.html"><span>目录</span><b>篇目总览</b></a>
+      <a class="nx" href="m3.html"><span>下一篇</span><b>03 Reference Manual 一章的固定骨架 →</b></a>
+    </div>
+  </main>
+</div>
+<script src="../assets/asm-tools.js"></script>
+</body>
+</html>

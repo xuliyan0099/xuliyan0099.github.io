@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=../docs/course-th04.html">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>理论 T04 · 文件系统与 VFS（详解） | i.MX6ULL Linux 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="../assets/viz.css">
+  <link rel="stylesheet" href="../assets/iviz.css">
+  <link rel="stylesheet" href="../assets/anim2.css">
+  <script src="../assets/readmode.js" defer></script>
+</head>
+<body data-page="th04">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>理论 T04 · 文件系统与 VFS</h1>
+    <p class="lede">Linux 同时支持几十种文件系统，却只需要一份 <code>open()</code> 代码——这是 VFS（虚拟文件系统）的功劳。这一章把 <code>open("a.txt")</code> 拆成十几步，说清 inode、dentry、file 三个对象各管什么，以及「文件删了空间还在占」的真正原因。</p>
+    <div class="viz" data-kind="tree" data-title="VFS 怎么抹平不同文件系统" data-sub="上层只看见 open/read/write" data-json='{"nodes":[{"n":"用户程序","d":"open / read / write","c":"cy","ch":[{"n":"VFS 虚拟文件系统","d":"统一的接口层","c":"vi","ch":[{"n":"ext4","d":"块设备上的文件系统"},{"n":"ubifs","d":"NAND 上的文件系统"},{"n":"proc / sysfs","d":"内存里的假文件","c":"gr"},{"n":"块设备层","d":"把文件读写变成扇区读写","c":"or","ch":[{"n":"eMMC / SD 卡","d":"真正落盘的地方"}]}]}]},{"n":"页缓存 page cache","d":"夹在 VFS 与块层之间，读写先过它","c":"or"}],"note":"ext4 按块寻址，ubifs 按页和擦除块管理，机制完全不同；但它们都交出同一套 file_operations。这就是「一切皆文件」的技术底座。"}'></div>
+
+
+    <div class="card">
+      <h4>本章要解决的问题</h4>
+      <p>① 一个 <code>open</code> 怎么从字符串走到磁盘块；② inode 与 dentry 到底谁缓存了什么；③ 硬链接与软链接的本质区别；④ 删除文件为什么有时不释放空间；⑤ 为什么 <code>/proc</code> 里的「文件」根本不是文件。</p>
+    </div>
+
+    <div class="card">
+      <h4>读完你应该能回答</h4>
+      <ul>
+        <li>打开一个文件，内核里会创建几个对象？哪个是「全系统唯一」的？</li>
+        <li>为什么同一文件被两个进程打开时，一个进程的读位置不影响另一个？</li>
+        <li>为什么 <code>rm</code> 掉一个大文件，<code>df</code> 却显示磁盘还是满的？</li>
+        <li>dentry 缓存为什么必须有「负条目」？</li>
+        <li>没有文件系统，字符设备还能用 <code>open</code> 打开吗？</li>
+      </ul>
+    </div>
+
+    <div class="anim2" data-json='{"title":"open 一个文件，VFS 依次动谁","hint":"名字和内容分开记","nodes":[{"k":"open 路径","s":"/etc/passwd"},{"k":"dentry","s":"名字 → inode"},{"k":"inode","s":"元数据与块地址"},{"k":"file","s":"本次打开的偏移"},{"k":"读数据","s":"回用户缓冲区"}],"frames":[{"i":0,"d":"进程给出路径字符串，VFS 逐段解析 /、etc、passwd，每段都要查一次名字。"},{"i":1,"d":"dentry 缓存里有这条映射就直接用；没有才去磁盘读目录项，读完放回缓存。"},{"i":2,"d":"inode 记着权限、大小、数据块位置。它不记名字，所以硬链接可以让多个名字指向同一个 inode。"},{"i":3,"d":"open 成功时新建一个 struct file，记住当前偏移与打开模式。fork 之后父子共享同一个偏移。"},{"i":4,"d":"read 按 inode 里的块地址取数据，先看 page cache，未命中才真的读盘。"}],"kind":"flow"}'></div>
+
+    <h2>1. VFS 要解决的核心矛盾</h2>
+
+    <p>磁盘上有几十种「怎么存文件」的方案：ext4 用 inode + 块位图，FAT32 用簇链，NFS 的文件在另一台机器上，tmpfs 干脆在内存里。<b>它们的实现毫无共同点</b>，但用户程序只想调 <code>open/read/write/close</code> 这四个函数。</p>
+
+    <p>VFS 的做法是<b>抽象出四个对象</b>，让每种文件系统都实现同一套操作函数（函数指针表），上层只调抽象接口：</p>
+
+    <table>
+      <thead><tr><th>对象</th><th>代表什么</th><th>生命周期</th><th>典型字段</th></tr></thead>
+      <tbody>
+        <tr><td><b>super_block</b></td><td>一个「已挂载的文件系统实例」</td><td>挂载到卸载</td><td>块大小、操作表 <code>s_op</code>、根 inode、设备号</td></tr>
+        <tr><td><b>inode</b></td><td>一个「文件本体」的元数据（与名字无关）</td><td>被引用时存在，可缓存可回收</td><td>大小、权限、时间戳、块指针、<code>i_op</code> / <code>i_fop</code></td></tr>
+        <tr><td><b>dentry</b></td><td>一个「名字 → inode」的目录项</td><td>被查找过就进缓存</td><td>名字、父目录、指向的 inode、<code>d_op</code></td></tr>
+        <tr><td><b>file</b></td><td>一个「打开的文件实例」（进程视角）</td><td><code>open</code> 到 <code>close</code></td><td>读写位置 <code>f_pos</code>、打开标志、<code>f_op</code>、私有数据</td></tr>
+      </tbody>
+    </table>
+
+    <div class="key">
+      <b>理解这四者的关系，一句话就够</b>
+      <b>super_block 管一片存储；inode 管一个文件的内容与属性；dentry 管「路径上的一个名字」；file 管「一次打开」。</b> 一个 inode 可以被多个 dentry 指向（硬链接），也可以被多个 file 打开（多进程同时读），但全系统只有一份 inode。
+    </div>
+
+    <h2>2. open 的完整路径</h2>
+
+    <p>以 <code>open("/home/u/a.txt", O_RDONLY)</code> 为例，别看它简单，内核里要过十来道关：</p>
+
+    <div class="flow">
+      <span>系统调用入口</span><span>→</span><span>拷贝路径名</span><span>→</span><span>取一个空 fd</span><span>→</span><span>逐段解析路径</span><span>→</span><span>查 dentry 缓存</span><span>→</span><span>取 inode</span><span>→</span><span>权限检查</span><span>→</span><span>调 fs 的 open</span><span>→</span><span>绑定 fd 与 file</span>
+    </div>
+
+    <p>逐步说明几个关键点：</p>
+
+    <ol>
+      <li><b>拷贝路径名</b>：路径在用户空间，内核先用 <code>getname()</code> 拷进内核缓冲。原因见 T01：内核不能直接信用户指针。</li>
+      <li><b>取空 fd</b>：<code>get_unused_fd_flags()</code> 在进程的 fd 表里找最小空位。这就是为什么你总是拿到 3（0/1/2 已被占）。</li>
+      <li><b>逐段解析</b>：<code>link_path_walk()</code> 把 <code>/home/u/a.txt</code> 按 <code>/</code> 切开，一段一段往下走。每段先查 <b>dentry 缓存</b>（这是性能关键），命中就直接拿到 inode；不命中才调具体文件系统的 <code>lookup</code> 去读目录块。</li>
+      <li><b>权限检查</b>：<code>inode_permission()</code> 检查 uid/gid 与权限位，还要过 LSM（SELinux/AppArmor）那一层。</li>
+      <li><b>调 fs 的 open</b>：真正打开动作在 <code>f_op-&gt;open()</code> 里，比如 ext4 可能在这里做日志恢复检查。</li>
+      <li><b>绑定</b>：<code>fd_install(fd, file)</code> 把新 file 对象挂到进程 fd 表的第 fd 格。</li>
+    </ol>
+
+    <p>注意第 3 步的代价：<b>路径解析是文件操作里最贵的部分</b>。一段很深的路径要逐段查缓存，每段还可能触发磁盘 IO。这也是为什么「打开文件比读文件慢」、为什么长路径、大量小文件会显著拖慢系统。</p>
+
+    <h3>2.1 一个文件被两个进程打开，为什么读位置互不影响</h3>
+
+    <p>因为 <b>file 对象是「每次 open 一份」</b>，而 inode 是共享的。<code>f_pos</code>（读写位置）存在 file 里，所以：</p>
+
+    <ul>
+      <li>进程 A、B 各自 <code>open</code> 同一文件 → 两个 file 对象 → 两个独立的 <code>f_pos</code>，各读各的。</li>
+      <li>进程 fork 后，父子<b>共享同一个 file 对象</b>（fd 表被复制但指向同一 file）→ <code>f_pos</code> 共享，会互相干扰。这是脚本里「父子进程读同一文件跳字节」的经典坑。</li>
+    </ul>
+
+    <p>顺便解释 <code>lseek</code> 的本质：它只是改 <code>file-&gt;f_pos</code> 这个整数，不涉及任何磁盘操作。所以它几乎零开销，也是「seek 后再读」不必然比顺序读慢的原因。</p>
+
+    <h2>3. inode 与 dentry 缓存：性能的真正战场</h2>
+    <div class="viz" data-kind="timeline" data-title="open(&quot;/etc/passwd&quot;) 花在哪几毫秒" data-sub="dentry 命中与否，差两个数量级" data-json='{"items":[{"t":"①","n":"路径解析","d":"dentry 逐级查缓存","c":"cy"},{"t":"②","n":"未命中","d":"读目录块、构造 dentry","c":"or"},{"t":"③","n":"读 inode","d":"磁盘 inode 装入内存","c":"vi"},{"t":"④","n":"权限检查","d":"uid/gid 与 mode 比对","c":"gr"},{"t":"⑤","n":"分配 file","d":"挂到进程 fd 表","c":"cy"}],"note":"全命中约 1µs，全不命中要几毫秒。「第一次打开慢、后面快」不是错觉。"}'></div>
+
+
+    <p>如果每次 <code>open</code> 都要读磁盘上的目录块、再读 inode 块，系统会慢到不能忍。所以内核做了两级缓存，它们的失效策略不同，理解差别很关键。</p>
+
+    <h3>3.1 inode 缓存（icache）</h3>
+
+    <p>键是「<b>哪个文件系统 + 哪个 inode 号</b>」。一个 inode 被读进内存后：</p>
+
+    <ul>
+      <li><b>i_count &gt; 0</b>（有 dentry 或 file 引用它）：不能被回收，动了系统就崩。</li>
+      <li><b>i_count = 0</b>：进 LRU 链表，内存紧张时优先回收。回收前如果它是脏的（有未写回的元数据），必须先写回磁盘。</li>
+    </ul>
+
+    <p>所以「inode 缓存占满了内存」是<b>正常且有益</b>的：那意味着你的目录结构、文件属性都在内存里，<code>ls -l</code> 不需要碰磁盘。这也是 <code>/proc/meminfo</code> 里 <code>Cached</code> 数字很大的原因——它不该被当成「内存泄漏」。</p>
+
+    <h3>3.2 dentry 缓存（dcache）</h3>
+
+    <p>键是「<b>父目录 dentry + 名字字符串</b>」。dentry 有四种状态，其中一种特别重要：</p>
+
+    <table>
+      <thead><tr><th>状态</th><th>含义</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td><b>已使用</b>（used）</td><td>指向有效 inode，被引用中</td><td>正常查找命中</td></tr>
+        <tr><td><b>未使用</b>（unused）</td><td>还在缓存里，但没人引用</td><td>下次查找还能命中，内存紧张可回收</td></tr>
+        <tr><td><b>负条目</b>（negative）</td><td><code>d_inode == NULL</code>，表示「这个名字不存在」</td><td><b>避免反复查磁盘</b></td></tr>
+        <tr><td>正在查找</td><td>查找进行中</td><td>并发控制</td></tr>
+      </tbody>
+    </table>
+
+    <div class="calc">
+      <h5>算一笔：负条目到底省了多少</h5>
+      <div class="line">场景：脚本循环 1000 次 <code>stat("cache/not_exist.txt")</code></div>
+      <div class="line">没有负缓存：每次都读目录块 → 1000 次磁盘（或页缓存）查找</div>
+      <div class="line">有负缓存：第一次之后全命中内存 → 1000 次纯内存哈希查找</div>
+      <div class="line">实测差距常在 <b>10 倍以上</b>（机械盘更多）</div>
+      <div class="line">代价：负条目也要占内存，且「新建同名文件」时必须让它失效</div>
+    </div>
+
+    <p>还有一条工程上很重要的事实：dentry 查找有<b>无锁快速路径</b>（RCU walk）。在读多写少的场景（绝大多数程序），路径解析可以不加锁并发进行，这是 Linux 文件系统吞吐高的关键设计之一。它带来的副作用是「查找过程中可能看到中间状态」，所以内核代码要严格遵守引用计数规则。</p>
+
+    <h2>4. 硬链接与软链接：本质是「几个名字」还是「另一个文件」</h2>
+
+    <p>这是最容易被面试官抓住的问题，但真正理解的人不多。区别在于<b>它们操作的对象不同</b>：</p>
+
+    <table>
+      <thead><tr><th>维度</th><th>硬链接（<code>ln a b</code>）</th><th>软链接（<code>ln -s a b</code>）</th></tr></thead>
+      <tbody>
+        <tr><td>本质</td><td>新增一个 dentry，指向<b>同一个 inode</b></td><td>新建一个<b>独立的 inode</b>，内容是「目标路径字符串」</td></tr>
+        <tr><td>inode 号</td><td>相同</td><td>不同</td></tr>
+        <tr><td>占用空间</td><td>几乎为 0（只多一个目录项）</td><td>至少一个块（存路径字符串）+ 一个 inode</td></tr>
+        <tr><td>跨文件系统</td><td><b>不行</b>（inode 号只在单个 fs 内有意义）</td><td>可以</td></tr>
+        <tr><td>指向目录</td><td><b>不行</b>（会造成循环遍历灾难）</td><td>可以</td></tr>
+        <tr><td>删除原文件后</td><td>另一个名字照常可用（数据还在）</td><td>链接变成「断链」，访问报错</td></tr>
+        <tr><td>计数</td><td><code>i_nlink</code> 记录有几个名字</td><td>不涉及 <code>i_nlink</code></td></tr>
+      </tbody>
+    </table>
+
+    <p>硬链接为什么不能跨文件系统？因为 inode 号是<b>文件系统内部</b>的编号——ext4 的 inode 42 和 FAT32 的 inode 42 完全无关。硬链接本质是「在同一个 fs 的目录树里再加一个名字指向这个 inode」，跨 fs 就无处落脚。</p>
+
+    <p>为什么不能硬链接目录？因为目录树必须是一棵<b>没有环</b>的树：路径解析、<code>find</code>、备份工具都假设「顺着走一定能走完」。允许目录硬链接就能造出环，遍历会死循环，删除时引用计数也会算不清。</p>
+
+    <h2>5. 删了文件空间没释放：三个计数在打架</h2>
+
+    <p>这是运维和嵌入式现场最常见的一个「灵异现象」。要解释它，必须区分 inode 上的两个完全不同的计数：</p>
+
+    <table>
+      <thead><tr><th>计数</th><th>含义</th><th>谁改它</th></tr></thead>
+      <tbody>
+        <tr><td><code>i_nlink</code></td><td><b>磁盘上</b>有几个目录项指向这个 inode</td><td><code>link()</code> 加一，<code>unlink()</code> 减一</td></tr>
+        <tr><td><code>i_count</code></td><td><b>内存里</b>有几个对象引用它（dentry、打开的文件、正在执行的系统调用）</td><td>内核自动维护，随引用增减</td></tr>
+      </tbody>
+    </table>
+
+    <p><code>rm</code> 的本质是 <code>unlink()</code>：<b>它只删掉「名字」，把 <code>i_nlink</code> 减一</b>。数据块什么时候真正释放？必须<b>同时</b>满足：</p>
+
+    <div class="reg">i_nlink == 0    （没有任何名字指向它了）
+且
+i_count == 0    （没有任何进程还打开着它）</div>
+
+    <p>第二个条件就是「删了不释放」的全部原因：<b>只要还有进程持有这个文件的 fd，数据块就必须留着</b>——否则那个进程后续的 <code>read</code> 会读到不存在的块。</p>
+
+    <div class="calc">
+      <h5>算一笔：一个 20GB 日志的「假删除」</h5>
+      <div class="line">14:00 服务在写 <code>/var/log/app.log</code>，同时有人 <code>tail -f</code> 看着</div>
+      <div class="line">14:05 <code>rm app.log</code> → i_nlink 变 0，但服务与 tail 都还开着 fd → 数据块<b>全部保留</b></div>
+      <div class="line"><code>df</code> 显示磁盘依旧占着 20GB，<code>ls</code> 却看不到这个文件</div>
+      <div class="line">14:06 重启服务与 tail → 最后一个 fd 关闭 → i_count 归零 → 20GB 立刻释放</div>
+      <div class="line">正确做法：<code>truncate -s 0 app.log</code>（清空但不删名字），或 <code>: &gt; app.log</code></div>
+    </div>
+
+    <p>排查命令：<code>lsof +L1</code> 专门列出「link 数为 0 但仍被打开」的文件，输出里带 <code>(deleted)</code> 标记。嵌入式设备上 Flash 空间被莫名吃掉时，先跑这一条。</p>
+
+    <p>另外两个常被误判为「删了不释放」的情况也要分清：<b>①</b> ext4 出厂保留 5% 空间给 root（<code>tune2fs -m</code> 可调），普通用户看到的是「可用」而不是「总容量」；<b>②</b> inode 用尽——<code>df -i</code> 显示 100% 时，即使还有空间也创建不了新文件（大量小文件场景常见）。</p>
+
+    <h2>6. 页缓存：read 和 write 都不直接碰磁盘</h2>
+    <div class="viz" data-kind="seq" data-title="read 命中页缓存 vs 未命中" data-sub="同一行代码，两种时序" data-json='{"slots":24,"sigs":[{"n":"命中：read","w":"0.1....0.........................","c":"gr"},{"n":"未命中：read","w":"0.1..........0..................","c":"rd"},{"n":"磁盘 IO","w":"0.......1.....1.................","c":"vi"}],"note":"write 同理：writeback 模式下 write 返回只代表进了页缓存，掉电可能丢——要可靠必须 fsync。"}'></div>
+
+
+    <p>很多人以为 <code>read()</code> 就是「从磁盘读」，<code>write()</code> 就是「写到磁盘」。真实路径完全不同，这也是系统性能与数据安全的关键。</p>
+
+    <h3>6.1 read 的真实路径</h3>
+
+    <div class="flow">
+      <span>read(fd)</span><span>→</span><span>查页缓存</span><span>→</span><span>命中？</span><span>→</span><span>是：拷到用户缓冲</span><span>→</span><span>否：触发预读</span><span>→</span><span>提交块 IO</span><span>→</span><span>等完成</span><span>→</span><span>拷到用户缓冲</span>
+    </div>
+
+    <p>页缓存（page cache）以「<b>inode + 页号</b>」为键。命中时 <code>read</code> 只是内存拷贝，几微秒；未命中时内核不仅读你要的那一页，还会<b>预读后面的若干页</b>（默认几十到 128KB，由 <code>read_ahead_kb</code> 控制）。这就是「顺序读大文件比随机读快得多」的原因——预读把零散的小 IO 合并成了连续大 IO。</p>
+
+    <h3>6.2 write 的真实路径与丢数据风险</h3>
+
+    <p><code>write()</code> 返回成功，<b>只代表数据进了页缓存并被标为「脏」</b>，一个字都没到磁盘。真正的落盘由内核的回写线程批量完成：</p>
+
+    <table>
+      <thead><tr><th>参数</th><th>默认值</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td><code>dirty_writeback_centisecs</code></td><td>500（5 秒）</td><td>回写线程多久醒一次</td></tr>
+        <tr><td><code>dirty_expire_centisecs</code></td><td>3000（30 秒）</td><td>脏页超过多久必须写</td></tr>
+        <tr><td><code>dirty_ratio</code></td><td>20%</td><td>脏页占内存超过这个比例，写操作开始同步阻塞</td></tr>
+      </tbody>
+    </table>
+
+    <p>所以<b>直接断电，最多会丢最近 30 秒的写入</b>。要保证落盘必须显式调用：</p>
+
+    <ul>
+      <li><code>fsync(fd)</code>：把这个文件的数据 + 元数据刷到存储，并等它真的写完。</li>
+      <li><code>fdatasync(fd)</code>：只刷数据，不刷不影响读取的元数据（如 mtime），更快。</li>
+      <li><code>O_SYNC</code> / <code>O_DSYNC</code>：打开时就要求每次写都同步。</li>
+      <li><code>O_DIRECT</code>：绕过页缓存直接读写设备，数据库常用（自己管缓存）。</li>
+    </ul>
+
+    <div class="note">
+      <b>嵌入式必记的一条</b>
+      掉电敏感的场景（配置、计量数据、日志），写完必须 <code>fsync</code>。只 <code>write</code> 就断电，重启后文件内容可能是旧的、甚至出现「长度对但中间是 0」的诡异现象（ext4 延迟分配 + 元数据先落盘的副作用）。
+    </div>
+
+    <h2>7. 那些「不是文件的文件」</h2>
+
+    <p>「一切皆文件」是 Linux 最著名的口号，但它常被误解成「所有东西都存在磁盘上」。真相是：<b>「文件」只是一个接口抽象</b>——只要有 <code>open/read/write/close</code> 这套操作，内核就把它挂进目录树。下面这几个挂载点全是这种「假文件」：</p>
+
+    <table>
+      <thead><tr><th>文件系统</th><th>挂载点</th><th>内容来自</th><th>能写吗</th></tr></thead>
+      <tbody>
+        <tr><td><b>proc</b></td><td><code>/proc</code></td><td>内核内部数据结构（进程、内存、参数）</td><td><code>/proc/sys</code> 下可写，其余只读</td></tr>
+        <tr><td><b>sysfs</b></td><td><code>/sys</code></td><td>设备模型：每个设备一个目录、每个属性一个文件</td><td>部分属性可写（如 GPIO 导出）</td></tr>
+        <tr><td><b>devtmpfs</b></td><td><code>/dev</code></td><td>内核探测到的设备节点（major:minor）</td><td>不能随意创建，由驱动决定</td></tr>
+        <tr><td><b>tmpfs</b></td><td><code>/tmp</code>、<code>/run</code></td><td>内存（可换出到 swap）</td><td>能写，断电全丢</td></tr>
+        <tr><td><b>debugfs</b></td><td><code>/sys/kernel/debug</code></td><td>内核调试信息（需挂载）</td><td>部分可写，仅调试用</td></tr>
+      </tbody>
+    </table>
+
+    <p>这类文件系统的实现方式是：<b>它们的「读」不是从块设备取数据，而是调用一个内核函数把当前状态格式化成文本</b>。所以你会看到两个「反常」现象：</p>
+
+    <ul>
+      <li><code>ls -l /proc/cpuinfo</code> 显示大小 0，但 <code>cat</code> 出来几十行。因为大小是动态生成的，stat 时并不知道将来会有多少内容。</li>
+      <li>同一个 <code>/proc/meminfo</code>，连续读两次内容不同。因为每次读都重新采样当前内存状态。</li>
+    </ul>
+
+    <div class="key">
+      <b>这条认知决定你怎么用 /sys 和 /proc</b>
+      <code>echo 1 &gt; /sys/class/gpio/gpio12/value</code> 不是在「写文件」，而是在<b>调用内核里对应的属性写函数</b>，这个函数会去操作 GPIO 寄存器。所以这里的 <code>echo</code> 失败可能意味着硬件没配好，而不是「文件权限不对」。
+    </div>
+
+    <h2>8. 十个常见误解</h2>
+
+    <table>
+      <thead><tr><th>误解</th><th>真相</th></tr></thead>
+      <tbody>
+        <tr><td>「inode 就是文件」</td><td>inode 是文件的<b>元数据</b>，不含名字。名字在 dentry / 目录项里。</td></tr>
+        <tr><td>「一个文件只有一个 inode」</td><td>对，但可以有多个 dentry 指向它（硬链接）。反过来说「一个 dentry 一定对应一个 inode」也不对——负条目就没有 inode。</td></tr>
+        <tr><td>「删文件就是删数据」</td><td><code>rm</code> 只删名字。数据块在引用计数归零后才释放。</td></tr>
+        <tr><td>「write 成功就安全了」</td><td>只到页缓存。断电会丢；必须 fsync 才算落盘。</td></tr>
+        <tr><td>「read 一定读磁盘」</td><td>命中页缓存时纯内存拷贝；只有未命中才触发 IO，且会预读。</td></tr>
+        <tr><td>「Cached 内存是浪费」</td><td>页缓存可随时回收，它是性能来源，不是泄漏。</td></tr>
+        <tr><td>「/proc 里的文件大小是 0 说明坏了」</td><td>动态生成的内容，大小无意义。</td></tr>
+        <tr><td>「软链接就是快捷方式，等价于原文件」</td><td>它是独立 inode，内容是路径字符串；原文件删了就断链。</td></tr>
+        <tr><td>「ext4 一定能防断电丢数据」</td><td>日志只保证<b>元数据一致性</b>，不保证数据不丢。要保数据必须 fsync。</td></tr>
+        <tr><td>「目录也是文件，所以可以硬链接」</td><td>目录是文件，但硬链接目录被禁止，因为它会破坏树的「无环」性质。</td></tr>
+      </tbody>
+    </table>
+
+    <h2>9. 自检：能答出来才算懂</h2>
+
+    <div class="q"><span class="n">1</span><p>VFS 的四个核心对象是什么？哪个是「全系统唯一」的？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>super_block（文件系统实例）、inode（文件元数据）、dentry（名字 → inode）、file（一次打开）。inode 在一个文件系统内唯一（同一文件不会有两份）；file 是每次 open 一份；dentry 与硬链接数量相关。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p><code>open()</code> 里最贵的一步是什么？为什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>路径解析（<code>link_path_walk</code>）。长路径要逐段查 dcache，未命中还要读目录块；深度目录 + 冷缓存时，一次 open 可能触发多次磁盘 IO。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>两个进程各自 open 同一文件，一个读了一半，另一个从哪开始读？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>从各自的位置开始——因为 <code>f_pos</code> 在 file 对象里，每次 open 一份。但如果是 fork 出来的父子进程，共享同一 file，位置就会互相影响。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>负 dentry 是什么？没有它会怎样？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p><code>d_inode == NULL</code> 的缓存项，记录「这个名字不存在」。没有它，每次访问不存在的路径都要真实查一次目录，脚本循环里会放大成大量 IO。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>硬链接为什么不能跨文件系统？为什么不能链目录？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>跨 fs 不行：inode 号只在单个文件系统内有意义，硬链接本质是「同一 fs 内新增一个指向该 inode 的目录项」。链目录不行：会让目录树出现环，遍历与引用计数都会崩。</p>
+    </div></details>
+
+    <div class="q"><span class="n">6</span><p><code>rm</code> 一个大文件后 <code>df</code> 没变化，列出两种可能原因。</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>① 还有进程打开着它（i_count &gt; 0），数据块保留，用 <code>lsof +L1</code> 找；② 不是空间问题而是 <b>inode 用尽</b>（<code>df -i</code> 100%），或者是 ext4 给 root 保留的 5% 让普通用户看不到。三者现象相似，原因完全不同。</p>
+    </div></details>
+
+    <div class="q"><span class="n">7</span><p><code>write()</code> 返回成功，数据在哪？断电会怎样？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>在页缓存里，标记为脏。断电最多丢最近 30 秒（<code>dirty_expire_centisecs</code> 默认 3000）。必须 <code>fsync</code> 才算真正落盘。</p>
+    </div></details>
+
+    <div class="q"><span class="n">8</span><p>为什么顺序读大文件比随机读快很多？两个原因。</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>① 预读把后续页一起读进缓存，把多个小请求合并成大请求；② 顺序访问符合存储介质的物理特性（eMMC/机械盘连续块更快）。随机读则每次都可能是 major fault。</p>
+    </div></details>
+
+    <div class="q"><span class="n">9</span><p>为什么 <code>ls -l /proc/cpuinfo</code> 显示大小是 0？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>因为它不是磁盘文件，内容在 read 时由内核函数实时生成，stat 阶段没有「大小」这个概念。</p>
+    </div></details>
+
+    <div class="q"><span class="n">10</span><p><code>echo 1 &gt; /sys/class/gpio/gpio12/value</code> 实际发生了什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>写这个「文件」触发了 sysfs 属性的 store 回调，该回调调用 GPIO 驱动的代码，最终写 GPIO 数据寄存器。所以这里的「写文件」= 调内核函数 = 操作硬件。</p>
+    </div></details>
+
+    <h2>10. 这一章要动手的命令</h2>
+
+    <div class="steps">
+      <ol>
+        <li><code>stat a.txt</code> —— 一次看清 inode 号、链接数、三个时间戳、块数。</li>
+        <li><code>ln a.txt b.txt &amp;&amp; ls -li a.txt b.txt</code> —— 验证硬链接 inode 号相同。</li>
+        <li><code>ln -s a.txt c.txt &amp;&amp; ls -li c.txt &amp;&amp; rm a.txt &amp;&amp; cat c.txt</code> —— 验证软链接断链。</li>
+        <li><code>lsof +L1</code> —— 找「已删除但仍被打开」的文件，复现第 5 节的 20GB 场景。</li>
+        <li><code>df -i</code> 与 <code>df -h</code> 一起看 —— 区分「空间满」和「inode 满」。</li>
+        <li>写 100MB 后立刻 <code>cat /proc/meminfo | grep Dirty</code>，再 <code>sync</code>，观察脏页清零。</li>
+        <li><code>echo 3 &gt; /proc/sys/vm/drop_caches</code> 后 <code>time cat bigfile</code>，再读第二次 <code>time cat bigfile</code>，对比页缓存的效果。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一章预告</b>
+      T05 讲设备模型：<code>/dev</code> 下那个设备节点怎么工作、major/minor 是什么、驱动怎么被匹配到设备、为什么插上 U 盘内核就「自动」知道该加载哪个驱动。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"VFS 的四个对象：谁记内容、谁记名字","hint":"点一个看它活多久","items":[{"b":"superblock","d":"一个挂载的文件系统一份，记块大小、inode 总数、空闲块。挂载时创建，卸载时销毁。"},{"b":"inode","d":"记一个文件的元数据：权限、大小、时间、数据块在哪。不记名字。硬链接就是多个名字指向同一个 inode。"},{"b":"dentry","d":"记「名字 → inode」的映射，带缓存。你 ls 一下，靠的就是它。"},{"b":"file","d":"一次打开才有一份，记当前读写偏移、打开模式。fork 后两个进程共享同一个 file 偏移。"},{"b":"为什么分开","d":"名字和内容分开，才能一个文件多个名字、一个文件被多次打开各自记偏移；文件系统不同也能用同一套接口。"}],"note":"cat 一个文件时四者依次登场：dentry 查名字 → inode 拿块地址 → file 记偏移 → superblock 提供块大小。"}'></div>
+  </main>
+</div>
+<script src="../assets/nav.js"></script>
+<script src="../assets/viz.js"></script>
+<script src="../assets/iviz.js"></script>
+<script src="../assets/anime.iife.min.js"></script>
+<script src="../assets/anim2.js"></script>
+</body>
+</html>
+
+
+
+

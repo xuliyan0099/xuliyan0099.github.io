@@ -1,0 +1,358 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>驱动开发入门 · 卷 09 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j09.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 09 · 驱动体系</div>
+<ol><li><a href="course-th05.html">
+  <span class="no">01</span><span>设备模型与驱动框架<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="course-45.html">
+  <span class="no">02</span><span>写一个字符设备<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-46.html">
+  <span class="no">03</span><span>pinctrl 与 GPIO<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-47.html">
+  <span class="no">04</span><span>I2C 设备驱动<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-48.html">
+  <span class="no">05</span><span>中断的上半部与下半部<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-ch12.html" class="active">
+  <span class="no">06</span><span>驱动开发入门<span class="sub">约 20 小时 · 当前</span></span></a></li>
+<li><a href="d09-01.html">
+  <span class="no">07</span><span>platform 总线模型：probe、匹配、资源与设备树<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="d09-02.html">
+  <span class="no">08</span><span>阻塞 IO 与等待队列：poll / select / epoll 的驱动侧<span class="sub">约 3 小时</span></span></a></li>
+<li><a href="d09-03.html">
+  <span class="no">09</span><span>SPI 子系统：控制器驱动与设备驱动<span class="sub">◆ · 约 3 小时</span></span></a></li>
+<li><a href="d09-04.html">
+  <span class="no">10</span><span>块设备与 eMMC：gendisk、请求队列与分区<span class="sub">◆ · 约 4 小时</span></span></a></li>
+<li><a href="d09-05.html">
+  <span class="no">11</span><span>DMA 与 Cache 一致性：谁负责 flush，谁负责 invalidate<span class="sub">◆ · 约 3 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j08.html">← 卷 08</a>
+  <a href="../juan/j10.html">卷 10 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 09<span>·</span>驱动体系<span>·</span>第 06 篇</div>
+  <h1>驱动开发入门</h1>
+  <p class="lede">应用层调 write()，内核里由驱动去写寄存器。驱动就是这两者之间的翻译官。这一章从「加载一个模块」走到「应用能控制一个 LED」。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 20 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+    <div class="viz" data-kind="stack" data-title="驱动被加载时发生了什么" data-sub="probe 不是你说的，是内核替你调的" data-json='{"frames":[{"n":"insmod my_driver.ko","d":"你只敲了这一行","sp":"用户态"},{"n":"模块加载器","d":"读 ELF、重定位、分配内存","sp":"内核态"},{"n":"driver_register","d":"把驱动挂到总线的驱动链表上"},{"n":"总线匹配","d":"遍历设备链表，比 compatible 字符串","sp":"匹配成功"},{"n":"probe 函数","d":"初始化硬件、注册字符设备节点","sp":"你的代码在这"},{"n":"mknod / sysfs 出现","d":"/dev/mydev 就来了","sp":"用户态可见"}],"spHint":"从上到下是调用顺序：你的代码在第五层才被执行","note":"所以「驱动没打印」有两种可能：模块没加载成功，或者加载了但没配上设备。看 dmesg 里有没有 probe 打印，一句话就能区分。"}'></div>
+
+
+    <div class="card">
+      <h4>本章目标</h4>
+      <p>① 编出并加载第一个内核模块；② 理解主次设备号与 file_operations；③ 写一个字符设备驱动并自动创建 /dev 节点；④ 在驱动里操作 GPIO；⑤ 用设备树 compatible 匹配自己的驱动。</p>
+    </div>
+
+    <div class="anim2" data-json='{"title":"第一个字符设备：从注册到能读","hint":"六步，缺一步就 open 不了","nodes":[{"k":"module_init","s":"入口函数"},{"k":"申请设备号","s":"alloc_chrdev"},{"k":"fops","s":"open/read/write"},{"k":"cdev_add","s":"挂进内核"},{"k":"mknod","s":"/dev 节点"},{"k":"read","s":"用户读到数据"}],"frames":[{"i":0,"d":"写 module_init / module_exit，加 MODULE_LICENSE，否则会有污染警告。"},{"i":1,"d":"alloc_chrdev_region 动态拿主次设备号，别写死 240 这种老号码。"},{"i":2,"d":"填 file_operations：read 里必须 copy_to_user，绝不能直接解引用用户指针。"},{"i":3,"d":"cdev_init 绑定 fops，cdev_add 挂进内核——设备就「在」了。"},{"i":4,"d":"mknod /dev/xxx c 主 次，或让 udev 自动建，用户程序才找得到入口。"},{"i":5,"d":"insmod 后 cat /dev/xxx 读到数据，dmesg 里有你的打印，rmmod 干净退出。"}],"kind":"flow"}'></div>
+
+    <h2 id="s1">12.1 驱动在哪一层</h2>
+
+    <div class="flow">
+      <div class="box"><b>应用程序</b><span>open / read / write</span></div>
+      <div class="arrow">↓</div>
+      <div class="box"><b>设备文件</b><span>/dev/myled</span></div>
+      <div class="arrow">↓</div>
+      <div class="box"><b>字符设备驱动</b><span>file_operations</span></div>
+      <div class="arrow">↓</div>
+      <div class="box"><b>GPIO 子系统</b><span>gpiod / pinctrl</span></div>
+      <div class="arrow">↓</div>
+      <div class="box"><b>寄存器</b><span>IOMUXC / GPIO_DR</span></div>
+    </div>
+
+    <p>应用永远不知道寄存器地址，它只认 <code>/dev/myled</code> 这个文件。驱动负责把「写一个字符」翻译成「把某个引脚拉高」。</p>
+
+    <h2 id="s2">12.2 第一个内核模块</h2>
+
+    <pre><code>// hello_mod.c
+#include &lt;linux/module.h&gt;
+#include &lt;linux/init.h&gt;
+
+static int __init hello_init(void)
+{
+    printk(KERN_INFO "hello_mod: loaded\n");
+    return 0;
+}
+
+static void __exit hello_exit(void)
+{
+    printk(KERN_INFO "hello_mod: removed\n");
+}
+
+module_init(hello_init);
+module_exit(hello_exit);
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("you");
+MODULE_DESCRIPTION("first module");</code></pre>
+
+    <p>Makefile（注意内核源码必须先编译过一次，否则没有 <code>Module.symvers</code>）：</p>
+
+    <pre><code>obj-m := hello_mod.o
+KDIR  := /home/ubuntu/linux-imx
+PWD   := $(shell pwd)
+
+all:
+	$(MAKE) -C $(KDIR) M=$(PWD) \
+		ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- modules
+
+clean:
+	$(MAKE) -C $(KDIR) M=$(PWD) clean</code></pre>
+
+    <pre><code>$ make
+$ scp hello_mod.ko root@192.168.1.101:/root/
+<span class="c"># 板子上</span>
+# insmod hello_mod.ko
+# dmesg | tail -3
+# lsmod | grep hello
+# rmmod hello_mod</code></pre>
+
+    <div class="key">
+      <b>printk 不是 printf</b>
+      它写进内核环形缓冲区，用 <code>dmesg</code> 看，不输出到你的终端。日志级别 <code>KERN_INFO</code>、<code>KERN_ERR</code> 决定它会不会被默认级别过滤掉。
+    </div>
+
+    <h2 id="s3">12.3 字符设备：从设备号到 /dev 节点</h2>
+    <div class="viz" data-kind="flow" data-title="从设备号到 /dev 节点，谁在中间" data-sub="主设备号找驱动，次设备号找实例" data-json='{"steps":[{"n":"设备号","d":"major:minor，alloc_chrdev_region"},{"n":"cdev","d":"把 ops 挂到设备号上"},{"n":"class/device","d":"让 udev 建 /dev/节点"},{"n":"open","d":"VFS 按 major 找到 cdev"},{"n":"file_operations","d":"read/write/ioctl → 你的代码"}],"note":"open 报 ENODEV，多半是设备号没注册成功；/dev 下没节点，是 class/device 那一步漏了。"}'></div>
+
+
+    <table>
+      <thead><tr><th>概念</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td>主设备号</td><td>标识「哪一类驱动」，如 240</td></tr>
+        <tr><td>次设备号</td><td>标识「同一驱动下的第几个设备」</td></tr>
+        <tr><td><code>file_operations</code></td><td>函数指针表：open/read/write/ioctl 都在这注册</td></tr>
+        <tr><td><code>cdev</code></td><td>内核里代表一个字符设备的结构体</td></tr>
+        <tr><td><code>class_create</code></td><td>在 <code>/sys/class</code> 下建类，为自动创建设备节点做准备</td></tr>
+      </tbody>
+    </table>
+
+    <p>老接口 <code>register_chrdev</code> 一行搞定但只给一个主设备号、无法精细控制；新接口是 <code>alloc_chrdev_region + cdev_init + cdev_add</code>，工程上只用新接口。</p>
+
+    <h2 id="s4">12.4 一个能用的字符设备驱动（骨架）</h2>
+
+    <pre><code>#include &lt;linux/module.h&gt;
+#include &lt;linux/fs.h&gt;
+#include &lt;linux/cdev.h&gt;
+#include &lt;linux/device.h&gt;
+#include &lt;linux/uaccess.h&gt;
+
+#define DEV_NAME  "mychar"
+#define BUF_SIZE  64
+
+static dev_t        dev_id;
+static struct cdev  my_cdev;
+static struct class *my_class;
+static char         kbuf[BUF_SIZE];
+
+static int my_open(struct inode *in, struct file *fp)
+{
+    printk(KERN_INFO "mychar: open\n");
+    return 0;
+}
+static int my_release(struct inode *in, struct file *fp) { return 0; }
+
+static ssize_t my_read(struct file *fp, char __user *ubuf,
+                       size_t len, loff_t *off)
+{
+    int ret = simple_read_from_buffer(ubuf, len, off, kbuf, BUF_SIZE);
+    return ret;
+}
+
+static ssize_t my_write(struct file *fp, const char __user *ubuf,
+                        size_t len, loff_t *off)
+{
+    if (len &gt; BUF_SIZE) len = BUF_SIZE;
+    if (copy_from_user(kbuf, ubuf, len)) return -EFAULT;
+    printk(KERN_INFO "mychar: got %zu bytes\n", len);
+    return len;
+}
+
+static const struct file_operations my_fops = {
+    .owner   = THIS_MODULE,
+    .open    = my_open,
+    .release = my_release,
+    .read    = my_read,
+    .write   = my_write,
+};
+
+static int __init my_init(void)
+{
+    alloc_chrdev_region(&amp;dev_id, 0, 1, DEV_NAME);
+    cdev_init(&amp;my_cdev, &amp;my_fops);
+    cdev_add(&amp;my_cdev, dev_id, 1);
+
+    my_class = class_create(THIS_MODULE, DEV_NAME);
+    device_create(my_class, NULL, dev_id, NULL, DEV_NAME);
+
+    printk(KERN_INFO "mychar: major=%d minor=%d\n",
+           MAJOR(dev_id), MINOR(dev_id));
+    return 0;
+}
+
+static void __exit my_exit(void)
+{
+    device_destroy(my_class, dev_id);
+    class_destroy(my_class);
+    cdev_del(&amp;my_cdev);
+    unregister_chrdev_region(dev_id, 1);
+}
+
+module_init(my_init);
+module_exit(my_exit);
+MODULE_LICENSE("GPL");</code></pre>
+
+    <pre><code><span class="c"># 板子上</span>
+# insmod mychar.ko
+# dmesg | tail -2          <span class="c"># 记下 major</span>
+# ls -l /dev/mychar        <span class="c"># 应该自动出现，c 开头</span>
+# echo "hello" &gt; /dev/mychar
+# cat /dev/mychar
+# dmesg | tail -2</code></pre>
+
+    <div class="tip">
+      <b>节点没自动出现？</b>
+      ① 有没有 <code>class_create</code> + <code>device_create</code> ② 板子上 udev/mdev 有没有跑（BusyBox 环境要 <code>mdev -s</code>）③ 手动救急：<code>mknod /dev/mychar c &lt;major&gt; 0</code>。
+    </div>
+
+    <h2 id="s5">12.5 在驱动里操作 GPIO</h2>
+
+    <pre><code>#include &lt;linux/gpio.h&gt;
+#include &lt;linux/of_gpio.h&gt;
+
+static int led_gpio;
+
+<span class="c">/* probe 里：从设备树取引脚号 */</span>
+led_gpio = of_get_named_gpio(dev-&gt;of_node, "led-gpios", 0);
+if (led_gpio &lt; 0) return led_gpio;
+
+gpio_request(led_gpio, "myled");
+gpio_direction_output(led_gpio, 0);
+
+<span class="c">/* 控制 */</span>
+gpio_set_value(led_gpio, 1);   <span class="c">/* 高电平 */</span>
+gpio_set_value(led_gpio, 0);
+
+<span class="c">/* remove 里 */</span>
+gpio_free(led_gpio);</code></pre>
+
+    <p>新内核推荐 <strong>gpiod 描述符接口</strong>（<code>devm_gpiod_get</code> / <code>gpiod_set_value</code>），能自动释放资源、自动处理有效电平，写产品代码时用它。</p>
+
+    <div class="warn">
+      <b>gpio_request 失败 = 引脚被别人占了</b>
+      <code>dmesg</code> 里会打印 <code>gpio ... already requested</code>。常见原因：设备树里 <code>gpio-leds</code> 节点已经把同一个引脚占用了。<b>一个引脚同时只能有一个使用者</b>，写自己的驱动前先把原生 LED 节点 <code>status = "disabled"</code>。
+    </div>
+
+    <h2 id="s6">12.6 用设备树匹配驱动</h2>
+    <div class="viz" data-kind="bits" data-title="GPIO1 的 DR 与 DIR：两个寄存器搞定一个灯" data-sub="i.MX6ULL GPIO1 基址 0x0209C000" data-json='{"w":32,"fields":[{"n":"bit31","lo":31,"hi":31,"c":"gray","t":"每组 32 位，对应 32 个引脚"},{"n":"…","lo":3,"hi":30,"c":"gray"},{"n":"bit3 = GPIO1_IO03","lo":3,"hi":3,"c":"or","t":"板上 LED 常接这个脚"},{"n":"bit2–bit0","lo":0,"hi":2,"c":"gray"}],"note":"DIR 位=1 输出、=0 输入；DR 位写 1 输出高。注意先配置 IOMUXC 把引脚切成 GPIO 功能，否则写 DR 无效。"}'></div>
+
+
+    <pre><code>static const struct of_device_id my_of_match[] = {
+    { .compatible = "myvendor,myled" },
+    { /* sentinel */ }
+};
+MODULE_DEVICE_TABLE(of, my_of_match);
+
+static struct platform_driver my_driver = {
+    .probe  = my_probe,
+    .remove = my_remove,
+    .driver = {
+        .name           = "myled",
+        .of_match_table = my_of_match,
+    },
+};
+module_platform_driver(my_driver);</code></pre>
+
+    <p>设备树里对应写：</p>
+
+    <pre><code>myled {
+    compatible = "myvendor,myled";
+    led-gpios = &lt;&amp;gpio1 3 GPIO_ACTIVE_HIGH&gt;;
+    pinctrl-names = "default";
+    pinctrl-0 = &lt;&amp;pinctrl_led&gt;;
+    status = "okay";
+};</code></pre>
+
+    <p><strong>compatible 字符串必须逐字符一致</strong>，包括厂商前缀的大小写。不一致，probe 根本不会被调用，<code>lsmod</code> 看着加载成功但什么也没发生——这是最常见的「驱动加载了没反应」。</p>
+
+    <h2 id="s7">12.7 完整流程串一遍</h2>
+
+    <ol class="steps">
+      <li>改设备树，加 <code>myled</code> 节点与 pinctrl，<code>make dtbs</code>。</li>
+      <li>编驱动 <code>.ko</code>，传到板子。</li>
+      <li><code>insmod myled.ko</code>，<code>dmesg</code> 看 probe 有没有执行。</li>
+      <li><code>ls /dev/myled</code>，不存在就 <code>mknod</code> 或检查 class 创建。</li>
+      <li>应用程序 <code>open("/dev/myled")</code> → <code>write("1")</code> → LED 亮。</li>
+      <li>看 <code>/sys/class/gpio</code> 或万用表验证电平。</li>
+    </ol>
+
+    <h2 id="s8">12.8 动手任务</h2>
+    <ul class="steps">
+      <li>编 hello_mod 模块，加载、查看 dmesg、卸载，全程记录输出。</li>
+      <li>编字符设备驱动，实现 write 存数据、read 读回来，用 <code>echo</code> / <code>cat</code> 验证。</li>
+      <li>把 GPIO 加进驱动，让 write "1"/"0" 控制板子上的 LED。</li>
+      <li>在设备树里改 compatible 为你的名字，验证 probe 被调用；再故意改成别的字符串，观察 probe 不再执行。</li>
+      <li>让另一个平台驱动同时请求同一个 GPIO，记录 <code>gpio_request</code> 失败时的报错。</li>
+      <li>把驱动写成开机自动加载（<code>/etc/modules</code> 或 modprobe 配置）。</li>
+    </ul>
+
+    <h2 id="s9">12.9 验收标准</h2>
+    <ul class="checklist">
+      <li>能独立编出 .ko 并加载/卸载</li>
+      <li>能写字符设备驱动，应用可读写，/dev 节点自动出现</li>
+      <li>能解释主次设备号、file_operations、cdev 的作用</li>
+      <li>能在驱动里申请并使用一个 GPIO 控制 LED</li>
+      <li>能用 compatible 匹配平台驱动，并知道不匹配时的现象</li>
+      <li>遇到「加载成功但没反应」能按 probe → dts → 引脚占用三步排查</li>
+    </ul>
+
+    <footer id="pager"></footer>
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"写第一个字符设备：六步","steps":[{"t":"① 铺框架","d":"写 module_init / module_exit，加上 MODULE_LICENSE。没有 license 会有污染警告。"},{"t":"② 拿设备号","d":"alloc_chrdev_region 动态申请主次设备号，别写死 240 这种老号码。"},{"t":"③ 填 file_operations","d":"至少实现 open、read、write、release。read 里用 copy_to_user，绝不能直接解引用用户指针。"},{"t":"④ 注册 cdev","d":"cdev_init 绑定 fops，cdev_add 挂进内核。这一步做完，设备就「在」了。"},{"t":"⑤ 建节点","d":"mknod /dev/xxx c 主 次，或让 udev 自动建。没有节点，用户程序找不到入口。"},{"t":"⑥ 插拔验证","d":"insmod 后在 dmesg 里看到你的打印，cat /dev/xxx 看到数据，rmmod 干净退出不掉引用计数。"}],"note":"最常见的两个坑：忘了 copy_to_user 返回值检查；rmmod 时设备还被打开，引用计数不为 0。"}'></div>
+  
+
+<nav class="pager">
+  <a href="course-48.html"><span>← 上一篇</span><b>中断的上半部与下半部</b></a>
+  <a class="nx" href="d09-01.html"><span>下一篇 →</span><b>platform 总线模型：probe、匹配、资源与设备树</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

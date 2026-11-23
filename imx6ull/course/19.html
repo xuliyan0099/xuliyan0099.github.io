@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=../docs/course-19.html">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>19 · 从源码到可执行</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/viz.css">
+<link rel="stylesheet" href="assets/iviz.css">
+<link rel="stylesheet" href="assets/anim2.css">
+  <script src="assets/readmode.js" defer></script>
+</head>
+<body data-page="19">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>第 19 课 · 从源码到可执行：段、符号、重定位</h1>
+    <p class="lede">上一课停在 <code>.o</code> 文件。它是一个「还没定地址的机器码盒子」：里面的 <code>call printf</code> 不知道该跳哪，只能留个坑。链接器的工作就是把这些坑填上，再把散落的盒子拼成一块能装进内存的东西。这一课讲段、符号、重定位，以及嵌入式里那个绕不开的文件——<b>链接脚本</b>。</p>
+
+    <div class="anim2" data-json='{"title":"从源码到可执行：段、符号、重定位","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"① 预处理"},{"k":"② 编译"},{"k":"③ 汇编"},{"k":"④ 链接"},{"k":"⑤ 加载"}],"frames":[{"i":0,"d":"#include 展开、宏替换、条件编译裁剪。产物是纯 C 源码，还没有任何机器码。"},{"i":1,"d":"语法语义检查，生成汇编。这一步报「语法错误」。"},{"i":2,"d":"汇编转成机器码，产出 .o（目标文件），里面还有没填的地址洞。"},{"i":3,"d":"合并多个 .o，按链接脚本摆放到指定地址，填上符号地址，产出 ELF。"},{"i":4,"d":"把 ELF 的段搬到内存、建页表、跳到入口。嵌入式里这一步常由 U-Boot 或内核完成。"}]}'></div>
+
+    <div class="viz" data-kind="map" data-title="一个可执行文件的段布局（ARM Linux 典型）" data-sub="从低地址到高地址，权限也不同" data-json='{"rows":[{"segs":[{"n":".text 代码","d":"只读可执行","c":"cy","size":4},{"n":".rodata 常量","d":"只读","c":"vi","size":2},{"n":".data 已初始化全局变量","d":"可读写","c":"or","size":2},{"n":".bss 未初始化变量","d":"可读写，不占文件体积","c":"gr","size":3},{"n":"堆 heap","d":"malloc 向上长","c":"rd","size":3},{"n":"栈 stack","d":"向下长","c":"rd","size":2}],"ptr":"程序加载后由 loader 建立"}],"note":"注意 .bss 很特殊：它在文件里几乎不占空间（只有长度信息），但运行时必须占内存且被清零。这就是为什么「全局大数组」会让二进制不变大、但内存占用暴涨。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 段是什么，为什么代码和常量要分开？② 符号是什么，重定位在填什么？③ 静态库与动态库差在哪？④ 链接脚本在嵌入式里干什么？⑤ 为什么嵌入式常推荐 <code>-static</code>？</p>
+    </div>
+
+    <h2>1. 段：不只是「分类」，是权限</h2>
+
+    <p>段不是随便分的：<b>它对应 MMU 的页权限</b>（第 25 课）。<code>.text</code> 只读可执行，防止代码被改写（这也是 W^X 安全策略的基础）；<code>.rodata</code> 只读，防止常量被偷偷修改；<code>.data/.bss</code> 可读写但不可执行。</p>
+
+    <p>你在内核里看到的 <code>__init</code> 段（启动后内存被回收）、<code>__user</code> 标记，都是「段」这个概念在软件层的延伸。</p>
+
+    <h2>2. 符号与重定位：先留坑，后填坑</h2>
+
+    <pre><code>; t.o 里的一段机器码
+    bl  printf        ; 此时 printf 地址未知 → 留坑 + 重定位项
+
+; readelf -r t.o 能看到：
+;   偏移      类型            符号
+;   0x00000008  R_ARM_CALL    printf
+
+; 链接后（a.out）：
+;   printf 被填成真实地址（静态链接）
+;   或填成 PLT 表项（动态链接，第一次调用才解析）</code></pre>
+
+    <p>两种填法对应两种库：</p>
+
+    <div class="viz" data-kind="compare" data-title="静态链接 vs 动态链接" data-sub="嵌入式和服务器在这件事上选择相反" data-json='{"bad":{"t":"动态链接（默认）","items":["可执行文件小，多个程序共享一份库","启动要加载 .so、解析符号（略慢）","依赖目标系统的库版本（glibc 升级会炸）","用 PLT/GOT 做延迟绑定"]},"good":{"t":"静态链接 -static","items":["所有代码打进一个文件，体积大","启动快，无运行时依赖","可在任意环境跑，不会「库版本不对」","嵌入式与救援工具的标准选择"]},"note":"busybox 静态编译后能塞进 1MB 的根文件系统，在没有任何 .so 的板子上照样跑——这就是为什么第 41 课的根文件系统常直接用静态 busybox。"}'></div>
+
+    <h2>3. PLT / GOT：动态库怎么「延迟绑定」</h2>
+
+    <p>动态库的地址在编译时不知道。于是链接器造了两张表：</p>
+
+    <ul>
+      <li><b>GOT</b>（全局偏移表）：存放「真实函数地址」的数组，位于数据段，可写。</li>
+      <li><b>PLT</b>（过程链接表）：每个外部函数一小段跳板，第一次调用时去查 GOT，若未解析就触发动态链接器填好。</li>
+    </ul>
+
+    <p>这解释了「第一次调用慢一点」的现象，也解释了为什么攻击者喜欢改 GOT（GOT 覆写攻击），以及为什么现代系统开启 RELRO 把 GOT 变只读。</p>
+
+    <h2>4. 链接脚本：嵌入式的地基</h2>
+
+    <p>PC 上链接脚本由发行版管，你从不用看。但在嵌入式里，<b>你必须自己写</b>——因为你要决定「哪段代码放在 SRAM、哪段放在 DDR、栈顶在哪」。</p>
+
+    <pre><code>/* 一个典型的 i.MX6ULL 裸机链接脚本片段 */
+MEMORY
+{
+    DDR   (rwx) : ORIGIN = 0x80000000, LENGTH = 512M
+    OCRAM (rwx) : ORIGIN = 0x00900000, LENGTH = 128K
+}
+
+SECTIONS
+{
+    .text : { *(.text*) } &gt; DDR
+    .rodata : { *(.rodata*) } &gt; DDR
+    .data : { *(.data*) } &gt; DDR
+    .bss : { *(.bss*) *(COMMON) } &gt; DDR
+    _stack_top = ORIGIN(DDR) + LENGTH(DDR);   /* 栈顶放最高地址 */
+}</code></pre>
+
+    <p>Uboot 的 <code>u-boot.lds</code>、内核的 <code>vmlinux.lds</code> 都是这个套路。看懂它们，你就知道「为什么内核启动代码必须放在最前面」——因为复位向量跳到的就是那儿。</p>
+
+    <h2>5. 实验：读懂一个 ELF</h2>
+
+    <pre><code>readelf -h a.out        # 文件头：入口地址、架构、类型
+readelf -S a.out        # 段表：每段的地址、大小、权限
+readelf -l a.out        # 加载视图：怎么装进内存
+readelf -s a.out        # 符号表
+readelf -r a.out        # 重定位（.o 才有意义）
+ldd a.out               # 依赖哪些动态库
+size a.out              # text/data/bss 各多大
+
+# 在板子上看内核：
+readelf -h vmlinux | head
+arm-linux-gnueabihf-objdump -d vmlinux | head -40</code></pre>
+
+    <p>先看 <code>size</code>：它会给你 text、data、bss 三个数字。<b>嵌入式里「Flash 够不够」看 text+data，「内存够不够」看 data+bss</b>——这两个判断几乎每天都要做。</p>
+
+    <h2>6. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于链接的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["编译通过就说明程序没问题","bss 不占空间，所以大数组不花钱","链接脚本是给链接器看的，跟运行没关系"]},"good":{"t":"实际","items":["编译只证明语法与符号可用，运行行为要另外验证","bss 不占文件体积，但占运行时内存并被清零","链接脚本决定每段的物理位置，直接决定程序能不能跑起来"]},"note":"裸机开发里 90% 的「程序跑飞」，最后都追到链接脚本：栈顶指错、向量表没放对、bss 没在启动代码里清零。这三件事比代码逻辑更常见。"}'></div>
+
+    <h2>7. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>为什么 .text 必须只读？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>防止代码被意外或恶意改写（如缓冲区溢出改返回地址），MMU 页权限提供硬件级保护。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>.bss 为什么不占文件体积？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>它的初值全是 0，文件里只需记录长度；加载时由 loader（或启动代码）把这块内存清零。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>动态链接的「延迟绑定」是什么意思？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>第一次调用外部函数时才去解析真实地址并写入 GOT，避免启动时解析所有符号。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>链接脚本里的 <code>_stack_top</code> 有什么用？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>给启动代码一个符号，用来初始化 SP；栈从高地址向低地址长，所以取可用内存的最高地址。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>嵌入式为什么常用 <code>-static</code>？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>避免依赖目标机的 .so 与 glibc 版本，程序可独立运行、启动快，适合精简根文件系统。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>对一个 C 程序跑 <code>readelf -h/-S/-l</code>，画出它的段布局。</li>
+        <li>用 <code>size</code> 比较 -static 与动态版本的三段大小。</li>
+        <li>写一个最小链接脚本，把程序放到指定地址，用 objdump 验证。</li>
+        <li>在板子上 <code>ldd busybox</code>，看它是静态还是动态。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      到这里，「软件」这条线已经打通：C → 汇编 → 机器码 → 段 → 可执行。接下来进入 P4 部，讲性能。第 20 课先建立存储层次的直觉：为什么 CPU 旁边要放一小块又贵又快的 SRAM。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"从 .c 到能跑，五步","hint":"点下一步","note":"出问题时先问：错在哪一步？找不到头文件是预处理，未定义符号是链接，跑起来段错误才是加载和执行。","steps":[{"t":"① 预处理","d":"#include 展开、宏替换、条件编译裁剪。产物是纯 C 源码，还没有任何机器码。"},{"t":"② 编译","d":"语法语义检查，生成汇编。这一步报「语法错误」。"},{"t":"③ 汇编","d":"汇编转成机器码，产出 .o（目标文件），里面还有没填的地址洞。"},{"t":"④ 链接","d":"合并多个 .o，按链接脚本摆放到指定地址，填上符号地址，产出 ELF。"},{"t":"⑤ 加载","d":"把 ELF 的段搬到内存、建页表、跳到入口。嵌入式里这一步常由 U-Boot 或内核完成。"}]}'></div>
+  </main>
+</div>
+<script src="assets/cnav.js"></script>
+<script src="assets/viz.js"></script>
+<script src="assets/iviz.js"></script>
+<script src="assets/anime.iife.min.js"></script>
+<script src="assets/anim2.js"></script>
+</body>
+</html>

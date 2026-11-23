@@ -1,0 +1,91 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>互动台：Cache 层次与命中 · 卷 03 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j03.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 03 · 存储与地址</div>
+<ol><li><a href="course-20.html">
+  <span class="no">01</span><span>存储层次<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-21.html">
+  <span class="no">02</span><span>Cache 三参数<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-22.html">
+  <span class="no">03</span><span>内存墙与局部性<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-23.html">
+  <span class="no">04</span><span>用 perf 量化<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="course-24.html">
+  <span class="no">05</span><span>虚拟地址是什么<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-25.html">
+  <span class="no">06</span><span>页表与 MMU<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-26.html">
+  <span class="no">07</span><span>缺页与换页<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th03.html">
+  <span class="no">08</span><span>虚拟内存与地址翻译（详解）<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="course-th14.html">
+  <span class="no">09</span><span>内存管理进阶：分页、回收与 OOM<span class="sub">◆ · 约 5 小时</span></span></a></li>
+<li><a href="viz-mmu.html">
+  <span class="no">10</span><span>互动台：MMU 页表翻译<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="viz-cache.html" class="active">
+  <span class="no">11</span><span>互动台：Cache 层次与命中<span class="sub">💻 · 约 1 小时 · 当前</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j02.html">← 卷 02</a>
+  <a href="../juan/j04.html">卷 04 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 03<span>·</span>存储与地址<span>·</span>第 11 篇</div>
+  <h1>互动台：Cache 层次与命中</h1>
+  <p class="lede">这是可以直接上手的互动实验台：拖动参数、切换模式，画面与数值实时跟着变。</p>
+  <div class="doc-chips">
+    <span class="hot">💻 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+<h2 id="s1">先玩：这台互动沙盘</h2>
+<p>下面这个实验台是独立页面，直接嵌在这里。点按、拖动、改数值，画面与数字会立刻跟着变——比看十段静态说明更快建立直觉。</p>
+<div class="viz-embed"><iframe src="../viz/cache.html" loading="lazy" style="width:100%;height:calc(100vh - 210px);min-height:620px;border:1px solid rgba(110,168,254,.22);border-radius:14px;background:#080c18"></iframe></div>
+<h2 id="s2">怎么玩</h2>
+<ul>
+<li>先在实验台里随手点几下，看哪一块跟着变，再回来对照下面的概念。</li>
+<li>改一个参数只观察一处变化，确认自己真的预测对了，再改下一个。</li>
+<li>卡住时把实验台当答案核对器：先猜结果，再操作验证。</li>
+</ul>
+<p class="note">也可以在新窗口打开：<a href="../viz/cache.html" target="_blank">cache.html</a></p>
+
+<nav class="pager">
+  <a href="viz-mmu.html"><span>← 上一篇</span><b>互动台：MMU 页表翻译</b></a>
+  <a class="nx" href="course-th01.html"><span>下一篇 →</span><b>操作系统与 Linux 的分层</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

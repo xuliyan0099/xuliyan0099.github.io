@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=../docs/course-ch13.html">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第 13 章 · 调试与排障工具箱 | i.MX6ULL Linux 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="../assets/viz.css">
+  <link rel="stylesheet" href="../assets/iviz.css">
+  <link rel="stylesheet" href="../assets/anim2.css">
+  <script src="../assets/readmode.js" defer></script>
+</head>
+<body data-page="ch13">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>13 · 调试与排障工具箱</h1>
+    <p class="lede">嵌入式开发 70% 的时间在查问题。工具不多，但要熟到形成条件反射：先看日志、再看状态、最后才动代码。</p>
+    <div class="viz" data-kind="flow" data-title="排障的四步循环" data-sub="不要一上来就猜，先让现象变窄" data-json='{"play":true,"steps":[{"n":"复现","d":"能一百次重复，才谈得上修"},{"n":"分层定位","d":"是用户态、内核态，还是硬件？"},{"n":"选工具","d":"strace 看系统调用、dmesg 看内核、示波器看电"},{"n":"验证假设","d":"改一个变量，看现象是否按预期变化"},{"n":"记录","d":"写进笔记，形成自己的排障树"}],"note":"高手和小白的差别不在知识量，在于「一次只改一个变量」。同时改三个地方，即使好了你也不知道为什么好——下次还会踩。"}'></div>
+
+
+    <div class="card">
+      <h4>本章目标</h4>
+      <p>① 会用串口日志 + dmesg 定位内核与驱动问题；② 用 strace 看清程序卡在哪个系统调用；③ 用 core dump + addr2line 定位段错误行号；④ 会用 ftrace 粗看内核函数调用；⑤ 有一张自己的报错速查表。</p>
+    </div>
+
+    <div class="anim2" data-json='{"title":"四件排障工具，各管一层","hint":"先定层级，再定时间点","nodes":[{"k":"dmesg","s":"内核说了什么"},{"k":"strace","s":"卡在哪个 syscall"},{"k":"gdb","s":"变量与断点"},{"k":"ftrace / perf","s":"耗时与热点"}],"frames":[{"i":0,"d":"出问题第一眼看 dmesg：驱动加载、设备匹配、报错堆栈都在里面。"},{"i":1,"d":"程序「没反应」就用 strace，看它最后停在哪一个系统调用上。"},{"i":2,"d":"gdb 单步、断点、看变量；配合 kgdb 还能调内核，但配置麻烦。"},{"i":3,"d":"性能问题靠 ftrace 看调用链、perf 看热点，不靠猜。"}],"kind":"flow"}'></div>
+
+    <h2>13.1 排障的正确顺序</h2>
+
+    <div class="flow">
+      <div class="box"><b>① 现象</b><span>到底哪里不对<br>不亮？没输出？重启？</span></div>
+      <div class="arrow">→</div>
+      <div class="box"><b>② 日志</b><span>串口 / dmesg / journalctl</span></div>
+      <div class="arrow">→</div>
+      <div class="box"><b>③ 状态</b><span>/proc /sys / lsmod</span></div>
+      <div class="arrow">→</div>
+      <div class="box"><b>④ 定位</b><span>strace / gdb / 反汇编</span></div>
+      <div class="arrow">→</div>
+      <div class="box"><b>⑤ 验证</b><span>改一处，重测</span></div>
+    </div>
+
+    <p><strong>新手最大的毛病是直接跳到第 ⑤ 步</strong>：猜一个原因就改代码，改完还是不行，再猜下一个。正确做法是让日志告诉你原因，改之前先确认假设。</p>
+
+    <h2>13.2 内核日志：dmesg 与 printk 级别</h2>
+
+    <pre><code>$ dmesg | tail -50
+$ dmesg -w                     <span class="c"># 实时跟随（插拔设备时用）</span>
+$ dmesg | grep -i -E "error|fail|denied"
+$ dmesg -T | tail -20         <span class="c"># 带人类可读时间戳</span>
+$ cat /proc/sys/kernel/printk  <span class="c"># 当前控制台日志级别</span></code></pre>
+
+    <table>
+      <thead><tr><th>级别</th><th>宏</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td><code>KERN_EMERG</code></td><td>系统要挂了</td></tr>
+        <tr><td>3</td><td><code>KERN_ERR</code></td><td><b>错误，必看</b></td></tr>
+        <tr><td>4</td><td><code>KERN_WARNING</code></td><td>警告</td></tr>
+        <tr><td>6</td><td><code>KERN_INFO</code></td><td>普通信息（默认常被过滤）</td></tr>
+        <tr><td>7</td><td><code>KERN_DEBUG</code></td><td>调试</td></tr>
+      </tbody>
+    </table>
+
+    <pre><code><span class="c"># 让所有级别都打到串口（调试期）</span>
+# echo 8 &gt; /proc/sys/kernel/printk
+<span class="c"># 或改 bootargs 加 loglevel=7</span></code></pre>
+
+    <div class="key">
+      <b>驱动打印看不到？</b>
+      多半是 <code>printk(KERN_INFO ...)</code> 被默认级别 4 过滤了。临时 <code>echo 8 &gt; /proc/sys/kernel/printk</code> 就能看到；或直接用 <code>pr_err()</code>/<code>dev_err()</code>。
+    </div>
+
+    <h2>13.3 运行时状态：/proc 和 /sys</h2>
+    <div class="viz" data-kind="timeline" data-title="排障的正确顺序：先证据，后猜测" data-sub="每一步都在缩小范围，而不是碰运气" data-json='{"items":[{"t":"1","n":"现象","d":"能不能复现、什么时候开始","c":"cy"},{"t":"2","n":"dmesg","d":"内核最近说了什么","c":"vi"},{"t":"3","n":"/proc /sys","d":"状态、计数、队列","c":"or"},{"t":"4","n":"strace","d":"卡在哪个系统调用","c":"gr"},{"t":"5","n":"ftrace/perf","d":"内核内部时间花在哪","c":"rd"}],"note":"顺序反了会浪费几小时：先 strace 再 dmesg，可能根本没进系统调用——是你驱动 probe 就失败了。"}'></div>
+
+
+    <pre><code>$ cat /proc/cpuinfo | grep -E "model|Processor"
+$ cat /proc/meminfo | head -3
+$ cat /proc/interrupts          <span class="c"># 中断有没有触发</span>
+$ cat /proc/devices             <span class="c"># 已注册的主设备号</span>
+$ cat /proc/modules             <span class="c"># 已加载模块</span>
+$ cat /proc/device-tree/model
+
+$ ls /sys/class/leds/           <span class="c"># LED 设备</span>
+$ ls /sys/class/gpio/           <span class="c"># GPIO 导出</span>
+$ cat /sys/class/net/eth0/address
+$ ls /sys/bus/platform/drivers/ <span class="c"># 平台驱动与已绑定设备</span></code></pre>
+
+    <div class="tip">
+      <b>判断驱动有没有 probe 成功</b>
+      <code>ls /sys/bus/platform/drivers/你的驱动名/</code>，里面出现设备名 = 绑定成功。只 <code>lsmod</code> 看到模块在，不代表 probe 跑了。
+    </div>
+
+    <h2>13.4 strace：程序卡在哪</h2>
+
+    <p>程序「跑着没反应」「打开文件失败但没报错」，用 strace 看它到底调了哪些系统调用、在哪一步返回错误。</p>
+
+    <pre><code>$ strace ./app
+$ strace -f ./app              <span class="c"># 跟子进程</span>
+$ strace -e trace=open,read,write ./app
+$ strace -p 1234               <span class="c"># 附到运行中的进程</span>
+$ strace -c ./app              <span class="c"># 统计各系统调用耗时</span></code></pre>
+
+    <p>典型输出：<code>open("/dev/myled", O_RDWR) = -1 ENOENT</code> —— 一眼看出设备节点不存在，比猜半小时快。</p>
+
+    <h2>13.5 段错误：从崩溃到代码行</h2>
+
+    <pre><code><span class="c"># 1. 编带符号的程序</span>
+$ arm-linux-gnueabihf-gcc -g -O0 app.c -o app
+
+<span class="c"># 2. 板子上开启 core dump</span>
+# ulimit -c unlimited
+# ./app
+Segmentation fault (core dumped)
+
+<span class="c"># 3. PC 上用 gdb 打开 core</span>
+$ gdb-multiarch app core
+(gdb) bt                  <span class="c"># 看调用栈，定位到函数与行号</span>
+(gdb) info registers
+(gdb) x/8i $pc            <span class="c"># 看崩溃处的指令</span>
+
+<span class="c"># 没有 core 时：用 addr2line 把地址翻译成行号</span>
+$ arm-linux-gnueabihf-addr2line -e app -f 0x000104f0
+$ arm-linux-gnueabihf-objdump -d app | less   <span class="c"># 反汇编</span></code></pre>
+
+    <div class="warn">
+      <b>段错误三大来源</b>
+      ① 空指针/野指针解引用 ② 数组越界写到只读段 ③ 栈溢出（大数组放局部变量）。<b>先看 bt 的最上面那一帧</b>，别从 main 开始读。
+    </div>
+
+    <h2>13.6 ftrace：内核里发生了什么</h2>
+    <div class="viz" data-kind="stack" data-title="段错误的调用栈，从下往上读" data-sub="backtrace 越靠下越外层" data-json='{"frames":[{"n":"main()","d":"调用处，行号在源码里","sp":"高位"},{"n":"parse_cfg()","d":"中间层","sp":""},{"n":"strcpy()","d":"崩在这一层：dst 越界","sp":"低位"}],"spHint":"← 栈从高地址往低地址长，越深的调用地址越小","note":"拿到地址后：addr2line -e vmlinux 0x… 翻译成文件:行号；开了 KASAN 会直接告诉你是越界读还是写。"}'></div>
+
+
+    <p>怀疑某驱动没被调用、中断没进、调度延迟，用 ftrace 看内核函数调用，不需要重新编译内核。</p>
+
+    <pre><code># cd /sys/kernel/debug/tracing
+# echo function &gt; current_tracer
+# echo gpio_set_value &gt; set_ftrace_filter
+# echo 1 &gt; tracing_on
+<span class="c"># …执行你的操作…</span>
+# echo 0 &gt; tracing_on
+# cat trace | head -30</code></pre>
+
+    <p>没有 <code>/sys/kernel/debug</code>？先 <code>mount -t debugfs none /sys/kernel/debug</code>，并确认内核配置里开了 <code>CONFIG_FUNCTION_TRACER</code>。</p>
+
+    <h2>13.7 报错速查表</h2>
+
+    <table>
+      <thead><tr><th>现象 / 报错</th><th>方向</th></tr></thead>
+      <tbody>
+        <tr><td><code>Permission denied</code></td><td>权限位、属主、dialout 组、只读文件系统</td></tr>
+        <tr><td><code>No such file or directory</code>（文件明明在）</td><td>动态链接器缺失、架构不对（用 file 查）</td></tr>
+        <tr><td><code>Text file busy</code></td><td>程序正在运行，不能覆盖写</td></tr>
+        <tr><td><code>cannot execute binary file</code></td><td>ABI 不匹配（x86 程序拿到 ARM 上跑）</td></tr>
+        <tr><td><code>insmod: invalid module format</code></td><td>.ko 与内核版本/配置不一致，必须用同一份内核源码编</td></tr>
+        <tr><td><code>Unknown symbol in module</code></td><td>依赖的符号没导出，检查 <code>Module.symvers</code> 与依赖模块</td></tr>
+        <tr><td>驱动加载但无反应</td><td>compatible 不匹配、probe 未执行、GPIO 被占用、pinctrl 没配</td></tr>
+        <tr><td><code>Kernel panic - not syncing</code></td><td>根文件系统挂不上 / init 缺失 / 内存越界</td></tr>
+        <tr><td>NFS 挂载超时</td><td>IP 网段、exports 权限、防火墙、nfsvers</td></tr>
+      </tbody>
+    </table>
+
+    <h2>13.8 动手任务</h2>
+    <ul class="steps">
+      <li>写一个故意空指针解引用的程序，编译运行，拿到 core，用 gdb 的 <code>bt</code> 定位到行号。</li>
+      <li>写一个打开不存在文件的程序，用 strace 找到 <code>ENOENT</code> 那一行。</li>
+      <li>用 <code>strace -c</code> 统计一个程序最耗时的系统调用。</li>
+      <li>驱动里加一条 <code>printk(KERN_INFO)</code>，先看不到，<code>echo 8 &gt; /proc/sys/kernel/printk</code> 后再看到。</li>
+      <li>用 <code>ls /sys/bus/platform/drivers/</code> 确认你的驱动是否绑定成功。</li>
+      <li>用 ftrace 跟踪一次 <code>gpio_set_value</code>，确认应用写 /dev 时内核里确实被调用。</li>
+    </ul>
+
+    <h2>13.9 验收标准</h2>
+    <ul class="checklist">
+      <li>遇到问题第一反应是看日志，而不是改代码</li>
+      <li>能用 dmesg + printk 级别解决「驱动没打印」</li>
+      <li>能用 strace 定位「程序卡住/文件打不开」</li>
+      <li>能用 core + gdb bt 定位段错误到具体行</li>
+      <li>能判断驱动是否 probe 成功（不是只看 lsmod）</li>
+      <li>手上有一份自己的报错速查表，遇到新问题会往里加</li>
+    </ul>
+
+    <footer id="pager"></footer>
+  
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"四件排障工具，各看什么","items":[{"b":"dmesg","d":"内核日志：驱动加载、设备匹配、报错堆栈。出问题第一眼看它。"},{"b":"strace","d":"看进程调了哪些系统调用、卡在哪一个。程序「没反应」时特别有效。"},{"b":"gdb","d":"单步、断点、看变量。配合 kgdb 还能调内核，但配置麻烦。"},{"b":"ftrace / perf","d":"看函数调用链与耗时、看热点在哪。性能问题靠它们，不靠猜。"}],"note":"排障的通用套路：先定层级（用户态还是内核态），再定时间点（哪一步之后开始错），最后才看代码。"}'></div>
+  </main>
+</div>
+<script src="../assets/nav.js"></script>
+<script src="../assets/viz.js"></script>
+<script src="../assets/iviz.js"></script>
+<script src="../assets/anime.iife.min.js"></script>
+<script src="../assets/anim2.js"></script>
+</body>
+</html>

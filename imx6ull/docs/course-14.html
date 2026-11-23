@@ -1,0 +1,232 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>机器码的位段 · 卷 01 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j01.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 01 · 机器与指令</div>
+<ol><li><a href="course-00.html">
+  <span class="no">01</span><span>计算机只是一台会照抄指令的机器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-01.html">
+  <span class="no">02</span><span>为什么偏偏是二进制<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-02.html">
+  <span class="no">03</span><span>一个字节能装什么<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-03.html">
+  <span class="no">04</span><span>从按键到屏幕<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-04.html">
+  <span class="no">05</span><span>一个开关能做什么<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-05.html">
+  <span class="no">06</span><span>与、或、非<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-06.html">
+  <span class="no">07</span><span>从半加器到全加器<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-07.html">
+  <span class="no">08</span><span>补码与减法器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-08.html">
+  <span class="no">09</span><span>时钟与触发器<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-09.html">
+  <span class="no">10</span><span>冯诺依曼五件事<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-10.html">
+  <span class="no">11</span><span>PC 与指令寄存器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-11.html">
+  <span class="no">12</span><span>ALU 与标志位<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-12.html">
+  <span class="no">13</span><span>一条指令的完整旅程<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-13.html">
+  <span class="no">14</span><span>流水线<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-14.html" class="active">
+  <span class="no">15</span><span>机器码的位段<span class="sub">◆ · 约 1 小时 · 当前</span></span></a></li>
+<li><a href="course-15.html">
+  <span class="no">16</span><span>九种寻址方式<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-16.html">
+  <span class="no">17</span><span>汇编只有四类动作<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-17.html">
+  <span class="no">18</span><span>函数调用与 ABI<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-18.html">
+  <span class="no">19</span><span>从 C 到汇编<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th18.html">
+  <span class="no">20</span><span>CPU 是怎么执行一行代码的（详解）<span class="sub">约 3 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j00.html">← 卷 00</a>
+  <a href="../juan/j02.html">卷 02 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 01<span>·</span>机器与指令<span>·</span>第 15 篇</div>
+  <h1>机器码的位段</h1>
+  <p class="lede">一条 ARM 指令永远是 32 位——不多不少。这 32 位里要塞进「什么操作、哪个寄存器、什么操作数、什么条件下执行」。这一课把 mov r0, #1 的机器码 E3A00001 逐位拆开，再讲那个让所有人第一次都看不懂的设计：立即数为什么只有 12 位，却要能表示 0xFF000000。</p>
+  <div class="doc-chips">
+    <span class="hot">◆ 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+<div class="cpu3" data-json='{"title":"CPU 拿到这 32 位之后：译码、执行、写回","hint":"寄存器与标志位逐帧变化，可暂停单步"}'></div>
+
+    <div class="anim2" data-json='{"title":"机器码的位段：32 个比特怎么分工","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"取 32 位进 IR"},{"k":"按位段切片"},{"k":"译码成控制信号"},{"k":"读寄存器堆"},{"k":"ALU 直通 immediate"}],"frames":[{"i":0,"d":"E3A00001"},{"i":1,"d":"cond / opcode / Rd / imm 各取几位"},{"i":2,"d":"RegWrite=1, ALUSrc=imm, ALUOp=MOV"},{"i":3,"d":"Rn=0（mov 忽略）→ 值 0"},{"i":4,"d":"输出 1，写进 r0"}]}'></div>
+
+    <div class="viz" data-kind="bits" data-title="数据处理指令：cond + opcode + 三个操作数" data-sub="0xE3A00001 = mov r0, #1 的完整拆解" data-json='{"w":32,"fields":[{"n":"cond 31:28 = 1110","lo":28,"hi":31,"c":"or","t":"无条件执行（AL）"},{"n":"00 27:26","lo":26,"hi":27,"c":"gray","t":"数据处理类标识"},{"n":"I 25 = 1","lo":25,"hi":25,"c":"vi","t":"操作数是立即数（0 表示寄存器）"},{"n":"opcode 24:21 = 1101","lo":21,"hi":24,"c":"cy","t":"1101 = MOV"},{"n":"S 20 = 0","lo":20,"hi":20,"c":"gray","t":"是否更新标志（movs 才是 1）"},{"n":"Rn 19:16 = 0000","lo":16,"hi":19,"c":"rd","t":"第一操作数寄存器，mov 不用"},{"n":"Rd 15:12 = 0000","lo":12,"hi":15,"c":"gr","t":"目标寄存器 r0"},{"n":"rot 11:8 = 0000","lo":8,"hi":11,"c":"vi","t":"立即数的循环右移量（×2）"},{"n":"imm 7:0 = 00000001","lo":0,"hi":7,"c":"cy","t":"8 位立即数值"}],"note":"数一数：4 + 2 + 1 + 4 + 1 + 4 + 4 + 4 + 8 = 32。每一位都有用途，没有浪费——这就是「固定长度指令」的代价与收益：译码简单，但表达力受限。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 为什么 ARM 指令固定 32 位？② cond 字段为什么放在最高 4 位？③ 立即数只有 8 位，怎么表示 0xFF000000？④ load/store 与分支的位段长什么样？⑤ 为什么会有 <code>movw</code>/<code>movt</code> 这两条「补充」指令？</p>
+    </div>
+
+    <h2 id="s1">1. 固定长度：一个大胆的取舍</h2>
+
+    <p>x86 的指令长度从 1 字节到 15 字节不等，译码器要靠「前缀 + 变长解码」一点点啃。ARM 选择固定 32 位（Thumb 是 16 位混合），好处：</p>
+
+    <ul>
+      <li><b>取指简单</b>：地址永远 4 字节对齐，PC+4 就是下一条。</li>
+      <li><b>译码快</b>：所有字段位置固定，组合逻辑直接切。</li>
+      <li><b>流水线友好</b>：不用等「解码出长度」才知道下一条在哪。</li>
+    </ul>
+
+    <p>代价：<b>表达力不足</b>。塞不进一个完整 32 位立即数、也塞不进一个完整 32 位地址——于是必须用「相对偏移」和「旋转编码」来补救。这两个补救方案，就是本课后半段的全部内容。</p>
+
+    <h2 id="s2">2. 立即数的旋转编码：8 位数据 + 4 位旋转</h2>
+
+    <p>规则：立即数 = <b>8 位值，循环右移 (rot × 2) 位</b>。rot 只有 4 位（0~15），所以移位量是 0,2,4,…,30。</p>
+
+    <div class="viz" data-kind="bits" data-title="0x00F00000 怎么装进 8 位 + 4 位" data-sub="值 0xFF？不，这里演示 0x3F 循环右移 8 位得到 0x3F000000 的思路" data-json='{"w":32,"fields":[{"n":"rot = 0100（×2 = 8）","lo":8,"hi":11,"c":"vi","t":"表示循环右移 8 位"},{"n":"imm8 = 0011 1111","lo":0,"hi":7,"c":"cy","t":"原始 8 位值 0x3F"},{"n":"展开后：0x3F00_0000","lo":8,"hi":31,"c":"gr","t":"0x3F 循环右移 8 位的结果"}],"note":"所以「能编码的立即数」只有 256 × 16 = 4096 个（且部分重复）。像 0x12345678 这种值，编码不进去——必须用 movw/movt 两条指令拼出来，或者从常量池里 ldr 读。"}'></div>
+
+    <p>试着手算：<code>0xFF000000</code> 能不能编码？<code>0xFF</code> 是 8 位值，循环右移 8 位 → <code>0xFF000000</code>。可以！rot=4。所以 <code>mov r0, #0xFF000000</code> 是一条合法指令。</p>
+
+    <p>而 <code>0x12345678</code> 不行——它的比特分布不满足「8 位连续段 + 循环移位」的形式。这就是为什么编译器会生成：</p>
+
+    <pre><code>movw r0, #0x5678      ; 低 16 位
+movt r0, #0x1234      ; 高 16 位
+; 两条指令拼出完整 32 位常量（movw/movt 是 ARMv6T2 起的新指令）</code></pre>
+
+    <h2 id="s3">3. load/store 与分支的位段</h2>
+
+    <pre><code>; ldr r0, [r1, #4]  =  0xE5910004
+; cond 1110 | 01 | I=0 P=1 U=1 B=0 W=0 L=1 | Rn=0001 | Rd=0000 | offset=0x004
+;  └ 条件    └类 └───────────────┘  └基址┘  └目标┘  └偏移┘
+
+; b label  =  0xEAxxxxxx
+; cond 1110 | 1010 | 24 位有符号偏移（单位 4 字节）
+
+; bl func  =  0xEBxxxxxx
+; cond 1110 | 1011 | 24 位有符号偏移，同时写 LR</code></pre>
+
+    <div class="viz" data-kind="flow" data-title="机器码 → 微操作：译码器怎么读这些位" data-sub="固定位置意味着可以用纯组合逻辑" data-json='{"steps":[{"n":"取 32 位进 IR","d":"E3A00001"},{"n":"按位段切片","d":"cond / opcode / Rd / imm 各取几位"},{"n":"译码成控制信号","d":"RegWrite=1, ALUSrc=imm, ALUOp=MOV"},{"n":"读寄存器堆","d":"Rn=0（mov 忽略）→ 值 0"},{"n":"ALU 直通 immediate","d":"输出 1，写进 r0"}],"note":"注意 mov 并不「复制」，它只是让 ALU 把立即数直通到输出。硬件没有专门的「复制电路」，复用 ALU 就足够了。"}'></div>
+
+    <h2 id="s4">4. Thumb 与 Thumb-2：为什么还要 16 位</h2>
+
+    <p>32 位指令虽然整齐，但代码密度差——同样的功能，x86 可能只占 3 字节，ARM 要 4 字节。对 Flash 只有几百 KB 的 MCU，这是真金白银的成本。</p>
+
+    <p>于是 ARM 推出 Thumb：16 位指令子集，只保留最常用的操作与寄存器（r0~r7）。代码密度提升约 30%，代价是指令能力受限。Thumb-2 再进一步，允许 16 位与 32 位混排。</p>
+
+    <p>i.MX6ULL 上跑 Linux 通常是 ARM 模式（性能优先），但很多 MCU（如 STM32）默认 Thumb。<b>你在反汇编里看到 <code>movs r0, #1</code>（带 s、寄存器少）就可能是 Thumb。</b></p>
+
+    <h2 id="s5">5. 实验：手工拆一条指令</h2>
+
+    <pre><code># 把机器码拆成位段（Python）
+def split(w):
+    print("cond  = %X" % ((w >> 28) & 0xF))
+    print("27:26 = %X" % ((w >> 26) & 0x3))
+    print("I     = %d" % ((w >> 25) & 1))
+    print("opcode= %X" % ((w >> 21) & 0xF))
+    print("S     = %d" % ((w >> 20) & 1))
+    print("Rn    = r%d" % ((w >> 16) & 0xF))
+    print("Rd    = r%d" % ((w >> 12) & 0xF))
+    rot = (w >> 8) & 0xF
+    imm = w & 0xFF
+    val = ((imm >> (rot*2)) | (imm << (32 - rot*2))) & 0xFFFFFFFF if rot else imm
+    print("rot=%d imm=%02X -> 立即数 0x%X" % (rot, imm, val))
+
+split(0xE3A00001)   # mov r0, #1
+split(0xE3A004FF)   # mov r0, #0xFF000000（rot=4, imm=0xFF）
+split(0xE5910004)   # ldr r0, [r1, #4]（注意这条不是数据处理类，字段含义不同）</code></pre>
+
+    <p>跑一遍，把输出与第 12 课的表格对照。<b>能手工拆一条指令，你就有资格读 ARM 手册的指令编码章节了</b>——那里全是这种表格。</p>
+
+    <h2 id="s6">6. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于机器码的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["机器码是「给机器看的」，和人没什么关系","32 位指令能装下任意 32 位立即数","反汇编是精确逆运算，一定能还原汇编"]},"good":{"t":"实际","items":["机器码就是位段表格，人能读、能手改、能用来做逆向与漏洞分析","立即数只有 8 位 + 4 位旋转，很多常量要 movw/movt 或常量池","反汇编有歧义（如数据被当成指令）、也丢失伪指令与符号，只能近似还原"]},"note":"第三条在嵌入式里很实际：你在 Flash 里 dump 出一段字节，怎么判断哪段是指令、哪段是数据？只能靠入口点、符号表和调用关系推断。"}'></div>
+
+    <h2 id="s7">7. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>cond 字段为什么放在最高 4 位？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>让所有指令（不管哪一类）都能用同一套条件执行机制——只要 cond 在固定位置，译码器不必先判断指令类型就能读到条件。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>立即数能编码的最大范围是什么？举一个能编、一个不能编的值。</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>8 位值 × 16 种偶数位移。能编：0xFF000000（0xFF 移 8 位）；不能编：0x12345678（需 movw/movt）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p><code>E3A00001</code> 里哪一位决定「这是 mov 而不是 add」？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>bits 24:21 的 opcode=1101 表示 MOV（ADD 是 0100）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>为什么 Thumb 在 MCU 上流行？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>代码密度高约 30%，省 Flash 与带宽；代价是寄存器受限、部分操作要拆成两条。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>为什么 <code>b</code> 用相对偏移而不是绝对地址？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>24 位装不下 32 位地址；相对偏移让代码位置无关，且 24 位即可覆盖 ±32MB，对单文件足够。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>跑 Python 拆分三个机器码，手工核对每一位。</li>
+        <li>自己写 <code>mov r0, #0xFF000000</code> 汇编，编译后看它是否只有一条指令。</li>
+        <li>写 <code>r0 = 0x12345678</code>，看编译器生成 movw/movt 还是常量池 ldr。</li>
+        <li>用 <code>arm-linux-gnueabihf-objdump -d -M reg-names-std</code> 反汇编一个小程序，标注每条的类别。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      位段里有个「offset」字段，但偏移可以来自立即数、也可以来自寄存器，还可以「先加后用」或「先用后加」。第 15 课讲九种寻址方式——这一课决定你写汇编时能不能少写一半指令。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"一条 32 位机器码，切成五段","hint":"点字段看作用","note":"汇编器干的事就是按这个格式拼位；反汇编就是反过来切位。看懂位段，你就看懂了「指令」到底是什么。","items":[{"b":"cond（位 31–28）","d":"条件码：这条指令在什么标志位状态下才执行。0xE 表示无条件，这是最常见的取值。"},{"b":"opcode（位 27–21）","d":"操作类型：加、减、装载、存储、跳转……决定 ALU 走哪条通路。"},{"b":"Rn（位 19–16）","d":"第一个源寄存器，通常是基址或左操作数。"},{"b":"Rd（位 15–12）","d":"目标寄存器。结果写这里，也是流水线冒险最常盯的位置。"},{"b":"imm / shift（位 11–0）","d":"立即数或移位量。ARM 的立即数不是随便填的，要能被 8 位值循环右移得到。"}]}'></div>
+  
+
+<nav class="pager">
+  <a href="course-13.html"><span>← 上一篇</span><b>流水线</b></a>
+  <a class="nx" href="course-15.html"><span>下一篇 →</span><b>九种寻址方式</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

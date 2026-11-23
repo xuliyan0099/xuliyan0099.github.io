@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=../docs/course-00.html">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>00 · 计算机只是一台会照抄指令的机器</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/viz.css">
+<link rel="stylesheet" href="assets/iviz.css">
+<link rel="stylesheet" href="assets/anim2.css">
+  <script src="assets/readmode.js" defer></script>
+</head>
+<body data-page="00">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>第 00 课 · 计算机只是一台会照抄指令的机器</h1>
+    <p class="lede">在学任何原理之前，先把一件事钉死：计算机不聪明，它不会「理解」你的程序，它只会做一件事——从内存里取出一串数字，照这个数字规定的动作做一次，然后取下一串。这一课的目标就是让你能用自己的话讲清这句话，并且亲手跑一遍这个过程。</p>
+
+    <section class="cc" id="cpu-cycle">
+<div class="cc-hd"><span class="cc-pill">跟着走一遍</span><b>一条指令在 CPU 里走一圈</b><span class="cc-sub">内存里的 0/1 → CPU 的格子 → 再回内存。这里把 32 位缩成 8 位，才看得清。</span></div>
+
+<div class="cc-grid">
+  <div class="cc-mem">
+    <div class="cc-cap">内存（每格 8 个比特）<span id="ccPcTag">PC 指向 0x00</span></div>
+    <ol id="ccRows"></ol>
+    <div class="cc-hint">指令和数据在内存里长得一模一样，CPU 只是照着比特干活——这就是「冯·诺依曼结构」。</div>
+  </div>
+  <div class="cc-cpu">
+    <div class="cc-cap">CPU 里的四个格子</div>
+    <div class="cc-regs">
+      <div class="cc-r" id="rPC"><span>PC</span><b>0x00</b><i>下一条去哪取</i></div>
+      <div class="cc-r" id="rIR"><span>IR</span><b>—</b><i>刚取到的那 8 位</i></div>
+      <div class="cc-r" id="rR0"><span>R0</span><b>0</b><i>装结果</i></div>
+      <div class="cc-r" id="rR1"><span>R1</span><b>4</b><i>先塞个数进去</i></div>
+    </div>
+    <div class="cc-now"><span class="cc-n" id="ccNo">待机</span><p id="ccTxt">点「下一步」，从取指开始走。</p></div>
+  </div>
+</div>
+
+<div class="cc-ctl">
+  <button type="button" data-a="prev">← 上一步</button>
+  <button type="button" data-a="play" id="ccPlay">▶ 播放</button>
+  <button type="button" data-a="next">下一步 →</button>
+  <button type="button" data-a="reset">↺ 重来</button>
+  <span class="cc-prog" id="ccProg">第 0 / 5 步</span>
+</div>
+</section>
+<style>
+.cc{margin:28px 0;border:1px solid rgba(120,150,200,.22);border-radius:18px;background:linear-gradient(180deg,#0b1120,#0a0f1c);overflow:hidden}
+.cc-hd{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:13px 16px;border-bottom:1px solid rgba(120,150,200,.16);background:rgba(61,219,217,.05)}
+.cc-pill{font-size:11px;letter-spacing:1px;color:#0a1020;background:#3ddbd9;border-radius:999px;padding:3px 9px;font-weight:700}
+.cc-hd b{color:#eaf3ff;font-size:15px}
+.cc-sub{color:#8fa0bd;font-size:12.5px}
+.cc-grid{display:grid;grid-template-columns:1.05fr 1fr;gap:0}
+.cc-mem{padding:14px 16px 16px;border-right:1px solid rgba(120,150,200,.14)}
+.cc-cpu{padding:14px 16px 16px}
+.cc-cap{display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:1.5px;color:#66738c;margin-bottom:10px;text-transform:uppercase}
+.cc-cap span{color:#3ddbd9;letter-spacing:0}
+#ccRows{list-style:none;margin:0;padding:0;font-variant-numeric:tabular-nums}
+#ccRows li{display:flex;align-items:center;gap:10px;padding:7px 10px;margin:0 0 5px;border-radius:9px;height:36px;box-sizing:border-box;border:1px solid transparent;background:rgba(255,255,255,.03);transition:background .18s,border-color .18s,box-shadow .18s}
+#ccRows li .a{width:44px;flex:none;font-size:11px;color:#66738c}
+#ccRows li .b{width:92px;flex:none;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#cfdcf7;letter-spacing:1px}
+#ccRows li .t{flex:1;font-size:12.5px;color:#8fa0bd;min-width:0}
+#ccRows li .pc{display:none;font-size:9.5px;letter-spacing:1px;color:#0a1020;background:#ffb84d;border-radius:4px;padding:1px 5px;font-weight:700}
+#ccRows li.ispc .pc{display:inline-block}
+#ccRows li.hl{border-color:rgba(61,219,217,.55);background:rgba(61,219,217,.13);box-shadow:inset 0 0 22px rgba(61,219,217,.1)}
+#ccRows li.hl .b{color:#eaf3ff}
+#ccRows li.dt{border-color:rgba(255,184,77,.55);background:rgba(255,184,77,.12)}
+#ccRows li.dt .b{color:#ffd79a}
+.cc-hint{margin:12px 2px 0;font-size:11.5px;line-height:1.7;color:#66738c}
+.cc-regs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cc-r{display:grid;grid-template-columns:34px 1fr;grid-template-rows:auto auto;align-items:center;gap:1px 8px;padding:8px 10px;border-radius:10px;border:1px solid rgba(120,150,200,.18);background:rgba(255,255,255,.03)}
+.cc-r span{font-size:11.5px;letter-spacing:1px;color:#66738c}
+.cc-r b{font-family:ui-monospace,Consolas,monospace;font-size:13px;color:#eaf3ff;letter-spacing:.5px}
+.cc-r i{grid-column:1/-1;font-style:normal;font-size:10.5px;color:#5c6b85}
+.cc-r.on{border-color:rgba(61,219,217,.6);background:rgba(61,219,217,.12);box-shadow:0 0 18px rgba(61,219,217,.12)}
+.cc-r.on b{color:#3ddbd9}
+.cc-now{display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(139,123,255,.09);border:1px solid rgba(139,123,255,.28);height:96px;overflow:hidden}
+.cc-n{flex:none;font-size:11px;font-weight:700;color:#0a1020;background:#8b7bff;border-radius:6px;padding:2px 7px;white-space:nowrap}
+.cc-now p{margin:0;font-size:12.5px;line-height:1.7;color:#d5e0f5}
+.cc-ctl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;border-top:1px solid rgba(120,150,200,.16);background:rgba(7,11,20,.5)}
+.cc-ctl button{font-size:12.5px;color:#cfdcf7;background:rgba(255,255,255,.05);border:1px solid rgba(120,150,200,.28);border-radius:9px;padding:7px 12px;cursor:pointer;transition:.18s}
+.cc-ctl button:hover{border-color:#3ddbd9;color:#fff}
+.cc-ctl button[data-a="play"].on{background:rgba(61,219,217,.2);border-color:#3ddbd9;color:#fff}
+.cc-prog{margin-left:auto;font-size:11.5px;color:#66738c;font-variant-numeric:tabular-nums}
+@media (max-width:760px){
+  .cc-grid{grid-template-columns:1fr}
+  .cc-mem{border-right:0;border-bottom:1px solid rgba(120,150,200,.14)}
+  .cc-hd b{font-size:14px}
+  .cc-sub{display:none}
+  #ccRows li .b{width:84px;font-size:12px}
+  #ccRows li .t{font-size:12px}
+  .cc-regs{grid-template-columns:1fr 1fr}
+  .cc-r i{display:none}
+  .cc-now{height:112px}
+  .cc-ctl button{padding:8px 11px}
+  .cc-prog{margin-left:0;width:100%}
+}
+</style>
+<script>
+(function(){
+  var PROG=[
+    {a:'0x00',b:'0001 0010',t:'LOAD R0, [0x02]'},
+    {a:'0x01',b:'0010 0001',t:'ADD  R0, R1'},
+    {a:'0x02',b:'0000 0011',t:'数据 3'},
+    {a:'0x03',b:'0000 0100',t:'数据 4'},
+    {a:'0x04',b:'0000 0000',t:'空槽，等结果'}
+  ];
+  var STEPS=[
+    {n:'① 取指', pc:'0x01', ir:'0001 0010', r0:'0', r1:'4', hl:[0], dt:[], pcRow:1,
+     t:'按 PC = 0x00 去内存读 8 位：0001 0010，塞进 IR。PC 顺手加一，指向 0x01——它永远记着「下一条」在哪。'},
+    {n:'② 译码', pc:'0x01', ir:'0001 0010', r0:'0', r1:'4', hl:[0], dt:[], pcRow:1,
+     t:'把 IR 切两半：0001 是动作（LOAD 装载），0010 是地址 0x02。CPU 不认识「LOAD」这个字，它只认 0001 这个编号。'},
+    {n:'③ 执行', pc:'0x01', ir:'0001 0010', r0:'0', r1:'4', hl:[], dt:[], pcRow:1,
+     t:'LOAD 的「执行」就是算地址：把 0010 当成 0x02，准备去这个格子取数。这一步还没有碰内存。'},
+    {n:'④ 访存', pc:'0x01', ir:'0001 0010', r0:'0', r1:'4', hl:[], dt:[2], pcRow:1,
+     t:'读内存 0x02，拿到 0000 0011，也就是十进制的 3。这 3 本来就是「数据」，和指令躺在同一片内存里。'},
+    {n:'⑤ 写回', pc:'0x01', ir:'0001 0010', r0:'3', r1:'4', hl:[], dt:[], pcRow:1, on:['rR0'],
+     t:'把 3 放进 R0。一圈走完，PC 已经是 0x01，下一轮从头再来——只是换成 ADD 那条指令。这五步重复上亿次，就是我们说的「程序在跑」。'}
+  ];
+  var rows=document.getElementById('ccRows');
+  if(!rows) return;
+  PROG.forEach(function(p,i){
+    var li=document.createElement('li');
+    li.innerHTML='<span class="a">'+p.a+'</span><span class="b">'+p.b+'</span><span class="t">'+p.t+'</span><span class="pc">PC</span>';
+    li.dataset.i=i;
+    rows.appendChild(li);
+  });
+  var rPC=document.getElementById('rPC'), rIR=document.getElementById('rIR'),
+      rR0=document.getElementById('rR0'), rR1=document.getElementById('rR1');
+  var ccNo=document.getElementById('ccNo'), ccTxt=document.getElementById('ccTxt'),
+      ccProg=document.getElementById('ccProg'), pcTag=document.getElementById('ccPcTag'),
+      play=document.getElementById('ccPlay');
+  var idx=0, timer=null;
+
+  function set(id,val,on){ id.querySelector('b').textContent=val; id.classList.toggle('on',!!on); }
+  function render(){
+    Array.prototype.forEach.call(rows.children,function(li){
+      li.classList.remove('hl','dt','ispc');
+    });
+    if(idx===0){
+      rPC.querySelector('b').textContent='0x00';
+      rIR.querySelector('b').textContent='—';
+      rR0.querySelector('b').textContent='0';
+      rR1.querySelector('b').textContent='4';
+      [rPC,rIR,rR0,rR1].forEach(function(x){x.classList.remove('on')});
+      ccNo.textContent='待机';
+      ccTxt.textContent='点「下一步」，从取指开始走。';
+      ccProg.textContent='第 0 / 5 步';
+      pcTag.textContent='PC 指向 0x00';
+      rows.children[0].classList.add('ispc');
+      return;
+    }
+    var s=STEPS[idx-1];
+    set(rPC,s.pc); set(rIR,s.ir,true); set(rR0,s.r0,s.on&&idx===5); set(rR1,s.r1);
+    s.hl.forEach(function(i){ rows.children[i].classList.add('hl'); });
+    s.dt.forEach(function(i){ rows.children[i].classList.add('dt'); });
+    rows.children[s.pcRow].classList.add('ispc');
+    ccNo.textContent=s.n;
+    ccTxt.textContent=s.t;
+    ccProg.textContent='第 '+idx+' / 5 步';
+    pcTag.textContent='PC 指向 '+s.pc;
+  }
+  function stop(){ if(timer){clearInterval(timer);timer=null;} play.classList.remove('on'); play.textContent='▶ 播放'; }
+  function go(n){ idx=Math.max(0,Math.min(STEPS.length,n)); render(); if(idx>=STEPS.length) stop(); }
+  document.querySelector('.cc-ctl').addEventListener('click',function(e){
+    var b=e.target.closest('button'); if(!b) return;
+    var a=b.dataset.a;
+    if(a==='next'){ stop(); go(idx+1); }
+    else if(a==='prev'){ stop(); go(idx-1); }
+    else if(a==='reset'){ stop(); go(0); }
+    else if(a==='play'){
+      if(timer){ stop(); return; }
+      if(idx>=STEPS.length) go(0);
+      play.classList.add('on'); play.textContent='❚❚ 暂停';
+      timer=setInterval(function(){ go(idx+1); }, 1800);
+    }
+  });
+  render();
+})();
+</script>
+
+    <div class="viz" data-kind="flow" data-title="CPU 一辈子的全部工作" data-sub="五件事循环，没有第六件" data-json='{"steps":[{"n":"取指","d":"按 PC 去内存取一串 0/1"},{"n":"译码","d":"看这串 0/1 属于哪种动作"},{"n":"执行","d":"按动作算一下"},{"n":"访存","d":"要读写数据就去内存"},{"n":"写回","d":"把结果放回某个格子"}],"note":"这五步走完，PC 自动加一点，回到第一步。所谓「程序在运行」，就是这五步被重复了上亿次。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 计算机「懂」程序吗？② 它凭什么知道下一个动作是什么？③ 为什么说「程序 = 指令 + 数据」，两者在内存里长得一模一样？④ 一块 500MHz 的芯片，一秒钟到底做了多少次这种循环？</p>
+    </div>
+
+    <h2>1. 先给一个能用的直觉：自动钢琴与纸卷</h2>
+
+    <p>老式自动钢琴的纸卷上有一排排小孔，孔的位置决定哪个琴键被按下。钢琴不「理解」曲子，它只是让纸卷匀速滚过，遇到孔就敲一下。</p>
+
+    <p>计算机几乎一模一样，只是把「孔」换成了 0 和 1，把「琴键」换成了「电路开关」：内存里有一长串 0/1，CPU 每过一个节拍就读一小段（32 个比特），按这 32 位的排列方式决定今天动哪个部件。</p>
+
+    <p><b>这个类比在哪里失效（必须记住）</b>：纸卷只能顺序读，碰到「跳回去重放一段」就没办法；计算机有「跳转」，可以回到前面任意位置，所以能循环、能调用函数、能分支。这也是它比纸卷强大的唯一原因——不是算得快，是<b>能改自己的下一步</b>。</p>
+
+    <h2>2. 硬件上到底发生了什么：五个部件</h2>
+
+    <p>冯·诺依曼在 1945 年提出的结构，到今天一颗 Cortex-A7 里还是这五块，只是名字换了：</p>
+
+    <div class="viz" data-kind="matrix" data-title="五大部分：教科书叫法与 i.MX6ULL 里的实体" data-sub="同一个东西，两套叫法；看懂对照就不会被术语绕晕" data-json='{"corner":"教科书","cols":["它的工作","在 Cortex-A7 里是谁","出问题时的症状"],"rows":[{"n":"运算器","c":"cy","cells":["做加减、与或、比较","ALU + 移位器 + 乘法器","算错、溢出、标志位不对"]},{"n":"控制器","c":"vi","cells":["取指、译码、发号施令","取指单元 + 译码器 + 流水线控制","跑飞、跳错地址、卡在异常"]},{"n":"存储器","c":"or","cells":["存指令与数据，按地址取","L1/L2 Cache + DDR 控制器","读写错位、越界、缺页"]},{"n":"输入设备","c":"gr","cells":["把外界信号变成数字","UART、GPIO、ADC、USB","收不到数据、电平不对"]},{"n":"输出设备","c":"gr","cells":["把数字变成外界能感知的东西","UART、LCD 控制器、PWM","没输出、时序错、花屏"]}],"note":"注意：现代 CPU 里「运算器」和「控制器」早就长在一起了，甚至和 Cache 同一块硅片。但功能划分不变——故障排查时按这五块分，能快速定位是算错、跳错、读错还是外部不对。"}'></div>
+
+    <p>关键的一个事实：<b>指令和数据放在同一个存储器里，长得一模一样</b>。一段 4 字节，CPU 既可以当「加法指令」执行，也可以当「一个整数」参与运算——取决于它被送到哪条路上。这是「冯·诺依曼结构」的核心，也是所有缓冲区溢出攻击的原理：如果程序能把数据写到本该放指令的地方，CPU 就会照抄你写的「数据」当指令执行。</p>
+
+    <h2>3. 软件上对应什么：一行 printf 是几百万条指令</h2>
+
+    <p>你在屏幕上打一行字，看起来是一个动作，实际上：</p>
+
+    <ul>
+      <li>键盘/终端产生一个字符，内核把它放进缓冲区；</li>
+      <li>你的程序调用 <code>printf</code>，库函数把格式串解析成字节，调用 <code>write</code> 系统调用；</li>
+      <li><code>write</code> 在硬件上是一条 <code>svc</code> 指令，让 CPU 从用户态切到内核态；</li>
+      <li>内核格式化、找到终端设备、驱动把字节写进 UART 寄存器；</li>
+      <li>UART 硬件按波特率把字节一位一位挪出去，显示器再画出来。</li>
+    </ul>
+
+    <p>整条链路上，CPU 执行了几万到几百万条指令——而它自己浑然不觉，因为它只是在重复「取指、译码、执行」。</p>
+
+    <p>算一下量级：i.MX6ULL 主频 528MHz，一个周期约 1.9 纳秒；Cortex-A7 双发射，理论峰值接近每周期 2 条指令。也就是说<b>一秒能执行十亿条指令量级</b>。你眨一次眼（约 300 毫秒），它已经取指译码执行了 3 亿次左右。</p>
+
+    <div class="viz" data-kind="timeline" data-title="从按下电源到看到画面，CPU 在忙什么" data-sub="同一颗核，五种完全不同的活" data-json='{"items":[{"t":"上电","n":"取第一条指令","d":"地址由硬件复位值决定","c":"or"},{"t":"BootROM","n":"读启动介质","d":"把一小段代码搬进片内 RAM","c":"or"},{"t":"U-Boot","n":"初始化 DDR","d":"几千行寄存器写","c":"vi"},{"t":"内核","n":"建立页表、跑 init","d":"从此地址变成虚拟的","c":"vi"},{"t":"你的程序","n":"printf","d":"几万条指令换一个字符","c":"cy"},{"t":"等待","n":"没事干就睡","d":"WFI 指令让核停摆省电","c":"gray"}],"note":"最后一项很反直觉：CPU 大部分时间在「等」。现代系统的优化重点不是算得更快，而是别让它在不该等的时候等。"}'></div>
+
+    <h2>4. 亲手跑一遍：20 行 Python 写一个「迷你 CPU」</h2>
+
+    <p>不用板子、不用编译器。下面这台玩具机器只有 16 个字节内存、一个累加器 A、一个 PC。指令是 8 位的，高 4 位是指令类型，低 4 位是操作数。它足以让你亲眼看到「取指—译码—执行」就是五行动作。</p>
+
+    <pre><code># mini_cpu.py —— 一台 16 字节内存的玩具计算机
+MEM = [0x01, 0x02, 0x03, 0x06, 0x00,
+       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+PC, A = 0, 0
+
+def step():
+    global PC, A
+    ir = MEM[PC]              # ① 取指：按 PC 从内存读一个字节
+    op, arg = ir &gt;&gt; 4, ir &amp; 0xF   # ② 译码：高 4 位是动作，低 4 位是操作数
+    if   op == 0x1: A = arg            # LDA：把立即数装进 A
+    elif op == 0x2: A = A + arg        # ADD：A 加上立即数
+    elif op == 0x3: MEM[arg] = A       # STA：把 A 存回内存
+    elif op == 0x4: PC = arg; return   # JMP：跳
+    elif op == 0x5:
+        if A == 0: PC = arg; return    # JZ：A 为零就跳
+    elif op == 0x6: print("OUT =", A)  # OUT：输出
+    elif op == 0x0: return "halt"      # HLT：停机
+    PC += 1                            # ③ 执行完，PC 自动加一
+
+for i in range(20):
+    print("PC=%2d  IR=0x%02X  A=%d" % (PC, MEM[PC], A))
+    if step() == "halt":
+        print("停机"); break</code></pre>
+
+    <p>跑出来的结果：</p>
+
+    <pre><code>PC= 0  IR=0x01  A=0
+PC= 1  IR=0x02  A=1
+PC= 2  IR=0x03  A=3
+PC= 3  IR=0x06  A=6
+OUT = 6
+PC= 4  IR=0x00  A=6
+停机</code></pre>
+
+    <p>这就是 1+2+3 的全过程。<b>注意三件事</b>：</p>
+
+    <ol>
+      <li><b>PC 是唯一知道「现在在哪」的东西</b>。没有它，程序就是一堆散落的字节。</li>
+      <li><b>「编译」在这台机器上是手工的</b>：我直接写了字节数组。真实编译器的活，就是把 <code>1+2+3</code> 这样的人类表达，翻译成这种字节数组。</li>
+      <li><b>内存里既有指令又有数据</b>：这个程序里没有数据段（数字直接写在指令里），但真实程序两边共用同一块内存——第 02 课会讲清楚怎么区分。</li>
+    </ol>
+
+    <p>再往前走一步：把 <code>0x06</code> 改成 <code>0x46</code>（JMP 到 6 号地址，那里是 0x00 停机），你就写了一个「跳转」。把 <code>0x01</code> 改成 <code>0x41</code> 就变成死循环——<b>程序跑飞，本质就是 PC 被改成了不该去的值。</b></p>
+
+    <h2>5. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于「计算机在工作」的三个误解" data-sub="左边是直觉，右边是硬件事实" data-json='{"bad":{"t":"直觉这样说","items":["CPU 在执行我的 C 代码，一行一行地执行","程序存在硬盘里，CPU 直接读硬盘执行","CPU 会「理解」程序的意思，所以能优化"]},"good":{"t":"硬件实际这样","items":["CPU 一次执行一条 32 位指令，一行 C 往往对应好几条指令（或零条）","执行前整段代码已被加载进内存，CPU 只认地址，不认文件","它不理解任何语义，优化全是编译器在编译期做的；CPU 只做前递、预测这类局部动作"]},"note":"把左边三句话改口成右边，你对「程序在跑」的理解就从使用者视角换成了机器视角。"}'></div>
+
+    <h2>6. 自测：五道题</h2>
+
+    <div class="q"><span class="n">1</span><p>如果 PC 被改成 0，计算机会发生什么？为什么很多「跑飞」最终表现为死循环或重启？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>会从地址 0 重新取指。若 0 处是启动代码或无效指令，通常导致重启或异常；「跑飞」本质是 PC 落到了不该执行的地址。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>为什么说「指令和数据长得一模一样」？这对安全意味着什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>它们都是同一块内存里的字节，CPU 按用途决定当作什么解释。若程序能往存代码的区域写数据，就能让 CPU 执行攻击者构造的指令（缓冲区溢出）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>528MHz、双发射，一秒大概能执行多少条指令？为什么实际远小于这个理论值？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>理论约 10 亿条/秒（528M×2）。实际受限于访存延迟、分支预测失败、Cache 缺失、等待 IO 与中断，通常只有理论值的几分之一到几十分之一。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>把 mini_cpu 的 0x03 改成 0x33（STA 到地址 3），会发生什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>会把累加器的值写到内存第 3 个字节——那里原本存的是 OUT 指令（0x06）。之后执行到 PC=3 时，取到的指令就变了。<b>这就是「代码被数据覆盖」。</b></p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>用一句话解释「程序在运行」。</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>PC 指向一个地址，CPU 取出一段比特、按比特规定的动作做一次、改一下自己的状态、PC 前进，然后重复。</p>
+    </div></details>
+
+    <h2>7. 动手清单</h2>
+
+    <div class="steps">
+      <ol>
+        <li>把 mini_cpu.py 抄进文件跑一遍，对齐输出。</li>
+        <li>把它改成「1 到 100 求和」：需要 JMP 和 JZ，自己设计字节。</li>
+        <li>故意让 STA 覆盖指令，观察输出怎么变。</li>
+        <li>在纸上画出它的五个部件（PC、内存、译码器、ALU、输出），标出每一步数据流向。</li>
+        <li>用 <code>python3 -c "print(528e6*2)"</code> 算一下理论指令速率，记住这个量级。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      第 01 课回答一个更底层的问题：既然内存里全是 0/1，那这些 0 和 1 在物理上到底是什么？为什么计算机不用十进制？为什么电压稍微抖一下，数据仍然是对的？
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"五个部件，各管什么","hint":"点一下看职责","note":"点任意部件，看它到底负责哪一步。它们都挂在同一条总线上。","items":[{"b":"运算器 ALU","d":"只做算术和逻辑运算，不关心数据从哪来、到哪去。"},{"b":"控制器","d":"按 PC 取指令、译码、发出控制信号。整个机器里只有它知道「下一步做什么」。"},{"b":"存储器","d":"按地址存字节。指令和数据放在同一片空间里，不分家——这是很多漏洞的源头。"},{"b":"输入","d":"把外部世界（按键、电压、光）变成电平，再变成字节。"},{"b":"输出","d":"把字节变回人能感知的东西：屏幕像素、声音、继电器动作。"},{"b":"总线","d":"所有部件共用的通道，同一时刻只能有一个主人；谁抢到谁说话。"}]}'></div>
+  </main>
+</div>
+<script src="assets/cnav.js"></script>
+<script src="assets/viz.js"></script>
+<script src="assets/iviz.js"></script>
+<script src="assets/anime.iife.min.js"></script>
+<script src="assets/anim2.js"></script>
+</body>
+</html>

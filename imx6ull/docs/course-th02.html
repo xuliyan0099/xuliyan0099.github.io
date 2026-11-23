@@ -1,0 +1,411 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>进程、线程与调度（详解） · 卷 04 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j04.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 04 · 操作系统</div>
+<ol><li><a href="course-th01.html">
+  <span class="no">01</span><span>操作系统与 Linux 的分层<span class="sub">约 3 小时</span></span></a></li>
+<li><a href="course-27.html">
+  <span class="no">02</span><span>进程、线程与 task_struct<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-28.html">
+  <span class="no">03</span><span>fork 与 exec<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-29.html">
+  <span class="no">04</span><span>特权级与异常<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-30.html">
+  <span class="no">05</span><span>中断<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-31.html">
+  <span class="no">06</span><span>调度<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-32.html">
+  <span class="no">07</span><span>上下文切换<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-33.html">
+  <span class="no">08</span><span>同步<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th02.html" class="active">
+  <span class="no">09</span><span>进程、线程与调度（详解）<span class="sub">约 4 小时 · 当前</span></span></a></li>
+<li><a href="course-th06.html">
+  <span class="no">10</span><span>中断、并发与同步（详解）<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-th15.html">
+  <span class="no">11</span><span>内核全貌：子系统如何协作<span class="sub">◆ · 约 4 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j03.html">← 卷 03</a>
+  <a href="../juan/j05.html">卷 05 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 04<span>·</span>操作系统<span>·</span>第 09 篇</div>
+  <h1>进程、线程与调度（详解）</h1>
+  <p class="lede">「进程」是操作系统里最容易被说滥的概念。这一章把它落到结构体和寄存器上：一个进程由哪几块内存组成、fork 到底复制了什么、切换时哪 12 个寄存器必须搬走、调度器凭什么算「谁该跑」。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 4 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+    <div class="viz" data-kind="flow" data-title="进程的五种状态" data-sub="调度器只从就绪队列里挑人" data-json='{"play":true,"steps":[{"n":"新建 NEW","d":"fork 造出 task_struct"},{"n":"就绪 READY","d":"排在队列里等 CPU"},{"n":"运行 RUNNING","d":"真正占着 CPU"},{"n":"阻塞 BLOCKED","d":"等 IO / 等锁 / 主动睡"},{"n":"退出 EXIT","d":"等父进程收尸"}],"note":"阻塞态不占 CPU，这是多任务能成立的前提。一个进程卡在读磁盘时，CPU 立刻去跑别人——不是「同时」，是「轮流得快」。"}'></div>
+
+
+    <div class="card">
+      <h4>本章要解决的问题</h4>
+      <p>① 进程在内核里长什么样；② fork 为什么「瞬间」完成，写时才拷贝；③ 上下文切换具体保存了哪些寄存器；④ CFS 的 vruntime 到底怎么算，nice 值如何变成 CPU 份额；⑤ 实时任务为什么会被普通任务「卡住」。</p>
+    </div>
+
+    <div class="card">
+      <h4>读完你应该能回答</h4>
+      <ul>
+        <li>一个进程的地址空间里，至少有几样东西是「独占」的？</li>
+        <li>fork 之后父子进程的页表项是什么权限？谁把它改回来的？</li>
+        <li>ARM 上下文切换保存 r4–r11 而不保存 r0–r3，为什么合理？</li>
+        <li>两个任务 nice 0 和 nice 5，CPU 时间大约按什么比例分？</li>
+        <li>僵尸进程占的是什么资源，为什么不能自动回收？</li>
+      </ul>
+    </div>
+
+    <div class="anim2" data-json='{"title":"一次进程切换的完整循环","hint":"看得见上下文切换的代价","nodes":[{"k":"就绪队列","s":"等待 CPU"},{"k":"调度器","s":"按 vruntime 选"},{"k":"上下文切换","s":"保存/恢复"},{"k":"运行","s":"占用 CPU"},{"k":"时间片耗尽","s":"重新入队"}],"frames":[{"i":0,"d":"可运行的进程排在红黑树上，键是 vruntime——谁跑得少，谁排得前。"},{"i":1,"d":"时钟中断到来，调度器比较当前进程与新候选的 vruntime，决定要不要切。"},{"i":2,"d":"切换要保存 16 个通用寄存器、CPSR、切栈指针，还要换页表基址——这一步会刷 TLB。"},{"i":3,"d":"新进程恢复寄存器后继续跑。真正的用户代码只占时间片的一部分，其余都花在切换与缓存重建上。"},{"i":4,"d":"时间片用完，进程带着累加的 vruntime 回到就绪队列，等待下一次被选中。"}],"kind":"flow"}'></div>
+
+    <h2 id="s1">1. 进程在内核里就是一个结构体</h2>
+    <div class="key">
+      <b>CPU 视角（配合 T18 读）</b>
+      本章说「切换就是保存 12 个值」，那 12 个值在硬件上就是几条 stmia/ldmia。 想看清每条指令的位段、流水线与寄存器实际变化，跳 <a href="../docs/course-th18.html">T18 · CPU 是怎么执行一行代码的</a> 第 10 节（一次线程切换，CPU 动了哪些寄存器）。
+    </div>
+
+
+    <p>内核用 <span class="path">struct task_struct</span>（在 <code>include/linux/sched.h</code>）描述一个进程。这个结构体有几百个字段，但对理解原理真正关键的是下面这十几个：</p>
+
+    <table>
+      <thead><tr><th>字段</th><th>存什么</th><th>缺了它会怎样</th></tr></thead>
+      <tbody>
+        <tr><td><code>state</code></td><td>运行 / 可中断睡眠 / 不可中断睡眠 / 停止 / 僵尸</td><td>调度器不知道该不该叫醒它</td></tr>
+        <tr><td><code>stack</code></td><td>内核栈指针（ARM 上通常 8KB，2 个页）</td><td>无法保存陷入内核时的现场</td></tr>
+        <tr><td><code>mm</code></td><td>指向 <code>mm_struct</code>：页表、VMA 链表、代码/数据/堆/栈区间</td><td>没有独立地址空间，就和线程没区别了</td></tr>
+        <tr><td><code>active_mm</code></td><td>当前实际在用的地址空间（内核线程借用上一个进程的）</td><td>内核线程切换时会丢掉页表基址</td></tr>
+        <tr><td><code>pid / tgid</code></td><td>线程 id / 线程组 id（用户看到的「进程号」其实是 tgid）</td><td>无法区分「进程」和「进程里的线程」</td></tr>
+        <tr><td><code>parent / children</code></td><td>父子关系链表</td><td>无法回收僵尸、无法做进程组信号</td></tr>
+        <tr><td><code>files</code></td><td>打开文件表（fd → file 结构）</td><td>fd 无法跨 fork 继承</td></tr>
+        <tr><td><code>fs</code></td><td>当前工作目录、根目录</td><td>相对路径无法解析</td></tr>
+        <tr><td><code>signal / sighand</code></td><td>待处理信号、信号处理函数表</td><td>信号机制失效</td></tr>
+        <tr><td><code>cred</code></td><td>uid/gid/能力集（权限的真正依据）</td><td>无法判断能不能打开某个设备</td></tr>
+        <tr><td><code>thread</code></td><td><code>cpu_context</code>：切换时要保存的寄存器快照</td><td>无法恢复执行</td></tr>
+        <tr><td><code>prio / se</code></td><td>动态优先级、调度实体（含 vruntime）</td><td>调度器找不到排序依据</td></tr>
+      </tbody>
+    </table>
+
+    <div class="key">
+      <b>一句话总结进程的构成</b>
+      <b>一个内核栈 + 一份 task_struct + 一张页表（mm）+ 一张文件表和信号表。</b>「线程」和「进程」的区别只在于：<b>哪些东西是共享的</b>。
+    </div>
+
+    <h2 id="s2">2. 进程和线程：差别就在 clone 的几个标志位</h2>
+
+    <p>Linux 内核里没有独立的「线程」概念，只有任务（task）。所谓线程，是<b>共享了地址空间和若干资源的任务</b>。这个「共享哪些」由 <code>clone()</code> 的标志位精确控制：</p>
+
+    <table>
+      <thead><tr><th>标志</th><th>共享的东西</th><th>不共享时</th></tr></thead>
+      <tbody>
+        <tr><td><code>CLONE_VM</code></td><td>同一张页表、同一份地址空间</td><td>各自独立地址空间（进程）</td></tr>
+        <tr><td><code>CLONE_FILES</code></td><td>同一张 fd 表（一个线程关 fd，别的线程也看不到）</td><td>fd 表各自复制一份</td></tr>
+        <tr><td><code>CLONE_FS</code></td><td>共享当前目录 / 根目录</td><td>各进程可 <code>chdir</code> 到不同地方</td></tr>
+        <tr><td><code>CLONE_SIGHAND</code></td><td>共享信号处理函数表</td><td>各进程可注册不同处理函数</td></tr>
+        <tr><td><code>CLONE_THREAD</code></td><td>放进同一个线程组，共享 tgid</td><td>pid == tgid，独立的「进程」</td></tr>
+      </tbody>
+    </table>
+
+    <div class="reg">/* pthread_create 在内核看来就是这一串 flag */
+clone(CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND
+      | CLONE_THREAD | CLONE_SYSVSEM | CLONE_SETTLS
+      | CLONE_PARENT_SETTID | CLONE_CHILD_CLEARTID, ...)</div>
+
+    <p>由此能推出一串实用结论：<b>线程崩溃会拖死整个进程</b>（因为共享地址空间，一个线程写坏堆，别的线程也用同一份堆）；<b>线程间切换比进程间便宜</b>（不用换页表、不用刷 TLB）；<b>一个线程调 <code>exit()</code> 会让所有线程退出</b>（因为它杀的是线程组），必须用 <code>pthread_exit()</code>。</p>
+
+    <h2 id="s3">3. fork 到底复制了什么</h2>
+    <div class="viz" data-kind="matrix" data-title="fork 之后：哪些复制、哪些共享" data-sub="copy-on-write：先共享，写的时候才真复制" data-json='{"corner":"区域","cols":["fork 瞬间","第一次写","谁回收"],"rows":[{"n":"代码段 text","cells":[{"v":"共享只读","c":"gr"},{"v":"仍共享","c":"gr"},{"v":"最后退出的进程","c":"gray"}]},{"n":"数据段 data","cells":[{"v":"共享只读","c":"gr"},{"v":"复制一页","c":"or"},{"v":"各自回收","c":"gray"}]},{"n":"堆 heap","cells":[{"v":"共享只读","c":"gr"},{"v":"复制一页","c":"or"},{"v":"各自回收","c":"gray"}]},{"n":"页表","cells":[{"v":"复制一份","c":"vi"},{"v":"改指向新页","c":"vi"},{"v":"父子各一份","c":"gray"}]}],"note":"fork 只复制 task_struct 与页表，物理页先共享标只读；谁写谁触发缺页才复制——这就是 fork 看起来很快的原因。"}'></div>
+
+
+    <p>教科书说「fork 复制父进程的地址空间」，这句话在实现上其实<b>不成立</b>。真实的 fork 分两步：</p>
+
+    <ol>
+      <li><b>复制结构，不复制内容</b>：新 task_struct、新内核栈、新 <code>mm_struct</code>、<b>新页表</b>（页表本身的页要复制），但页表里指向的<b>物理页一页都不复制</b>。</li>
+      <li><b>把所有可写页表项改成只读</b>，并打上「写时复制（COW）」标记，父子双方共享同一批物理页。</li>
+    </ol>
+
+    <p>然后等着「谁写谁分配」：任一进程写某个页时，MMU 发现该页只读 → 触发 Abort（缺页）→ 内核缺页处理发现是 COW 页 → 分配一个新物理页、把原内容拷进去、把当前进程的页表项改回可写并指向新页。</p>
+
+    <div class="calc">
+      <h5>算一笔：fork 一个 100MB 的进程，真正花了多少内存带宽？</h5>
+      <div class="line">若真复制数据：100MB 内存拷贝 → 约 100MB 的读 + 100MB 的写</div>
+      <div class="line">实际 fork 只复制页表：100MB ÷ 4KB = 25600 个页表项</div>
+      <div class="line">每个 PTE 4 字节 → 约 100KB 的页表数据要写</div>
+      <div class="line">比率：100MB vs 100KB ≈ <b>1000 倍</b></div>
+      <div class="line">结论：fork 便宜不是因为「聪明」，是因为它<b>把成本推迟到真正写的时候</b></div>
+    </div>
+
+    <p>这解释了两个经典现象：① <code>fork</code> 之后父子进程各自改自己的变量，互不影响（因为已经分了页）；② 一个进程 fork 后只读不写，实际内存占用几乎不增加（<code>ps</code> 里的 RSS 会因共享页而偏低，这是正常的）。</p>
+
+    <p>把 fork 拆开看，<code>copy_process()</code> 的主要步骤是：<b>dup_task_struct（复制结构体和栈）→ 检查资源限制 → sched_fork（设置调度参数）→ copy_mm（复制页表或共享）→ copy_files / copy_fs / copy_sighand → 分配 pid → wake_up_new_task</b>。任何一步失败都要原路回滚，这是个很长的错误处理链，也是 fork 相关 bug 的高发区。</p>
+
+    <h2 id="s4">4. 五个状态：进程到底「在干什么」</h2>
+
+    <p>内核里进程只有五种基本状态，每个状态对应「它现在能不能被选中运行」这一个问题：</p>
+
+    <table>
+      <thead><tr><th>状态</th><th>含义</th><th>怎么进</th><th>怎么出</th></tr></thead>
+      <tbody>
+        <tr><td><code>TASK_RUNNING</code></td><td>可运行（在跑或在就绪队列里等）</td><td>被创建、被唤醒、时间片用完仍可运行</td><td>被抢占 / 主动睡眠</td></tr>
+        <tr><td><code>TASK_INTERRUPTIBLE</code></td><td>可中断睡眠：等事件，能被信号打断</td><td><code>wait_event_interruptible</code> 之类</td><td>事件到达 / 收到信号</td></tr>
+        <tr><td><code>TASK_UNINTERRUPTIBLE</code></td><td>不可中断睡眠：等硬件，连 kill 都不理</td><td>等 IO 完成、等锁</td><td>只有事件到达</td></tr>
+        <tr><td><code>TASK_STOPPED</code></td><td>被暂停（收到 SIGSTOP）</td><td>SIGSTOP / 调试器 attach</td><td>SIGCONT</td></tr>
+        <tr><td><code>TASK_ZOMBIE</code></td><td>已退出，等父进程收尸</td><td>进程调用 exit</td><td>父进程 wait 回收</td></tr>
+      </tbody>
+    </table>
+
+    <p>两个最常被问的点：</p>
+
+    <p><b>为什么有「不可中断睡眠」这种杀人都不管的状态？</b> 因为它等的东西不能半途而废。典型例子是等磁盘 IO 或等某个硬件寄存器就绪——如果这时响应信号强行退出，可能留下半个写坏的文件或半个配置好的外设。代价是你偶尔会看到进程卡在 <code>D</code> 状态、<code>kill -9</code> 无效，此时只能等硬件返回或重启。</p>
+
+    <p><b>僵尸进程占什么？为什么不能自动回收？</b> 它已经释放了地址空间、文件表、大部分内存，只剩两样：<code>task_struct</code>（含退出码、资源统计）和一个 pid。之所以内核不敢自动删，是因为<b>父进程有权知道子进程是怎么死的</b>（退出码、被哪个信号杀死、用了多少 CPU）。这些信息只能存在 task_struct 里等父进程来取。父进程一旦 <code>wait()</code>，内核就把这块内存释放。<b>父进程先死了</b>怎么办？子进程会被 <code>init</code>（或 systemd）收养，由它负责收尸——这就是为什么孤儿进程不会变成永久僵尸。</p>
+
+    <h2 id="s5">5. 上下文切换：凭什么只保存 12 个寄存器</h2>
+
+    <p>「上下文」就是「CPU 此刻的全部可见状态」：通用寄存器、程序计数器、栈指针、状态寄存器。切换的本质是<b>把这一整套存进旧任务的存储区，再从新任务的存储区装回来</b>。</p>
+
+    <p>ARM 上的切换核心是这么一段（<span class="path">arch/arm/kernel/entry-armv.S</span> 的 <code>__switch_to</code>）：</p>
+
+    <div class="reg">/* 简化示意 */
+stmia  prev_thread, {r4-r11, sp, lr}   /* 存 10 个值到 prev->thread.cpu_context */
+ldmia  next_thread, {r4-r11, sp, lr}   /* 从 next 的同一位置装回来 */
+/* 再写 CP15 c2（TTBR0）换成 next 的页表，DSB + ISB 保证生效 */</div>
+
+    <p>问题来了：<b>为什么不保存 r0–r3 和 CPSR？</b> 两个理由：</p>
+
+    <ul>
+      <li><b>r0–r3 是「调用者保存」寄存器</b>。ARM 的调用约定规定：函数调用后 r0–r3 可以被随意改。而切换一定发生在一次函数调用内部，所以被切走的那一刻，编译器早就认为 r0–r3 是「已经不需要了」的。切回来接着执行，它也不会去读 r0–r3 的旧值。</li>
+      <li><b>CPSR 在切换时本来就是内核态</b>。被切走的任务是在内核里（可能刚处理完中断或刚进系统调用）被切走的，CPSR 待会儿恢复时还是内核态；用户态的 CPSR 早就存在 pt_regs 的 SPSR 槽里了。</li>
+    </ul>
+
+    <div class="key">
+      <b>要保存的 12 个值分别是：r4–r11（被调用者保存，8 个）+ sp + lr。</b>
+      这 12 个值全放在 <code>task_struct.thread.cpu_context</code> 里。所以「上下文切换」在内核里就是十几次内存访问，这也是它能做到微秒级的原因。
+    </div>
+
+    <p>还有两个必须提的细节：</p>
+
+    <p><b>① 页表切换的时机。</b> 换 TTBR0 之后必须执行 <code>DSB</code>（等前面的写完成）+ <code>ISB</code>（清流水线），否则 CPU 可能还在用旧页表取指。这类「屏障指令」在驱动里也常出现，原因相同：<b>CPU 和内存不是同步的</b>。</p>
+
+    <p><b>② 内核线程的页表问题。</b> 内核线程没有自己的 <code>mm</code>，它借用上一个用户进程的 <code>active_mm</code>。如果这时不做特殊处理，内核线程一跑就可能把某个进程的页表当成自己的用；更糟的是如果那个进程刚好退出，页表就没了。所以内核用 <code>active_mm</code> 的引用计数来兜住这个生命周期。</p>
+
+    <h2 id="s6">6. CFS：用「虚拟运行时间」排队</h2>
+    <div class="viz" data-kind="bars" data-title="同样 nice 值，谁先被调度" data-sub="CFS 按 vruntime 排队，最小者先跑" data-json='{"max":22,"items":[{"n":"A 已跑 12ms","v":12,"unit":" ms","c":"cy"},{"n":"B 已跑 20ms","v":20,"unit":" ms","c":"vi"},{"n":"C 刚唤醒 3ms","v":3,"unit":" ms","c":"gr"}],"note":"红黑树最左节点是下一个。C 睡醒后 vruntime 最小，所以交互进程总是「手感很快」——这也是服务器上 CPU 抢占式调度的由来。"}'></div>
+
+
+    <p>普通进程（<code>SCHED_NORMAL</code>）由 CFS（完全公平调度器）管。它的核心不是「时间片」，而是一个虚拟时钟：</p>
+
+    <div class="reg">vruntime += 本次实际运行时间 × (NICE_0_WEIGHT / 该任务的权重)
+其中 NICE_0_WEIGHT = 1024，权重 = 1024 / 1.25^nice</div>
+
+    <p>直觉解释：<b>vruntime 跑得越快，说明这个任务「占便宜」越多，应该少给它机会。</b> 调度器永远挑 vruntime 最小的那个跑（用红黑树维护，取最左节点，O(log n)）。</p>
+
+    <p>nice 值就是权重档位。几个关键值：</p>
+
+    <table>
+      <thead><tr><th>nice</th><th>权重</th><th>相对 nice 0 的 CPU 份额</th></tr></thead>
+      <tbody>
+        <tr><td>-5</td><td>3121</td><td>约 3.05 倍</td></tr>
+        <tr><td>0</td><td>1024</td><td>1 倍（基准）</td></tr>
+        <tr><td>5</td><td>335</td><td>约 0.327 倍</td></tr>
+        <tr><td>10</td><td>110</td><td>约 0.107 倍</td></tr>
+        <tr><td>19</td><td>15</td><td>约 0.015 倍</td></tr>
+      </tbody>
+    </table>
+
+    <div class="calc">
+      <h5>算一遍：nice 0 与 nice 5 两个任务抢一个核</h5>
+      <div class="line">权重：1024 与 335，总权重 = 1359</div>
+      <div class="line">CPU 份额：1024/1359 = <b>75.3%</b>；335/1359 = <b>24.7%</b></div>
+      <div class="line">调度周期 sched_latency 默认 6ms → 分别得 4.52ms 和 1.48ms</div>
+      <div class="line">反推 vruntime：nice 5 每真跑 1ms，账面扣 1024/335 ≈ 3.06ms</div>
+      <div class="line">所以它「账面跑得快」，很快变成最左节点被切走——公平由此实现</div>
+    </div>
+
+    <p>还有三个机制要知道，否则你会对观测结果困惑：</p>
+
+    <ul>
+      <li><b><code>min_vruntime</code> 单调递增</b>：所有新任务的 vruntime 起点被抬到不低于它，防止「睡很久的老任务」回来时账面太低、一把抢走 CPU 很久。</li>
+      <li><b>最小粒度</b>：即使份额算出来只有 0.2ms，也不能真给这么短（切换开销会吃掉收益），所以有 <code>sched_min_granularity</code>（默认 0.75ms）兜底。</li>
+      <li><b>6.6 起换成 EEVDF</b>：把「虚拟时间」换成「lag（应得与已得的差）」模型，允许任务申请指定时间片（<code>sched_setattr</code>），并显式处理延迟敏感任务。原理相通，细节不同——你只要记住「按应得份额排队」这个不变的内核。</li>
+    </ul>
+
+    <h2 id="s7">7. 实时调度与优先级反转</h2>
+
+    <p>实时任务（<code>SCHED_FIFO</code> / <code>SCHED_RR</code>）的优先级是 1–99，普通任务是 0。规则残酷而简单：<b>只要有任何一个实时任务处于可运行状态，普通任务就永远拿不到 CPU。</b></p>
+
+    <ul>
+      <li><b>SCHED_FIFO</b>：同优先级先进先出，除非它自己阻塞、退出或被更高优先级抢占，否则一直跑。写错就是「一个死循环卡死整机」。</li>
+      <li><b>SCHED_RR</b>：同优先级按时间片轮转，时间片用完排到队尾。</li>
+    </ul>
+
+    <p>这解释了嵌入式里最常见的故障现象：<b>系统看起来「卡死了」，但串口还能响应中断</b>。因为中断照常进（硬件中断优先级高于任何任务），而所有普通进程（包括 shell、看门狗喂狗线程）都饿死了。</p>
+
+    <h3>7.1 优先级反转：一个真实的翻车模型</h3>
+
+    <p>假设三个任务，优先级 H &gt; M &gt; L，共用一把互斥锁：</p>
+
+    <div class="flow">
+      <span>L 拿到锁</span><span>→</span><span>M 抢占 L（M 优先级更高）</span><span>→</span><span>H 就绪，需要这把锁</span><span>→</span><span>H 阻塞等 L</span><span>→</span><span>M 继续跑，L 拿不到 CPU</span>
+    </div>
+
+    <p>结果是：<b>最高优先级的 H 被最低优先级的 L 拖住，而 L 又被中优先级的 M 拖住。</b> H 的实际等待时间取决于 M 跑多久，跟 H 自己毫无关系。这就是优先级反转。</p>
+
+    <p>1997 年火星探路者的重启事故就是它：低优先级的气象任务持有总线锁，被中优先级的通信任务抢占，高优先级的总线管理任务等锁超时，看门狗判定系统失效并重启。</p>
+
+    <h3>7.2 解法：优先级继承与优先级天花板</h3>
+
+    <p><b>优先级继承（PI）</b>：当高优先级任务 H 因等锁被阻塞时，内核临时把持锁任务 L 的优先级<b>提升到 H 的级别</b>。这样 M（中间优先级）就无法抢占 L，L 能尽快跑完临界区放锁，H 立刻得到锁并恢复自己的优先级。</p>
+
+    <p><b>优先级天花板</b>：另一种做法是把锁的优先级一开始就定死为「所有可能用它的任务中最高的那个」，只要拿到锁就升到那个级别。开销更小，但要求你事先知道谁会用这把锁。</p>
+
+    <p>Linux 里的使用门槛要注意：</p>
+
+    <ul>
+      <li><b>内核的 <code>rt_mutex</code></b> 默认就带优先级继承，是内核里实时锁的基础。</li>
+      <li><b>用户态的 <code>pthread_mutex_t</code> 默认不带 PI</b>，必须创建时指定属性 <code>PTHREAD_PRIO_INHERIT</code>，否则你自己写的实时程序仍然会发生反转。</li>
+      <li><b>Spinlock 不能睡眠</b>，所以它无法参与 PI，实时场景要用 <code>rt_mutex</code> 替代。</li>
+    </ul>
+
+    <div class="note">
+      <b>一个常被混淆的点</b>
+      优先级反转 ≠ 死锁。反转是「临时被拖延」，只要中间任务跑完就会恢复；死锁是「互相等对方放锁」，永远不恢复。两者都会让系统「看起来卡住」，但排查手段完全不同：反转看优先级和持锁时间，死锁看循环等待链。
+    </div>
+
+    <h2 id="s8">8. 十个常见误解</h2>
+
+    <table>
+      <thead><tr><th>误解</th><th>真相</th></tr></thead>
+      <tbody>
+        <tr><td>「fork 会复制父进程全部内存」</td><td>只复制页表并做 COW 标记，物理页共享，写时才真正复制。</td></tr>
+        <tr><td>「线程是内核里另一种对象」</td><td>内核只有 task，线程 = 带 <code>CLONE_VM|CLONE_THREAD</code> 等标志的 task。</td></tr>
+        <tr><td>「pid 就是进程号」</td><td>用户看到的「进程号」是 <code>tgid</code>，<code>pid</code> 在主线里是线程号。</td></tr>
+        <tr><td>「nice 值是绝对优先级」</td><td>它是权重档位，只影响<b>相对份额</b>；两个任务都 nice 0 就是 50/50，谈不上「优先级」。</td></tr>
+        <tr><td>「CFS 有时间片」</td><td>CFS 没有固定时间片，只有「按 vruntime 排队 + 最小粒度兜底」。</td></tr>
+        <tr><td>「实时任务一定准时」</td><td>它只保证「优先被调度」，不保证「无延迟」。关中断、关抢占的内核临界区一样会让你晚到。</td></tr>
+        <tr><td>「kill -9 一定能杀进程」</td><td>处于不可中断睡眠的进程杀不掉，只能等硬件事件返回。</td></tr>
+        <tr><td>「僵尸进程占很多内存」</td><td>只剩 task_struct 和一个 pid，几 KB 量级；但 pid 会被耗尽，这是真危害。</td></tr>
+        <tr><td>「上下文切换只保存通用寄存器」</td><td>ARM 上还要换 TTBR0、刷 TLB 相关状态，代价远不止 12 个寄存器。</td></tr>
+        <tr><td>「多线程一定比多进程快」</td><td>省的是切换与共享成本，代价是锁竞争与缓存伪共享，未必更快。</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s9">9. 自检：能答出来才算懂</h2>
+
+    <div class="q"><span class="n">1</span><p>一个进程最少由哪几块「独占资源」构成？线程共享了其中哪几块？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>独占：内核栈 + <code>task_struct</code> + 地址空间（<code>mm</code>）+ 寄存器上下文。线程共享地址空间、fd 表、当前目录、信号处理表（取决于 clone 标志）；但<b>内核栈和 task_struct 永远是各自独立的</b>，这就是线程也能独立被调度、独立陷入内核的原因。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>fork 之后，父子进程对同一全局变量的修改为什么互不影响？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>因为写之前两者共享同一物理页；一旦某一方写入，MMU 因该页只读触发缺页，内核为它分配新物理页并复制内容，从此两边指向不同页。所以「互不影响」是 COW 的结果，不是 fork 时就复制了。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>ARM 上下文切换为什么只保存 r4–r11、sp、lr？r0–r3 去哪了？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>r0–r3 是调用者保存寄存器，切换发生在函数调用内部，编译器已认定它们可被破坏，恢复后也不会读旧值。r4–r11 是被调用者保存寄存器，必须由内核负责保存。CPSR 则因为在切换时本就在内核态，用户态的那份早存在 pt_regs 的 SPSR 里。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>nice 0 和 nice 5 抢一个核，CPU 大约怎么分？为什么不是 1024:335 以外的比例？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>约 75% 与 25%（1024/1359 与 335/1359）。因为 CFS 按「权重占比」分配时间，权重由 <code>1024/1.25^nice</code> 决定，所以比例是权重的直接比值。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>进程卡在 D 状态，kill -9 无效，为什么？怎么办？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>因为它处于 <code>TASK_UNINTERRUPTIBLE</code>，内核故意忽略信号，避免在硬件操作中途被打断留下不一致状态。只能等事件返回（IO 完成、驱动超时），或者排查驱动问题、重启。若频繁出现，通常是驱动或存储介质有问题。</p>
+    </div></details>
+
+    <div class="q"><span class="n">6</span><p>僵尸进程到底占什么资源？父进程不 wait 会怎样？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>占一个 <code>task_struct</code> 和一个 pid。父进程不 wait，它就一直挂着；数量多了会耗尽 pid（默认几万到几十万），新进程无法创建。父进程先退出的话，子进程被 init/systemd 收养并自动收尸。</p>
+    </div></details>
+
+    <div class="q"><span class="n">7</span><p>为什么一个死循环的 SCHED_FIFO 任务能让系统「假死」但串口仍有反应？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>实时任务优先级高于所有普通任务，只要它不阻塞就一直占 CPU，普通任务（shell、日志、喂狗线程）全部饿死；但硬件中断仍能进入（中断不受任务调度影响），所以串口这类中断驱动的外设还能响应。</p>
+    </div></details>
+
+    <div class="q"><span class="n">8</span><p>用一句话说清优先级反转，再说清它与死锁的区别。</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>反转：高优先级任务被低优先级任务持有的锁挡住，而低优先级任务又被中优先级任务抢占，导致高优先级任务的等待时间与它自身无关。死锁：两个以上任务互相等待对方持有的资源，永远不恢复。反转是「拖延但会好」，死锁是「永久卡住」。</p>
+    </div></details>
+
+    <div class="q"><span class="n">9</span><p>pthread 互斥锁默认能防优先级反转吗？要怎么改？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>不能。默认属性没有优先级继承，必须用 <code>pthread_mutexattr_setprotocol(&amp;attr, PTHREAD_PRIO_INHERIT)</code> 创建带 PI 的互斥锁。内核里的 <code>rt_mutex</code> 则默认支持。</p>
+    </div></details>
+
+    <div class="q"><span class="n">10</span><p>EEVDF 相比 CFS，改的到底是什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>把「累积虚拟运行时间」换成「lag（应得与已得的差）」作为排序依据，并允许任务显式申请时间片；同时把「延迟敏感」从隐式的唤醒抢占变成显式的资格判断。核心目标没变：按权重公平分配，但延迟控制更可控。</p>
+    </div></details>
+
+    <h2 id="s10">10. 这一章要动手的命令</h2>
+
+    <div class="steps">
+      <ol>
+        <li><code>ps -eo pid,tgid,stat,pri,ni,comm</code> —— 一次看清 pid 与 tgid 的区别（多线程进程里 tgid 相同）。</li>
+        <li><code>cat /proc/&lt;pid&gt;/sched</code> —— 直接读该任务的 vruntime、切换次数、在 CPU 上的累计时间。</li>
+        <li><code>chrt -f 50 ./busy &amp;</code> 再 <code>top</code> —— 亲眼看到普通进程被饿死、系统「假死」。</li>
+        <li><code>taskset -c 0 ./busy</code> —— 把进程钉在 CPU0，观察单核争抢时的份额分配。</li>
+        <li><code>nice -n 5 ./busy &amp;</code> 与 <code>nice -n 0 ./busy &amp;</code> 同时跑，配合 <code>top</code> 验证 75:25。</li>
+        <li><code>pidstat -w 1</code> —— 看每秒的上下文切换次数（cswch/s 与 nvcswch/s 的区别值得查清）。</li>
+        <li><code>perf sched record -- sleep 5</code> 然后 <code>perf sched latency</code> —— 看真实的调度延迟分布。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一章预告</b>
+      T03 讲虚拟内存：一个 4KB 页怎么映射、页表为什么是三级、缺页处理到底分几种、为什么 <code>malloc</code> 拿到 1MB 却一个字节都不占物理内存。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="slider" data-iviz="1" data-json='{"title":"时间片和切换开销：调度器的两难","label":"时间片","unit":" ms","min":1,"max":50,"step":1,"value":10,"out":[{"k":"每秒被切走的次数","expr":"1000/v"},{"k":"切换开销占比（按每次 5 µs）","expr":"5/(v*1000)*100","unit":" %"},{"k":"一个进程每秒拿到的 CPU 时间","expr":"v","unit":" ms/次"}],"presets":[{"v":1,"t":"1 ms 极响应"},{"v":10,"t":"10 ms 桌面默认"},{"v":50,"t":"50 ms 吞吐优先"}],"note":"时间片越短，交互越跟手，但切换本身要保存/恢复寄存器、刷 TLB，白白吃掉 CPU。桌面取 10 ms 量级，服务器更愿意给长一点。"}'></div>
+  
+
+<nav class="pager">
+  <a href="course-33.html"><span>← 上一篇</span><b>同步</b></a>
+  <a class="nx" href="course-th06.html"><span>下一篇 →</span><b>中断、并发与同步（详解）</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

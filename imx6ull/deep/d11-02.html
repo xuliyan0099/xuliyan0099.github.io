@@ -1,0 +1,133 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JTAG 与 Ozone：停核、看页表、单步走启动链 · 卷 11 | i.MX6ULL</title>
+<meta name="description" content="串口只能告诉你「到哪了」，JTAG 能让你在任意一条指令上把 CPU 按停，然后翻它的寄存器、页表和内存。">
+<link rel="stylesheet" href="../assets/deep.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/deep.js" defer></script>
+</head><body>
+<div class="dp-prog"><i></i></div>
+<div class="dp">
+<header class="dp-top">
+  <div class="dp-crumbs">
+    <a href="../../index.html">知识库</a><span>/</span>
+    <a href="../index.html">i.MX6ULL</a><span>/</span>
+    <a href="../juan/index.html">十四卷</a><span>/</span>
+    <a href="../juan/j11.html">卷 11</a>
+  </div>
+  <div class="dp-tools">
+    <a href="../juan/j11.html">☰ 卷 11 目录</a>
+    <a href="../juan/index.html">◫ 十四卷总览</a>
+  </div>
+</header>
+
+<div class="dp-hero">
+  <div class="dp-kicker">卷 11<span>·</span>第 11·04 篇</div>
+  <h1>JTAG 与 Ozone：停核、看页表、单步走启动链</h1>
+  <p class="dp-lede">串口只能告诉你「到哪了」，JTAG 能让你在任意一条指令上把 CPU 按停，然后翻它的寄存器、页表和内存。</p>
+  <div class="dp-chips">
+    <span class="c hot">★ 一读</span>
+    <span class="c">纯读约 4 小时</span>
+    <span class="c">理论为主 · 实作可跳</span>
+    <span class="c">配 3–4 个互动演示</span>
+  </div>
+</div>
+
+<aside class="dp-toc"><div class="dp-toc-h">本页目录</div><a href="#s1"><span>01</span>先玩一下：停核、看寄存器、单步</a><a href="#s2"><span>02</span>一、i.MX6ULL 上的三个关键状态</a><a href="#s3"><span>03</span>二、硬件断点、观察点与它们的限制</a><a href="#s4"><span>04</span>三、什么时候必须上 JTAG</a><a href="#s5"><span>05</span>动手（可选）：停住刚上电的 CPU</a><a href="#s6"><span>06</span>离开这一篇，你应该能</a></aside>
+<main class="dp-main">
+<p class="lead">串口只能告诉你「跑到哪了」，而且只有你打了 <code>printk</code> 的地方才说。JTAG 不一样：它能让 CPU 在<strong>任意一条指令</strong>上停下来，然后把寄存器、内存、页表全翻给你看。</p>
+
+<p>对 i.MX6ULL 这种「从 BootROM 开始就只有几行串口」的芯片，JTAG 是唯一能看到启动早期真相的工具。</p>
+
+<h2 id="s1">先玩一下：停核、看寄存器、单步</h2>
+
+<p>这就是 Ozone/J-Link 的基本操作循环。注意第 3 步：停核读到的是「此刻真正在执行的指令」，不是日志。</p>
+
+<div class="ikit" data-type="seq" data-json='{"title":"JTAG 调试的五个动作","badge":"seq",
+"actors":[{"name":"调试器（Ozone）","start":"连接"},{"name":"CPU 核","start":"运行"}],
+"steps":[
+{"label":"attach / reset & halt","states":["已连接","停住"],"note":"复位后立即停住，PC 停在复位向量，此时串口一个字都没输出。"},
+{"label":"读 PC、CPSR、SP","states":["读寄存器","停住"],"note":"CPSR 的 mode 位告诉你当前是 SVC/USR/IRQ；PC 告诉你第几条指令。"},
+{"label":"读 TTBR0 / TTBCR / SCTLR","states":["读系统寄存器","停住"],"note":"SCTLR.M=0 表示 MMU 还没开，此时地址就是物理地址。"},
+{"label":"在某个地址设硬件断点","states":["下断点","停住"],"note":"Cortex-A7 只有 6 个左右硬件断点，用完就没有了。"},
+{"label":"continue，命中断点再停","states":["继续","停在断点"],"note":"断点命中后可以看内存、看外设寄存器、改值，再继续。"},
+{"label":"单步一条指令","states":["单步","停住"],"note":"单步走启动链，是最笨也最有效的理解方式。"}]}'></div>
+
+<p>这三件事——停核、读寄存器、单步——构成了 JTAG 的全部价值。剩下的功能（Flash 烧写、trace）都是它们的组合。</p>
+
+<h2 id="s2">一、i.MX6ULL 上的三个关键状态</h2>
+
+<table>
+<thead><tr><th>阶段</th><th>PC 大致在哪</th><th>MMU</th><th>你能看到什么</th></th></tr></thead>
+<tbody>
+<tr><td>复位瞬间</td><td>BootROM（内部 ROM 区）</td><td>关</td><td>物理地址；串口未初始化</td></tr>
+<tr><td>SPL / U-Boot 早期</td><td>OCR RAM / DDR</td><td>通常关或刚开</td><td>DDR 初始化结果、时钟寄存器</td></tr>
+<tr><td>内核运行中</td><td>内核代码段</td><td>开</td><td>虚拟地址；要看物理地址得手动走页表</td></tr>
+</tbody></table>
+
+<p>最容易踩的坑是「地址对不上」：U-Boot 里你看到 <code>0x8000_0000</code> 是 DDR 起始，内核里同一个物理地址可能映射在 <code>0xC000_0000</code> 的虚拟地址上。判断方法就是读 <code>SCTLR</code> 的 M 位：MMU 关了，地址即物理；开了，就要查页表或让调试器做地址翻译。</p>
+
+<div class="ikit" data-type="code" data-json='{"title":"单步走启动链时要盯的寄存器","badge":"code",
+"regs":[{"n":"PC","v":"0x0000_0004"},{"n":"CPSR","v":"0x0000_01D3"},{"n":"SCTLR","v":"0x00C5_1878"},{"n":"TTBR0","v":"0x8000_4000"}],
+"lines":[
+{"c":"复位 → 取 IVT 头（0x0 处）","set":{"PC":"0x0000_0000"},"note":"BootROM 会按启动介质找 IVT，i.MX6 系列在 SD 卡偏移 0x400。"},
+{"c":"读 entry 字段 → 跳到 SPL","set":{"PC":"0x0090_0000"},"note":"entry 是 SPL 入口；此时还在 OCRAM，DDR 未初始化。"},
+{"c":"SPL 初始化 DDR、时钟","set":{"SCTLR":"0x00C5_1878"},"note":"这一步之后才能把 U-Boot 搬进 DDR。"},
+{"c":"U-Boot relocate，开 MMU（可选）","set":{"TTBR0":"0x8000_4000"},"note":"一旦开 MMU，PC 的数值含义就变了。"},
+{"c":"bootm 跳内核 head.S","set":{"PC":"0x8000_8000"},"note":"内核入口；r0=0, r1=machine id, r2=dtb 地址。"}]}'></div>
+
+<p>这张表的价值在于「预期」：单步时你心里有一个 PC 应该在哪，一旦偏离，问题就出在上一步。</p>
+
+<h2 id="s3">二、硬件断点、观察点与它们的限制</h2>
+
+<ul>
+  <li><b>硬件断点</b>：靠 CPU 内的地址比较器，数量有限（Cortex-A7 通常 6 个）。软件断点（改指令为 BKPT）在 Flash/ROM 上不可用，所以早期启动只能靠硬件断点。</li>
+  <li><b>观察点（watchpoint）</b>：监视某个地址的读/写，命中即停。查「谁把这个变量改坏了」时无可替代。</li>
+  <li><b>单步</b>：每次只执行一条指令，慢但准确；配合 <code>step over</code> 跳过函数调用。</li>
+</ul>
+
+<div class="cal warn"><span class="h">误解：接上 JTAG 就能随便停</span>停核会让看门狗继续计数，停太久板子会被复位；某些外设（DMA、eMMC）在 CPU 停住时仍在动，读到的状态可能已经变了。调试早期启动时，先确认看门狗已关或已喂。</div>
+
+<div class="cal tip"><span class="h">Ozone 的三个实用动作</span>1）加载 ELF 后按符号下断点，比记地址可靠；2）用 <code>Memory</code> 窗口看外设寄存器，配合手册的 offset；3）用 <code>Timeline</code>/<code>Trace</code>（若支持）看中断进出，比 printk 精确。</div>
+
+<h2 id="s4">三、什么时候必须上 JTAG</h2>
+
+<div class="ikit" data-type="hop" data-json='{"title":"从「没输出」到「知道卡在哪」","badge":"hop","packet":"问题",
+"nodes":[{"n":"串口无输出","s":"症状"},{"n":"怀疑启动","s":"阶段"},{"n":"停核看 PC","s":"定位"},{"n":"读寄存器","s":"判断"},{"n":"结论","s":"下一步"}],
+"hops":[
+{"at":"串口无输出","pkt":"症状","label":"先确认硬件","note":"电源、晶振、复位、串口线序、波特率，五项排除再上调试器。"},
+{"at":"怀疑启动","pkt":"阶段","label":"分段假设","note":"BootROM → SPL → U-Boot → 内核，四段各有一个「应该出现的输出」。"},
+{"at":"停核看 PC","pkt":"PC","label":"停在哪","note":"PC 在 ROM 区 → 卡在 BootROM（镜像/启动介质问题）。"},
+{"at":"读寄存器","pkt":"SCTLR","label":"MMU/时钟状态","note":"MMU 未开而 PC 在大地址 → 跳转地址错；时钟未配 → 外设全无响应。"},
+{"at":"结论","pkt":"假设","label":"改一处再验","note":"每次只改一个变量，避免「改了三处好了，不知道哪处起作用」。"}]}'></div>
+
+<h2 id="s5">动手（可选）：停住刚上电的 CPU</h2>
+
+<div class="cal q"><span class="h">只在 🔧 实作模式展开</span>需要 J-Link 与板子；本站在根目录另有 J-Link 连接笔记可对照。</div>
+
+<ol>
+  <li>Ozone 新建工程，选 i.MX6ULL（Cortex-A7），连接方式 JTAG，复位策略选 <code>Reset and halt</code>。</li>
+  <li>连上后先读 <code>PC</code> 与 <code>CPSR</code>，确认停在复位向量。</li>
+  <li>加载 U-Boot 的 ELF（带符号），在 <code>board_init_f</code> 或 <code>dram_init</code> 下硬件断点。</li>
+  <li>命中后读 DDR 控制器寄存器与串口寄存器，对照手册确认初始化是否真的生效。</li>
+</ol>
+
+<h2 id="s6">离开这一篇，你应该能</h2>
+
+<ul class="qa">
+  <li>说出停核时该看哪四个寄存器，以及 <code>SCTLR.M</code> 为什么关键。</li>
+  <li>解释硬件断点与软件断点的区别，以及为什么早期启动只能用前者。</li>
+  <li>按「四段假设」定位一块完全没输出的板子。</li>
+</ul>
+
+<p>JTAG 是「手动挡」。日常排障更需要「自动挡」：不加 printk 也能知道谁慢、谁在频繁分配。下一篇讲 ftrace、perf 与 eBPF。</p>
+
+<nav class="dp-nav">
+  <a href="d11-01.html"><span>← 上一篇</span>oops 现场还原：寄存器、栈回溯、反汇编定位到行</a>
+  <a href="d11-03.html" class="nxt"><span>下一篇 →</span>ftrace / perf / eBPF：内核里的可观测四件套</a>
+</nav>
+<footer class="dp-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线。文中的「动手」段落只在 🔧 实作模式下展开，纯读可整篇跳过。</footer>
+</main>
+</div></body></html>

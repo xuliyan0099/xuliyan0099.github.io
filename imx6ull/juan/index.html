@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>从零学计算机 · 十四卷 113 篇 · 总览</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<style>
+main.doc table{width:100%;border-collapse:collapse;margin:14px 0 8px;font-size:14px}
+main.doc th,main.doc td{border-bottom:1px solid rgba(110,168,254,.14);padding:9px 10px;text-align:left;vertical-align:top}
+main.doc th{color:#93a9cf;font-weight:600;font-size:13px;background:rgba(12,18,30,.5)}
+main.doc td.sn{white-space:nowrap;font-variant-numeric:tabular-nums;width:56px}
+main.doc td.nm{color:#eafdff}
+main.doc td.kk{color:#93a4c4;font-size:13px;white-space:nowrap}
+main.doc tbody tr:hover{background:rgba(110,168,254,.05)}
+main.doc ul.acc{margin:10px 0 20px;padding-left:22px;color:#c8d6ec}
+main.doc ul.acc li{margin:0 0 8px}
+@media(max-width:900px){main.doc td.kk{display:none}}
+</style>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../index.html">☰ 手册入口</a>
+  <a class="home hide-sm" href="../viz/index.html">互动台</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+<div class="vol-h">十四卷 · 逐卷进入</div>
+<ol>
+<li><a href="j00.html">
+  <span class="no">00</span><span>起步 · Linux 与实验台<span class="sub">6 篇 · 读 8h</span></span></a></li>
+<li><a href="j01.html">
+  <span class="no">01</span><span>机器与指令<span class="sub">20 篇 · 读 24h</span></span></a></li>
+<li><a href="j02.html">
+  <span class="no">02</span><span>编译与运行<span class="sub">6 篇 · 读 4h</span></span></a></li>
+<li><a href="j03.html">
+  <span class="no">03</span><span>存储与地址<span class="sub">11 篇 · 读 12h</span></span></a></li>
+<li><a href="j04.html">
+  <span class="no">04</span><span>操作系统<span class="sub">11 篇 · 读 13h</span></span></a></li>
+<li><a href="j05.html">
+  <span class="no">05</span><span>文件与设备<span class="sub">3 篇 · 读 3h</span></span></a></li>
+<li><a href="j06.html">
+  <span class="no">06</span><span>网络栈<span class="sub">3 篇 · 读 6h</span></span></a></li>
+<li><a href="j07.html">
+  <span class="no">07</span><span>芯片与硬件底座<span class="sub">14 篇 · 读 15h</span></span></a></li>
+<li><a href="j08.html">
+  <span class="no">08</span><span>启动链<span class="sub">10 篇 · 读 13h</span></span></a></li>
+<li><a href="j09.html">
+  <span class="no">09</span><span>驱动体系<span class="sub">11 篇 · 读 8h</span></span></a></li>
+<li><a href="j10.html">
+  <span class="no">10</span><span>用户态<span class="sub">4 篇 · 读 8h</span></span></a></li>
+<li><a href="j11.html">
+  <span class="no">11</span><span>调试与可观测<span class="sub">5 篇 · 读 3h</span></span></a></li>
+<li><a href="j12.html">
+  <span class="no">12</span><span>产品化<span class="sub">5 篇 · 读 2h</span></span></a></li>
+<li><a href="j13.html">
+  <span class="no">13</span><span>拔高<span class="sub">4 篇 · 读 1h</span></span></a></li>
+</ol>
+<div class="vol-nav"><a href="../index.html">← 路口页</a><a href="j00.html">卷 00 →</a></div>
+  </aside>
+  <main class="doc">
+
+    <div class="doc-kicker"><span>总览</span><span>·</span><span>14 卷 113 篇</span></div>
+    <h1>从零学计算机 · 十四卷 113 篇</h1>
+    <p class="lede">这套东西只有一个目标：让你从「不知道 0 和 1 是什么」开始，一路走到「能看懂 CPU 在执行什么、能解释软件为什么这样跑、能在自己的板子上跑起自己写的驱动」。左栏只有十四卷——选一卷进去，那一卷的篇目才展开。</p>
+
+    <div class="doc-chips"><span class="hot">通读 120h</span><span>动手 375h</span><span>14 卷</span><span>113 篇</span></div>
+
+    <div class="card" style="border-color:rgba(61,219,217,.30);background:linear-gradient(135deg,rgba(61,219,217,.10),rgba(139,123,255,.06))">
+      <h4>这套主线与参考卷的关系</h4>
+      <p>参考卷（理论 T01–T18 / 实践 C01–C14）是与本主线<b>并行</b>的一套：讲得更深、成体系，适合按章查细节。本主线是<b>因果链</b>：卷 00 先把机器和命令行摸熟，卷 01 打通「比特 → 指令」，卷 02–05 进内核（进程、内存、文件、中断），卷 06–09 打通网络、并发、存储与图形这几条外设通道，卷 10–13 落到板子上（设备树、驱动、启动链、产品化）。</p>
+    </div>
+
+    <h2>1. 每一篇都是同一个骨架</h2>
+
+    <p>问题 → 直觉 → 硬件 → 软件 → 图 → 上手 → 误解 → 自测。八节顺序固定，最容易犯的错是「看懂了就跳过上手」，所以每篇都把手放在自测之前。没时间动手也行，先把图和一个因果链记住。</p>
+
+    <div class="viz" data-kind="layers" data-title="八节骨架" data-sub="任何一篇都不例外" data-json='{"items":[{"n":"问题","d":"这一篇要回答什么（一句话）","c":"cy"},{"n":"直觉","d":"用生活类比建立第一印象","c":"gray"},{"n":"硬件","d":"电路/寄存器层面到底怎么发生","c":"vi"},{"n":"软件","d":"代码/内核里对应的现象","c":"or"},{"n":"图","d":"一张能背下来的结构图","c":"gr"},{"n":"上手","d":"照着敲一遍，能贴出输出","c":"cy"},{"n":"误解","d":"三个最常见的错法","c":"gray"},{"n":"自测","d":"五道题，答不出就回去重读","c":"vi"}],"note":"写课的人最容易犯的错是「懂了就跳过实验」。上手放在自测之前，就是为了拦住这个。"}'></div>
+
+    <h2>2. 十四卷 · 完整目录</h2>
+
+    <p>时长按「读懂 + 做完上手」计。通读约 <b>120 小时</b>，动手全做完再加 <b>375 小时</b>。点任意一行进入该卷，左栏就只剩这一卷的篇目。</p>
+
+    <table>
+      <thead><tr><th>卷</th><th>这一卷讲什么</th><th>篇</th><th>读 + 做</th><th>要点</th></tr></thead>
+      <tbody>
+<tr>
+  <td class="sn"><a href="j00.html">🧰 00</a></td>
+  <td class="nm"><a href="j00.html">起步 · Linux 与实验台</a></td>
+  <td>6</td>
+  <td>8 + 70 h</td>
+  <td class="kk">小白入口。一台机器、一套命令行、一条网络通路，先把「能干活」的地基铺平。</td>
+</tr>
+<tr>
+  <td class="sn"><a href="j01.html">⚡ 01</a></td>
+  <td class="nm"><a href="j01.html">机器与指令</a></td>
+  <td>20</td>
+  <td>24 + 30 h</td>
+  <td class="kk">从比特到汇编。这一卷解决「CPU 到底在干什么」，是后面一切的地基。程序员可只读第 14–18 篇。</td>
+</tr>
+<tr>
+  <td class="sn"><a href="j02.html">🔧 02</a></td>
+  <td class="nm"><a href="j02.html">编译与运行</a></td>
+  <td>6</td>
+  <td>4 + 18 h</td>
+  <td class="kk">你写了 16 年代码，这一卷把「会用」变成「讲得清」：四阶段、ELF、重定位、动态链接。</td>
+</tr>
+<tr>
+  <td class="sn"><a href="j03.html">🧠 03</a></td>
+  <td class="nm"><a href="j03.html">存储与地址</a></td>
+  <td>11</td>
+  <td>12 + 20 h</td>
+  <td class="kk">Cache 与 MMU 是「程序为什么快、为什么崩」的总开关。这一卷全部可纯读，PC 上能验证。</td>
+</tr>
+<tr>
+  <td class="sn"><a href="j04.html">🔁 04</a></td>
+  <td class="nm"><a href="j04.html">操作系统</a></td>
+  <td>11</td>
+  <td>13 + 16 h</td>
+  <td class="kk">进程、中断、调度、同步。这一卷解释「为什么一个 CPU 能同时跑一百个程序」。</td>
+</tr>
+<tr>
+  <td class="sn"><a href="j05.html">🗄️ 05</a></td>
+  <td class="nm"><a href="j05.html">文件与设备</a></td>
+  <td>3</td>
+  <td>3 + 8 h</td>
+  <td class="kk">一切皆文件。这一卷把 VFS 的四张表理清，并补上 ext4 的磁盘布局（现有内容缺这一块）。</td>
+</tr>
+<tr>
+  <td class="sn"><a href="j06.html">🌐 06</a></td>
+  <td class="nm"><a href="j06.html">网络栈</a></td>
+  <td>3</td>
+  <td>6 + 10 h</td>
+  <td class="kk">全站最大的理论空白：socket 到网卡之间，内核到底做了什么。三篇都是深读，纯读即可，无需板子。</td>
+</tr>
+<tr>
+  <td class="sn"><a href="j07.html">🔌 07</a></td>
+  <td class="nm"><a href="j07.html">芯片与硬件底座</a></td>
+  <td>14</td>
+  <td>15 + 40 h</td>
+  <td class="kk">i.MX6ULL 主战场。寄存器、时钟、DDR、总线、外设——软硬通吃就在这一卷。</td>
+</tr>
+<tr>
+  <td class="sn"><a href="j08.html">🚀 08</a></td>
+  <td class="nm"><a href="j08.html">启动链</a></td>
+  <td>10</td>
+  <td>13 + 45 h</td>
+  <td class="kk">从通电到 shell：BootROM、IVT/DCD、SPL、U-Boot、设备树、内核、根文件系统。</td>
+</tr>
+<tr>
+  <td class="sn"><a href="j09.html">🧩 09</a></td>
+  <td class="nm"><a href="j09.html">驱动体系</a></td>
+  <td>11</td>
+  <td>8 + 30 h</td>
+  <td class="kk">从「填一张函数表」到「挂上总线、被设备树匹配」。现有 4 篇是最小原型，惯常缺口在本卷补齐。</td>
+</tr>
+<tr>
+  <td class="sn"><a href="j10.html">🧑‍💻 10</a></td>
+  <td class="nm"><a href="j10.html">用户态</a></td>
+  <td>4</td>
+  <td>8 + 24 h</td>
+  <td class="kk">做产品靠这一层：文件、线程、socket、事件循环、进程间通信。四篇都是深读，纯读即可。</td>
+</tr>
+<tr>
+  <td class="sn"><a href="j11.html">🔍 11</a></td>
+  <td class="nm"><a href="j11.html">调试与可观测</a></td>
+  <td>5</td>
+  <td>3 + 14 h</td>
+  <td class="kk">把排障从「到处搜」变成一套流程：串口、dmesg、oops 现场、JTAG 停核、ftrace/perf。</td>
+</tr>
+<tr>
+  <td class="sn"><a href="j12.html">📦 12</a></td>
+  <td class="nm"><a href="j12.html">产品化</a></td>
+  <td>5</td>
+  <td>2 + 30 h</td>
+  <td class="kk">从「能跑 demo」到「能交产品」：构建系统、分区、双 Bank 升级、安全启动、看门狗。</td>
+</tr>
+<tr>
+  <td class="sn"><a href="j13.html">🌌 13</a></td>
+  <td class="nm"><a href="j13.html">拔高</a></td>
+  <td>4</td>
+  <td>1 + 20 h</td>
+  <td class="kk">i.MX6ULL 是 32 位 ARMv7 单核，它的天花板就在这。这一卷负责跨出去。</td>
+</tr>
+      <tr><td class="sn"><b>合计</b></td><td class="nm"><b>14 卷</b></td><td><b>113</b></td><td><b>120 + 375 h</b></td><td class="kk">逐卷往下读</td></tr>
+      </tbody>
+    </table>
+
+    <h2>3. 三种读法，按你现在的位置挑一种</h2>
+
+    <p><b>纯小白</b>：卷 00 → 01 → 02，一篇不跳。<br>
+    <b>会写程序但没碰过硬件</b>：从卷 01 的第 14 篇（机器码位段）插进去，往回补卷 01 的 00–13 只要看图。<br>
+    <b>只想上板</b>：卷 00 第 02 篇（搭实验台）→ 卷 10 设备树 → 卷 11 驱动 → 卷 12 启动链，其余当字典查。</p>
+
+    <nav class="pager">
+      <a href="../index.html"><span>返回</span><b>路口页 · 六个入口</b></a>
+      <a class="nx" href="j00.html"><span>开始</span><b>卷 00 · 起步 · Linux 与实验台 →</b></a>
+    </nav>
+    <div class="doc-foot">共 14 卷 113 篇 · 左栏逐卷进入 · 本页由 build-hub.js 生成</div>
+  </main>
+</div>
+<script src="../assets/anime.iife.min.js"></script>
+<script src="../assets/viz.js"></script>
+<script src="../assets/iviz.js"></script>
+<script src="../assets/anim2.js"></script>
+<script src="../assets/anim.js"></script>
+<script src="../assets/cpu3.js"></script>
+<script src="../assets/ikit.js"></script>
+</body></html>

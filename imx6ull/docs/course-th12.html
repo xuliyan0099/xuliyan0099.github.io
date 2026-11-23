@@ -1,0 +1,466 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>最小系统必需外设（上）：DDR、中断、定时器、GPIO、UART · 卷 07 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j07.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 07 · 芯片与硬件底座</div>
+<ol><li><a href="course-th07.html">
+  <span class="no">01</span><span>ARM 架构与 Cortex-A7<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-35.html">
+  <span class="no">02</span><span>i.MX6ULL 最小系统<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th10.html">
+  <span class="no">03</span><span>总线体系：AXI / AHB / APB 与 I2C / SPI / CAN<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="course-th11.html">
+  <span class="no">04</span><span>时钟树、复位、电源域、RTC 与看门狗<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-th12.html" class="active">
+  <span class="no">05</span><span>最小系统必需外设（上）：DDR、中断、定时器、GPIO、UART<span class="sub">约 6 小时 · 当前</span></span></a></li>
+<li><a href="course-th13.html">
+  <span class="no">06</span><span>最小系统必需外设（下）：存储、DMA、以太网、USB<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-37.html">
+  <span class="no">07</span><span>设备树<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th16.html">
+  <span class="no">08</span><span>BSP 与设备树原理<span class="sub">约 6 小时</span></span></a></li>
+<li><a href="course-38.html">
+  <span class="no">09</span><span>总线<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-39.html">
+  <span class="no">10</span><span>GIC 与定时器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-40.html">
+  <span class="no">11</span><span>存储与外设<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="viz-clock-tree.html">
+  <span class="no">12</span><span>互动台：时钟树与门控<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="viz-gpio.html">
+  <span class="no">13</span><span>互动台：GPIO 与 IOMUX 配置<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="viz-nvic.html">
+  <span class="no">14</span><span>互动台：中断优先级与抢占<span class="sub">💻 · 约 1 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j06.html">← 卷 06</a>
+  <a href="../juan/j08.html">卷 08 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 07<span>·</span>芯片与硬件底座<span>·</span>第 05 篇</div>
+  <h1>最小系统必需外设（上）：DDR、中断、定时器、GPIO、UART</h1>
+  <p class="lede">「最小系统」不是「能亮个灯」，而是能自己跑起来、能对外说话、能按时间做事、能存住数据的那一小撮硬件。这一章逐个拆开 DDR、中断控制器、定时器、引脚复用与 GPIO、串口，每个都给出寄存器级初始化顺序与算例。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 6 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+    <div class="viz" data-kind="seq" data-title="UART 一帧数据长什么样" data-sub="115200 波特率下，一帧 10 位约 87µs" data-json='{"slots":20,"scan":true,"sigs":[{"n":"空闲线","w":"11111111111111111111","c":"gray"},{"n":"起始位","w":"11101111111111111111","c":"vi","note":"一个低电平把接收方叫醒"},{"n":"8 个数据位","w":"11100011011011111111","c":"cy","note":"低位先发：0x 的位序要反着看"},{"n":"校验位","w":"11100011011001111111","c":"or"},{"n":"停止位","w":"11100011011011111111","c":"gr","note":"必须回高，否则算帧错误"}],"note":"串口没有时钟线，全靠双方约定波特率。双方快慢差超过约 2.5%，第 8 位就会采错——这就是「串口乱码」最常见的物理原因。"}'></div>
+
+
+    <div class="card">
+      <h4>本章要解决的问题</h4>
+      <p>① 一块裸板要跑起来，最少需要哪些外设；② DDR 初始化为什么是整板最难的、难在哪；③ 几十路中断怎么收敛到 CPU 的一个引脚上；④ 操作系统的心跳从哪来；⑤ 为什么「点灯」之前必须先配引脚复用；⑥ 串口为什么会乱码。</p>
+    </div>
+
+    <div class="card">
+      <h4>读完你应该能回答</h4>
+      <ul>
+        <li>DDR 配置表里那些 tRFC/tRCD 数字到底在约束什么？</li>
+        <li>GIC 的 SGI、PPI、SPI 分别是什么中断，编号范围怎么划？</li>
+        <li>EPIT 与 GPT 有什么区别，定时中断的频率怎么算？</li>
+        <li>GPIO1_IO03 的引脚编号规则是什么，为什么要先写 IOMUXC？</li>
+        <li>UART 初始化的正确顺序是什么，为什么不能先开再配？</li>
+      </ul>
+    </div>
+
+    <div class="anim2" data-json='{"title":"最小系统（上）：四样缺一不可","hint":"不启动先查这四样","nodes":[{"k":"电源","s":"多路电压"},{"k":"复位","s":"电压稳了才放开"},{"k":"时钟","s":"晶振起振"},{"k":"调试串口","s":"唯一的眼睛"}],"frames":[{"i":0,"d":"核心 1.2V、DDR 1.5V、IO 3.3V，上电有先后顺序；顺序错，芯片可能锁死。"},{"i":1,"d":"复位芯片盯着电压，稳了才放开复位脚。按住复位不放，什么都不会发生。"},{"i":2,"d":"晶振起振后 PLL 才锁得住。用示波器看波形，或者量 OSC 引脚有没有起振。"},{"i":3,"d":"UART1 接 USB 转串口，115200 8N1。BootROM 的第一句输出就从这来，它是你唯一的眼睛。"}],"kind":"flow"}'></div>
+
+    <h2 id="s1">1. 最小系统的外设清单</h2>
+
+    <p>一块 i.MX6ULL 裸板，从「上电什么都不做」到「Linux 能跑起来」，必须凑齐下面这些。少任何一项，系统就停在某个阶段不动：</p>
+
+    <table>
+      <thead><tr><th>外设</th><th>芯片内模块</th><th>没有它会怎样</th><th>最小验证方式</th></tr></thead>
+      <tbody>
+        <tr><td>时钟</td><td>CCM + 外部晶振</td><td>CPU 不执行任何指令</td><td>量晶振起振、读时钟寄存器</td></tr>
+        <tr><td>复位</td><td>SRC</td><td>上电状态不确定</td><td>读复位原因寄存器</td></tr>
+        <tr><td>启动介质</td><td>SD/eMMC/NAND + BootROM</td><td>BootROM 找不到代码，卡在下载模式</td><td>串口看不到任何输出</td></tr>
+        <tr><td>DRAM</td><td>MMDC</td><td>只能跑在内部 128KB SRAM，Linux 起不来</td><td>写读测 DDR 首地址</td></tr>
+        <tr><td>串口</td><td>UART1</td><td>没有任何输出，等于瞎调试</td><td>能打印一个字符</td></tr>
+        <tr><td>中断控制器</td><td>GIC-400</td><td>外设中断全部收不到</td><td>定时器中断能进</td></tr>
+        <tr><td>定时器</td><td>GPT / EPIT</td><td>没有 tick，调度器不工作</td><td>周期性中断计数</td></tr>
+        <tr><td>GPIO + IOMUXC</td><td>GPIO1–5、IOMUXC</td><td>引脚停在默认功能，点不亮灯</td><td>拉高一个 LED 引脚</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      <b>顺序很重要</b>
+      正确顺序是：时钟 → DDR → 串口 → 其他。因为 DDR 初始化要靠串口打日志，而串口又要靠正确的时钟。这就是为什么几乎所有 SoC 厂商的 BootROM 日志都从「时钟 OK、DDR OK、串口 OK」这三行开始。
+    </div>
+
+    <h2 id="s2">2. DDR 控制器：初始化最难的一块</h2>
+
+    <p>i.MX6ULL 的 DDR 控制器叫 <b>MMDC</b>，基址 <b>0x021B_0000</b>。它之所以是整板最难的部分，是因为 DDR 是<b>高速同步并行总线</b>，几十根线在同一时刻采数据，时序余量只有皮秒级。参数差一点不会「完全不能用」，而是「偶尔出错」——这类问题最难查。</p>
+
+    <h3>2.1 初始化到底做了什么</h3>
+
+    <div class="flow">
+      <span>上电</span><span>→</span><span>颗粒上电复位</span><span>→</span><span>配置时序参数</span><span>→</span><span>ZQ 校准</span><span>→</span><span>写 Leveling</span><span>→</span><span>读 DQS 门控训练</span><span>→</span><span>正常读写</span>
+    </div>
+
+    <ul>
+      <li><b>颗粒上电复位</b>：DDR3 上电后要等电源与时钟稳定，再发 <code>MRS</code> 命令配置模式寄存器，然后等 <code>tXPR</code>（几百 ns）才能访问。</li>
+      <li><b>时序参数</b>：把颗粒手册里的 tRCD、tRP、tRAS、tRFC、tWR、CL 换算成控制器时钟周期数写进寄存器。写错一项，表现就是「读写偶发失败」。</li>
+      <li><b>ZQ 校准</b>：DDR 用外部精密电阻（通常 240Ω）做阻抗校准，抵消工艺与温度漂移——这是 DDR3 比 DDR2 多出来的一步。</li>
+      <li><b>写 Leveling</b>：并行总线里每根数据线物理长度略有差异，到达时间不同。写 Leveling 让控制器逐根测量延迟并补偿，保证数据同时到达。</li>
+      <li><b>读 DQS 门控</b>：读方向上，控制器要根据 DQS 选通信号找准采样窗口；训练失败就会读出错数据。</li>
+    </ul>
+
+    <p>关键寄存器（MMDC0）：</p>
+
+    <table>
+      <thead><tr><th>寄存器</th><th>偏移</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td><code>MDMISC</code></td><td>0x018</td><td>杂项控制（burst 长度、DDR 类型选择等）</td></tr>
+        <tr><td><code>MDCFG0</code></td><td>0x02C</td><td>tRFC、tRAS、tRP 等主要时序</td></tr>
+        <tr><td><code>MDCFG1</code></td><td>0x030</td><td>tRCD、CL 等</td></tr>
+        <tr><td><code>MDRWD</code></td><td>0x094</td><td>读路径延迟与门控训练</td></tr>
+        <tr><td><code>MPRDD</code></td><td>0x0A0</td><td>写 Leveling 相关</td></tr>
+        <tr><td><code>MDSCR</code></td><td>0x01C</td><td>DDR 初始化与自刷新控制</td></tr>
+      </tbody>
+    </table>
+
+    <div class="calc">
+      <h5>算一笔：tRCD 该写多少</h5>
+      <div class="line">DDR3L-800 颗粒手册：tRCD = 13.75ns（DDR 时钟 400MHz，即 800MT/s）</div>
+      <div class="line">换算成控制器时钟周期：13.75ns × 400MHz = 5.5 → 进一取 <b>6</b></div>
+      <div class="line">若 MMDC 工作在 528MHz：13.75ns × 528MHz = 7.26 → 取 <b>8</b>（宁可保守）</div>
+      <div class="line">原则：时序只能取大不能取小；取小会让数据在未就绪时被采样</div>
+    </div>
+
+    <div class="warn">
+      <b>不要手写 DDR 参数表</b>
+      U-Boot 里 <code>board/freescale/mx6ull_xxx/</code> 下的 <code>ddr_init.c</code> 是一整张几百行的配置数组，由 NXP 的 DDR Stress Test 工具在实际板子上跑到稳定后导出。<b>换板、换颗粒必须重新跑工具生成</b>，手改参数几乎不可能一次成功。
+    </div>
+
+    <h3>2.2 怎么验证 DDR 真的稳</h3>
+
+    <p>不要只测「能读写一次」。要测三种模式：</p>
+
+    <ol>
+      <li><b>全 0 / 全 1</b>：检查线路是否短路或断路。</li>
+      <li><b>地址走 1 / 数据走 1</b>：检查地址线、数据线有没有接错或串扰。</li>
+      <li><b>长时间随机读写 + 温升</b>：连续跑几十分钟并加热，暴露「冷机正常、热机出错」的时序余量不足。</li>
+    </ol>
+
+    <p>Linux 起来后可以用 <code>memtester 32M 5</code> 压测，但注意它会占满内存，测试时不要跑关键服务。</p>
+
+    <h2 id="s3">3. 中断控制器：几十路中断怎么收敛</h2>
+    <div class="viz" data-kind="tree" data-title="GIC-400：几十路中断怎么收敛到两个 CPU 引脚" data-sub="分发器管「给谁」，CPU 接口管「什么时候给」" data-json='{"nodes":[{"n":"GIC-400","d":"0x00A0_0000","c":"vi","ch":[{"n":"分发器 Distributor","d":"0x00A0_1000：使能、优先级、目标 CPU","c":"cy","ch":[{"n":"SPI 共享中断","d":"UART/GPIO/定时器 → CPU0","c":"or"},{"n":"PPI 私有中断","d":"每个核自己的定时器","c":"gr"}]},{"n":"CPU 接口","d":"0x00A0_0100：ack / eoi","c":"cy","ch":[{"n":"IRQ 引脚","c":"or"},{"n":"FIQ 引脚","c":"rd"}]}]}],"note":"ack 是「我接了」，eoi 是「处理完了」。忘写 eoi，同类中断就再也不来了——这是驱动里最常见的「中断只进一次」。"}'></div>
+
+
+    <p>i.MX6ULL 有上百个中断源，而 ARM 核只有一个 IRQ 引脚和一个 FIQ 引脚。GIC（Generic Interrupt Controller，型号 GIC-400）的职责是把这些中断<b>排队、分级、送给某一个核</b>。</p>
+
+    <ul>
+      <li><b>分发器（Distributor）</b>：基址 <b>0x00A0_1000</b>，负责全局——哪路中断使能、优先级、路由到哪个 CPU、电平还是边沿触发。</li>
+      <li><b>CPU 接口（CPU Interface）</b>：基址 <b>0x00A0_0000</b>，负责单个核——屏蔽、应答、结束中断。</li>
+    </ul>
+
+    <p>中断编号（ID）的划分是最需要记住的：</p>
+
+    <table>
+      <thead><tr><th>ID 范围</th><th>类型</th><th>来源</th></tr></thead>
+      <tbody>
+        <tr><td>0–15</td><td><b>SGI</b> 软件中断</td><td>软件写寄存器触发，常用于多核核间通信</td></tr>
+        <tr><td>16–31</td><td><b>PPI</b> 私有外设中断</td><td>每核独立的定时器、看门狗等</td></tr>
+        <tr><td>32–1019</td><td><b>SPI</b> 共享外设中断</td><td>GPIO、UART、I2C、DMA、USB 等所有外设</td></tr>
+      </tbody>
+    </table>
+
+    <div class="tip">
+      <b>编号不是随便定的</b>
+      SGI 与 PPI 的编号在 ARM 架构里写死，SPI 的编号由 SoC 手册的「中断表」定义。写驱动时 <code>IRQ_UART1</code> 这类宏就是查表来的，写错编号会出现「中断进了但处理的是别的设备」。
+    </div>
+
+    <h3>3.1 使能一路中断的完整顺序</h3>
+
+    <div class="steps">
+      <ol>
+        <li>写 <code>ICDICENABLERn</code>（0x0180 + n×4）置位对应 ID 的使能位。GIC 用的是「写 1 生效、读无意义」的寄存器风格。</li>
+        <li>写 <code>ICDIPRIORITYR</code> 设优先级，数值越小优先级越高。</li>
+        <li>写 <code>ICDICFR</code> 设触发类型：电平还是边沿触发。<b>这一项配错，中断要么丢失、要么无限重复进</b>。</li>
+        <li>写 <code>ICDIPTR</code> 指定目标 CPU。</li>
+        <li>CPU 接口侧：<code>ICCICR</code>（0x100）使能，<code>ICCPMR</code>（0x104）设优先级门限。</li>
+        <li>处理器侧 <code>CPSR</code> 的 I 位清零——<b>这一步最容易漏</b>，硬件中断早到了，但 CPU 一直屏蔽，dmesg 里看着「驱动加载成功」却永不进中断。</li>
+      </ol>
+    </div>
+
+    <div class="reg">读 ICCIAR (0x10C) → 得到要处理的 ID（应答，同时抬高同优先级以下的屏蔽）
+处理完 → 写 ICCEOIR (0x110) → 写回同一个 ID（结束中断）
+不写 ICCEOIR 的后果：该中断永远处于 active，后续同类中断全部收不到</div>
+    <h2 id="s4">4. 定时器：操作系统的心跳</h2>
+
+    <p>i.MX6ULL 有两类通用定时器：<b>EPIT</b>（Enhanced Periodic Interrupt Timer，只有周期性中断，基址 0x020D_0000 与 0x020D_4000）和 <b>GPT</b>（General Purpose Timer，能自由计数、能捕获、能比较，基址 0x0209_8000 与 0x020A_0000）。</p>
+
+    <table>
+      <thead><tr><th>模块</th><th>能力</th><th>典型用途</th></tr></thead>
+      <tbody>
+        <tr><td>EPIT</td><td>单次/周期中断，结构简单</td><td>裸机节拍、简单延时中断</td></tr>
+        <tr><td>GPT</td><td>自由运行计数、输入捕获、输出比较、可级联</td><td>测脉宽、PWM 辅助、长时间计时</td></tr>
+        <tr><td>ARM 通用定时器</td><td>CPU 内部，每核一个，走 CPU 时钟</td><td><b>Linux 的 tick 实际用它</b>（CNTP/CNTV）</td></tr>
+      </tbody>
+    </table>
+
+    <p>EPIT 的关键寄存器：</p>
+
+    <table>
+      <thead><tr><th>寄存器</th><th>偏移</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td><code>EPIT_CR</code></td><td>0x000</td><td>使能、计数模式（单次/周期）、分频、中断使能</td></tr>
+        <tr><td><code>EPIT_SR</code></td><td>0x004</td><td>状态，溢出标志；<b>必须写 1 清除</b></td></tr>
+        <tr><td><code>EPIT_LR</code></td><td>0x008</td><td>装载值（重装计数值）</td></tr>
+        <tr><td><code>EPIT_CMPR</code></td><td>0x00C</td><td>比较值，计到它就触发中断</td></tr>
+        <tr><td><code>EPIT_CNR</code></td><td>0x010</td><td>当前计数值（只读）</td></tr>
+      </tbody>
+    </table>
+
+    <div class="calc">
+      <h5>算一笔：要 1ms 中断一次</h5>
+      <div class="line">EPIT 时钟取 66MHz（IPG 时钟分频而来），先设分频 PRESCALAR=0（1 分频）</div>
+      <div class="line">1ms 内计数：66,000,000 × 0.001 = 66,000</div>
+      <div class="line">装载值写 66,000 − 1 = <b>65,999</b>（计数从 0 开始，数到装载值共装载值+1 个周期）</div>
+      <div class="line">若分频设 66：装载值 = 66,000/66 − 1 = <b>999</b>，同样得 1ms</div>
+      <div class="line">分频的作用：避免装载值超出 32 位，也方便微调</div>
+    </div>
+
+    <div class="note">
+      <b>Linux 里的 tick 不是 EPIT</b>
+      裸机和 RTOS 常用 EPIT 做节拍；Linux 用 ARM 架构自带的通用定时器（每核一个，频率由 CPU 时钟除以固定系数），因为它离 CPU 最近、延迟最低，而且不占 SoC 外设。EPIT/GPT 在 Linux 下留给驱动做精确定时（比如 PWM、输入捕获）。
+    </div>
+
+    <h2 id="s5">5. GPIO 与引脚复用：所有外设的公共前提</h2>
+
+    <p>一个物理引脚（pad）内部是一个多路选择器：既可以做 GPIO，也可以做 UART_TXD、I2C_SCL、PWM 输出……<b>默认状态往往不是你想要的那个功能</b>。所以任何外设的第一步都是写 IOMUXC。</p>
+
+    <p>IOMUXC 基址 <b>0x020E_0000</b>，每个 pad 有两个关键寄存器：</p>
+
+    <table>
+      <thead><tr><th>寄存器组</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td><code>SW_MUX_CTL_PAD_xxx</code></td><td>选择这个 pad 的功能（ALT0–ALT7），如 ALT5 = GPIO</td></tr>
+        <tr><td><code>SW_PAD_CTL_PAD_xxx</code></td><td>电气属性：上下拉、驱动强度、转换速率、开漏、迟滞</td></tr>
+      </tbody>
+    </table>
+
+    <p><code>SW_PAD_CTL</code> 的位段（i.MX6 系列通用）：</p>
+
+    <table>
+      <thead><tr><th>位</th><th>字段</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td>16</td><td>HYS</td><td>迟滞使能，慢速信号抗噪用</td></tr>
+        <tr><td>15–14</td><td>PUS</td><td>上拉/下拉强度（100k/5k 等）</td></tr>
+        <tr><td>13</td><td>PUE</td><td>是否启用内部上/下拉，1 启用</td></tr>
+        <tr><td>12</td><td>PKE</td><td>上下拉/保持器使能</td></tr>
+        <tr><td>11</td><td>ODE</td><td>开漏输出（I2C 用）</td></tr>
+        <tr><td>10–8</td><td>SPEED</td><td>转换速率等级</td></tr>
+        <tr><td>5–3</td><td>DSE</td><td>驱动强度（mA 档位）</td></tr>
+      </tbody>
+    </table>
+
+    <p>GPIO 控制器本身（GPIO1 基址 <b>0x0209_C000</b>，GPIO2–5 依次偏移 0x4000）：</p>
+
+    <table>
+      <thead><tr><th>寄存器</th><th>偏移</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td><code>DR</code></td><td>0x000</td><td>数据寄存器，输出时写它</td></tr>
+        <tr><td><code>GDIR</code></td><td>0x004</td><td>方向，1 = 输出，0 = 输入</td></tr>
+        <tr><td><code>PSR</code></td><td>0x008</td><td>引脚状态，输入时读它</td></tr>
+        <tr><td><code>ICR1/ICR2</code></td><td>0x00C/0x010</td><td>中断触发类型（每引脚 2 位：低电平/高电平/上升沿/下降沿）</td></tr>
+        <tr><td><code>IMR</code></td><td>0x014</td><td>中断屏蔽，1 = 允许</td></tr>
+        <tr><td><code>ISR</code></td><td>0x018</td><td>中断状态，<b>写 1 清除</b></td></tr>
+        <tr><td><code>EDGE_SEL</code></td><td>0x01C</td><td>双沿触发选择，置 1 后忽略 ICR</td></tr>
+      </tbody>
+    </table>
+
+    <div class="calc">
+      <h5>算一笔：GPIO1_IO03 是第几个引脚</h5>
+      <div class="line">规则：<code>全局编号 = (端口号 − 1) × 32 + 引脚号</code></div>
+      <div class="line">GPIO1_IO03 → (1−1)×32 + 3 = <b>3</b>，即第 3 位</div>
+      <div class="line">GPIO4_IO17 → (4−1)×32 + 17 = 96 + 17 = <b>113</b></div>
+      <div class="line">写 DR 时：<code>DR |= (1 &lt;&lt; 3)</code>；写 GDIR 时同理按位操作</div>
+    </div>
+
+    <p>点一个 LED 的完整顺序（少一步就不亮）：</p>
+
+    <div class="steps">
+      <ol>
+        <li>在 IOMUXC 里找到该 pad 的 <code>SW_MUX_CTL_PAD_xxx</code>，写 <b>ALT5</b>（<code>0x5</code>）切到 GPIO 功能。</li>
+        <li>写 <code>SW_PAD_CTL_PAD_xxx</code>，一般给 <code>0x10B0</code>（上拉、驱动强度中等）；I2C 引脚则必须开开漏。</li>
+        <li>写 GPIO 的 <code>GDIR</code> 对应位为 1，设为输出。</li>
+        <li>写 <code>DR</code> 对应位为 1，输出高电平。</li>
+        <li>若要做输入中断：先写 <code>ICR</code> 定触发类型，再写 <code>ISR</code> 清残留标志，最后 <code>IMR</code> 置 1 允许。</li>
+      </ol>
+    </div>
+
+    <div class="warn">
+      <b>顺序反了就白改</b>
+      如果先把 GDIR 设成输出再配 MUX，中间那一瞬间引脚可能按默认功能输出一个奇怪电平，外部电路会看到毛刺。正确做法：<b>先复用、再电气属性、最后方向与数据</b>。
+    </div>
+
+    <h2 id="s6">6. UART：唯一的「眼睛」</h2>
+    <div class="viz" data-kind="bits" data-title="IOMUXC：一个引脚要先「许配」给外设" data-sub="MUX_MODE 决定这根脚归谁" data-json='{"w":32,"fields":[{"n":"MUX_MODE[2:0]","lo":0,"hi":2,"c":"cy","t":"0=GPIO，1=UART，5=I2C…"},{"n":"PKE / ODE","lo":3,"hi":5,"c":"vi","t":"上下拉使能、开漏输出"},{"n":"SPEED / DSE","lo":6,"hi":16,"c":"or","t":"驱动强度、压摆率"},{"n":"SION","lo":17,"hi":17,"c":"gr","t":"回环，读引脚真实电平"}],"note":"顺序永远是：先配 IOMUXC（这根脚做什么），再配外设（怎么工作）。反过来写寄存器全是无效操作。"}'></div>
+
+
+    <p>UART1 基址 <b>0x0202_0000</b>（UART2–8 依次 +0x4000）。它是整板<b>第一个必须打通的外设</b>，因为其他一切都要靠它输出日志。</p>
+
+    <table>
+      <thead><tr><th>寄存器</th><th>偏移</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td><code>UCR1</code></td><td>0x080</td><td>UART 使能、发送/接收使能、各类中断使能</td></tr>
+        <tr><td><code>UCR2</code></td><td>0x084</td><td>软复位、8/7 位数据、停止位、校验位</td></tr>
+        <tr><td><code>UCR3</code></td><td>0x088</td><td>RX 采样、DMA 使能、硬件流控</td></tr>
+        <tr><td><code>UCR4</code></td><td>0x08C</td><td>唤醒、红外、超时中断</td></tr>
+        <tr><td><code>UFCR</code></td><td>0x090</td><td>参考时钟分频（RFDIV）</td></tr>
+        <tr><td><code>UBIR</code></td><td>0x0A4</td><td>波特率分子</td></tr>
+        <tr><td><code>UBMR</code></td><td>0x0A8</td><td>波特率分母</td></tr>
+        <tr><td><code>USR1</code></td><td>0x094</td><td>状态：发送空、接收有数据、错误标志</td></tr>
+        <tr><td><code>UTS</code></td><td>0x0B4</td><td>发送数据寄存器，写它即开始发送</td></tr>
+      </tbody>
+    </table>
+
+    <div class="calc">
+      <h5>算一笔：80MHz 出 115200</h5>
+      <div class="line">工程公式：分频值 = 参考时钟 / (16 × 波特率)</div>
+      <div class="line">80,000,000 / (16 × 115,200) = <b>43.40</b></div>
+      <div class="line">取 43：实际 = 80,000,000 / (16 × 43) = 116,279 → 误差 <b>+0.94%</b></div>
+      <div class="line">取 44：实际 = 80,000,000 / (16 × 44) = 113,636 → 误差 <b>−1.36%</b></div>
+      <div class="line">串口容忍度约 ±2%~3%，两者都可用；优先取落在这条线上的更接近值</div>
+    </div>
+
+    <div class="reg">// 正确的初始化顺序
+1. UCR1 = 0                  先关闭 UART，避免配置中误发数据
+2. UCR2 |= 0x1               软复位，等它自动清零
+3. UFCR 设分频               先定参考时钟
+4. UBIR / UBMR 设分频值      再定波特率
+5. UCR2 设 8N1               8 位数据、无校验、1 停止位
+6. 清 USR1/USR2 残留错误标志
+7. UCR1 |= TXEN|RXEN|UARTEN  最后才使能
+8. IOMUXC 复用 + 中断使能</div>
+
+    <p>漏掉第 6 步的典型现象：第一帧发出去就报 framing error，看起来像「波特率不对」，其实是复位残留的标志位还没清。</p>
+
+    <h2 id="s7">7. 常见误解</h2>
+
+    <table>
+      <thead><tr><th>误解</th><th>真相</th></tr></thead>
+      <tbody>
+        <tr><td>「DDR 参数照抄开发板就行」</td><td>换颗粒、换 PCB 走线就不是同一组参数，抄来只能「可能能跑」，长期稳定性没保证。</td></tr>
+        <tr><td>「DDR 能读写就说明没问题」</td><td>时序余量不足表现为偶发错误，必须长时间加压 + 温升测试才暴露。</td></tr>
+        <tr><td>「中断号可以随便试」</td><td>中断号来自 SoC 中断表，写错会进到别人的处理函数，现象极其诡异。</td></tr>
+        <tr><td>「GIC 使能了就一定能进中断」</td><td>CPSR 的 I 位不清零，CPU 永远不响应——最典型的「驱动加载成功但没反应」。</td></tr>
+        <tr><td>「EPIT 是 Linux 的 tick 源」</td><td>Linux 用 ARM 通用定时器；EPIT/GPT 留给业务驱动做精确定时与捕获。</td></tr>
+        <tr><td>「GPIO 只要写 DR 就能拉高」</td><td>必须先切 MUX 到 GPIO 功能，否则写的是 GPIO 模块内部寄存器，引脚上什么都没发生。</td></tr>
+        <tr><td>「I2C 引脚不用开开漏」</td><td>I2C 是开漏总线，不开 ODE 总线拉不低，通信直接失败。</td></tr>
+        <tr><td>「UART 先使能再配波特率也行」</td><td>中间的半配置状态会发出乱码字节，对端看到一串垃圾。</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s8">8. 自检：能答出来才算懂</h2>
+
+    <div class="q"><span class="n">1</span><p>最小系统清单里，哪一项决定「能跑 Linux」而不只是「能跑裸机」？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>DDR。裸机可以只靠片内 128KB SRAM；Linux 内核加根文件系统必须放进 DDR。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>ZQ 校准和写 Leveling 分别解决什么问题？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>ZQ 校准抵消驱动器阻抗随工艺/温度的漂移；写 Leveling 补偿各数据线长度差造成的到达时间不一致。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>tRCD = 13.75ns，控制器 528MHz，寄存器该写几？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>13.75 × 528 = 7.26，取 <b>8</b>。时序只能进一，不能向下取整。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>SGI、PPI、SPI 的 ID 范围各是多少，分别由谁触发？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>SGI 0–15（软件写寄存器触发）；PPI 16–31（每核私有外设）；SPI 32 起（SoC 外设共享）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>中断处理返回前必须做什么？漏了会怎样？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>必须往 <code>ICCEOIR</code> 写回中断 ID。漏了则该中断一直 active，同优先级及以下的后续中断全被屏蔽。</p>
+    </div></details>
+
+    <div class="q"><span class="n">6</span><p>EPIT 时钟 66MHz、分频 66、要 1ms 中断，装载值多少？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>66,000,000 × 0.001 / 66 = 1000，装载值 = 1000 − 1 = <b>999</b>。</p>
+    </div></details>
+
+    <div class="q"><span class="n">7</span><p>GPIO4_IO17 的全局编号是多少，操作哪个寄存器的第几位？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>全局编号 (4−1)×32 + 17 = <b>113</b>；但寄存器操作的是 GPIO4 的 DR 第 <b>17</b> 位，端口内按引脚号算。</p>
+    </div></details>
+
+    <div class="q"><span class="n">8</span><p>UART 参考 80MHz、要 115200，分频取 43 与 44 的误差各是多少？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>43 → 116,279（+0.94%）；44 → 113,636（−1.36%）。都在容差内，取更接近的 43。</p>
+    </div></details>
+
+    <h2 id="s9">9. 这一章要动手的命令</h2>
+
+    <div class="steps">
+      <ol>
+        <li><code>cat /proc/iomem | head -30</code> —— 看内核眼里的物理内存与外设地址区间。</li>
+        <li><code>cat /proc/interrupts</code> —— 看每路中断的 ID、触发次数、绑定到哪个核。</li>
+        <li><code>cat /sys/kernel/debug/gpio</code> —— 看所有 GPIO 的方向与电平。</li>
+        <li><code>echo 3 &gt; /sys/class/gpio/export</code> —— 从用户态操作引脚 3，验证第 5 节编号规则。</li>
+        <li><code>stty -F /dev/ttyS0 -a</code> —— 看串口实际波特率、数据位、校验位。</li>
+        <li><code>dmesg | grep -i -E "mmdc|ddr|gic|uart"</code> —— 看 DDR、中断控制器、串口的初始化日志。</li>
+        <li>U-Boot 里 <code>md 0x021B0018 1</code> —— 读 MMDC 的 MDMISC，确认 DDR 已配置。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一章预告</b>
+      T13 补齐下半部分：SD/eMMC/NAND 三种存储、NAND 的 ECC 为什么难伺候、DMA 如何把搬数据从 CPU 手里拿走、以太网 MAC 与 PHY 的分工、USB 主从结构。
+    </div>
+
+
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"最小系统（上）：少了哪个都开不了机","items":[{"b":"电源","d":"多路电压：核心 1.2V 左右、DDR 1.5V、IO 3.3V。上电顺序有要求，错了可能锁死芯片。"},{"b":"复位","d":"一颗复位芯片或 RC 网络，保证电压稳了才放开复位。按住复位不放，什么都不会发生。"},{"b":"时钟","d":"24 MHz 或 32.768 kHz 晶振，加上内部 PLL。没有时钟，数字电路连「一步」都迈不出去。"},{"b":"调试串口","d":"UART1 接 USB 转串口。它是你唯一的眼睛：BootROM 的第一句输出就从这来。"}],"note":"板子不启动时，先量这四样：电压对不对、复位放开没有、晶振起振没有、串口有没有字符。这四步能解决大半问题。"}'></div>
+  
+
+<nav class="pager">
+  <a href="course-th11.html"><span>← 上一篇</span><b>时钟树、复位、电源域、RTC 与看门狗</b></a>
+  <a class="nx" href="course-th13.html"><span>下一篇 →</span><b>最小系统必需外设（下）：存储、DMA、以太网、USB</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

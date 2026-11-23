@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>学习规划手册 · i.MX6ULL Linux 从零到驱动</title>
+<link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="../assets/viz.css">
+  <link rel="stylesheet" href="../assets/iviz.css">
+  <link rel="stylesheet" href="../assets/anim2.css">
+  <script src="../assets/readmode.js" defer></script>
+</head>
+<body data-page="index">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <div class="card" style="border-color:rgba(92,225,160,.5);background:linear-gradient(135deg,rgba(92,225,160,.14),rgba(139,123,255,.09))">
+      <h4>📚 这一页是参考卷的总目录：T01–T18 理论 + C01–C14 实践，共 34 页</h4>
+      <p><b>参考卷</b>是独立成章的一套：理论 18 章讲机制（分层、调度、地址翻译、VFS、设备模型、中断、ARM、启动链、总线、时钟、DDR、驱动），实践 14 章讲上板操作（装系统、命令行、交叉编译、U-Boot、设备树、根文件系统、调试）。定位是<b>按章查细节、按章照做</b>。另一套入口是 <b>49 课 · 从零学计算机</b>（P0–P9，168 小时，每课八节，末尾各挂一块能点能拖的交互组件），按因果链由浅入深。</p>
+      <p><a href="../course/index.html"><b>→ 进 49 课总览</b></a>　·　<a href="../docs/course-00.html">第 00 课 计算机只会照抄指令</a>　·　<a href="../docs/course-45.html">第 45 课 字符设备（页尾有滑块）</a></p>
+      <p style="opacity:.72">两边是并行入口，没有先后：想从头顺一遍走 49 课；想直接查某一章、或照着某章动手，走这一页。</p>
+    </div>
+
+    <section class="hero">
+      <h1>Linux 学习手册<br>用 i.MX6ULL 从零走到驱动</h1>
+      <p class="sub">理论 17 章 + 实践 14 章。理论卷<b>完全脱离开发板</b>也能读完，实践卷用 i.MX6ULL 做实验台。两条线各自独立，先读理论、后上板子，或反过来都行。</p>
+      <div class="meta-strip">
+        <span>目标读者：零基础 · 会一点 C 更好</span>
+        <span>理论主线：CPU → 启动链 → 总线/时钟 → 外设 → 内核 → BSP</span>
+        <span>实践主线：系统 → 开发 → 板子 → 驱动</span>
+        <span>实验环境：Ubuntu 22.04 + i.MX6ULL（可选）</span>
+      </div>
+    </section>
+    <div class="card" style="border-color:rgba(255,179,92,.35);background:linear-gradient(135deg,rgba(255,179,92,.10),rgba(139,123,255,.06))">
+      <h4>🗺 先看完整路线图：从比特到板子</h4>
+      <p>如果这是第一次学计算机，不要按卷号顺序读。先看 <a href="roadmap.html"><b>学习路线图</b></a>：六个阶段（S0 先跑起来 → S1 比特与门 → S2 机器码与汇编 → S3 流水线与 Cache → S4 地址空间 → S5 内核与并发 → S6 上板 → S7 工程化），约 150 小时、半年，每个阶段都有「能跑的东西 + 能解释的现象」两条验收线，还有一张「软件现象 ↔ 硬件机制」对账表。</p>
+    </div>
+    <div class="card" style="border-color:rgba(61,219,217,.28);background:linear-gradient(135deg,rgba(61,219,217,.08),rgba(139,123,255,.08))">
+      <h4>▶ 互动实验台（先玩，再看书）</h4>
+      <p>全站 32 页共 <b>96 个可视化块</b>，13 类组件：位域图、流程条、层级树、时序波形、内存映射条、栈帧、柱状对比、时间线、正误对照、矩阵表、环形占比、流水线、分层堆叠——大多自带循环动画（流程条逐格亮、波形扫描线、流水线光点跑）。下面两个是<b>深度互动台</b>，可以输入数字、点开关，结果实时跟着变：</p>
+      <ul>
+        <li><a href="../docs/viz-clock-tree.html">时钟树与门控（T11）</a>：拖 PLL 倍频比、点 CCGR 门控开关、算 UART 波特率误差</li>
+        <li><a href="../docs/viz-mmu.html">MMU 页表翻译（T03）</a>：输虚拟地址看 10/10/12 拆位、两级查表、TLB 命中与 data abort</li>
+      </ul>
+    </div>
+
+
+    <div class="note">
+      <b>这份规划怎么用</b>
+      这一页是<b>总纲</b>，不要背，先读一遍知道路有多长、每段该干什么。然后按章节顺序走，<b>每一章结尾都有「验收标准」</b>，达不到就不要往下翻——Linux 的知识是叠罗汉，下面缺一块，上面一定塌。
+    </div>
+    <div class="viz" data-kind="flow" data-title="四个阶段，一条主线" data-sub="每周都有可验收的产出" data-json='{"play":true,"steps":[{"n":"第一阶段 地基","d":"约 4 周：命令行、文件系统、权限、进程、Shell"},{"n":"第二阶段 开发","d":"约 2 周：SSH/NFS/TFTP、交叉编译、Makefile、gdb"},{"n":"第三阶段 上板","d":"约 5 周：启动链、U-Boot、内核裁剪、设备树、根文件系统"},{"n":"第四阶段 碰硬件","d":"约 3 周：字符设备、GPIO 驱动、调试、综合实战"}],"note":"四个阶段不是并列的四本书，是一条链：地基是「会用」，开发是「能编」，上板是「能装」，碰硬件是「能改」。卡在哪一段，就回到上一段补。"}'></div>
+
+    <div class="viz" data-kind="bars" data-title="95 小时怎么分布" data-sub="按章估算，含动手时间" data-json='{"max":36,"items":[{"n":"地基（1-5 章）","v":34,"unit":" h","c":"cy"},{"n":"开发（6-7 章）","v":12,"unit":" h","c":"vi"},{"n":"上板（8-11 章）","v":32,"unit":" h","c":"or"},{"n":"驱动（12-14 章）","v":17,"unit":" h","c":"gr"},{"n":"理论卷加读","v":20,"unit":" h","c":"gray"}],"note":"按每周 6–8 小时算，大约 3 个月能走完。时间不够就砍理论卷的深度，但地基那 34 小时不能省——省了后面每一步都会卡。"}'></div>
+    <div class="viz" data-kind="donut" data-title="95 小时里，时间花在哪" data-sub="动手时间必须占大头，否则只是「看过」" data-json='{"unit":" h","center":95,"items":[{"n":"动手敲命令","v":58,"c":"cy"},{"n":"读书与笔记","v":27,"c":"vi"},{"n":"排错与调试","v":10,"c":"or"}],"note":"纸面阅读只占三成。凡是只读不做的章节，过两周基本忘光——这也是每章都带「动手命令」清单的原因。"}'></div>
+
+
+    <div class="anim2" data-json='{"title":"34 页怎么用：四组各管什么","hint":"先定阶段，再挑章","nodes":[{"k":"理论卷","s":"T01–T18 讲机制"},{"k":"实践卷","s":"C01–C14 讲操作"},{"k":"路线图","s":"六阶段定顺序"},{"k":"互动台","s":"参数可拖"}],"frames":[{"i":0,"d":"理论卷讲机制：分层、调度、地址翻译、VFS、设备模型、中断、ARM、启动链、总线、时钟、DDR、驱动。"},{"i":1,"d":"实践卷讲操作：装系统、命令行、交叉编译、U-Boot、设备树、rootfs、驱动、调试，每一步都能照做。"},{"i":2,"d":"路线图把 150 小时分成六阶段，每阶段都有「能跑的东西 + 能解释的现象」两条验收线。"},{"i":3,"d":"两个互动台把参数变成可拖的：改倍频看时钟、输地址看页表，比看静态图直观。"}],"kind":"flow"}'></div>
+
+    <h2 id="s1">一、先说结论：学完你能干什么</h2>
+
+    <p>市面上 Linux 教程的通病是「命令大全 + 一堆原理」，学完还是不会用。这份手册只围绕一件事：<strong>让你能独立维护一台 Linux 机器，并且能在 i.MX6ULL 这类 ARM 板子上把程序、系统、驱动跑起来</strong>。</p>
+
+    <p>全部走完后，你应该能做到下面 6 件事，这也是本书的最终验收标准：</p>
+
+    <div class="grid two">
+      <div class="card">
+        <h4>1. 纯命令行生存</h4>
+        <p>不用鼠标完成文件管理、查找、批量处理、权限调整；看到报错能自己定位，而不是截图问人。</p>
+      </div>
+      <div class="card">
+        <h4>2. 搭环境</h4>
+        <p>从零装一台 Ubuntu，配好国内源、SSH、NFS、TFTP、交叉编译工具链，让别人能远程连上你的机器编译代码。</p>
+      </div>
+      <div class="card">
+        <h4>3. 写工程代码</h4>
+        <p>能写 Shell 脚本做自动化，能写 Makefile / CMake 管理多文件 C 工程，能用 gdb 定位段错误。</p>
+      </div>
+      <div class="card">
+        <h4>4. 读懂启动过程</h4>
+        <p>能讲清楚从通电到出现 shell 提示符之间，BootROM、SPL、U-Boot、内核、设备树、根文件系统各干了什么。</p>
+      </div>
+      <div class="card">
+        <h4>5. 改系统</h4>
+        <p>能裁剪内核、改设备树点亮一个 LED、用 Buildroot 做出自己的根文件系统并烧进板子。</p>
+      </div>
+      <div class="card">
+        <h4>6. 写驱动</h4>
+        <p>能写字符设备驱动 + GPIO 驱动，通过设备树匹配硬件，用 insmod 加载并用应用程序验证。</p>
+      </div>
+    </div>
+
+    <p>注意这里没有「精通内核」「看懂调度算法」。那是第 14 章之后的事，<strong>先能干活，再谈深挖</strong>。新手最大的时间浪费，就是在还没跑通过一次编译链的情况下，去啃《深入理解 Linux 内核》。</p>
+
+    <h2 id="s2">二、全书结构：三条主线拧成一条链</h2>
+
+    <p>整本书其实只有三条线，最终在第 8 章汇合到板子上：</p>
+
+    <div class="flow">
+      <div class="box"><b>① 会用 Linux</b><span>第 1–5 章<br>命令行 / 权限 / 脚本</span></div>
+      <div class="arrow">→</div>
+      <div class="box"><b>② 能开发</b><span>第 6–7 章<br>网络 / 交叉编译 / 工程</span></div>
+      <div class="arrow">→</div>
+      <div class="box"><b>③ 上板子</b><span>第 8–11 章<br>启动链 / U-Boot / 内核 / 根文件系统</span></div>
+      <div class="arrow">→</div>
+      <div class="box"><b>④ 碰硬件</b><span>第 12–14 章<br>驱动 / 调试 / 综合实战</span></div>
+    </div>
+
+    <div class="key">
+      <b>为什么是这个顺序</b>
+      第 1–5 章不是「凑数的基础课」。后面每一步操作（编译、挂载、烧写、看日志）都发生在这套命令行体系里。你在 PC 上都不熟悉 <code>ls -l</code> 和权限位，到了板子上看到 <code>Permission denied</code> 只会更懵。所以前 5 章必须打穿，不能跳。
+    </div>
+
+    <h2 id="sth">三、理论卷：17 章，完全可以脱离开发板</h2>
+
+    <p>实践卷解决「怎么做」，理论卷解决「为什么是这样」。<b>两者独立成册，互不依赖</b>：没有板子、不想动手，只读理论卷也能从头读到尾；只想快点上板子，可以先跳实践卷，回头再补理论。</p>
+
+    <p>理论卷沿一条主线走：<b>CPU 与操作系统原理 → 从上电第一个字节到内核启动 → 总线与时钟 → 最小系统必需外设逐个讲 → 内存管理与内核子系统 → BSP 与设备树 → 工具链</b>。</p>
+
+    <div class="tip">
+      <b>本版已按「细节级」重写完毕（17 章全部）</b>
+      初版每章只有概念与结论，零基础读完只知道「大概是什么」。现在每章都拆到<b>寄存器位、算例、完整流程、带答案自检</b>：看完一章你应该能算出具体数值、能指出某一位写错会导致什么现象，而不是背名词。<b>17 章合计约 12 万字。</b>
+    </div>
+
+    <p>每一章都固定是这套骨架，所以你可以放心跳着读：</p>
+
+    <div class="steps">
+      <ol>
+        <li><b>本章要解决的问题 / 读完你应该能回答</b> —— 两张卡先告诉你「这一章要拿下什么」，读完再回头自测。</li>
+        <li><b>4–8 个机制小节</b> —— 每节都带流程条（<code>flow</code>）、对比表、寄存器表（<code>reg</code>）与<b>算例</b>（<code>calc</code>）。算例是真数字，不是「大约这样」。</li>
+        <li><b>常见误解表</b> —— 5–8 条「你以为的 vs 实际」，专治「看懂了但理解反了」。</li>
+        <li><b>8–10 题带答案自检</b> —— 点击展开答案，答不出来就说明这章没读懂，回去重看对应小节。</li>
+        <li><b>这一章要动手的命令</b> —— 7 条左右，全是在真板子或 QEMU 上能直接敲的，用来验证本章结论。</li>
+        <li><b>下一章预告</b> —— 说明它和后面哪一章咬合，防止读成孤立知识点。</li>
+      </ol>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>章</th><th>主题</th><th>这一章让你明白</th><th>投入</th><th>难度</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>T01</td><td>操作系统与 Linux 的分层</td><td>用户态与内核态、系统调用、宏内核与微内核</td><td>3h</td><td>★</td></tr>
+        <tr><td>T02</td><td>进程、线程与调度</td><td>task_struct、五状态、写时复制、CFS 与实时调度</td><td>4h</td><td>★★</td></tr>
+        <tr><td>T03</td><td>虚拟内存与地址翻译</td><td>MMU、页表、TLB、buddy 与 slab 的区别</td><td>4h</td><td>★★</td></tr>
+        <tr><td>T04</td><td>文件系统与 VFS</td><td>inode、dentry、页缓存、fsync 到底保证了什么</td><td>4h</td><td>★★</td></tr>
+        <tr><td>T05</td><td>设备模型与驱动框架</td><td>三类设备、主次设备号、bus-device-driver 匹配</td><td>4h</td><td>★★</td></tr>
+        <tr><td>T06</td><td>中断、并发与同步</td><td>上半部/下半部、软中断与工作队列、锁与死锁</td><td>5h</td><td>★★★</td></tr>
+        <tr><td>T07</td><td>ARM 架构与 Cortex-A7</td><td>特权级与模式、异常向量、Cache 一致性与屏障</td><td>5h</td><td>★★★</td></tr>
+        <tr><td>T08</td><td>从第一个字节开始</td><td>BootROM 怎么找镜像、IVT/DCD 写了什么、为什么要有 SPL</td><td>5h</td><td>★★★</td></tr>
+        <tr><td>T09</td><td>内核怎么起来</td><td>head.S 为何早开 MMU、start_kernel 顺序、init 进程怎么拉起</td><td>5h</td><td>★★★</td></tr>
+        <tr><td>T10</td><td>总线体系</td><td>AXI/AHB/APB 三档、地址分区、I2C/SPI/CAN/USB 怎么选</td><td>4h</td><td>★★</td></tr>
+        <tr><td>T11</td><td>时钟树、复位、电源域</td><td>一颗晶振怎么变出全网时钟、时钟门控坑、RTC 与看门狗</td><td>5h</td><td>★★★</td></tr>
+        <tr><td>T12</td><td>最小系统外设（上）</td><td>DDR 为何要训练、中断控制器、定时器、GPIO/IOMUX、UART</td><td>6h</td><td>★★★★</td></tr>
+        <tr><td>T13</td><td>最小系统外设（下）</td><td>SD/eMMC/NAND 差异、DMA 与 Cache、MAC+PHY、USB 枚举</td><td>5h</td><td>★★★★</td></tr>
+        <tr><td>T14</td><td>内存管理进阶</td><td>分页与多级页表、缺页五类、回收水位、OOM 怎么挑人杀</td><td>5h</td><td>★★★★</td></tr>
+        <tr><td>T15</td><td>内核全貌：子系统协作</td><td>一次 read 穿过全部子系统、可观测性四件套、为什么要裁剪</td><td>4h</td><td>★★★</td></tr>
+        <tr><td>T16</td><td>BSP 与设备树原理</td><td>BSP 六件套、dts/dtsi/dtb、compatible 匹配、自绘板改哪几处</td><td>6h</td><td>★★★★</td></tr>
+        <tr><td>T17</td><td>交叉编译与工具链原理</td><td>目标三元组、四步编译、静态与动态、常见坑判断</td><td>4h</td><td>★★★</td></tr>
+      </tbody>
+    </table>
+
+    <p>理论卷合计约 <strong>95 小时</strong>（细节级版本比初版更厚，读得慢是正常的：每章都要求你算一遍、答一遍自检）。只读理论、不碰开发板，按每周 8–10 小时算，<strong>10–12 周可以读完一遍</strong>；只想通读一遍不求全懂，2 周也能过。</p>
+
+    <h3><span class="tag-no">3.1</span>纯理论路线（不动手，只读）</h3>
+
+    <table>
+      <thead><tr><th>阶段</th><th>章节</th><th>读完你应该能回答</th></tr></thead>
+      <tbody>
+        <tr><td>① 系统原理</td><td>T01 → T07</td><td>进程为什么能隔离、内存为什么要分页、驱动为什么分两层</td></tr>
+        <tr><td>② 从上电到启动</td><td>T08 → T09</td><td>第一个字节从哪来、DDR 为什么要训练、内核怎样长成操作系统</td></tr>
+        <tr><td>③ 硬件底座</td><td>T10 → T11</td><td>一次寄存器写穿过哪几层总线、一颗晶振如何变出所有时钟</td></tr>
+        <tr><td>④ 必需外设逐个</td><td>T12 → T13</td><td>最小系统需要哪些外设、每个外设的初始化顺序与典型故障</td></tr>
+        <tr><td>⑤ 内核深化</td><td>T14 → T15</td><td>缺页与回收的完整机制、OOM 怎么选进程、一次 read 经过多少层</td></tr>
+        <tr><td>⑥ 工程落地</td><td>T16 → T17</td><td>BSP 包含什么、设备树如何解耦硬件、工具链三段约定各约束什么</td></tr>
+      </tbody>
+    </table>
+
+    <div class="tip">
+      <b>纯理论也建议做三分钟验证（成本极低）</b>
+      不必买板子。在 Ubuntu 虚拟机上做三件小事即可：用 <code>file</code> 看一个 ARM 二进制、用 <code>dtc</code> 反编译一个现成 dtb、用 <code>cat /proc/meminfo</code> 看内存水位。这三分钟会让抽象概念立刻落地。
+    </div>
+
+    <h2 id="s3">四、实践卷：十四章地图（上板子用）</h2>
+
+    <p>「投入」是按每天 2 小时估的纯学习时长，不含加班补课；「难度」是相对零基础而言。</p>
+
+    <table>
+      <thead>
+        <tr><th>章</th><th>解决什么问题</th><th>关键产出物</th><th>投入</th><th>难度</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>01</td><td>Linux 到底是什么，嵌入式 Linux 和服务器 Linux 差在哪</td><td>一张能自己讲出来的架构图</td><td>4h</td><td>★</td></tr>
+        <tr><td>02</td><td>虚拟机、Ubuntu、串口、SSH 怎么搭</td><td>一台能远程登录的 Ubuntu</td><td>10h</td><td>★★</td></tr>
+        <tr><td>03</td><td>目录结构、核心命令、一切皆文件</td><td>纯终端完成全部文件操作</td><td>16h</td><td>★★</td></tr>
+        <tr><td>04</td><td>权限、装软件、进程、服务、日志</td><td>能装环境、杀进程、配开机自启</td><td>16h</td><td>★★</td></tr>
+        <tr><td>05</td><td>Vim 无鼠标编辑 + Shell 自动化</td><td>4 个自写脚本</td><td>14h</td><td>★★</td></tr>
+        <tr><td>06</td><td>IP、端口、SSH、NFS、TFTP</td><td>板子能挂载 PC 目录跑程序</td><td>10h</td><td>★★</td></tr>
+        <tr><td>07</td><td>交叉编译工具链、Makefile、gdb</td><td>一个能在 ARM 上跑的 C 工程</td><td>12h</td><td>★★★</td></tr>
+        <tr><td>08</td><td>i.MX6ULL 芯片、内存映射、启动全链路</td><td>画得出 5 级启动流程图</td><td>10h</td><td>★★★</td></tr>
+        <tr><td>09</td><td>U-Boot 命令、环境变量、烧写到 eMMC/SD</td><td>能自己烧一套系统进板子</td><td>12h</td><td>★★★</td></tr>
+        <tr><td>10</td><td>内核裁剪编译、设备树语法</td><td>改 DTS 点亮 LED</td><td>18h</td><td>★★★★</td></tr>
+        <tr><td>11</td><td>BusyBox 手工做根文件系统 / Buildroot 一键构建</td><td>可启动的最小根文件系统</td><td>14h</td><td>★★★★</td></tr>
+        <tr><td>12</td><td>字符设备驱动、GPIO、设备树匹配</td><td>一个能被应用调用的 LED 驱动</td><td>20h</td><td>★★★★</td></tr>
+        <tr><td>13</td><td>串口日志、dmesg、strace、gdb、ftrace</td><td>一套自己的排障流程</td><td>8h</td><td>★★★</td></tr>
+        <tr><td>14</td><td>从零构建 + 部署 + 排错，完整闭环</td><td>一份可复现的项目笔记</td><td>16h</td><td>★★★★</td></tr>
+      </tbody>
+    </table>
+
+    <p>合计约 <strong>172 小时</strong>。按每周 12 小时（每天 2h × 6 天）算，<strong>约 14 周，98 天</strong>。如果你是周末党（每周 8 小时），大概 5 个月；如果全职投入，1 个月能拿下前 11 章。</p>
+
+    <h2 id="s4">五、14 周时间表（可直接照着排）</h2>
+
+    <table>
+      <thead>
+        <tr><th>周次</th><th>章节</th><th>本周要做的事</th><th>周末该达到的状态</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>W1</td><td>01 + 02 前半</td><td>读概念、装虚拟机、装 Ubuntu、配源</td><td>能 ssh 连上自己的 Ubuntu</td></tr>
+        <tr><td>W2</td><td>02 后半 + 03 前半</td><td>串口工具、目录结构、文件命令</td><td>不查文档能完成文件增删改查</td></tr>
+        <tr><td>W3</td><td>03 后半 + 04 前半</td><td>查找、管道重定向、权限、用户</td><td>能解释 <code>chmod 755</code> 每一位含义</td></tr>
+        <tr><td>W4</td><td>04 后半</td><td>装软件、进程管理、systemd、crontab、日志</td><td>能自己装一套 C/Python 开发环境</td></tr>
+        <tr><td>W5</td><td>05</td><td>Vim 全部操作 + Shell 脚本 4 个练习</td><td>全程 Vim 写代码，脚本能跑通</td></tr>
+        <tr><td>W6</td><td>06</td><td>静态 IP、SSH 免密、NFS、TFTP</td><td>PC 与板子（或两台 VM）互通</td></tr>
+        <tr><td>W7</td><td>07</td><td>交叉编译工具链、Makefile、gdb</td><td>能编出 ARM 可执行文件并跑起来</td></tr>
+        <tr><td>W8</td><td>08</td><td>芯片框图、地址映射、五级启动链</td><td>能白板画出启动流程图</td></tr>
+        <tr><td>W9</td><td>09</td><td>U-Boot 命令、环境变量、烧写流程</td><td>独立烧一套系统进板子</td></tr>
+        <tr><td>W10–11</td><td>10</td><td>内核配置编译、DTS 语法、pinctrl</td><td>改设备树点亮/熄灭一个 LED</td></tr>
+        <tr><td>W12</td><td>11</td><td>BusyBox 手工版 + Buildroot 版</td><td>板子用自己做的根文件系统启动</td></tr>
+        <tr><td>W13</td><td>12 + 13</td><td>字符设备驱动、GPIO、调试工具</td><td>应用能通过驱动控制硬件</td></tr>
+        <tr><td>W14</td><td>14</td><td>综合实战：从零重做一遍全流程</td><td>脱离教程能独立复现</td></tr>
+      </tbody>
+    </table>
+
+    <div class="tip">
+      <b>进度落后怎么办</b>
+      正常现象，别硬追。判断标准不是「第几周」，而是<b>每章验收标准是否达成</b>。W10–W11 的内核与设备树最容易超时，留了双周就是给这个的。
+    </div>
+
+    <h2 id="s5">六、每一章怎么学：读 → 敲 → 造</h2>
+
+    <p>每章固定三步，缺一步这一章就等于没学：</p>
+
+    <ul class="steps">
+      <li><strong>读（30%）</strong>：先通读本章，只求看懂「为什么需要这个东西」。看不懂的名词先记在便签上，不要停下来查，读完再回头。</li>
+      <li><strong>敲（50%）</strong>：把本章所有命令、代码<strong>手打一遍</strong>，不许复制粘贴。打错、报错、修好，这个过程才长肌肉记忆。看到的报错信息记进笔记。</li>
+      <li><strong>造（20%）</strong>：做本章「动手任务」，并且<strong>故意改坏一次</strong>——改错一个参数、删错一个文件、拔掉网线，看系统怎么反应，再修回来。会修，才算会。</li>
+    </ul>
+
+    <div class="warn">
+      <b>只读不敲 = 白学</b>
+      Linux 是操作型技能，和游泳一样。看 100 小时教程的旱鸭子，下水还是沉。本手册每章都设了「动手任务」，那是作业，不是选读。
+    </div>
+
+    <h2 id="s6">七、实验台清单</h2>
+
+    <h3><span class="tag-no">6.1</span>软件（全部免费）</h3>
+    <table>
+      <thead><tr><th>用途</th><th>推荐</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>虚拟机</td><td>VMware Workstation Player</td><td>免费版够用；VirtualBox 也行</td></tr>
+        <tr><td>Linux 发行版</td><td>Ubuntu 22.04 LTS</td><td>资料最多、包最全、对新手最宽容</td></tr>
+        <tr><td>终端 / SSH</td><td>Windows Terminal + 自带 ssh</td><td>Win10 以上自带 OpenSSH，不用装 PuTTY</td></tr>
+        <tr><td>串口工具</td><td>MobaXterm / SecureCRT / minicom</td><td>MobaXterm 免费且串口+SSH 一体</td></tr>
+        <tr><td>代码编辑</td><td>Vim（服务器） + VS Code（PC）</td><td>服务器上必须会 Vim</td></tr>
+        <tr><td>烧写工具</td><td>mfgtool / dd / UUU</td><td>取决于板卡厂商提供什么</td></tr>
+      </tbody>
+    </table>
+
+    <h3><span class="tag-no">6.2</span>硬件（按预算选一档）</h3>
+    <table>
+      <thead><tr><th>档位</th><th>配置</th><th>够不够用</th></tr></thead>
+      <tbody>
+        <tr><td>最低</td><td>i.MX6ULL 核心板 + 底板、USB 转串口、SD 卡、网线</td><td>够，能走完 8–12 章全部实验</td></tr>
+        <tr><td>推荐</td><td>上面 + 5V 电源 + 网线直连 + 8GB SD</td><td>舒服，NFS 调试体验好很多</td></tr>
+        <tr><td>PC 侧</td><td>内存 16GB、磁盘留 60GB 给虚拟机</td><td>8GB 也能跑，只是编译内核会慢</td></tr>
+      </tbody>
+    </table>
+
+    <div class="key">
+      <b>没有开发板也能学（重要）</b>
+      第 1–7 章完全不依赖板子，一台 Ubuntu 虚拟机就够了。第 8–11 章如果暂时没板子，可以用 <strong>QEMU 模拟 ARM 平台</strong>跑内核与根文件系统（本目录里已有 i.MX6ULL 的 QEMU 方案笔记，可以直接拿来当实验台），只是没法做真实 GPIO 实验。第 12 章驱动可以先用 <code>/dev</code> 下的现成设备练框架，等板子到了再补硬件部分。
+    </div>
+
+    <h2 id="s7">八、四个阶段的验收标准</h2>
+
+    <p>每到一个阶段结束，拿这张清单自测。有一条做不到，就回头补，别往下走。</p>
+
+    <h3><span class="tag-no">7.1</span>第一阶段（第 1–5 章）· 地基</h3>
+    <ul class="checklist">
+      <li>能说出 Linux 内核、发行版、GNU 工具三者关系</li>
+      <li>不查资料，30 秒内完成：找到 /home 下所有大于 10MB 的文件</li>
+      <li>能解释 <code>-rw-r--r--</code> 的含义，并把它改成 755</li>
+      <li>能说清楚软链接和硬链接的区别，并各建一个</li>
+      <li>能用 <code>ps aux | grep xxx</code> 找到进程并杀掉</li>
+      <li>能写一个 for 循环脚本批量改文件名</li>
+      <li>全程 Vim 编辑，不碰鼠标、不碰记事本</li>
+    </ul>
+
+    <h3><span class="tag-no">7.2</span>第二阶段（第 6–7 章）· 开发</h3>
+    <ul class="checklist">
+      <li>两台机器 ping 通、ssh 免密登录成功</li>
+      <li>板子（或第二台 VM）能通过 NFS 挂载 PC 目录，并直接运行里面的程序</li>
+      <li>能写出一个三文件 C 工程的 Makefile，含 clean 目标</li>
+      <li>能用 <code>arm-linux-gnueabihf-gcc -v</code> 确认工具链正常，并编出一个 ARM 可执行文件</li>
+      <li>能用一个 gdb 会话定位一次数组越界导致的段错误</li>
+    </ul>
+
+    <h3><span class="tag-no">7.3</span>第三阶段（第 8–11 章）· 系统</h3>
+    <ul class="checklist">
+      <li>能画出 BootROM → SPL → U-Boot → 内核 → 根文件系统 的完整链路，并标出各阶段加载地址</li>
+      <li>会改 <code>bootargs</code> 让内核从 NFS 启动，从 eMMC 启动</li>
+      <li>能独立完成一次系统烧写，并在串口看到完整启动日志</li>
+      <li>能改设备树，让板子上的 LED 在系统启动后处于你想要的状态</li>
+      <li>能用 Buildroot 生成自己的根文件系统并启动成功</li>
+    </ul>
+
+    <h3><span class="tag-no">7.4</span>第四阶段（第 12–14 章）· 驱动与实战</h3>
+    <ul class="checklist">
+      <li>能写一个字符设备驱动，<code>insmod</code> 后 <code>/dev</code> 下出现对应节点</li>
+      <li>应用程序 <code>write()</code> 能控制 GPIO 电平，用万用表或 LED 验证到</li>
+      <li>能说出 <code>register_chrdev</code> 老接口和 <code>cdev/misc</code> 新接口的差别</li>
+      <li>驱动出错时，能靠 <code>dmesg</code> + 串口日志定位到具体文件行</li>
+      <li>脱离教程，从零做出「内核 + 设备树 + 根文件系统 + 一个驱动」四件套</li>
+    </ul>
+
+    <h2 id="s8">九、小白最容易踩的 8 个坑</h2>
+
+    <div class="grid two">
+      <div class="card">
+        <h4>坑 1：版本不对</h4>
+        <p>教程用的是 4.1.15 内核 + 2016.03 U-Boot，你装了 5.15。命令、目录、配置项全不一样。<b>跟板卡厂商的版本来</b>，别自己升级。</p>
+      </div>
+      <div class="card">
+        <h4>坑 2：地址乱抄</h4>
+        <p>0x87800000、0x80800000 这些是<b>特定板卡特定配置</b>下的加载地址。DDR 大小变了、U-Boot 配置变了，地址就可能变。</p>
+      </div>
+      <div class="card">
+        <h4>坑 3：忽视串口</h4>
+        <p>板子起不来时，SSH 是连不上的，唯一的信息源就是串口。<b>先把串口调通</b>，再谈其他。</p>
+      </div>
+      <div class="card">
+        <h4>坑 4：中文路径 / 空格路径</h4>
+        <p>编译工具链、内核源码放在含中文或空格的路径上，<code>make</code> 会报各种莫名其妙找不到文件的错误。</p>
+      </div>
+      <div class="card">
+        <h4>坑 5：直接 root 干活</h4>
+        <p><code>sudo rm -rf</code> 一次失误就重装系统。日常用普通用户 + sudo，权限问题才用 root。</p>
+      </div>
+      <div class="card">
+        <h4>坑 6：网线没通就烧写</h4>
+        <p>NFS 挂载失败、TFTP 超时，先 <code>ping</code>、再看防火墙、最后看服务是否真的起来了。</p>
+      </div>
+      <div class="card">
+        <h4>坑 7：只看不动手</h4>
+        <p>把教程当小说看，看到第 12 章发现自己连 <code>chmod</code> 都敲不利索。这行没有「看会」这回事。</p>
+      </div>
+      <div class="card">
+        <h4>坑 8：报错就换方案</h4>
+        <p>一个报错卡三天很正常。先把<b>报错的第一个错误</b>（不是最后一个）读完，再搜索。90% 的答案就在第一行错误里。</p>
+      </div>
+    </div>
+
+    <h2 id="s9">十、全书书写约定</h2>
+
+    <table>
+      <thead><tr><th>约定</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td><code>$ 命令</code></td><td>普通用户在 PC / 板子终端执行</td></tr>
+        <tr><td><code># 命令</code></td><td>root 身份执行（提示符为 #）</td></tr>
+        <tr><td><code>[pc]</code> / <code>[board]</code></td><td>标明命令在哪台机器上跑，这是新手最常混的地方</td></tr>
+        <tr><td>地址、引脚、分区名</td><td>除特别说明外，均以正点原子 i.MX6ULL 阿尔法/迷你板为准，<b>你的板子不同就必须对照原理图和厂商文档</b></td></tr>
+        <tr><td>灰色段落</td><td>补充说明，可跳过</td></tr>
+      </tbody>
+    </table>
+
+    <div class="warn">
+      <b>关于硬件差异</b>
+      本手册里出现的 GPIO 编号、I2C 地址、分区名、DDR 容量都是示例。i.MX6ULL 有几十种封装与板型，<b>唯一权威是你的原理图和厂商提供的 DTS 文件</b>。看书时养成「先核对原理图」的习惯，比背任何代码都有用。
+    </div>
+
+    <h2 id="s10">十一、开始吧</h2>
+
+    <p>读完这一页就可以开始了。<b>只想懂原理</b>：从 T01 一路读到 T17，不碰板子也能读通；<b>想快点上板子</b>：从实践卷 01 开始，遇到「为什么」再回理论卷查。两条路都不需要等「准备好」。</p>
+
+    <p class="side-t" style="margin-top:24px">理论卷 · 17 章</p>
+    <div class="toc-mini">
+      <a href="../docs/course-th01.html">T01 · 操作系统与 Linux 的分层</a>
+      <a href="../docs/course-th02.html">T02 · 进程、线程与调度</a>
+      <a href="../docs/course-th03.html">T03 · 虚拟内存与地址翻译</a>
+      <a href="../docs/course-th04.html">T04 · 文件系统与 VFS</a>
+      <a href="../docs/course-th05.html">T05 · 设备模型与驱动框架</a>
+      <a href="../docs/course-th06.html">T06 · 中断、并发与同步</a>
+      <a href="../docs/course-th07.html">T07 · ARM 架构与 Cortex-A7</a>
+      <a href="../docs/course-th08.html">T08 · 从第一个字节开始</a>
+      <a href="../docs/course-th09.html">T09 · 内核怎么起来</a>
+      <a href="../docs/course-th10.html">T10 · 总线体系</a>
+      <a href="../docs/course-th11.html">T11 · 时钟树、复位与电源域</a>
+      <a href="../docs/course-th12.html">T12 · 最小系统外设（上）</a>
+      <a href="../docs/course-th13.html">T13 · 最小系统外设（下）</a>
+      <a href="../docs/course-th14.html">T14 · 内存管理进阶</a>
+      <a href="../docs/course-th15.html">T15 · 内核全貌：子系统协作</a>
+      <a href="../docs/course-th16.html">T16 · BSP 与设备树原理</a>
+      <a href="../docs/course-th17.html">T17 · 交叉编译与工具链原理</a>
+      <a href="../docs/course-th18.html">T18 · CPU 是怎么执行代码的</a>
+    </div>
+
+    <p class="side-t" style="margin-top:24px">实践卷 · 14 章</p>
+    <div class="toc-mini">
+      <a href="../docs/course-ch01.html">01 · Linux 全景认知</a>
+      <a href="../docs/course-ch02.html">02 · 搭好实验台</a>
+      <a href="../docs/course-ch03.html">03 · 命令行与文件系统</a>
+      <a href="../docs/course-ch04.html">04 · 系统管理四件事</a>
+      <a href="../docs/course-ch05.html">05 · Vim 与 Shell 脚本</a>
+      <a href="../docs/course-ch06.html">06 · 网络与远程开发</a>
+      <a href="../docs/course-ch07.html">07 · 交叉编译与工程构建</a>
+      <a href="../docs/course-ch08.html">08 · i.MX6ULL 与启动链路</a>
+      <a href="../docs/course-ch09.html">09 · U-Boot 与烧写</a>
+      <a href="../docs/course-ch10.html">10 · 内核裁剪与设备树</a>
+      <a href="../docs/course-ch11.html">11 · 根文件系统构建</a>
+      <a href="../docs/course-ch12.html">12 · 驱动开发入门</a>
+      <a href="../docs/course-ch13.html">13 · 调试与排障工具箱</a>
+      <a href="../docs/course-ch14.html">14 · 综合实战项目</a>
+    </div>
+
+    <footer id="pager"></footer>
+  
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"34 页分四组，先看哪一组","items":[{"b":"理论卷 T01–T18","d":"讲机制：分层、调度、地址翻译、VFS、设备模型、中断、ARM、启动链、总线、时钟、DDR、驱动。不碰开发板也能读完。"},{"b":"实践卷 C01–C14","d":"讲操作：装系统、命令行、交叉编译、U-Boot、设备树、rootfs、驱动、调试。每一步都能照做。"},{"b":"目录与路线","d":"这一页是总表，roadmap 是六阶段路线图，两者配合看：先定阶段，再按阶段挑章。"},{"b":"两个互动台","d":"时钟树和 MMU 页表。参数能拖、结果实时变，比看十张静态图直观。"}],"note":"不确定从哪开始：先看 roadmap 定阶段，再回本页挑章。"}'></div>
+  </main>
+</div>
+<script src="../assets/nav.js"></script>
+<script src="../assets/viz.js"></script>
+<script src="../assets/iviz.js"></script>
+<script src="../assets/anime.iife.min.js"></script>
+<script src="../assets/anim2.js"></script>
+</body>
+</html>

@@ -1,0 +1,301 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>内核怎么起来：head.S → start_kernel → init · 卷 08 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j08.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 08 · 启动链</div>
+<ol><li><a href="course-th08.html">
+  <span class="no">01</span><span>从第一个字节开始：BootROM → SPL → U-Boot<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-36.html">
+  <span class="no">02</span><span>启动链<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-ch08.html">
+  <span class="no">03</span><span>i.MX6ULL 与启动链路<span class="sub">约 10 小时</span></span></a></li>
+<li><a href="course-th09.html" class="active">
+  <span class="no">04</span><span>内核怎么起来：head.S → start_kernel → init<span class="sub">约 5 小时 · 当前</span></span></a></li>
+<li><a href="course-ch09.html">
+  <span class="no">05</span><span>U-Boot 与烧写<span class="sub">约 12 小时</span></span></a></li>
+<li><a href="course-ch10.html">
+  <span class="no">06</span><span>内核裁剪与设备树<span class="sub">约 18 小时</span></span></a></li>
+<li><a href="course-41.html">
+  <span class="no">07</span><span>根文件系统<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-ch11.html">
+  <span class="no">08</span><span>根文件系统构建<span class="sub">约 14 小时</span></span></a></li>
+<li><a href="course-42.html">
+  <span class="no">09</span><span>做出一块能跑的系统<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="viz-boot.html">
+  <span class="no">10</span><span>互动台：启动链路逐级点亮<span class="sub">💻 · 约 1 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j07.html">← 卷 07</a>
+  <a href="../juan/j09.html">卷 09 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 08<span>·</span>启动链<span>·</span>第 04 篇</div>
+  <h1>内核怎么起来：head.S → start_kernel → init</h1>
+  <p class="lede">U-Boot 跳过来之后，内核的第一条指令在 head.S 里。这一段代码在「没有栈、没有页表、没有 C 环境」的条件下把机器改造成能跑 C 的状态，然后交给 start_kernel()。这一章把这两段之间的每一步说清，包括为什么早期日志会「丢」。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 5 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+    <div class="viz" data-kind="flow" data-title="内核启动的七个跳点" data-sub="从汇编入口到第一个用户进程" data-json='{"play":true,"steps":[{"n":"head.S","d":"设栈、查 CPU ID、建初始页表"},{"n":"start_kernel","d":"C 语言世界的第一站"},{"n":"setup_arch","d":"解析设备树、初始化内存"},{"n":"mm_init","d":"页表与分配器就位"},{"n":"rest_init","d":"造出 0 号与 1 号进程"},{"n":"do_initcalls","d":"按等级依次跑各驱动初始化"},{"n":"/sbin/init","d":"用户态第一号进程启动"}],"note":"每一步失败都会在串口最后一行停住——所以看串口日志的最后一句，就等于知道内核死在哪一步。"}'></div>
+
+
+    <div class="card">
+      <h4>本章要解决的问题</h4>
+      <p>① 内核第一条指令在做什么；② 没有页表时怎么建页表、怎么开 MMU；③ <code>start_kernel</code> 里几十个初始化为什么顺序不能乱；④ 驱动是靠什么机制「自动」被初始化的；⑤ 为什么启动早期的 printk 看不到。</p>
+    </div>
+
+    <div class="card">
+      <h4>读完你应该能回答</h4>
+      <ul>
+        <li>head.S 里最先做的是哪三件检查？</li>
+        <li>早期页表为什么用 1MB 段而不是 4KB 页？</li>
+        <li>initcall 分几级，谁的优先级最高？</li>
+        <li>内核线程和用户态 init 进程是什么关系？</li>
+        <li>没有 earlycon，启动早期的日志去哪了？</li>
+      </ul>
+    </div>
+
+    <div class="anim2" data-json='{"title":"内核怎么把自己启动起来","hint":"从关着 MMU 到能跑进程","nodes":[{"k":"head.S","s":"建临时页表"},{"k":"start_kernel","s":"总入口"},{"k":"setup_arch","s":"解析 dtb"},{"k":"rest_init","s":"造 0/1 号"},{"k":"kernel_init","s":"跑 init"}],"frames":[{"i":0,"d":"刚接手时 MMU 关着，用的是物理地址。汇编里先建一张临时页表、打开 MMU，才敢跳进 C。"},{"i":1,"d":"start_kernel 依次初始化控制台、内存管理、中断、定时器、调度器，每一步都有打印可看。"},{"i":2,"d":"setup_arch 解析 dtb：内存多大、串口在哪、中断控制器怎么配，全从这里读出来。"},{"i":3,"d":"rest_init 创建 0 号进程与 1 号内核线程，自己退化成 idle——没事干就睡。"},{"i":4,"d":"1 号线程挂根文件系统、执行 init。挂载失败就是那句 Kernel panic: no init found。"}],"kind":"chain"}'></div>
+
+    <h2 id="s1">1. head.S：在没有 C 环境的情况下开局</h2>
+
+    <p>内核入口（<span class="path">arch/arm/kernel/head.S</span>）运行时，条件是极端的：<b>MMU 关、缓存关、栈指针不可信、不能调用任何 C 函数、连 printf 都没有</b>。它必须按顺序完成下面这些，每一步都为下一步创造条件：</p>
+
+    <table>
+      <thead><tr><th>步骤</th><th>做什么</th><th>为什么必须现在做</th></tr></thead>
+      <tbody>
+        <tr><td>① 校验 CPU</td><td><code>__lookup_processor_type</code> 读 CPU ID，查内核是否支持这颗核</td><td>不支持的核上跑下去毫无意义，早点死掉比乱跑好</td></tr>
+        <tr><td>② 校验启动参数</td><td>检查 r2 指向的 DTB/ATAGS 是否合法</td><td>后面解析硬件全靠它，坏了必须立刻报</td></tr>
+        <tr><td>③ 建初始页表</td><td><code>__create_page_tables</code>，映射内核自身 + DTB + 串口</td><td>不开 MMU 就没法用虚拟地址，也没法开缓存</td></tr>
+        <tr><td>④ 使能 MMU</td><td><code>__enable_mmu</code>：写 TTBR0、DACR、置 SCTLR 的 M/C/I</td><td>之后的代码按虚拟地址链接，必须能翻译</td></tr>
+        <tr><td>⑤ 设栈</td><td>SP 指向 <code>init_thread_union</code> 的栈顶</td><td>C 函数需要栈才能跑</td></tr>
+        <tr><td>⑥ 清 BSS</td><td>把 <code>__bss_start</code> 到 <code>__bss_stop</code> 清零</td><td>C 语言规定未初始化全局变量为 0</td></tr>
+        <tr><td>⑦ 跳到 C</td><td><code>b start_kernel</code></td><td>正式进入内核主体</td></tr>
+      </tbody>
+    </table>
+
+    <p>其中第 ③ 步是这一章的技术核心。<b>它必须在「MMU 还关着」的时候完成</b>，所以它用的是物理地址；而且它只能用最小的代价建最少的映射：</p>
+
+    <ul>
+      <li>映射内核代码与数据（否则开了 MMU 立刻取指失败）；</li>
+      <li>映射 DTB（后面要用它解析硬件）；</li>
+      <li>映射串口寄存器（<b>earlycon 要用</b>，否则早期日志一个字都出不来）。</li>
+    </ul>
+
+    <p>为什么用 <b>1MB 段</b>而不是 4KB 页？因为此时还没有内存分配器、没有 L2 表的空间，而段映射只需要在 L1 表里写一项就能覆盖 1MB。这是「用精度换可行性」的典型取舍（T03 讲过段的开销优势）。</p>
+
+    <div class="key">
+      <b>这里有一个隐蔽的坑</b>
+      早期页表必须把「内核正在执行的这段代码」映射到它<b>链接时假定的虚拟地址</b>（0xC000_8000 附近），同时还要保证「开 MMU 的那条指令本身」不会因为地址翻译而失效。这就是为什么开 MMU 的那几条指令要放在「同一段映射内」——启动代码里的位置安排不是随意写的。
+    </div>
+
+    <h2 id="s2">2. start_kernel：一场严格排序的初始化</h2>
+
+    <p><code>start_kernel()</code> 是内核的「main 函数」，它按顺序调用几十个初始化函数。顺序不是随意的：<b>后面依赖前面的成果</b>，动一处就可能全盘崩。关键调用按序如下：</p>
+
+    <table>
+      <thead><tr><th>调用</th><th>建立什么</th><th>依赖谁</th></tr></thead>
+      <tbody>
+        <tr><td><code>setup_arch()</code></td><td>解析 DTB、建立内存布局、识别 CPU、初始化早期控制台</td><td>head.S 给的 DTB 指针</td></tr>
+        <tr><td><code>mm_init()</code></td><td>伙伴系统、slab 分配器可用（终于能 <code>kmalloc</code>）</td><td>setup_arch 报出的内存范围</td></tr>
+        <tr><td><code>sched_init()</code></td><td>调度器、运行队列、idle 任务</td><td>mm_init（任务结构要内存）</td></tr>
+        <tr><td><code>irq_init()</code> 系列</td><td>中断控制器（GIC）驱动、中断描述符</td><td>setup_arch 的 DT 解析</td></tr>
+        <tr><td><code>time_init()</code></td><td>定时器、时钟源、jiffies 开始走</td><td>中断可用</td></tr>
+        <tr><td><code>console_init()</code></td><td>真正注册控制台，printk 的日志终于能输出</td><td>串口驱动已 probe</td></tr>
+        <tr><td><code>rest_init()</code></td><td>创建内核线程，转入「多任务世界」</td><td>以上全部</td></tr>
+      </tbody>
+    </table>
+
+    <p>注意 <code>mm_init</code> 在 <code>sched_init</code> 之前、<code>console_init</code> 很靠后。这两条顺序解释了新手最常遇到的两个现象：</p>
+
+    <p><b>① 「为什么启动早期不能 kmalloc？」</b> 因为在 <code>mm_init</code> 之前分配器还没建立，只能用静态数组或 <code>memblock</code> 这类早期分配器。</p>
+
+    <p><b>② 「为什么启动早期的 printk 看不到？」</b> 因为在 <code>console_init</code> 之前，控制台还没注册，日志只是被塞进内核的环形缓冲区（<code>log_buf</code>）。等控制台就绪后，这些日志会被「刷」出来——所以你在 <code>dmesg</code> 里能看到它们，但在串口实时输出里看不到。</p>
+
+    <div class="note">
+      <b>earlycon 是唯一的例外</b>
+      内核支持用 bootargs 里的 <code>earlycon</code> 参数，在 <code>setup_arch</code> 阶段就用「裸寄存器写」的方式驱动串口。它不依赖驱动框架、不依赖中断、不依赖内存分配，就是几个 <code>writel</code>。这就是「板子起不来时，加上 earlycon 能看到第一行日志」的原因。
+    </div>
+    <h2 id="s3">3. initcall：驱动「自动被初始化」的机制</h2>
+    <div class="viz" data-kind="pipe" data-title="start_kernel：一场严格排序的初始化" data-sub="顺序错了，后面每一行都会崩" data-json='{"stages":[{"n":"setup_arch","d":"解析 dtb、建内存模型","c":"cy"},{"n":"mm_init","d":"建页表、启分配器","c":"vi"},{"n":"sched_init","d":"建调度器、idle 进程","c":"or"},{"n":"irq/time","d":"中断与定时器接管","c":"rd"},{"n":"rest_init","d":"创建 init/kthreadd","c":"gr"}],"note":"为什么 mm 要在 sched 之前：调度器要分配结构体内存；为什么 timer 要在 sched 之后：时钟中断里要能唤醒进程。"}'></div>
+
+
+    <p>你有没有想过：你写驱动时只用了 <code>module_init(my_init)</code>，谁在什么时候调用了它？答案就是 initcall 机制。<b>内核把所有初始化函数收集到一张表里，按级别顺序依次调用。</b></p>
+
+    <table>
+      <thead><tr><th>级别</th><th>宏</th><th>执行时机</th><th>典型用途</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td><code>pure_initcall</code></td><td>最早</td><td>纯计算、无依赖的常量初始化</td></tr>
+        <tr><td>1</td><td><code>core_initcall</code></td><td>核心</td><td>内存、调度等最基础的设施</td></tr>
+        <tr><td>2</td><td><code>postcore_initcall</code></td><td>核心之后</td><td>总线（platform）、基础框架</td></tr>
+        <tr><td>3</td><td><code>arch_initcall</code></td><td>架构相关</td><td>SoC 特有初始化</td></tr>
+        <tr><td>4</td><td><code>subsys_initcall</code></td><td>子系统</td><td>class、gpio、pinctrl、clock 框架</td></tr>
+        <tr><td>5</td><td><code>fs_initcall</code></td><td>文件系统</td><td>VFS、proc、sysfs</td></tr>
+        <tr><td>6</td><td><code>device_initcall</code></td><td>设备驱动（默认）</td><td><b>绝大多数驱动</b>（<code>module_init</code> 就是它）</td></tr>
+        <tr><td>7</td><td><code>late_initcall</code></td><td>最后</td><td>依赖前面全部就绪的功能</td></tr>
+      </tbody>
+    </table>
+
+    <p>三条必须记住的规则：</p>
+
+    <ul>
+      <li><b>级别决定大顺序，链接顺序决定同级别内的小顺序。</b> 同一级别里，谁在 Makefile 里排前面谁先执行——这就是为什么改 <code>obj-y</code> 的顺序能改变初始化顺序（也是某些「玄学 bug」的来源）。</li>
+      <li><b>级别错了就是全错。</b> 一个 device 级别的驱动要用 gpio 框架，而 gpio 框架是 subsys 级别（4 &lt; 6），所以它一定已经就绪。</li>
+      <li><b>依赖没就绪就返回 <code>-EPROBE_DEFER</code></b>（见 T05），不要靠「调高级别」硬解决。</li>
+    </ul>
+
+    <p>还有一条容易误解的：<code>module_init</code> 对「编译进内核」和「编译成模块」都有效——编进内核时它等价于 <code>device_initcall</code>；编成模块时它变成 <code>insmod</code> 时的入口函数。所以你在源码里看不到它出现在启动顺序里，但内建时确实会跑。</p>
+
+    <h2 id="s4">4. rest_init：从单线程内核到多任务世界</h2>
+
+    <p><code>start_kernel</code> 的最后一步是 <code>rest_init()</code>，它做三件事，然后「原来的执行流」自己变成 idle：</p>
+
+    <ol>
+      <li><b>创建 kernel_init 线程</b>（最终成为 PID 1）：它负责跑完所有 initcall、挂载根文件系统、执行用户态 init。</li>
+      <li><b>创建 kthreadd</b>（PID 2）：所有后续内核线程的父进程，负责「生」各种内核线程（工作队列线程、迁移线程等）。</li>
+      <li><b>自己进入 cpu_idle</b>：此时主启动流变成 idle 任务（每个核一个），只在没别的事时运行。</li>
+    </ol>
+
+    <p>所以「PID 1」不是一个神秘的存在，它就是<b>启动流程最后的那个内核线程转身变成的用户态进程</b>。它的关键步骤是：</p>
+
+    <div class="flow">
+      <span>kernel_init</span><span>→</span><span>do_basic_setup（跑 initcall）</span><span>→</span><span>挂 rootfs</span><span>→</span><span>exec /sbin/init</span><span>→</span><span>变成用户态 PID 1</span>
+    </div>
+
+    <p>挂 rootfs 的来源优先级：<b>initramfs</b>（若编进内核）→ bootargs 的 <code>root=</code> 指定设备 → NFS 根。如果最后找不到可执行的 <code>/sbin/init</code>（以及 <code>/etc/init</code>、<code>/bin/sh</code> 等备选），内核会打印 <code>No working init found</code> 并 panic。这是嵌入式最常见的启动失败之一：<b>rootfs 挂了但里面没有 init</b>，或者设备号写错。</p>
+
+    <div class="calc">
+      <h5>算一笔：启动为什么「看起来卡住」几秒</h5>
+      <div class="line"><code>do_basic_setup</code> 里要跑几百个 initcall，其中很多会去探测硬件</div>
+      <div class="line">I2C 探测超时、SD 卡初始化、以太网 PHY 自协商，每项几十到几百毫秒</div>
+      <div class="line">累计起来 2–5 秒很正常，日志上表现为「最后一行之后没动静」</div>
+      <div class="line">判断方式：<code>dmesg</code> 带时间戳，看哪两项之间跨度大；或加 <code>initcall_debug</code> 启动参数，它会逐个打印每个 initcall 的耗时</div>
+    </div>
+
+    <h2 id="s5">5. 八个常见误解</h2>
+
+    <table>
+      <thead><tr><th>误解</th><th>真相</th></tr></thead>
+      <tbody>
+        <tr><td>「内核第一条指令在 C 代码里」</td><td>在 <code>head.S</code> 的汇编里。C 环境（栈、BSS、MMU）是它造出来的。</td></tr>
+        <tr><td>「MMU 一开始就是开的」</td><td>一开始是关的。head.S 建好页表后才开，且开的那一刻地址翻译规则就变了。</td></tr>
+        <tr><td>「早期页表映射了全部内存」</td><td>只映射内核、DTB、串口寄存器等最小集合，其余靠后面 <code>setup_arch</code> 补齐。</td></tr>
+        <tr><td>「printk 一直能用」</td><td><code>console_init</code> 之前只进环形缓冲，不输出。要看早期日志必须 earlycon。</td></tr>
+        <tr><td>「initcall 就是按源码出现顺序执行」</td><td>先按级别（0–7），同级别才按链接顺序。</td></tr>
+        <tr><td>「module_init 只对模块有效」</td><td>编进内核时等价于 <code>device_initcall</code>，同样会在启动时被调用。</td></tr>
+        <tr><td>「PID 1 是内核创建的普通进程」</td><td>它是内核线程 <code>kernel_init</code> 执行 <code>exec</code> 后变成的用户态进程，之前一直是内核线程。</td></tr>
+        <tr><td>「启动慢一定是硬件问题」</td><td>大量 initcall 的探测超时也会造成数秒延迟，用 <code>initcall_debug</code> 能定位到具体函数。</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s6">6. 自检：能答出来才算懂</h2>
+    <div class="viz" data-kind="matrix" data-title="initcall 的七个等级，决定谁先初始化" data-sub="驱动「自动被初始化」全靠这张表" data-json='{"corner":"等级","cols":["典型使用者","为什么在这一级"],"rows":[{"n":"pure","cells":[{"v":"极早期，无依赖","c":"gray"},{"v":"连内存管理都还没有","c":"gray"}]},{"n":"core","cells":[{"v":"内核核心设施","c":"cy"},{"v":"后面全要用它","c":"gray"}]},{"n":"postcore","cells":[{"v":"总线、设备模型","c":"vi"},{"v":"设备要在驱动之前注册","c":"gray"}]},{"n":"subsys","cells":[{"v":"子系统（网络、块层）","c":"or"},{"v":"驱动依赖子系统","c":"gray"}]},{"n":"device","cells":[{"v":"绝大多数驱动","c":"gr"},{"v":"此时设备与子系统都就绪","c":"gray"}]},{"n":"late","cells":[{"v":"收尾、用户态前最后一步","c":"rd"},{"v":"再晚就没有意义","c":"gray"}]}],"note":"所以「驱动 probe 比 XXX 晚」这种问题，先看驱动的 module_init 落在哪一级，而不是加延时。"}'></div>
+
+
+    <div class="q"><span class="n">1</span><p>head.S 里最先做的三件事是什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>校验 CPU ID（是否支持这颗核）、校验启动参数（DTB/ATAGS 是否合法）、创建初始页表（内核 + DTB + 串口）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>为什么早期页表用 1MB 段而不是 4KB 页？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>此时没有内存分配器、没有 L2 表空间；段映射只需在 L1 表里写一项就能覆盖 1MB，代价最小、可行性最高。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>为什么 <code>mm_init</code> 必须在 <code>sched_init</code> 之前？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>因为调度器要创建任务结构、运行队列等对象，这些都依赖内存分配器可用。分配器没起来，调度器无处落腳。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>启动早期的 printk 日志去哪了？怎么才能实时看到？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>进了内核的环形缓冲区 <code>log_buf</code>，<code>console_init</code> 后统一刷出。要实时看到必须在 bootargs 加 <code>earlycon</code>（配合正确的串口地址/波特率）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>initcall 共几级？<code>module_init</code> 属于哪一级？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>0–7 共八级（pure/core/postcore/arch/subsys/fs/device/late）。<code>module_init</code> 等价于 device_initcall（第 6 级）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">6</span><p>同级别的 initcall 谁先执行？由什么决定？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>由链接顺序决定，也就是 Makefile 里 <code>obj-y</code> 的排列顺序。改顺序会影响初始化次序。</p>
+    </div></details>
+
+    <div class="q"><span class="n">7</span><p>PID 1 是怎么产生的？它和 kthreadd 是什么关系？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>rest_init 创建 <code>kernel_init</code> 线程，它跑完 initcall、挂 rootfs 后 <code>exec</code> 用户态 init，成为 PID 1。kthreadd 是 PID 2，所有内核线程的父，两者是兄弟线程。</p>
+    </div></details>
+
+    <div class="q"><span class="n">8</span><p>打印 <code>No working init found</code> 并 panic，通常是什么原因？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>根文件系统挂上了但里面没有可执行的 init（或 <code>root=</code> 设备写错、rootfs 格式不被支持、init 缺少执行权限/动态库）。</p>
+    </div></details>
+
+    <h2 id="s7">7. 这一章要动手的命令</h2>
+
+    <div class="steps">
+      <ol>
+        <li>在 bootargs 里加 <code>earlycon</code>，重启，观察最早出现的日志行（通常能看到「Booting Linux on physical CPU 0x0」）。</li>
+        <li>加 <code>initcall_debug</code> 启动，<code>dmesg | grep initcall</code> —— 看每个初始化函数的耗时，找启动慢的真凶。</li>
+        <li><code>dmesg | grep -E "Memory:|On node|Kernel command line"</code> —— 确认内核看到的内存大小与 bootargs。</li>
+        <li><code>cat /proc/cmdline</code> —— 确认 earlycon/root/console 真的传进来了。</li>
+        <li>在 <code>init/main.c</code> 的 <code>start_kernel</code> 里加一行 <code>pr_info</code>，重编内核，验证自己的第一行内核日志。</li>
+        <li><code>grep -c initcall /proc/kallsyms</code> 或读 <code>System.map</code> 里 <code>__initcall_*</code> 段，看初始化函数表有多大。</li>
+        <li>故意给一个不存在的 <code>root=</code>，观察 panic 信息与「init 找不到」的完整提示。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一章预告</b>
+      T10 讲总线：CPU 怎么通过 AXI/AHB/APB 摸到外设、I2C/SPI/CAN 的时序差别、为什么「地址对了但读不到」往往是总线或时钟没开。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"内核自己怎么把自己启动起来","steps":[{"t":"① head.S","d":"刚接手时 MMU 还关着，用的是物理地址。先建一张临时页表、打开 MMU，再跳到 C 代码。"},{"t":"② start_kernel","d":"内核的 main。初始化控制台、内存管理、中断、定时器、调度器，一路 setup_arch 解析 dtb 和设备树里的内存大小。"},{"t":"③ rest_init","d":"创建 0 号进程和 1 号内核线程，之后自己退化成 idle，没事干就睡。"},{"t":"④ kernel_init","d":"1 号线程负责挂根文件系统、跑 init 程序。挂载失败就是那句著名的 Kernel panic: no init found。"},{"t":"⑤ 交给用户态","d":"init 起来后，内核初始化就算完事。之后所有服务都是用户态进程，内核只负责让它们公平跑、安全访问。"}],"note":"内核启动过程里没有「操作系统已就绪」这种状态，它是边初始化边能用的：越早初始化的子系统越基础。"}'></div>
+  
+
+<nav class="pager">
+  <a href="course-ch08.html"><span>← 上一篇</span><b>i.MX6ULL 与启动链路</b></a>
+  <a class="nx" href="course-ch09.html"><span>下一篇 →</span><b>U-Boot 与烧写</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

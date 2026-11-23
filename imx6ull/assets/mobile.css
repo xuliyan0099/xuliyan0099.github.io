@@ -1,0 +1,142 @@
+/* mobile.css —— 手机 / 平板适配（最后加载，压过 style.css 与 doc-compat.css 的冲突）
+   分界：>1080 桌面，左侧目录常驻；≤1080 改成「浮动 ☰ 目录 + 抽屉」。
+   抽屉用复选框驱动，不依赖任何 JS。 */
+
+.nav-chk{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+.nav-btn{display:none}
+.nav-mask{display:none}
+
+@media (max-width:1280px){
+  /* ---- 外壳：单列 ---- */
+  .shell{display:grid;grid-template-columns:1fr;max-width:none}
+  .doc{padding:22px 18px 84px;min-width:0}
+  .doc h1{font-size:27px;line-height:1.32}
+  .doc h2{font-size:19px;margin-top:38px}
+  .doc h3{font-size:16px}
+  .doc p,.doc li{font-size:14.5px;line-height:1.85}
+  .doc .lede{font-size:15px}
+
+  /* ---- 顶栏：吸顶 + 左边一个浮动的「☰ 目录」 ---- */
+  #topbar{
+    padding:9px 12px;gap:10px;flex-wrap:nowrap;
+    /* 不用 backdrop-filter：安卓上吸顶 + 模糊会让整页反复重绘，表现为“闪” */
+    background:#080c18;
+    }
+  #topbar .brand{font-size:13.5px;gap:7px;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  #topbar .brand small{display:none}
+  #topbar .home{font-size:12.5px;padding:6px 10px;white-space:nowrap}
+  #topbar .home.hide-sm{display:none}
+  #topbar .spacer{display:none}
+
+  /* 浮动目录按钮：压在顶栏最左边，滚动时始终在手边 */
+  .nav-btn{
+    display:inline-flex;align-items:center;gap:5px;flex:none;order:-1;
+    height:34px;padding:0 13px;border-radius:999px;
+    border:1px solid rgba(61,219,217,.4);color:#eaf3ff;font-size:13.5px;font-weight:600;
+    cursor:pointer;background:linear-gradient(135deg,rgba(61,219,217,.18),rgba(139,123,255,.16));
+    box-shadow:0 6px 18px rgba(0,0,0,.45),inset 0 0 12px rgba(61,219,217,.12);
+    -webkit-tap-highlight-color:transparent;user-select:none;
+  }
+  .nav-btn:active{background:rgba(61,219,217,.3)}
+  #topbar .home{margin-left:auto}
+
+  /* ---- 侧栏抽屉 ---- */
+  #sidebar{
+    position:fixed;top:0;left:0;bottom:0;width:min(84vw,330px);height:100%;max-height:none;
+    transform:translateX(-103%);transition:transform .26s cubic-bezier(.4,0,.2,1);
+    background:linear-gradient(180deg,#0a1020,#0b1122);
+    border-right:1px solid rgba(120,150,200,.28);border-bottom:0;
+    box-shadow:28px 0 60px rgba(0,0,0,.6);
+    padding:16px 12px 90px 14px;overflow-y:auto;z-index:70;
+    overscroll-behavior:contain;
+  }
+  #sidebar::before{
+    content:"目录 · 本卷篇目";display:block;
+    font-size:11px;letter-spacing:2px;color:#66738c;margin:2px 0 12px 8px;
+  }
+  .nav-chk:checked ~ .shell #sidebar{transform:none}
+  #sidebar .vol-h{margin:4px 0 12px 8px}
+  #sidebar .vol-nav{margin-top:18px}
+
+  .nav-mask{
+    position:fixed;inset:0;z-index:69;background:rgba(0,0,0,.55);
+    display:none;
+  }
+  .nav-chk:checked ~ .nav-mask{display:block}
+  .nav-chk:checked ~ .shell{overflow:hidden}
+
+  /* ---- 表格与代码 ---- */
+  .doc table{table-layout:auto}
+  .doc table th,.doc table td{white-space:normal;word-break:break-word}
+  .doc pre{overflow-x:auto;font-size:12.5px}
+  .doc img,.doc iframe{max-width:100%;height:auto}
+
+  /* ---- 组件 ---- */
+  .doc-chips{gap:6px}
+  .doc-chips span{font-size:11.5px;padding:4px 9px}
+  .doc-kicker{font-size:12px;flex-wrap:wrap;line-height:1.8}
+  .cards{grid-template-columns:1fr}
+  .doc .pager a{max-width:100%;padding:11px 13px}
+  .doc .pager{flex-direction:column;gap:10px}
+  .doc .pager .nx{margin-left:0;text-align:left}
+  .layers .ly{flex-direction:column;align-items:flex-start;gap:3px}
+  .layers .ly b{width:auto}
+  .qa li{padding:10px 12px 10px 40px}
+  .viz{padding:14px 12px}
+  /* 分层/流程组件在窄屏上直接给终态，避免入场动画没跑完时整块是空的 */
+  .vz-layer,.vz-bar,.vz-node{animation:none!important;opacity:1!important;transform:none!important}
+
+  /* 无限循环的装饰动画在手机上会一直重绘，看起来就是「闪」，一律停掉 */
+  .vz-flow.vz-play .st,.vz-ptr,.vz-bitrow .seg{animation:none!important}
+  .vz-scan{display:none!important}
+  .anim .an-link.on::after{animation:none!important}
+  .anim .an-h i{animation:none!important}
+  .an2-node rect{animation:none!important}
+}
+
+/* ---- 平板：901–1080 收紧一点字号 ---- */
+
+@media (max-width:540px){
+  /* style.css 原本在 540 以下把品牌压成一个圆点，手机上一眼认不出这是哪套手册 */
+  #topbar .brand{font-size:13px;gap:6px;max-width:none;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  #topbar .home{font-size:12px;padding:5px 9px}
+  .doc{padding:18px 14px 84px}
+  .doc h1{font-size:22px}
+}
+
+@media (max-width:420px){
+  .doc h1{font-size:23px}
+  #topbar .brand{font-size:12.5px}
+  #topbar .home{font-size:11.5px;padding:5px 8px}
+  .nav-btn{height:32px;padding:0 11px;font-size:13px}
+}
+
+/* 平板/手机上播放演示时画面要稳：去掉模糊层与过渡，避免反复重绘 */
+@media (max-width:1280px){
+  .fb,.floats,.fb *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+  .fb{background:rgba(10,16,32,.96)!important}
+  .cc,.cc *{transition:none!important;animation:none!important}
+}
+
+/* 平板/触屏：把会周期性重绘的发光、模糊、粘滞效果全部压平 */
+html{scroll-behavior:auto}
+#topbar{box-shadow:none!important}
+.cc *,.viz *,.an2 *,.c3 *,.ikit *{filter:none!important;text-shadow:none!important}
+
+/* ---- 全局稳定化：装饰性循环动画会让触屏设备周期性重绘（表现为隔几秒闪一下）---- */
+.fb,.floats,.fb *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.fb{background:rgba(10,16,32,.96)!important}
+.vz-flow.vz-play .st{animation-iteration-count:1!important}
+.vz-bitrow .seg,.vz-ptr,.anim .an-h i,.anim .an-link.on::after,.an2-node rect{animation:none!important}
+.vz-scan{display:none!important}
+.cc,.cc *{transition:none!important}
+
+/* 兜底：任何 CSS 动画只跑一遍，绝不允许无限循环（平板周期重绘的根源） */
+*,*::before,*::after{animation-iteration-count:1!important}
+
+/* 窄屏（手机）：宽表格改为横向滚动，避免每列只剩几十像素 */
+@media (max-width:760px){
+  .doc table{display:block;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .doc table th,.doc table td{white-space:nowrap;word-break:normal}
+  .doc table th:last-child,.doc table td:last-child{white-space:normal;min-width:170px}
+}

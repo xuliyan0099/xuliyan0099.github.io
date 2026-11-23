@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第 05 章 · 时间：时钟、建立保持、抖动、消抖 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/doc-compat.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+<link rel="stylesheet" href="../../assets/asm.css">
+</head><body style="--acc:#ffb545">
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../../index.html">☰ 六个入口</a>
+  <a class="home hide-sm" href="../../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">硬件是怎么工作的 · 9 篇</div>
+    <ol>
+      <li><a href="index.html"><span class="no">⌂</span><span>路口目录<span class="sub">篇目总览与读法</span></span></a></li>
+      <li><a href="b0.html"><span class="no">00</span><span>先修：怎么学才算学会<span class="sub">三条判断标准，和一条错的路径</span></span></a></li>
+      <li><a href="b1.html"><span class="no">01</span><span>电的四个字：电压、电流、电阻、功率<span class="sub">欧姆定律、串并联、LED 限流实算</span></span></a></li>
+      <li><a href="b2.html"><span class="no">02</span><span>无源五件套：电阻、电容、电感、二极管、晶振<span class="sub">每个元件都在解决一个具体问题</span></span></a></li>
+      <li><a href="b3.html"><span class="no">03</span><span>有源器件：三极管与 MOS 管<span class="sub">为什么一个「开关」需要三个脚</span></span></a></li>
+      <li><a href="b4.html"><span class="no">04</span><span>数字电路的骨架：电平、门、组合、时序<span class="sub">五种门、真值表、加法器、触发器</span></span></a></li>
+      <li><a href="b5.html" class="active"><span class="no">05</span><span>时间：时钟、建立保持、抖动、消抖<span class="sub">为什么电路需要「等一会儿」</span></span></a></li>
+      <li><a href="b6.html"><span class="no">06</span><span>总线到底是什么<span class="sub">地址、数据、控制，与片选、时序</span></span></a></li>
+      <li><a href="b7.html"><span class="no">07</span><span>回到这块板子：元件对号入座<span class="sub">电源树、晶振、DDR、eMMC、按键、LED</span></span></a></li>
+      <li><a href="b8.html"><span class="no">08</span><span>工具与六个实验<span class="sub">万用表、示波器、逻辑分析仪怎么用</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="../index.html">硬件入口</a><a href="../../juan/index.html">十四卷总览</a></div>
+  </aside>
+  <main class="doc">
+    <div class="doc-kicker">硬件基础课 · 从一颗电阻开始 <span>·</span> 第 05 章</div>
+    <div class="ch-head">
+      <h1>时间：时钟、建立保持、抖动、消抖</h1>
+      <div class="ch-meta"><span class="hot">第 05 章</span><span>约 24 分钟</span><span>★★ 核心</span><span>含互动工具</span></div>
+    </div>
+<h2 id="s1">数字电路有一个隐含前提：等一等</h2>
+<p>所有「时钟沿采样」的动作，都默认两件事成立：</p>
+<ol>
+<li>数据在沿之前已经稳定（<b>建立时间 setup</b>）。</li>
+<li>数据在沿之后还能保持（<b>保持时间 hold</b>）。</li>
+</ol>
+<p>这两条来自电路的真实物理：门有延迟，走线有延迟，负载有电容。<b>「等一会儿」不是保守，是硬性要求。</b></p>
+<h2 id="s2">时钟：不是方波就行</h2>
+<p>理想时钟是完美方波，实际时钟有四个指标：</p>
+<table class="regtbl"><thead><tr><th>指标</th><th>含义</th><th>坏了会怎样</th></tr></thead><tbody><tr><td class="nm">频率</td><td>每秒多少个周期</td><td>太快 → 来不及建立</td></tr><tr><td class="nm">占空比</td><td>高电平占的比例</td><td>偏了 → 半周期不够用</td></tr><tr><td class="nm">上升/下降时间</td><td>边沿斜率</td><td>太慢 → 噪声窗口变长、易误触发</td></tr><tr><td class="nm">抖动（jitter）</td><td>边沿位置在抖</td><td>有效时间窗缩短，高速时致命</td></tr></tbody></table>
+<p>i.MX6ULL 的主时钟从 24MHz 晶振进来，经 PLL 倍频再分频给各模块。<b>每个模块的频率都不是随便设的</b>——它受「模块自身上限」与「外部器件时序」双重限制（这就是为什么 Datasheet 的 AC 表与驱动的 <code>max-frequency</code> 是同一个来源）。</p>
+<h2 id="s3">建立/保持：一张图就够了</h2>
+<pre class="asm"><code>        ┌───────┐
+CLK ────┘       └───────
+        │←setup→│←hold→│
+DATA ───╳═══════╳═══════╳──
+        数据必须在 沿 前后 这段时间内保持不变</code></pre>
+<p>违反的后果：</p>
+<ul>
+<li><b>违反 setup</b>：数据来得太晚，被采到的是<b>上一次</b>的值。表现为「偶尔少一位」「数据总是慢一拍」。</li>
+<li><b>违反 hold</b>：数据变得太早，被采到的是<b>新值</b>。表现为「偶尔提前」「错位」。</li>
+</ul>
+<p>两者都<b>不是每次必现</b>，因为延迟随温度、电压、批次漂移。这就是「实验室好的，量产坏了」的经典成因。</p>
+<h2 id="s4">抖动的两个来源与软件的对策</h2>
+<p><b>机械抖动</b>（按键）：金属弹片在接触瞬间弹跳几毫秒，产生一串边沿。软件对策有两种：</p>
+<ul>
+<li>延时消抖：检测到变化后等 10–20ms 再读一次。</li>
+<li>定时采样：每 5ms 采一次，连续 N 次一致才认。</li>
+</ul>
+<p><b>电气噪声</b>（开关电源、电机、长线）：高频尖峰。硬件对策：</p>
+<ul>
+<li>RC 低通（串电阻 + 对地电容）。</li>
+<li>施密特触发器输入（带滞回，抗噪声）。</li>
+<li>TVS 钳位。</li>
+</ul>
+<h2 id="s5">RC 充放电：硬件消抖的数学</h2>
+<p>电容电压按指数上升：</p>
+<div class="fm">U(t) = U<sub>0</sub> · (1 − e<sup>−t/τ</sup>)　　τ = R·C</div>
+<p>三个经验值（<b>必记</b>）：</p>
+<ul>
+<li><b>1τ → 63.2%</b> 满幅</li>
+<li><b>2τ → 86.5%</b></li>
+<li><b>5τ → 99.3%</b>（工程上认为「充满」）</li>
+</ul>
+<p>「到达某个阈值需要多久」由反解得到：</p>
+<div class="fm">t = −τ · ln(1 − U<sub>th</sub> / U<sub>0</sub>)</div>
+<p>这就是「为什么 10kΩ + 100nF = 1ms 量级」：τ = 10k × 100n = 1ms，2τ 就是 2ms，正好覆盖按键的抖动窗口。</p>
+<div class="tool">
+  <h4>RC 充放电曲线 · 改 R、C、阈值看时间</h4>
+  <div class="sim-row">
+    <input id="rcR" type="text" value="10">
+    <input id="rcC" type="text" value="0.1">
+    <input id="rcT" type="text" value="0.5">
+  </div>
+  <div class="out" id="rcOut"></div>
+  <canvas id="rcCv" width="640" height="260" style="width:100%;max-width:640px;height:auto;display:block;margin-top:12px"></canvas>
+</div>
+<p>输入单位：R 用 kΩ、C 用 µF、阈值用「满幅比例」（0–1）。绿线标出「到达阈值的时间点」。</p>
+<p>三组值得试的：</p>
+<ul>
+<li>10k / 0.1µF / 0.5 → τ=1ms，到 50% 约 0.69ms（按键消抖的量级）。</li>
+<li>10k / 0.1µF / 0.9 → 约 2.3ms（更保守的阈值）。</li>
+<li>1k / 0.1µF / 0.5 → τ=0.1ms，太快，消抖不够。</li>
+</ul>
+<h2 id="s6">复位电路也是 RC</h2>
+<p>板子上的复位按键旁边通常有「R + C」：按下拉低，松开后电容慢慢充电，让复位信号延迟释放。<b>这是同一个公式的另一个用途：把「瞬间动作」变成「持续一段时间的信号」。</b></p>
+<p>同理，上电复位（POR）电路也是 RC：电源上升后，复位保持一段时间，等电源稳定再放开 CPU。<b>这段时间不够，CPU 会在电源还没稳时启动，表现为「有时能启动、有时不能」。</b></p>
+<h2 id="s7">本篇验收</h2>
+<ul>
+<li>能说出 setup/hold 违反各自的现象。</li>
+<li>能解释「为什么违反时序是偶发的」，以及温度/电压/批次的影响。</li>
+<li>能默写 τ=RC 与 1τ/2τ/5τ 三个经验值。</li>
+<li>能用公式算出「到达 50% 需要多久」。</li>
+<li>能解释「复位电路本质上是一个 RC 延时」。</li>
+<li>能用工具把 τ 调成 1ms 与 0.1ms，并说出哪个适合消抖。</li>
+</ul>
+<h2 id="s8">下一篇</h2>
+<p>时间解决了「什么时候动作」，接下来解决「怎么把数据传过去」。06 篇讲总线：地址、数据、控制三组线，片选、时序、以及「总线」这个词在不同语境下的三种含义。</p>
+<div class="pager">
+      <a href="b4.html"><span>上一篇</span><b>← 04 数字电路的骨架：电平、门、组合、时序</b></a>
+      <a href="index.html"><span>目录</span><b>篇目总览</b></a>
+      <a class="nx" href="b6.html"><span>下一篇</span><b>06 总线到底是什么 →</b></a>
+    </div>
+  </main>
+</div>
+<script src="../../assets/hw-tools.js"></script>
+</body>
+</html>

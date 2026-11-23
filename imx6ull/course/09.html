@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=../docs/course-09.html">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>09 · 冯诺依曼五件事</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/viz.css">
+<link rel="stylesheet" href="assets/iviz.css">
+<link rel="stylesheet" href="assets/anim2.css">
+  <script src="assets/readmode.js" defer></script>
+</head>
+<body data-page="09">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>第 09 课 · 冯诺依曼五件事</h1>
+    <p class="lede">1945 年那份草稿里写的结构，今天的手机、服务器、你的 i.MX6ULL 开发板，一模一样的五个部件。这一课把这五件事讲清楚，再讲它带来的<b>唯一一个根本缺陷</b>——指令和数据挤在同一条路上。这个瓶颈至今没被解决，只是被层层缓存掩盖。</p>
+
+    <div class="anim2" data-json='{"title":"冯诺依曼五件事","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"存储器"},{"k":"取指令"},{"k":"控制器译码"},{"k":"运算器执行"},{"k":"写回 / 更新 PC"}],"frames":[{"i":0,"d":"存指令和数据，按地址访问"},{"i":1,"d":"PC 指到哪就读哪"},{"i":2,"d":"这条指令要干什么"},{"i":3,"d":"加减与或、访存、跳转"},{"i":4,"d":"结果落地，PC 指向下一条"}]}'></div>
+
+    <div class="viz" data-kind="flow" data-title="五件事，一个循环" data-sub="取指令 → 译码 → 取数 → 执行 → 写回，这就是 CPU 的一生" data-json='{"steps":[{"n":"存储器","d":"存指令和数据，按地址访问"},{"n":"取指令","d":"PC 指到哪就读哪"},{"n":"控制器译码","d":"这条指令要干什么"},{"n":"运算器执行","d":"加减与或、访存、跳转"},{"n":"写回 / 更新 PC","d":"结果落地，PC 指向下一条"}],"note":"五件事里的「输入 / 输出」在嵌入式里就是 GPIO、UART、SPI——它们不是特殊硬件，只是「可以被读写地址」的外设寄存器。这个统一视角是写驱动的第一块基石。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 五件事分别是什么？②「存储程序」为什么是革命性的？③ 冯诺依曼瓶颈到底是什么？④ 哈佛结构怎么绕开它，为什么现代 CPU 用「改良哈佛」？⑤ 为什么「读写一个地址」就能控制硬件？</p>
+    </div>
+
+    <h2>1. 五个部件，各司其职</h2>
+
+    <table>
+      <thead><tr><th>部件</th><th>职责</th><th>本课程里的位置</th></tr></thead>
+      <tbody>
+        <tr><td><b>运算器 ALU</b></td><td>算术与逻辑运算</td><td>第 06–07 课造，第 11 课用</td></tr>
+        <tr><td><b>控制器</b></td><td>取指、译码、发出控制信号</td><td>第 10、12 课核心</td></tr>
+        <tr><td><b>存储器</b></td><td>按地址存/取指令与数据</td><td>第 20–26 课</td></tr>
+        <tr><td><b>输入</b></td><td>把外部世界变成比特</td><td>第 03 课按键，第 40 课外设</td></tr>
+        <tr><td><b>输出</b></td><td>把比特变成外部动作</td><td>第 03 课屏幕，第 40 课 PWM / LCD</td></tr>
+      </tbody>
+    </table>
+
+    <p>注意：控制器 + 运算器通常合称 CPU；存储器、输入、输出在嵌入式里往往「长在一起」——SoC 内部有 SRAM、DDR 控制器、几十个外设控制器。<b>五件事是一个逻辑划分，不是物理划分。</b></p>
+
+    <h2>2. 存储程序：把程序也变成数据</h2>
+
+    <p>在冯诺依曼之前，计算机（如 ENIAC）的「程序」是接线板和开关：换一个任务，要重新插一堆线、拨一堆开关，耗时几小时到几天。</p>
+
+    <p>冯诺依曼的关键一步：<b>把指令也用二进制编码，存在同一片存储器里</b>。于是换程序只需要「换一段数据」，机器本身不用改。CPU 需要的只有一件事：能从内存读 32 位、能解释这 32 位。</p>
+
+    <div class="viz" data-kind="map" data-title="统一编址：指令、数据、外设都在一个地址空间里" data-sub="这是嵌入式最实用的一个认知模型" data-json='{"rows":[{"segs":[{"n":"0x8000_0000 起：DDR 里的指令","d":"代码段，只读可执行","c":"cy","size":3},{"n":"数据段 / 堆 / 栈","d":"可读写","c":"vi","size":4},{"n":"0x0200_0000 起：片上 SRAM","d":"启动时前段代码跑在这里","c":"or","size":1},{"n":"0x0209_C000 起：外设寄存器","d":"GPIO/CCM/UART，用指针读写","c":"rd","size":2}],"ptr":"CPU 看到的是一个连续的 4GB 地址空间"}],"note":"注意：这不是物理内存的分布，而是 CPU 眼里的「地址空间」。「读写 0x0209C000」这句话，意味着通过总线向某个外设寄存器发一次访问——这就是第 25 课 MMU 与第 40 课外设的接缝。"}'></div>
+
+    <h2>3. 冯诺依曼瓶颈：一条路，两个用途</h2>
+
+    <p>既然指令和数据在同一个存储器里，那就只有<b>一条总线</b>。取指令要占用它，取数据也要占用它。CPU 运算一次只要 1 纳秒，但从 DDR 取一次数据要几十纳秒——于是 CPU 大部分时间在<b>等内存</b>。</p>
+
+    <p>这就是冯诺依曼瓶颈。所有现代计算机的复杂结构，都可以理解为「围绕这个瓶颈做的缓解措施」：</p>
+
+    <ul>
+      <li><b>Cache</b>：把常用数据搬到离 CPU 最近的 SRAM（第 20–23 课）。</li>
+      <li><b>流水线</b>：让取指与执行重叠进行（第 13 课）。</li>
+      <li><b>多级存储</b>：寄存器 → L1 → L2 → DDR → Flash，越远越大越慢（第 20 课）。</li>
+      <li><b>预取</b>：提前把即将用到的指令/数据搬进来。</li>
+    </ul>
+
+    <div class="viz" data-kind="compare" data-title="冯诺依曼 vs 哈佛：两条路还是一条路" data-sub="ARM9 是哈佛，Cortex-A7 是改良哈佛" data-json='{"bad":{"t":"纯冯诺依曼","items":["指令与数据共用一条总线","结构简单、成本低","取指和取数不能同时进行","瓶颈：总线带宽被争抢"]},"good":{"t":"哈佛 / 改良哈佛","items":["指令总线与数据总线分开（或 L1 分开）","取指与取数可并行，吞吐提升","代价：两套接口、芯片面积增大","i.MX6ULL 的 Cortex-A7：L1 I/D 分离，L2 与 DDR 统一"]},"note":"为什么叫「改良」：L1 层分开（I-Cache 与 D-Cache 各一份），但 L2 与主存还是统一的。兼顾了并行与成本——这是几乎所有现代处理器的做法。"}'></div>
+
+    <h2>4. 读写一个地址，就是控制硬件</h2>
+
+    <p>这一点对写驱动的人至关重要。看这段 C 代码：</p>
+
+    <pre><code>#define GPIO1_DR   (*(volatile unsigned long *)0x0209C000)
+#define GPIO1_GDIR (*(volatile unsigned long *)0x0209C004)
+
+void led_on(void) {
+    GPIO1_GDIR |= (1 << 26);   // 把 GPIO1_26 设为输出
+    GPIO1_DR   |= (1 << 26);   // 输出高电平，点亮
+}</code></pre>
+
+    <p>这段代码没有调用任何「驱动函数」，只是在写内存。但 <code>0x0209C000</code> 不在 DDR 上，它在 SoC 内部的一个寄存器上。<b>写这个地址，总线就会把值送到那个寄存器，硬件立刻响应。</b></p>
+
+    <p>三个细节必须注意：</p>
+
+    <ul>
+      <li><code>volatile</code>：告诉编译器「别优化掉、每次都真去读」，否则循环里可能只读一次。</li>
+      <li><b>位操作读-改-写不是原子的</b>：中断或另一个核同时改同一寄存器会丢位。内核里要用 <code>setbits</code>/<code>clrbits</code> 或自旋锁。</li>
+      <li><b>写后要屏障</b>：某些外设要求写入顺序严格，需要 <code>wmb()</code> 或读回一次做 flush。</li>
+    </ul>
+
+    <h2>5. 实验：摸到冯诺依曼结构的边界</h2>
+
+    <pre><code># 在 Ubuntu 上，看看 CPU 眼里的地址空间长什么样
+cat /proc/iomem        # 物理地址映射（需要 root）
+cat /proc/cpuinfo      # 核数、型号、频率
+ls /sys/devices/system/cpu/   # 每个核的目录
+cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq
+
+# 用 dd 测一下内存带宽，感受「瓶颈」的量级
+dd if=/dev/zero of=/dev/null bs=1M count=1000
+
+# 在板子上：看外设寄存器地址
+cat /proc/iomem | head -40</code></pre>
+
+    <p>在 i.MX6ULL 上你会看到 <code>0x02000000-0x0202ffff : ocram</code>、<code>0x0209c000-0x0209cfff : gpio1</code> 之类的条目。<b>这就是「五件事」在真实硬件上的物理地址快照。</b></p>
+
+    <h2>6. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于冯诺依曼结构的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["冯诺依曼结构就是「CPU + 内存」，没什么特别","冯诺依曼瓶颈是可以靠更快的 CPU 解决的","外设和内存是两回事，驱动要用特殊指令"]},"good":{"t":"实际","items":["关键在「存储程序」：指令与数据同构、同址","瓶颈在总线带宽，CPU 再快也只是等更久；要靠缓存与并行缓解","外设就是「映射到地址的寄存器」，用普通 load/store 访问"]},"note":"第三点特别重要：ARM 没有 x86 那种 in/out 指令，所有外设访问都是内存访问。这就是为什么「指针」在嵌入式里能直接操控硬件。"}'></div>
+
+    <h2>7. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>「存储程序」相比接线板编程，解决了什么问题？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>换任务不用改硬件，只换内存里的指令序列；程序可以被读、被改、被生成——这是编译器、操作系统存在的前提。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>冯诺依曼瓶颈的物理原因是什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>指令与数据共用同一存储器与总线，取指与取数争抢带宽；且内存访问延迟远大于运算延迟。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>为什么说 Cortex-A7 是「改良哈佛」？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>L1 的指令缓存与数据缓存分离（可并行取指取数），但 L2 与主存统一，兼顾吞吐与成本。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>为什么访问外设寄存器必须加 <code>volatile</code>？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>否则编译器会认为值不变而缓存到寄存器，或删掉「无用」写入；实际硬件状态可能随时改变，必须每次真读。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p><code>GPIO1_DR |= (1&lt;&lt;26)</code> 有什么隐患？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>读-改-写三步非原子：若中断在中间改了其它位，会丢更新。应使用内核提供的原子位操作或加锁。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>在 Ubuntu 上跑 <code>cat /proc/iomem</code>，找出三块不同性质的区域。</li>
+        <li>在板子上跑同样命令，找到 <code>gpio1</code> 的地址范围。</li>
+        <li>写一个最小内核模块，用指针写 GPIO 寄存器点亮 LED。</li>
+        <li>用 <code>dd</code> 测带宽，算出「一次 DDR 访问 = 多少条指令的时间」。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      五件事里最神秘的是「控制器」。它凭什么知道「下一条指令在哪」？答案是两个寄存器：PC 和 IR。第 10 课讲这两个寄存器，以及为什么改 PC 就能跳转。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"一条指令的五件事","hint":"逐步走一遍","note":"顺序不是设计出来的，是被「必须在同一时间只有一个部件用总线」这个约束逼出来的。","steps":[{"t":"① 取指","d":"把 PC 放上地址总线，存储器把那条指令送回指令寄存器 IR，PC 自动加 4。"},{"t":"② 译码","d":"控制器切开 IR 的位段：这是什么操作、操作数在哪个寄存器、要不要访存。"},{"t":"③ 执行","d":"ALU 拿两个操作数算一次，同时产生标志位 N/Z/C/V，写回 CPSR。"},{"t":"④ 访存","d":"只有 ldr/str 才走这一步：用算出来的地址再访问一次存储器。"},{"t":"⑤ 写回","d":"把结果写进目标寄存器。到这里一条指令才算完，PC 指向下一条。"}]}'></div>
+  </main>
+</div>
+<script src="assets/cnav.js"></script>
+<script src="assets/viz.js"></script>
+<script src="assets/iviz.js"></script>
+<script src="assets/anime.iife.min.js"></script>
+<script src="assets/anim2.js"></script>
+</body>
+</html>

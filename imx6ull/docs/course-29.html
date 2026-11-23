@@ -1,0 +1,210 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>特权级与异常 · 卷 04 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j04.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 04 · 操作系统</div>
+<ol><li><a href="course-th01.html">
+  <span class="no">01</span><span>操作系统与 Linux 的分层<span class="sub">约 3 小时</span></span></a></li>
+<li><a href="course-27.html">
+  <span class="no">02</span><span>进程、线程与 task_struct<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-28.html">
+  <span class="no">03</span><span>fork 与 exec<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-29.html" class="active">
+  <span class="no">04</span><span>特权级与异常<span class="sub">约 1 小时 · 当前</span></span></a></li>
+<li><a href="course-30.html">
+  <span class="no">05</span><span>中断<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-31.html">
+  <span class="no">06</span><span>调度<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-32.html">
+  <span class="no">07</span><span>上下文切换<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-33.html">
+  <span class="no">08</span><span>同步<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th02.html">
+  <span class="no">09</span><span>进程、线程与调度（详解）<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="course-th06.html">
+  <span class="no">10</span><span>中断、并发与同步（详解）<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-th15.html">
+  <span class="no">11</span><span>内核全貌：子系统如何协作<span class="sub">◆ · 约 4 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j03.html">← 卷 03</a>
+  <a href="../juan/j05.html">卷 05 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 04<span>·</span>操作系统<span>·</span>第 04 篇</div>
+  <h1>特权级与异常</h1>
+  <p class="lede">用户程序写了 1 万行代码，为什么就是改不了内核的一个变量？因为它们在不同的特权级跑，而 CPU 有一套硬件机制保证「低权限的代码无法自己升权」，只能通过一条特殊指令走「正门」。这一课讲这个正门：异常向量与模式切换。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+
+    <div class="anim2" data-json='{"title":"特权级与异常：权限是怎么被「切」的","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"保存 CPSR 到 SPSR_svc"},{"k":"切到 SVC 模式"},{"k":"保存返回地址到 lr_svc"},{"k":"跳到向量表 0x08"}],"frames":[{"i":0,"d":"记住进入前的状态"},{"i":1,"d":"切换到内核的 sp/lr"},{"i":2,"d":"PC 之后那条"},{"i":3,"d":"开始执行内核代码"}]}'></div>
+
+    <div class="viz" data-kind="matrix" data-title="ARM 的七种模式：只有一种能跑用户程序" data-sub="Linux 实际只用 User 与 SVC 两种" data-json='{"corner":"模式","cols":["用途","私有寄存器","Linux 用途"],"rows":[{"n":"User","c":"cy","cells":["用户程序","普通 r0-r14","用户态"]},{"n":"SVC","c":"gr","cells":["内核 / 系统调用","sp_svc, lr_svc, spsr","内核态"]},{"n":"IRQ","c":"or","cells":["普通中断","sp_irq, lr_irq, spsr","中断上半部"]},{"n":"FIQ","c":"or","cells":["快速中断","r8-r12 私有","基本不用"]},{"n":"Abort","c":"rd","cells":["访存异常","sp_abt, lr_abt","缺页/保护错误"]},{"n":"Undef","c":"rd","cells":["未定义指令","sp_und, lr_und","协处理器模拟"]},{"n":"System","c":"gray","cells":["特权但同 User 寄存器","普通寄存器","内核早期/SMP"]}],"note":"每种异常模式有「自己的 sp 和 lr」——这叫 banked register。所以进异常时不必先保存 sp，硬件直接换了一套。这是异常处理能极快进入的原因。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 七种模式分别干什么？② SVC 指令执行时硬件做了什么？③ 向量表里八个入口是什么？④ CPSR 与 SPSR 什么关系？⑤ 为什么用户态不能执行特权指令？</p>
+    </div>
+
+    <h2 id="s1">1. 一条 svc 的硬件动作</h2>
+
+    <div class="viz" data-kind="flow" data-title="svc #0 执行时，硬件依次做了四件事" data-sub="全部自动完成，软件一条都不用写" data-json='{"steps":[{"n":"保存 CPSR 到 SPSR_svc","d":"记住进入前的状态"},{"n":"切到 SVC 模式","d":"切换到内核的 sp/lr"},{"n":"保存返回地址到 lr_svc","d":"PC 之后那条"},{"n":"跳到向量表 0x08","d":"开始执行内核代码"}],"note":"这四步是「硬件级」的：不存在「用户程序自己决定跳不跳」。所以这是真正不可绕过的边界，也是为什么它能作为安全模型的基石。"}'></div>
+
+    <pre><code>; 向量表（8 个入口，每个 4 字节，通常放一条跳转）
+0x00  b  reset          ; 复位
+0x04  b  undef_handler  ; 未定义指令
+0x08  b  svc_handler    ; 系统调用 ← Linux 的入口
+0x0C  b  prefetch_abort ; 取指失败
+0x10  b  data_abort     ; 访存失败（缺页在这里）
+0x14  b  reserved
+0x18  b  irq_handler    ; 普通中断
+0x1C  b  fiq_handler    ; 快速中断</code></pre>
+
+    <p>Linux 在启动时把向量表放到 <code>0xFFFF0000</code>（高地址）或 0x00000000，由 CP15 的 SCTLR 控制位决定。</p>
+
+    <h2 id="s2">2. CPSR 与 SPSR</h2>
+
+    <p>CPSR 存着：条件标志（N/Z/C/V）、中断使能（I/F）、模式位（低 5 位）。进入异常时，<b>旧的 CPSR 被自动复制到 SPSR_&lt;mode&gt;</b>，返回时用 <code>movs pc, lr</code> 或 <code>rfe</code> 把 SPSR 恢复回 CPSR——一条指令完成「还状态 + 改 PC」。</p>
+
+    <pre><code>; 典型的异常返回
+    ldmia sp!, {r0-r12, pc}^   ; ^ 表示同时把 SPSR 恢复进 CPSR</code></pre>
+
+    <p>注意那个 <code>^</code>：它是 ARM 汇编里最容易被忽略、也最容易出错的一个符号。<b>忘了它，返回后模式没恢复，程序就会在错误模式里跑。</b></p>
+
+    <h2 id="s3">3. 为什么用户态不能执行特权指令</h2>
+
+    <p>硬件检查两件事：</p>
+
+    <ul>
+      <li><b>模式位</b>：在 User 模式下执行 <code>mcr</code>（访问协处理器）、改 CPSR、关中断等指令，会触发「未定义指令」异常。</li>
+      <li><b>页表权限</b>：内核页在页表项里标成「仅特权可访问」，User 模式访问会触发 data abort。</li>
+    </ul>
+
+    <p>两道锁，一道在指令层、一道在内存层。绕过任何一道都不可能——除非内核有漏洞。</p>
+
+    <h2 id="s4">4. 异常与中断、陷阱的区别</h2>
+
+    <table>
+      <thead><tr><th>类型</th><th>来源</th><th>同步性</th><th>例子</th></tr></thead>
+      <tbody>
+        <tr><td><b>异常（同步）</b></td><td>当前指令执行引起</td><td>与指令同步</td><td>svc、缺页、未定义指令</td></tr>
+        <tr><td><b>中断（异步）</b></td><td>外部设备</td><td>任意时刻</td><td>定时器、串口、GPIO</td></tr>
+        <tr><td><b>陷阱 trap</b></td><td>软件主动</td><td>同步</td><td>svc、断点指令</td></tr>
+      </tbody>
+    </table>
+
+    <p>区分它们很重要：同步异常可以「修好后重试原指令」（缺页就是这样），异步中断只能「处理完继续下一条」。</p>
+
+    <h2 id="s5">5. 实验：看一次 svc 的全过程</h2>
+
+    <pre><code># 用户态 strace 看到的是「系统调用」
+strace -f ./prog
+
+# 内核侧看入口
+# arch/arm/kernel/entry-armv.S 里的 vector_swi
+# 它读 r7 作为 syscall 号，查 sys_call_table
+
+# 在板子上看向量表位置
+cat /proc/cpuinfo | grep -i "Features"   # 可能显示 vmsa 等
+dmesg | grep -i "vector"
+
+# gdb 断在 svc 前后，观察 CPSR 模式位变化
+(gdb) info registers cpsr</code></pre>
+
+    <p>如果你用 gdb 单步过一条 <code>svc</code>，会看到 PC 突然跳到 0xFFFF0008 附近——<b>那就是向量表在起作用</b>。</p>
+
+    <h2 id="s6">6. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于特权级的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["用户程序只要知道内核地址就能读写内核","系统调用是一次「函数调用」","中断和异常是一回事"]},"good":{"t":"实际","items":["地址知道也没用：页表里标了「仅特权」，访问即 abort","是硬件触发的模式切换 + 向量跳转，比函数调用重得多","异常是同步的（由指令引起），中断是异步的（外设引起）"]},"note":"第一条是理解安全模型的关键：安全不靠「藏地址」，靠「硬件权限」。地址公开也没关系——访问不了。"}'></div>
+
+    <h2 id="s7">7. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>svc 执行时硬件自动做了哪四件事？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>保存 CPSR 到 SPSR_svc、切到 SVC 模式、保存返回地址到 lr_svc、跳到向量表 0x08。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>SPSR 的作用是什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>保存进入异常前的 CPSR，返回时用它恢复状态（模式位、中断使能、标志位）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>User 模式执行 mcr 会怎样？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>触发未定义指令异常（进入 Undef 模式），内核可据此模拟或杀掉进程。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>缺页属于哪一类异常？能重试吗？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>同步异常（data abort），可以：补好页表后返回重试原指令。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>为什么 banked 寄存器让异常进入变快？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>每种模式有自己的 sp/lr/spsr，硬件自动切换，不必用指令保存这些寄存器。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>查 A7 的向量表基址寄存器（VBAR），确认 Linux 把它设在哪。</li>
+        <li>用 gdb 单步一条 svc，观察 PC 跳转与 CPSR 变化。</li>
+        <li>写一段内联汇编执行 <code>mcr</code>，在用户态跑，观察收到什么信号。</li>
+        <li>读 <code>entry-armv.S</code> 的 <code>vector_swi</code>，找出 r7 → 表的索引代码。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      异常里最常用的是中断：定时器每秒打断你几千次。第 30 课讲中断的完整链路——从 GIC 到内核 handler，以及「上半部/下半部」为什么要分开。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"五种异常，进来先看是谁","hint":"点一种看场景","note":"异常共用一个向量入口，所以内核进来第一件事就是读 CPSR 模式位和异常类型，判断「我是被谁叫来的」。","items":[{"b":"svc（软中断）","d":"用户态主动要求内核服务，比如 read、write 系统调用。这是唯一「程序自己发起」的异常。"},{"b":"irq（普通中断）","d":"外设拉线，可屏蔽。键盘、网卡、定时器都走这里。"},{"b":"fiq（快速中断）","d":"优先级更高、有独立寄存器组，可以不等保存现场就开工。现代系统很少用。"},{"b":"prefetch abort","d":"取指阶段访问非法地址，通常是跳到了野指针。"},{"b":"data abort","d":"访存阶段地址非法或无权限，对应我们熟悉的段错误。"},{"b":"undef（未定义指令）","d":"遇到 CPU 不认识的编码。ARM 用它在用户态模拟浮点、或在 32 位系统上跑 64 位指令。"}]}'></div>
+  
+
+<nav class="pager">
+  <a href="course-28.html"><span>← 上一篇</span><b>fork 与 exec</b></a>
+  <a class="nx" href="course-30.html"><span>下一篇 →</span><b>中断</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

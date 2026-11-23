@@ -1,0 +1,291 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>搭好实验台 · 卷 00 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j00.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 00 · 起步 · Linux 与实验台</div>
+<ol><li><a href="course-ch01.html">
+  <span class="no">01</span><span>Linux 全景认知<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="course-ch02.html" class="active">
+  <span class="no">02</span><span>搭好实验台<span class="sub">约 10 小时 · 当前</span></span></a></li>
+<li><a href="course-ch03.html">
+  <span class="no">03</span><span>命令行与文件系统<span class="sub">约 16 小时</span></span></a></li>
+<li><a href="course-ch04.html">
+  <span class="no">04</span><span>系统管理四件事<span class="sub">约 16 小时</span></span></a></li>
+<li><a href="course-ch05.html">
+  <span class="no">05</span><span>Vim 与 Shell 脚本<span class="sub">约 14 小时</span></span></a></li>
+<li><a href="course-ch06.html">
+  <span class="no">06</span><span>网络与远程开发<span class="sub">约 10 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <span></span>
+  <a href="../juan/j01.html">卷 01 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 00<span>·</span>起步 · Linux 与实验台<span>·</span>第 02 篇</div>
+  <h1>搭好实验台</h1>
+  <p class="lede">这一章结束时，你会有一台能远程登录的 Ubuntu，一个能看板子日志的串口，和一套能编译 ARM 代码的工具链。这是后面所有实验的地基。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 10 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+    <div class="viz" data-kind="flow" data-title="实验台的四个里程碑" data-sub="每一步都要有可验证的产出" data-json='{"play":true,"steps":[{"n":"装虚拟机","d":"Ubuntu 22.04，4 核 4G，桥接网卡"},{"n":"配国内源","d":"apt 能在十秒内装完一个包"},{"n":"开 SSH","d":"从 Windows 免密登录，不再切窗口"},{"n":"通网三件套","d":"静态 IP、NFS、TFTP 全通"},{"n":"交叉编译","d":"编出 ARM 程序并用 file 确认"}],"note":"判断实验台搭好没有，只看一条：能不能在 Windows 上敲一行命令，让 Ubuntu 编出一个 ARM 程序，再用 TFTP 传到板子上跑起来。"}'></div>
+
+
+    <div class="card">
+      <h4>本章目标</h4>
+      <p>① 装好 Ubuntu 22.04 虚拟机并换国内源；② 一次装齐后续 14 章要用到的工具；③ 从 Windows 用 SSH 登进虚拟机；④ 串口能收到板子（或任意串口设备）的打印；⑤ 学会打快照，敢折腾。</p>
+    </div>
+
+    <div class="anim2" data-json='{"title":"实验台从零到跑通 hello","hint":"每一项单独验证再往下","nodes":[{"k":"虚拟机","s":"当开发机"},{"k":"工具链","s":"arm-gcc"},{"k":"串口","s":"115200 8N1"},{"k":"网络","s":"同网段互通"},{"k":"hello 跑通","s":"闭环"}],"frames":[{"i":0,"d":"先装 Ubuntu 当开发机，所有交叉编译在它上面做，不污染 Windows。"},{"i":1,"d":"装 build-essential 与 arm-linux-gnueabihf 工具链，跑一次 -v 看能不能用。"},{"i":2,"d":"串口线接 UART1，用 minicom 打开 115200 8N1，能看到启动日志就算通。"},{"i":3,"d":"板子与虚拟机同网段 ping 通——后面 tftp 拉内核、nfs 挂 rootfs 全靠它。"},{"i":4,"d":"交叉编译一个 hello，拷进板子跑起来。这一步通了，后面全部顺。"}],"kind":"flow"}'></div>
+
+    <h2 id="s1">2.1 为什么一定要用虚拟机</h2>
+
+    <p>你也可以装双系统，但对新手来说虚拟机有三个无法替代的好处：</p>
+
+    <div class="grid three">
+      <div class="card"><h4>弄坏能回滚</h4><p>一条 <code>rm -rf</code> 敲错，双系统就重装。虚拟机拍个快照，30 秒回到昨天。</p></div>
+      <div class="card"><h4>环境可复制</h4><p>配好一台，复制三台。学 NFS、SSH 时正好需要「两台机器」。</p></div>
+      <div class="card"><h4>不污染 Windows</h4><p>交叉编译工具链、老版本 gcc、一堆依赖，全塞在虚拟磁盘里。</p></div>
+    </div>
+
+    <h2 id="s2">2.2 安装 Ubuntu 22.04</h2>
+
+    <ul class="steps">
+      <li>装 VMware Workstation Player（免费）或 VirtualBox。</li>
+      <li>下载 <code>ubuntu-22.04-desktop-amd64.iso</code>（约 4GB）。<strong>一定选 22.04 LTS</strong>，不要 24.04：很多板卡 BSP 和教程仍以 22.04/20.04 为准，老工具链在新系统上容易出兼容问题。</li>
+      <li>新建虚拟机，分配 <strong>4 核 CPU、4–8GB 内存、50GB 磁盘</strong>（磁盘选「拆分成多个文件」）。内存 8GB 时编译内核更舒服；只有 8GB 物理内存就分 4GB，别让宿主机开始换页。</li>
+      <li>安装时选「最小安装」也可以，但新手建议保留默认桌面，方便第一次熟悉系统；键盘布局、时区选上海。</li>
+      <li>装完第一件事：打开终端，确认能联网。</li>
+    </ul>
+
+    <pre><code>$ ping -c 3 mirrors.tuna.tsinghua.edu.cn</code></pre>
+
+    <div class="warn">
+      <b>装完先拍快照</b>
+      VMware：虚拟机 → 快照 → 拍摄快照，命名「干净系统」。以后搞崩了直接回滚，比重装省两小时。
+    </div>
+
+    <h2 id="s3">2.3 换国内源（必做，否则装包慢到怀疑人生）</h2>
+    <div class="viz" data-kind="timeline" data-title="把实验台搭起来的五步" data-sub="每步都有验收动作，不要凭感觉往下走" data-json='{"items":[{"t":"1","n":"装虚拟机","d":"VirtualBox + 4GB 内存","c":"cy"},{"t":"2","n":"装 Ubuntu","d":"22.04 LTS，桌面版省事","c":"vi"},{"t":"3","n":"换国内源","d":"apt 从 20KB/s 到 10MB/s","c":"or"},{"t":"4","n":"装工具","d":"gcc/make/git/nfs/tftp","c":"gr"},{"t":"5","n":"连通板子","d":"串口 + 网络双通道","c":"cy"}],"note":"顺序不能颠倒：源没换就装工具，会卡在下载上怀疑人生；串口没通就上板，等于闭眼开车。"}'></div>
+
+
+    <p>Ubuntu 22.04 的代号是 <code>jammy</code>。官方源在国外，<code>apt update</code> 可能要十分钟。换成清华源：</p>
+
+    <pre><code><span class="c"># 备份原文件</span>
+$ sudo cp /etc/apt/sources.list /etc/apt/sources.list.bak
+
+<span class="c"># 一键替换域名（保留原有路径结构）</span>
+$ sudo sed -i 's|http://.*archive.ubuntu.com|https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list
+$ sudo sed -i 's|http://.*security.ubuntu.com|https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list
+
+$ sudo apt update
+$ sudo apt upgrade -y</code></pre>
+
+    <p>如果你的 sources.list 里是 <code>cn.archive.ubuntu.com</code> 这种带地区前缀的写法，sed 可能替换不到，直接手动编辑更稳：</p>
+
+    <pre><code>$ sudo vim /etc/apt/sources.list
+<span class="c"># 把每行 http://xx.archive.ubuntu.com/ubuntu/ 改成：</span>
+<span class="c"># https://mirrors.tuna.tsinghua.edu.cn/ubuntu/</span>
+<span class="c"># 保存后执行：</span>
+$ sudo apt update</code></pre>
+
+    <div class="tip">
+      <b>怎么判断换源成功</b>
+      <code>apt update</code> 输出的 <code>Get:1</code> 行里出现 <code>mirrors.tuna.tsinghua.edu.cn</code> 就对了。如果报 <code>404 Not Found</code>，多半是版本代号写错（22.04 必须是 jammy）。
+    </div>
+
+    <h2 id="s4">2.4 一次装齐 14 章要用的工具</h2>
+
+    <p>别等用到再装。下面这条命令覆盖了后文的编译、串口、NFS、TFTP、设备树、内核配置：</p>
+
+    <pre><code>$ sudo apt install -y \
+    build-essential vim git curl wget \
+    net-tools iproute2 openssh-server \
+    nfs-kernel-server tftpd-hpa minicom \
+    device-tree-compiler u-boot-tools \
+    libncurses5-dev libncursesw5-dev bison flex libssl-dev bc \
+    gdb-multiarch gcc-arm-linux-gnueabihf</code></pre>
+
+    <table>
+      <thead><tr><th>包</th><th>干什么用</th><th>哪章用到</th></tr></thead>
+      <tbody>
+        <tr><td><code>build-essential</code></td><td>gcc、make、libc 头文件，本地编译基础</td><td>03 / 07</td></tr>
+        <tr><td><code>openssh-server</code></td><td>让 Windows 能 ssh 进虚拟机</td><td>02 / 06</td></tr>
+        <tr><td><code>nfs-kernel-server</code></td><td>把 PC 目录共享给板子挂载</td><td>06 / 08</td></tr>
+        <tr><td><code>tftpd-hpa</code></td><td>板子从 PC 下载内核/设备树</td><td>06 / 09</td></tr>
+        <tr><td><code>minicom</code></td><td>命令行串口工具（Windows 侧用 MobaXterm）</td><td>02 / 08</td></tr>
+        <tr><td><code>device-tree-compiler</code></td><td>dtc，把 .dts 编译成 .dtb，也能反编译 .dtb</td><td>10</td></tr>
+        <tr><td><code>u-boot-tools</code></td><td>mkimage，给内核加 U-Boot 头</td><td>09</td></tr>
+        <tr><td><code>libncurses5-dev bison flex libssl-dev bc</code></td><td>内核 menuconfig 与编译的依赖</td><td>10</td></tr>
+        <tr><td><code>gdb-multiarch</code></td><td>调试 ARM 程序 / 内核</td><td>07 / 13</td></tr>
+        <tr><td><code>gcc-arm-linux-gnueabihf</code></td><td>ARM 交叉编译器（也可换成厂商自带工具链）</td><td>07</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      <b>关于交叉编译器版本</b>
+      板卡厂商一般会提供配套工具链（如 <code>gcc-linaro-4.9.4-arm-linux-gnueabihf</code>）。<b>编译 U-Boot 和内核时优先用厂商那一套</b>，因为老版本内核源码对新版 gcc 常有报错。本章装的 apt 版只用来做第 7 章的入门练习。
+    </div>
+
+    <h2 id="s5">2.5 网络模式：NAT 还是桥接</h2>
+
+    <p>虚拟机要跟板子通信，这个选择很关键，选错了后面 NFS 一定连不上：</p>
+
+    <table>
+      <thead><tr><th>模式</th><th>行为</th><th>适合</th><th>坑</th></tr></thead>
+      <tbody>
+        <tr><td>NAT</td><td>虚拟机借宿主机上网，IP 是 192.168.x.y 内网段</td><td>只上网、只 ssh</td><td>板子若直连 PC 网口，<b>访问不到</b>虚拟机</td></tr>
+        <tr><td><strong>桥接</strong></td><td>虚拟机像一台独立设备接在同一个交换机上</td><td><b>板子 + 虚拟机 + PC 同网段互访</b></td><td>公司/校园网可能禁止，或 IP 冲突</td></tr>
+        <tr><td>仅主机</td><td>只与宿主机通信</td><td>做隔离实验</td><td>上不了网</td></tr>
+      </tbody>
+    </table>
+
+    <p>推荐做法：给虚拟机加<strong>两块网卡</strong>——网卡 1 用 NAT 专门上网，网卡 2 用桥接（或直接连着板子的那个物理网口）专门跟板子通信。这样能上网，也能连板子。</p>
+
+    <pre><code><span class="c"># 看 IP 与网卡名</span>
+$ ip addr
+$ ip route
+
+<span class="c"># 临时配静态 IP（重启失效，第 6 章讲永久配置）</span>
+$ sudo ip addr add 192.168.1.100/24 dev ens33
+$ sudo ip link set ens33 up</code></pre>
+
+    <h2 id="s6">2.6 从 Windows 登进虚拟机</h2>
+    <div class="viz" data-kind="matrix" data-title="NAT 还是桥接：先把网想清楚" data-sub="板子能不能被 PC 访问，取决于这个选择" data-json='{"corner":"模式","cols":["虚拟机 IP","板子能访问","外网","适合"],"rows":[{"n":"NAT","cells":[{"v":"10.0.2.x","c":"gray"},{"v":"不能","c":"rd"},{"v":"可以","c":"gr"},{"v":"只上网查资料","c":"gray"}]},{"n":"桥接","cells":[{"v":"与主机同网段","c":"cy"},{"v":"能","c":"gr"},{"v":"可以","c":"gr"},{"v":"NFS/TFTP/SSH","c":"gr"}]}],"note":"做 NFS 根文件系统、TFTP 下载内核时必须桥接——NAT 下板子根本看不见虚拟机。"}'></div>
+
+
+    <p>为什么不直接在虚拟机窗口里敲？因为窗口里复制粘贴别扭、字体小、切换麻烦。SSH 上去之后，Windows Terminal 全屏，体验完全不一样。</p>
+
+    <pre><code><span class="c"># 虚拟机内：确认 ssh 服务在跑</span>
+$ sudo systemctl status ssh
+$ ip addr show | grep "inet "
+
+<span class="c"># Windows 端（Win10 以上自带 ssh 客户端）</span>
+<span class="c"># 假设虚拟机 IP 是 192.168.1.100</span>
+C:\&gt; ssh ubuntu@192.168.1.100</code></pre>
+
+    <p>每次输密码很烦，配免密（后面写脚本、scp 传文件都靠它）：</p>
+
+    <pre><code><span class="c"># Windows 端生成密钥（一路回车）</span>
+C:\&gt; ssh-keygen -t rsa -b 4096
+
+<span class="c"># 把公钥推到虚拟机</span>
+C:\&gt; type %USERPROFILE%\.ssh\id_rsa.pub | ssh ubuntu@192.168.1.100 "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+
+<span class="c"># 之后免密登录</span>
+C:\&gt; ssh ubuntu@192.168.1.100</code></pre>
+
+    <div class="tip">
+      <b>虚拟机 IP 老是变？</b>
+      第 6 章会给它配静态 IP。临时办法：在 VMware 里把虚拟网络编辑器中的 DHCP 租约时间调长，或在 Ubuntu 里用 <code>nmcli</code> 固定地址。
+    </div>
+
+    <h2 id="s7">2.7 串口：板子唯一的生命线</h2>
+
+    <p>板子启动到一半挂掉，网还没起来，SSH 是连不上的。这时唯一能告诉你「死在哪一步」的，就是串口打印。</p>
+
+    <h3>接线（三根线，接错就收不到数据）</h3>
+
+    <table>
+      <thead><tr><th>板子</th><th>USB 转串口模块</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>GND</td><td>GND</td><td>必须接，信号才有共同参考电平</td></tr>
+        <tr><td>TX（板子发）</td><td>RX</td><td><b>交叉接</b>：发对收</td></tr>
+        <tr><td>RX（板子收）</td><td>TX</td><td>交叉接</td></tr>
+      </tbody>
+    </table>
+
+    <p>板子的调试串口一般是 <strong>UART1</strong>，参数 <strong>115200、8 数据位、无校验、1 停止位、无流控</strong>（记作 115200 8N1）。这是 i.MX 系列 BSP 默认值，改过的话以厂商文档为准。</p>
+
+    <h3>Windows 端用 MobaXterm</h3>
+    <ol class="steps">
+      <li>设备管理器里确认 USB 转串口对应哪个 COM 口（如 COM3）。</li>
+      <li>MobaXterm → Session → Serial → 选 COM3，波特率 115200，8N1，无流控。</li>
+      <li>打开会话，板子上电，应该能看到一堆启动日志刷出来。看不到就换 TX/RX，或换个 USB 口。</li>
+    </ol>
+
+    <h3>Linux 端用 minicom</h3>
+
+    <pre><code><span class="c"># 插入 USB 转串口后查看设备名</span>
+$ dmesg | tail -20
+$ ls -l /dev/ttyUSB*
+
+<span class="c"># 把自己加进 dialout 组，否则没权限打开串口</span>
+$ sudo usermod -aG dialout $USER
+<span class="c"># 重新登录生效</span>
+
+<span class="c"># 直接指定参数打开</span>
+$ minicom -D /dev/ttyUSB0 -b 115200</code></pre>
+
+    <div class="warn">
+      <b>串口打不出东西的排查顺序</b>
+      ① 线是不是交叉接的 ② GND 接了吗 ③ 波特率对不对（试 115200 / 57600 / 38400）④ COM 口选错没 ⑤ 板子到底上电没（灯亮不亮）。这五步能解决 90% 的「串口没输出」。
+    </div>
+
+    <h2 id="s8">2.8 动手任务</h2>
+    <ul class="steps">
+      <li>装完 Ubuntu，拍一张快照，命名为「干净系统 + 换源完成」。</li>
+      <li>从 Windows 用 SSH 免密登录进虚拟机，并执行 <code>htop</code> 或 <code>top</code> 看资源占用。</li>
+      <li>执行 <code>arm-linux-gnueabihf-gcc -v</code>，把输出的 gcc 版本记进笔记。</li>
+      <li>插上 USB 转串口，在 Windows 和 Ubuntu 各打开一次串口（Ubuntu 侧把 <code>/dev/ttyUSB0</code> 打开后敲回车，看有没有回显）。</li>
+      <li>故意做坏一次：把 <code>sources.list</code> 改乱，执行 <code>apt update</code> 看报错长什么样，再从备份恢复。</li>
+    </ul>
+
+    <h2 id="s9">2.9 验收标准</h2>
+    <ul class="checklist">
+      <li><code>apt update</code> 走的是国内源，输出里没有超时</li>
+      <li>Windows 能免密 ssh 进虚拟机，且能在里面正常跑 <code>ls</code>、<code>vim</code></li>
+      <li>能说出 NAT 和桥接的区别，以及为什么板子实验需要桥接或独立网口</li>
+      <li>串口工具能打开设备，参数是 115200 8N1</li>
+      <li>有至少一张可用快照，知道怎么回滚</li>
+    </ul>
+
+    <footer id="pager"></footer>
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"搭实验台的顺序，别乱","steps":[{"t":"① 虚拟机","d":"先装一台 Ubuntu，把它当开发机。所有交叉编译都在这里做，不污染 Windows。"},{"t":"② 基础依赖","d":"build-essential、git、vim、串口工具。装完先编译一个 hello.c 验证。"},{"t":"③ 交叉工具链","d":"装 arm-linux-gnueabihf 工具链，跑一次 arm-linux-gnueabihf-gcc -v 看能不能用。"},{"t":"④ 连板子","d":"串口线接 UART1，用 minicom 或 putty 打开 115200 8N1，能看到启动日志就算通。"},{"t":"⑤ 网络通道","d":"板子和虚拟机同网段，ping 通。后面 tftp 拉内核、nfs 挂 rootfs 全靠它。"},{"t":"⑥ 验证闭环","d":"改一个 hello 程序，交叉编译，拷进板子跑起来。这一步通了，后面全部顺。"}],"note":"实验台最怕「一半能用」：串口能用但网不通，就会在别的地方浪费一整晚。每一项都单独验证过再往下走。"}'></div>
+  
+
+<nav class="pager">
+  <a href="course-ch01.html"><span>← 上一篇</span><b>Linux 全景认知</b></a>
+  <a class="nx" href="course-ch03.html"><span>下一篇 →</span><b>命令行与文件系统</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

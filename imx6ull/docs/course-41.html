@@ -1,0 +1,191 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>根文件系统 · 卷 08 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j08.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 08 · 启动链</div>
+<ol><li><a href="course-th08.html">
+  <span class="no">01</span><span>从第一个字节开始：BootROM → SPL → U-Boot<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-36.html">
+  <span class="no">02</span><span>启动链<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-ch08.html">
+  <span class="no">03</span><span>i.MX6ULL 与启动链路<span class="sub">约 10 小时</span></span></a></li>
+<li><a href="course-th09.html">
+  <span class="no">04</span><span>内核怎么起来：head.S → start_kernel → init<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-ch09.html">
+  <span class="no">05</span><span>U-Boot 与烧写<span class="sub">约 12 小时</span></span></a></li>
+<li><a href="course-ch10.html">
+  <span class="no">06</span><span>内核裁剪与设备树<span class="sub">约 18 小时</span></span></a></li>
+<li><a href="course-41.html" class="active">
+  <span class="no">07</span><span>根文件系统<span class="sub">约 1 小时 · 当前</span></span></a></li>
+<li><a href="course-ch11.html">
+  <span class="no">08</span><span>根文件系统构建<span class="sub">约 14 小时</span></span></a></li>
+<li><a href="course-42.html">
+  <span class="no">09</span><span>做出一块能跑的系统<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="viz-boot.html">
+  <span class="no">10</span><span>互动台：启动链路逐级点亮<span class="sub">💻 · 约 1 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j07.html">← 卷 07</a>
+  <a href="../juan/j09.html">卷 09 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 08<span>·</span>启动链<span>·</span>第 07 篇</div>
+  <h1>根文件系统</h1>
+  <p class="lede">内核起来了，但它只会「管理资源」，不会「做事」。要有一个 shell、能执行命令、能挂载、能登录，需要一份最小的用户态集合——根文件系统。这一课讲清它最少要有什么、怎么构出来、以及为什么嵌入式常用「只读 + overlay」。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+
+    <div class="anim2" data-json='{"title":"根文件系统：让系统「能用」的那一堆文件","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"① 准备目录骨架"},{"k":"② 放 BusyBox"},{"k":"③ 放动态库"},{"k":"④ 写 init 脚本"},{"k":"⑤ 打包成镜像"}],"frames":[{"i":0,"d":"/bin、/etc、/dev、/proc、/sys、/lib 这些必须存在，少一个 init 就会报错退出。"},{"i":1,"d":"一个可执行文件装几十条命令，靠符号链接区分行为（ls、cat、sh 都是同一个文件的软链）。"},{"i":2,"d":"ldd 查出依赖的 .so，全拷进 /lib。少一个库的表现是 exec 直接失败，且没有任何输出。"},{"i":3,"d":"挂载 proc/sys、配置网络、启动服务，最后 exec 到 shell 或应用。"},{"i":4,"d":"做成 ext4 或 squashfs，或者直接用 initramfs 打进内核，让内核自己解压挂载。"}]}'></div>
+
+    <div class="viz" data-kind="layers" data-title="一个最小根文件系统的组成" data-sub="五类东西，缺一类就起不来" data-json='{"items":[{"n":"/bin /sbin","d":"busybox 及其符号链接：sh、ls、mount…","c":"gr"},{"n":"/etc","d":"inittab、fstab、启动脚本","c":"cy"},{"n":"/lib","d":"动态链接器 ld.so 与库（静态编译则不需要）","c":"vi"},{"n":"/dev /proc /sys","d":"设备节点与内核接口，由内核或 mdev 生成","c":"or"},{"n":"/usr /var /tmp","d":"应用、可变数据、临时文件（可裁）","c":"gray"}],"note":"最小可用集合其实很少：一个静态 busybox + 一个 init 符号链接 + 几个空目录，不到 1MB 就能起来。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 最小 rcS 长什么样？② busybox 为什么这么小？③ 静态与动态链接怎么选？④ 为什么嵌入式常用只读根 + overlay？⑤ 怎么在 PC 上先把 rootfs 搭好？</p>
+    </div>
+
+    <h2 id="s1">1. 一个真实的启动脚本</h2>
+
+    <pre><code># /etc/inittab（busybox 格式）
+::sysinit:/etc/init.d/rcS
+::askfirst:-/bin/sh
+::ctrlaltdel:/sbin/reboot
+
+# /etc/init.d/rcS
+#!/bin/sh
+mount -t proc  none /proc
+mount -t sysfs none /sys
+mount -t devtmpfs none /dev 2&gt;/dev/null || mdev -s
+ifconfig eth0 192.168.1.10 up
+# 启动你的应用
+/usr/bin/myapp &amp;</code></pre>
+
+    <p>整个系统的「开机流程」就这么几行。这也是嵌入式调试的入口：<b>应用起不来时，先看 rcS 有没有执行到那一行。</b></p>
+
+    <h2 id="s2">2. busybox：一个二进制，几百个命令</h2>
+
+    <p>busybox 把所有常用命令编进一个可执行文件，靠「看自己被叫什么名字」分派功能。所以 <code>/bin/ls</code> 其实只是一个指向 busybox 的符号链接。</p>
+
+    <pre><code># 静态编译（推荐给嵌入式）
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- defconfig
+make menuconfig     # 选 static、选需要的命令
+make &amp;&amp; make install
+
+# 结果
+file _install/bin/busybox     # 应为 statically linked
+ldd  _install/bin/busybox     # 静态时为 "not a dynamic executable"</code></pre>
+
+    <p>静态版的好处是「零依赖」——把整个 rootfs 拷到任何 ARM 板子都能跑。<b>代价是体积大一点（约 1MB），但对根文件系统来说完全值得。</b></p>
+
+    <h2 id="s3">3. 只读根 + overlay</h2>
+
+    <div class="viz" data-kind="compare" data-title="两种 rootfs 策略" data-sub="取决于「要不要经常改」" data-json='{"bad":{"t":"可读写 ext4","items":["改配置方便","断电可能损坏文件系统","Flash 磨损快","适合开发阶段"]},"good":{"t":"只读 squashfs + overlay","items":["根只读，物理不可写","改动落在 overlay 层（tmpfs 或可写分区）","断电不怕，重启回到干净状态","适合量产的设备"]},"note":"overlay 的代价是「改动不持久」（若上层是 tmpfs）。想持久就把上层放一个小的可写分区——这是工业设备的常见做法。"}'></div>
+
+    <h2 id="s4">4. 三种构建方式</h2>
+
+    <table>
+      <thead><tr><th>方式</th><th>做法</th><th>适用</th></tr></thead>
+      <tbody>
+        <tr><td>手工</td><td>busybox + 手写 rcS + 手拷库</td><td>学习、极简系统</td></tr>
+        <tr><td>Buildroot</td><td>配置菜单 → 自动生成完整 rootfs + 交叉工具链</td><td>大多数嵌入式项目</td></tr>
+        <tr><td>Yocto</td><td>配方化、可复现、支持多层定制</td><td>产品化、长期维护</td></tr>
+      </tbody>
+    </table>
+
+    <p>学习阶段用「手工」最有价值——你会踩到「忘了拷 ld.so 导致所有命令都不能执行」这种经典坑，从而真正理解动态链接。<b>做产品时用 Buildroot 或 Yocto。</b></p>
+
+    <h2 id="s5">5. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于 rootfs 的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["rootfs 就是把程序和库拷进去","忘了拷动态链接器只会报「找不到库」","只读根就不能改任何配置"]},"good":{"t":"实际","items":["还要设备节点、/etc 配置、正确的权限与 init","实际报的是「No such file or directory」——因为 ld.so 本身找不到","overlay 让你「看起来能改」，改动落在可写层"]},"note":"第二条是最著名的嵌入式坑：程序存在、库存在、权限也对，却报「文件不存在」。原因是 <code>ld-linux.so</code> 缺失——它在执行任何动态程序前就被需要。"}'></div>
+
+    <h2 id="s6">6. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>最小 rootfs 至少要哪几样？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>可执行的 init（或 shell）、/dev 与 /proc 挂载、必要的库（动态时）、基本配置。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>busybox 怎么能用一个文件提供几百个命令？</p></div>
+<details class="ans"><summary>看答案</summary><div class="body">
+      <p>靠 argv[0]（自己被调用的名字）分派到对应功能，其余名字都是符号链接。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>为什么会报「文件不存在」但文件明明存在？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>缺动态链接器 ld-linux.so，内核找不到解释器，报 ENOENT。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>只读根 + overlay 解决什么问题？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>避免断电损坏与 Flash 磨损，同时保留「可改」的使用体验。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>Buildroot 与手工搭建的核心差别？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>Buildroot 自动处理依赖、库、工具链并生成镜像；手工要自己盯每一件。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>在 PC 上用静态 busybox 搭一个 rootfs 目录。</li>
+        <li>用 <code>chroot</code> 进去跑几个命令，验证能工作。</li>
+        <li>故意删掉 ld.so，观察「文件不存在」的报错。</li>
+        <li>把它打成 ext4 或 squashfs 镜像，挂到板子上启动。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      所有零件都讲过了。第 42 课把它们串起来：从零做出一块能跑的系统——分区、烧写、启动、验证。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"根文件系统，从空目录到能登录","hint":"逐步走","note":"内核只认「根目录上有没有一个可执行的 init」。剩下的一切——shell、库、配置、服务——都是这个 init 自己去拉起来的。","steps":[{"t":"① 准备目录骨架","d":"/bin、/etc、/dev、/proc、/sys、/lib 这些必须存在，少一个 init 就会报错退出。"},{"t":"② 放 BusyBox","d":"一个可执行文件装几十条命令，靠符号链接区分行为（ls、cat、sh 都是同一个文件的软链）。"},{"t":"③ 放动态库","d":"ldd 查出依赖的 .so，全拷进 /lib。少一个库的表现是 exec 直接失败，且没有任何输出。"},{"t":"④ 写 init 脚本","d":"挂载 proc/sys、配置网络、启动服务，最后 exec 到 shell 或应用。"},{"t":"⑤ 打包成镜像","d":"做成 ext4 或 squashfs，或者直接用 initramfs 打进内核，让内核自己解压挂载。"}]}'></div>
+  
+
+<nav class="pager">
+  <a href="course-ch10.html"><span>← 上一篇</span><b>内核裁剪与设备树</b></a>
+  <a class="nx" href="course-ch11.html"><span>下一篇 →</span><b>根文件系统构建</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

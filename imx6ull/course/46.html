@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=../docs/course-46.html">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>46 · pinctrl 与 GPIO</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/viz.css">
+<link rel="stylesheet" href="assets/iviz.css">
+<link rel="stylesheet" href="assets/anim2.css">
+  <script src="assets/readmode.js" defer></script>
+</head>
+<body data-page="46">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>第 46 课 · pinctrl 与 GPIO：点亮一个引脚要过三道关</h1>
+    <p class="lede">新手的第一个困境往往不是写不出驱动，而是「代码没错，灯就是不亮」。九成原因是这颗引脚根本没被交给 GPIO——它可能还归 UART1，可能被拉成了开漏，可能电源域没开。这一课把「复用（pinmux）→ 配置（pinconf）→ 驱动（gpiod）」这三关拆开讲，每关都给出你在设备树和代码里的具体落点。</p>
+
+    <div class="viz" data-kind="layers" data-title="一个引脚的三道关" data-sub="三件事归三个地方管，不要混在一起查" data-json='{"items":[{"n":"第一关 复用 pinmux：这个焊盘是谁的","d":"写 IOMUXC 的 MUX_MODE 字段，选 ALT5 才是 GPIO1_IO16","c":"cy"},{"n":"第二关 配置 pinconf：电气属性","d":"上下拉、驱动强度、开漏、速率、施密特触发","c":"vi"},{"n":"第三关 驱动 gpiod：谁把它拉高","d":"驱动里 gpiod_get、direction_output、set_value","c":"gr"},{"n":"设备树：前两关的书面申请","d":"pinctrl 子节点 + 属性引用，内核 probe 时自动写寄存器","c":"or"}],"note":"排障顺序必须按这个顺序：先确认复用对了（读寄存器），再确认电气配置对了，最后才怀疑代码。反过来查会浪费几个小时。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 一颗 SoC 的 100 多个引脚，凭什么能当 UART、I2C、GPIO 用？② <code>IOMUXC</code> 里到底存了什么？③ 设备树里的 <code>pinctrl-0</code> 是谁在什么时候写进寄存器的？④ <code>gpiod_get</code> 和老的 <code>gpio_request</code> 差在哪？⑤ 内核里已经有 GPIO 驱动了，我的 LED 驱动还要不要自己写寄存器？</p>
+    </div>
+
+    <h2>1. 直觉：引脚是一个多功能插孔，同一时刻只能插一个插头</h2>
+    <p>芯片内部每个焊盘都连着一条「选择器」，外面接了七八个功能模块（UART、I2C、PWM、GPIO…）。你写 MUX_MODE 就是拨动这个选择器。拨错档位，你后面怎么拉高都没用——因为信号根本没接到 GPIO 模块上。</p>
+    <p><b>类比失效处</b>：插孔拨错还能换，寄存器拨错会让两个模块同时驱动一条线（比如 UART 的 TX 和 GPIO 都在推），出现「电压只有 1.6V」这种诡异现象。这不是软件 bug，是电气冲突。</p>
+
+    <h2>2. 硬件：IOMUXC 里存的是两样东西</h2>
+    <p>以 i.MX6ULL 为例，每个焊盘对应两个寄存器：<b>MUX</b>（4 位，选功能）与 <b>PAD</b>（16 位，选电气属性）。PAD 里典型字段：<code>HYS</code> 施密特触发、<code>PUS</code> 上下拉强度、<code>PUE</code> 保持/上下拉、<code>PKE</code> 是否启用、<code>ODE</code> 开漏、<code>SPEED</code> 速率、<code>DSE</code> 驱动能力。</p>
+<pre><code>// 头文件里一个宏就代表「焊盘 + 功能」这一对数
+#define MX6UL_PAD_UART1_TX_DATA__GPIO1_IO16  0x0084 0x02E8 5 0x0 0x10B0
+//                                     ↑mux寄存器 ↑pad寄存器 ↑mux值 ↑pad值 ↑输入选择</code></pre>
+    <p>这串数字的含义是：把 <code>0x02E8</code> 处的 MUX 写成 5（ALT5 = GPIO1_IO16），把 <code>0x0084</code> 处的 PAD 写成 <code>0x10B0</code>（上下拉、驱动强度等）。设备树里的 <code>fsl,pins</code> 就是在写这张表，内核的 pinctrl 驱动在 probe 时把它翻译成寄存器写入。</p>
+    <h2>3. 软件：设备树申请，驱动只管「拉」</h2>
+<pre><code>// 设备树：前两关写在这里
+led_gpio: led-gpio {
+    fsl,pins = &lt;MX6UL_PAD_UART1_TX_DATA__GPIO1_IO16 0x10B0&gt;;
+};
+
+myled {
+    compatible = "demo,myled";
+    led-gpios = &lt;&amp;gpio1 16 GPIO_ACTIVE_HIGH&gt;;   /* 控制器 + 编号 + 极性 */
+    pinctrl-names = "default";
+    pinctrl-0 = &lt;&amp;led_gpio&gt;;
+};</code></pre>
+<pre><code>#include &lt;linux/gpio/consumer.h&gt;
+
+struct gpio_desc *led;
+
+static int my_probe(struct platform_device *pdev)
+{
+    led = devm_gpiod_get(&amp;pdev-&gt;dev, "led", GPIOD_OUT_LOW);
+    if (IS_ERR(led)) return PTR_ERR(led);
+    gpiod_set_value(led, 1);      /* 天亮 */
+    gpiod_set_value(led, 0);      /* 天灭 */
+    return 0;
+}</code></pre>
+    <p>注意 <code>devm_</code> 前缀：它把资源绑定到设备生命周期，卸载时自动释放。没有 <code>devm</code> 的版本必须手写 <code>gpiod_put</code>，忘了就泄漏——泄漏几十次之后你会开始怀疑人生。</p>
+
+    <div class="viz" data-kind="seq" data-title="probe 那一刻，寄存器被谁写" data-sub="时序：设备树 → pinctrl → gpiod → 你的代码" data-json='{"slots":["设备树解析","pinctrl 生效","gpiod 申请","你的 probe"],"sigs":[{"n":"MUX 寄存器","w":[0,1,0,0],"c":"cy","note":"只有 pinctrl 这一拍会写"},{"n":"PAD 寄存器","w":[0,1,0,0],"c":"vi","note":"电气属性同一时刻写"},{"n":"GPIO 方向","w":[0,0,1,0],"c":"gr","note":"direction_output 决定"},{"n":"GPIO 电平","w":[0,0,0,1],"c":"or","note":"只有你的代码能改"}],"note":"这就是「内核已经管好了，你只要拉」的确切含义：前两拍与你无关，第三四拍才属于驱动。"}'></div>
+
+    <h2>4. 三条误解</h2>
+    <ul>
+      <li><b>「设备树里写了就生效」</b>：只有被 <code>compatible</code> 匹配上的设备、且 pinctrl 驱动确实实现了 <code>set_mux</code>，这段才生效。引脚名拼错（比如把 <code>PAD_UART1_TX_DATA</code> 写成 <code>PAD_UART1_TX</code>）编译期不报错，运行期静默失败。</li>
+      <li><b>「gpiod_set_value 能当延时用」</b>：可以，但忙等很浪费；<code>gpiod_set_value_cansleep</code> 用于可能休眠的 I2C/SPI 扩展 GPIO（如 9555），在中断上下文里调它会睡死。</li>
+      <li><b>「极性不重要」</b>：<code>GPIO_ACTIVE_LOW</code> 表示「低电平算点亮」。很多底板 LED 是灌电流接法，写 1 反而灭。设备树里把极性写对，代码里就永远写「1=亮」，不用记硬件接法。</li>
+    </ul>
+
+    <h2>5. 五题自测</h2>
+    <div class="q"><span class="n">1</span><p>为什么「代码没错灯不亮」，先查复用而不是先查代码？</p></div>
+    <details class="ans"><summary>看答案</summary><p>因为复用错了，GPIO 模块的输出根本没接到焊盘，后面所有操作都是「对着空气拉高」。用 <code>devmem2</code> 读一下 MUX 寄存器的值最快确认。</p></details>
+
+    <div class="q"><span class="n">2</span><p><code>pinctrl-0</code> 和 <code>led-gpios</code> 各自负责什么？</p></div>
+    <details class="ans"><summary>看答案</summary><p><code>pinctrl-0</code> 管「复用 + 电气属性」，<code>led-gpios</code> 管「哪个控制器的第几号、什么极性」。前者在设备初始化阶段生效，后者在驱动取用时解析。</p></details>
+
+    <div class="q"><span class="n">3</span><p>同一颗引脚被两个设备树节点同时申请，会发生什么？</p></div>
+    <details class="ans"><summary>看答案</summary><p>谁先 probe 谁先占；后者 <code>gpiod_get</code> 会拿到 <code>-EBUSY</code>。日志里能看到 <code>gpio 16 is already requested</code>——这是很典型的「两个驱动抢一个引脚」。</p></details>
+
+    <div class="q"><span class="n">4</span><p><code>GPIO_ACTIVE_LOW</code> 下 <code>gpiod_set_value(led,1)</code> 输出什么电平？</p></div>
+    <details class="ans"><summary>看答案</summary><p>低电平。内核在 gpiod 层做了取反，所以软件语义永远是「1 = 有效（点亮）」，与硬件高低无关。</p></details>
+
+    <div class="q"><span class="n">5</span><p>为什么推荐 <code>devm_gpiod_get</code> 而不是 <code>gpio_request</code>？</p></div>
+    <details class="ans"><summary>看答案</summary><p><code>gpio_request</code> 是旧的整数编号 API，还要手动 <code>gpio_free</code>；<code>devm_gpiod_get</code> 用描述符、自动释放、支持极性抽象，且 probe 失败时不会泄漏。</p></details>
+
+    <h2>6. 动手（40 分钟）</h2>
+    <div class="steps">
+      <p>1. 用 <code>cat /sys/kernel/debug/gpio</code> 看当前哪些 GPIO 已被占用，找到你板子上 LED 的编号。</p>
+      <p>2. 用 <code>devmem2</code> 读该引脚的 MUX 寄存器，确认它是否真在 GPIO 模式（ALT5）。</p>
+      <p>3. 在设备树里加 <code>led-gpios</code> 节点，重新编译 dtb，启动后用 <code>gpioset</code> 手动拉高，确认灯亮。</p>
+      <p>4. 再把它改成 <code>GPIO_ACTIVE_LOW</code>，观察「写 1 反而灭」——这是极性写错的经典复现。</p>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      一个引脚能点亮，但传感器不只有一根线。第 47 课讲 I2C 设备驱动：两条线挂一串设备，靠地址区分，靠 regmap 读写寄存器，靠 <code>i2cdetect</code> 排障。
+    </div>
+  
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"点亮一个 LED，要过三道关","hint":"点一关看代码","note":"新手最常跳过第一关：直接去 set 电平，结果引脚还在复位默认的复用功能上，写进去毫无反应。","items":[{"b":"第一关：pinmux（复用功能）","d":"引脚默认可能是 UART 的 TX。必须先写 IOMUXC 的 MUX 寄存器，把它切成 GPIO 模式，否则后面的操作根本作用不到引脚。"},{"b":"第二关：pinconf（电气属性）","d":"PAD 寄存器管上拉/下拉、驱动强度、转换速率。LED 要推挽输出、强驱动；按键要上拉输入。设错会出现「能读但一直为 0」。"},{"b":"第三关：gpiod（用驱动接口）","d":"用 devm_gpiod_get 从设备树取引脚，再 gpiod_set_value 改电平。极性写在设备树（GPIO_ACTIVE_LOW），驱动代码就不用关心高低有效。"}]}'></div>
+  </main>
+</div>
+<script src="assets/cnav.js"></script>
+<script src="assets/viz.js"></script>
+<script src="assets/iviz.js"></script>
+<script src="assets/anime.iife.min.js"></script>
+<script src="assets/anim2.js"></script>
+</body>
+</html>

@@ -1,0 +1,186 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>platform 总线模型：probe、匹配、资源与设备树 · 卷 09 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j09.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 09 · 驱动体系</div>
+<ol><li><a href="course-th05.html">
+  <span class="no">01</span><span>设备模型与驱动框架<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="course-45.html">
+  <span class="no">02</span><span>写一个字符设备<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-46.html">
+  <span class="no">03</span><span>pinctrl 与 GPIO<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-47.html">
+  <span class="no">04</span><span>I2C 设备驱动<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-48.html">
+  <span class="no">05</span><span>中断的上半部与下半部<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-ch12.html">
+  <span class="no">06</span><span>驱动开发入门<span class="sub">约 20 小时</span></span></a></li>
+<li><a href="d09-01.html" class="active">
+  <span class="no">07</span><span>platform 总线模型：probe、匹配、资源与设备树<span class="sub">约 4 小时 · 当前</span></span></a></li>
+<li><a href="d09-02.html">
+  <span class="no">08</span><span>阻塞 IO 与等待队列：poll / select / epoll 的驱动侧<span class="sub">约 3 小时</span></span></a></li>
+<li><a href="d09-03.html">
+  <span class="no">09</span><span>SPI 子系统：控制器驱动与设备驱动<span class="sub">◆ · 约 3 小时</span></span></a></li>
+<li><a href="d09-04.html">
+  <span class="no">10</span><span>块设备与 eMMC：gendisk、请求队列与分区<span class="sub">◆ · 约 4 小时</span></span></a></li>
+<li><a href="d09-05.html">
+  <span class="no">11</span><span>DMA 与 Cache 一致性：谁负责 flush，谁负责 invalidate<span class="sub">◆ · 约 3 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j08.html">← 卷 08</a>
+  <a href="../juan/j10.html">卷 10 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 09<span>·</span>驱动体系<span>·</span>第 07 篇</div>
+  <h1>platform 总线模型：probe、匹配、资源与设备树</h1>
+  
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 4 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+<p class="lead">SoC 内部的外设不在 PCI 上，也不在 USB 上。它们挂在地址总线的固定位置上，没有「枚举」这回事。于是 Linux 用一条<strong>假总线</strong>把它们管起来：platform 总线。</p>
+
+<p>它解决的问题只有一个：<strong>设备与驱动要能互相找到，但谁都不该硬编码对方</strong>。设备树说「我这里有一个 UART，寄存器在 0x2020000，中断是 26」；驱动说「我支持 compatible = fsl,imx-uart」；platform 总线负责配对。</p>
+
+<h2 id="s1">先玩一下：从 insmod 到 probe 被调用</h2>
+
+<p>点「单步」。注意 <code>EPROBE_DEFER</code> 那一步：驱动不是失败，而是「我要的时钟还没准备好，等会儿再来」——这是 probe 可能被调用多次的原因，也是新手最常踩的坑。</p>
+
+<div class="ikit" data-type="machine" data-json='{"title":"platform 设备的匹配与 probe","badge":"machine",
+"states":[{"id":"dev","x":16,"y":20},{"id":"drv","x":16,"y":62},{"id":"match","x":42,"y":40},{"id":"probe","x":68,"y":22},{"id":"bound","x":86,"y":60},{"id":"defer","x":52,"y":80}],
+"edges":[
+{"from":"dev","to":"match","label":"设备注册","event":"设备注册"},
+{"from":"drv","to":"match","label":"驱动注册","event":"驱动注册"},
+{"from":"match","to":"probe","label":"名字/compatible 命中","event":"匹配成功"},
+{"from":"probe","to":"bound","label":"probe 返回 0","event":"probe 成功"},
+{"from":"probe","to":"defer","label":"返回 -EPROBE_DEFER","event":"缺依赖"},
+{"from":"defer","to":"probe","label":"依赖就绪后重试","event":"重新 probe"},
+{"from":"probe","to":"match","label":"返回错误，解绑","event":"probe 失败"}],
+"script":[0,2,3],
+"stateNotes":{
+"dev":"platform_device 已加入总线，但还没有驱动认领它。",
+"drv":"platform_driver 已注册，但还没有设备匹配。",
+"match":"总线的 match 函数在跑：先比 name，再比 of_match_table 的 compatible。",
+"probe":"驱动的 probe() 被调用。这里做真正的初始化：取资源、ioremap、申请中断、注册字符设备。",
+"bound":"设备与驱动绑定，sysfs 下出现 driver 软链。",
+"defer":"返回 -EPROBE_DEFER 后进入 deferred probe 链表，等依赖（时钟、 regulator、GPIO）就绪后重试。"}}'></div>
+
+<p>这台状态机里最重要的不是「成功」，而是<strong>失败路径</strong>。probe 里任何一步失败都必须把前面已经申请的东西退回去（<code>goto</code> 分级错误处理），否则下次 probe 会撞上「中断已被占用」「ioremap 泄漏」。这是驱动代码审查的第一眼。</p>
+
+<h2 id="s2">一、三个名字，一条匹配规则</h2>
+
+<ul>
+  <li><code>platform_device</code>：描述「有什么」。来自设备树的 <code>of_platform_populate</code>，或老式的板级文件静态注册。</li>
+  <li><code>platform_driver</code>：描述「我会什么」。包含 <code>probe</code>、<code>remove</code>、<code>id_table</code>、<code>of_match_table</code>。</li>
+  <li><code>platform_bus_type</code>：把两者配对。匹配优先级：<code>of_match_table</code>（设备树 compatible）→ <code>id_table</code> → <code>name</code> 字符串相等。</li>
+</ul>
+
+<p>设备树里的节点长这样（i.MX6ULL 的 UART 为例，节选）：</p>
+
+<pre data-lang="dts"><code>uart2: serial@21e8000 {
+    compatible = "fsl,imx6ul-uart", "fsl,imx6q-uart";
+    reg = &lt;0x021e8000 0x4000&gt;;
+    interrupts = &lt;GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH&gt;;
+    clocks = &lt;&amp;clks IMX6UL_CLK_UART2_IPG&gt;, &lt;&amp;clks IMX6UL_CLK_UART2_SERIAL&gt;;
+    status = "okay";
+};</code></pre>
+
+<p>驱动的匹配表就是这段 compatible 的镜像。两边字符串必须完全一致，多一个空格都不行——这是最常见的一类「驱动不 probe」。</p>
+
+<h2 id="s3">二、probe 里到底该做什么</h2>
+
+<div class="ikit" data-type="code" data-json='{"title":"一个能跑通的 probe 骨架","badge":"code",
+"regs":[{"n":"ret","v":"0"},{"n":"base","v":"—"},{"n":"irq","v":"—"}],
+"lines":[
+{"c":"static int my_probe(struct platform_device *pdev)","set":{"ret":"0"},"note":"入参就是那条 platform_device，设备树节点挂在 pdev->dev.of_node。"},
+{"c":"  base = devm_ioremap_resource(&pdev->dev, res);","set":{"base":"0xF0A00000"},"note":"从 reg 取资源并映射。devm_ 版本会在 remove 时自动释放。"},
+{"c":"  irq = platform_get_irq(pdev, 0);","set":{"irq":"27"},"note":"从 interrupts 属性解析，不需要自己算 GIC 编号。"},
+{"c":"  ret = devm_request_irq(..., my_isr, 0, ...);","set":{"ret":"0"},"note":"申请中断；devm 同样托管生命周期。"},
+{"c":"  ret = register_chrdev_region(...); if (ret) return ret;","set":{"ret":"0"},"note":"失败就返回，前面 devm 申请的东西由框架回收。"},
+{"c":"  return 0;","set":{"ret":"0"},"note":"返回 0 表示绑定成功；返回 -EPROBE_DEFER 表示稍后重试。"}]}'></div>
+
+<p>这里有个容易被忽略的设计：<strong>驱动不该自己去找寄存器地址</strong>。地址、中断号、时钟全来自描述信息（设备树），驱动只消费。这样同一份驱动代码可以服务 i.MX6ULL、i.MX6UL、甚至别的 SoC，只要 compatible 与资源描述对得上。</p>
+
+<div class="ikit" data-type="drag" data-json='{"title":"insmod 之后的七步","badge":"drag",
+"items":[{"id":"init","text":"module_init 执行，调用 platform_driver_register"},{"id":"add","text":"driver 加入 platform 总线，遍历已有设备"},{"id":"match","text":"match：of_match_table 比对 compatible"},{"id":"probe","text":"调用 probe，取资源、ioremap、申请中断"},{"id":"devnode","text":"注册字符设备，device_create 生成 /dev 节点"},{"id":"sys","text":"sysfs 出现 /sys/bus/platform/drivers/…"},{"id":"udev","text":"mdev/udev 收到 uevent，补上设备节点权限"}],
+"answer":["init","add","match","probe","devnode","sys","udev"],
+"explain":"注册是「我来了」，匹配是「谁要我」，probe 是「开始干活」，节点与权限是「用户能用了」。顺序错在驱动里就是空指针。"}'></div>
+
+<h2 id="s4">三、设备树与资源：三种取法</h2>
+
+<table>
+<thead><tr><th>资源</th><th>设备树属性</th><th>驱动 API</th><th>拿到什么</th></tr></thead>
+<tbody>
+<tr><td>寄存器</td><td><code>reg</code></td><td><code>platform_get_resource</code> + <code>devm_ioremap_resource</code></td><td>映射后的虚拟地址</td></tr>
+<tr><td>中断</td><td><code>interrupts</code></td><td><code>platform_get_irq</code></td><td>Linux 中断号</td></tr>
+<tr><td>时钟</td><td><code>clocks</code></td><td><code>devm_clk_get</code> + <code>clk_prepare_enable</code></td><td><code>struct clk *</code></td></tr>
+<tr><td>GPIO</td><td><code>gpios</code></td><td><code>devm_gpiod_get</code></td><td><code>struct gpio_desc *</code></td></tr>
+<tr><td>自定义</td><td><code>my-prop</code></td><td><code>of_property_read_u32</code></td><td>值或 <code>-EINVAL</code></td></tr>
+</tbody></table>
+
+<div class="cal warn"><span class="h">误解：probe 只调用一次</span>只要返回 <code>-EPROBE_DEFER</code>，或者设备被 unbind/bind，probe 会再次执行。所以 probe 必须可重入、必须能清理干净，不能假设「全局变量只初始化一次」。</div>
+
+<div class="cal tip"><span class="h">排障第一现场</span><code>/sys/bus/platform/devices/</code> 看设备在不在；<code>/sys/bus/platform/drivers/&lt;drv&gt;/</code> 看有没有软链指向设备。没有软链就是没匹配上，先 diff compatible，别怀疑硬件。</div>
+
+<h2 id="s5">动手（可选）：写一个最小 platform 驱动</h2>
+
+<div class="cal q"><span class="h">只在 🔧 实作模式展开</span>需要板子与内核源码树；只想懂理论可跳过。</div>
+
+<ol>
+  <li>在设备树里加一个节点 <code>mydev@0 { compatible="demo,mydev"; reg=&lt;0x02000000 0x1000&gt;; status="okay"; };</code>（地址要用你板子上确实空着的区域）。</li>
+  <li>驱动里写 <code>of_match_table</code> 与 probe，probe 里只 <code>dev_info</code> 打印 base 与 irq。</li>
+  <li><code>insmod</code> 后 <code>dmesg | tail</code> 看到打印，说明匹配与资源解析通了。</li>
+  <li>故意把 compatible 改错一个字符，重新编译 dtb，观察不再 probe——这就是「驱动不加载」的最常见原因。</li>
+</ol>
+
+<h2 id="s6">离开这一篇，你应该能</h2>
+
+<ul class="qa">
+  <li>画出 device / driver / bus 的三角关系，说出匹配的三种依据。</li>
+  <li>解释 <code>-EPROBE_DEFER</code> 为什么存在，以及它对 probe 代码的要求。</li>
+  <li>列出 probe 里至少五件必须做的事，以及失败时怎么退。</li>
+</ul>
+
+<p>驱动挂上总线之后，就要面对用户态最朴素的需求：read 的时候数据还没来怎么办。下一篇专门讲「等」这件事。</p>
+
+
+<nav class="pager">
+  <a href="course-ch12.html"><span>← 上一篇</span><b>驱动开发入门</b></a>
+  <a class="nx" href="d09-02.html"><span>下一篇 →</span><b>阻塞 IO 与等待队列：poll / select / epoll 的驱动侧</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

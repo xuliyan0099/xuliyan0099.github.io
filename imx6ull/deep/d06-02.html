@@ -1,0 +1,186 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TCP 状态机与 sk_buff：一次数据往返的完整路径 · 卷 06 | i.MX6ULL</title>
+<meta name="description" content="TCP 的全部智能都藏在一个状态机里。状态图把它摊开，sk_buff 则解释为什么内核加一个头几乎不花钱。">
+<link rel="stylesheet" href="../assets/deep.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/deep.js" defer></script>
+</head><body>
+<div class="dp-prog"><i></i></div>
+<div class="dp">
+<header class="dp-top">
+  <div class="dp-crumbs">
+    <a href="../../index.html">知识库</a><span>/</span>
+    <a href="../index.html">i.MX6ULL</a><span>/</span>
+    <a href="../juan/index.html">十四卷</a><span>/</span>
+    <a href="../juan/j06.html">卷 06</a>
+  </div>
+  <div class="dp-tools">
+    <a href="../juan/j06.html">☰ 卷 06 目录</a>
+    <a href="../juan/index.html">◫ 十四卷总览</a>
+  </div>
+</header>
+
+<div class="dp-hero">
+  <div class="dp-kicker">卷 06<span>·</span>第 06·02 篇</div>
+  <h1>TCP 状态机与 sk_buff：一次数据往返的完整路径</h1>
+  <p class="dp-lede">TCP 的全部智能都藏在一个状态机里。状态图把它摊开，sk_buff 则解释为什么内核加一个头几乎不花钱。</p>
+  <div class="dp-chips">
+    <span class="c hot">★ 一读</span>
+    <span class="c">纯读约 2 小时</span>
+    <span class="c">理论为主 · 实作可跳</span>
+    <span class="c">配 3–4 个互动演示</span>
+  </div>
+</div>
+
+<aside class="dp-toc"><div class="dp-toc-h">本页目录</div><a href="#s1"><span>01</span>先玩一下：把 TCP 状态机走一遍</a><a href="#s2"><span>02</span>一、一次数据往返，序号与窗口在动</a><a href="#s3"><span>03</span>二、带宽×时延：窗口到底该多大</a><a href="#s4"><span>04</span>三、sk_buff：四个指针撑起一次封装</a><a href="#s5"><span>05</span>四、Nagle 与延迟 ACK 的「40 毫秒之谜」</a><a href="#s6"><span>06</span>动手（可选）：让状态机在你眼前跑</a><a href="#s7"><span>07</span>离开这一篇，你应该能</a></aside>
+<main class="dp-main">
+<p class="lead">TCP 的全部智能，几乎都压缩在一个<strong>十一状态的状态机</strong>里。序号、确认、窗口、超时重传，都是这个状态机在不同状态下的动作。</p>
+
+<p>而它每天搬运的东西叫 <strong>sk_buff</strong>。理解了 sk_buff 的四个指针，你就理解了「为什么内核给一个包加三层头几乎不花时间」。</p>
+
+<h2 id="s1">先玩一下：把 TCP 状态机走一遍</h2>
+
+<p>点「按剧本巡演」，它会带你走一整圈：被动打开 → 建连 → 主动关闭 → TIME_WAIT → 回到 CLOSED。也可以手动点事件按钮，只有当前状态可达的边才亮。</p>
+
+<div class="ikit" data-type="machine" data-json='{"title":"TCP 状态机（简化版）","badge":"machine",
+"states":[
+{"id":"CLOSED","x":12,"y":14},{"id":"LISTEN","x":34,"y":6},{"id":"SYN_SENT","x":12,"y":44},
+{"id":"SYN_RCVD","x":34,"y":34},{"id":"ESTABLISHED","x":60,"y":20},
+{"id":"FIN_WAIT_1","x":36,"y":56},{"id":"CLOSE_WAIT","x":62,"y":48},{"id":"FIN_WAIT_2","x":20,"y":66},
+{"id":"LAST_ACK","x":76,"y":64},{"id":"TIME_WAIT","x":88,"y":48},{"id":"CLOSING","x":30,"y":80}],
+"edges":[
+{"from":"CLOSED","to":"SYN_SENT","label":"connect()","event":"connect()"},
+{"from":"CLOSED","to":"LISTEN","label":"listen()","event":"listen()"},
+{"from":"LISTEN","to":"SYN_RCVD","label":"SYN","event":"收到 SYN"},
+{"from":"SYN_SENT","to":"ESTABLISHED","label":"SYN+ACK","event":"收到 SYN+ACK"},
+{"from":"SYN_RCVD","to":"ESTABLISHED","label":"ACK","event":"收到 ACK"},
+{"from":"ESTABLISHED","to":"FIN_WAIT_1","label":"close()","event":"close()"},
+{"from":"ESTABLISHED","to":"CLOSE_WAIT","label":"FIN","event":"收到 FIN"},
+{"from":"FIN_WAIT_1","to":"FIN_WAIT_2","label":"ACK","event":"收到 ACK"},
+{"from":"FIN_WAIT_1","to":"CLOSING","label":"FIN","event":"收到 FIN"},
+{"from":"FIN_WAIT_2","to":"TIME_WAIT","label":"FIN","event":"收到 FIN"},
+{"from":"CLOSE_WAIT","to":"LAST_ACK","label":"close()","event":"close()"},
+{"from":"LAST_ACK","to":"CLOSED","label":"ACK","event":"收到 ACK"},
+{"from":"TIME_WAIT","to":"CLOSED","label":"2MSL","event":"等 2MSL"},
+{"from":"CLOSING","to":"TIME_WAIT","label":"ACK","event":"收到 ACK"}],
+"script":[1,2,4,5,7,9,12],
+"stateNotes":{
+"CLOSED":"没有连接。也是「端口没人监听」时收到包的状态——回 RST。",
+"LISTEN":"被动打开。此时有两个队列在工作：半连接与全连接。",
+"SYN_SENT":"主动打开，SYN 已发，等 SYN+ACK。失败会重传，若干次后回 CLOSED 并报 ETIMEDOUT。",
+"SYN_RCVD":"半连接。已收到 SYN 并回了 SYN+ACK，等对方最后一个 ACK。",
+"ESTABLISHED":"数据可以双向流动。绝大多数时间都在这个状态。",
+"FIN_WAIT_1":"我方发了 FIN，等对方 ACK（或同时收到对方的 FIN）。",
+"FIN_WAIT_2":"对方已确认我的 FIN，等它的 FIN。可以持续很久，也可能一直卡住。",
+"CLOSE_WAIT":"对方已发 FIN，我还没 close。程序忘了 close 就会永久停在这里。",
+"LAST_ACK":"我 close 了，发最后一个 FIN 等 ACK。",
+"CLOSING":"双方几乎同时关闭的罕见路径。",
+"TIME_WAIT":"主动关闭方在 2MSL 内保持。不是浪费，是必要设计。"}}'></div>
+
+<p>这张图上有两个状态最值得死记：<strong>CLOSE_WAIT</strong> 和 <strong>TIME_WAIT</strong>。</p>
+
+<ul>
+  <li><code>CLOSE_WAIT</code> 堆积，几乎总是<strong>代码问题</strong>：收到对端 FIN 之后你没有 <code>close(fd)</code>。半开连接、异常路径没释放——查你的业务代码，不要改内核参数。</li>
+  <li><code>TIME_WAIT</code> 堆积，是<strong>主动关闭方</strong>的正常代价。它的作用有两个：让最后一个 ACK 丢失时能重发；让这条连接的旧重复包在网络里消失（2MSL 之后旧包不可能还活着）。</li>
+</ul>
+
+<div class="cal tip"><span class="h">TIME_WAIT 多了要不要调</span>先看是不是短连接太多（改用长连接/连接池）；再看 <code>net.ipv4.tcp_tw_reuse=1</code>（只对「连出去」的连接生效，且要求时间戳单调递增）。<code>tcp_tw_recycle</code> 在 NAT 环境下会误杀，新内核已经删掉了——别照旧教程抄。</div>
+
+<h2 id="s2">一、一次数据往返，序号与窗口在动</h2>
+
+<p>下面这条时序只画了「发—确认」的骨架。注意每一次 ACK 里的 <code>ack</code> 是「我期望的下一个字节」，而不是「我收到了多少」——差一，是初学者最常错的地方。</p>
+
+<div class="ikit" data-type="seq" data-json='{"title":"数据往返：序号、确认与窗口","badge":"seq",
+"actors":[{"name":"客户端","start":"ESTABLISHED"},{"name":"服务端","start":"ESTABLISHED"}],
+"steps":[
+{"label":"DATA seq=1000,len=1000","states":["发送中","ESTABLISHED"],"note":"一个 MSS 的数据段。seq 是本段第一个字节的编号。","dir":"r"},
+{"label":"ACK ack=2000,win=4096","states":["等待 ACK","已收到"],"note":"ack=2000 表示「2000 之前的都收到了」。win 是接收窗口，告诉对方我还能收多少。","dir":"l"},
+{"label":"DATA seq=2000,len=1000","states":["发送中","ESTABLISHED"],"note":"可以连续发多个段，不必等每个 ACK（滑动窗口的意义）。","dir":"r"},
+{"label":"ACK ack=3000,win=2048","states":["窗口缩小","已收到"],"note":"窗口从 4096 掉到 2048：接收方应用读得慢，缓冲快满了。"},
+{"label":"DATA seq=3000,len=1000","states":["发送中","接收慢"],"note":"发送方受窗口限制，最多只能再发 2048 字节。"},
+{"label":"ACK ack=4000,win=0","states":["停等","缓冲满"],"note":"零窗口：发送方必须停下来，靠「窗口探测」定期问一句。"},
+{"label":"窗口更新 win=8192","states":["恢复","已腾空"],"note":"应用读走数据，接收方发窗口更新，发送方继续。"}]}'></div>
+
+<p>这三个数字构成 TCP 的流控闭环：<code>seq</code> 定位置，<code>ack</code> 定进度，<code>win</code> 定节奏。丢包则由另一套机制处理：重复 ACK 触发快速重传，超时触发慢启动。</p>
+
+<h2 id="s3">二、带宽×时延：窗口到底该多大</h2>
+
+<p>一条链路上能有多少「在途数据」，由<strong>带宽时延积（BDP）</strong>决定。窗口小于 BDP，链路就跑不满——这是跨地域传输慢的根本原因，不是「带宽不够」。</p>
+
+<div class="ikit" data-type="param" data-json='{"title":"BDP：窗口够不够用","badge":"param",
+"fields":[{"k":"bw","label":"带宽","min":1,"max":1000,"step":1,"val":100,"unit":"Mbps"},
+{"k":"rtt","label":"往返时延","min":1,"max":500,"step":1,"val":40,"unit":"ms"},
+{"k":"win","label":"接收窗口","min":16,"max":2048,"step":16,"val":256,"unit":"KB"}],
+"outs":[
+{"label":"带宽时延积","expr":"V.bw * V.rtt / 8","unit":" KB"},
+{"label":"窗口能撑住的吞吐","expr":"min(V.win / (V.bw * V.rtt / 8), 1) * V.bw","unit":" Mbps"},
+{"label":"链路利用率","expr":"min(V.win / (V.bw * V.rtt / 8), 1) * 100","unit":" %"},
+{"label":"还需要多少窗口才满速","expr":"max(V.bw * V.rtt / 8 - V.win, 0)","unit":" KB"}],
+"bar":{"expr":"min(V.win / (V.bw * V.rtt / 8), 1) * 100"},
+"verdict":{"expr":"V.win >= V.bw * V.rtt / 8","ok":"窗口足够，链路能跑满","bad":"窗口不足：吞吐被窗口卡住，不是带宽问题"},
+"note":"把 RTT 拉到 200 ms、窗口不动，你会看到吞吐断崖式下跌。这就是「同城很快、跨洋很慢」的算术解释。"}'></div>
+
+<h2 id="s4">三、sk_buff：四个指针撑起一次封装</h2>
+
+<p>内核里没有一个「包」的实体对象，只有 <code>struct sk_buff</code> 加一块数据缓冲。缓冲被切成四段，由四个指针标出边界：</p>
+
+<div class="layers">
+  <div class="ly"><b>head</b><span>缓冲起点，malloc 时定下，之后不动。用来算「还能往前推多少」。分片信息也挂在这里。</span></div>
+  <div class="ly"><b>data</b><span>当前第一个有效字节。加头 = <code>skb_push</code> 把 data 往前挪，并返回新头指针。</span></div>
+  <div class="ly"><b>tail</b><span>当前最后一个有效字节的下一个位置。加尾 = <code>skb_put</code> 把 tail 往后挪。</span></div>
+  <div class="ly hi"><b>end</b><span>缓冲终点，也不动。用 <code>skb_headroom()</code> / <code>skb_tailroom()</code> 判断还有没有空间。</span></div>
+</div>
+
+<p>所以「加一个 TCP 头」的真实动作是：<code>data -= 20; tail 不变</code>，然后把 20 个字节写进去。没有 memcpy，没有重新分配。TCP → IP → 以太，三层头依次往前推，一共 54 字节的 headroom 就够（这正是内核分配 skb 时会预留的量）。</p>
+
+<table>
+<thead><tr><th>操作</th><th>改哪个指针</th><th>典型用途</th></tr></thead>
+<tbody>
+<tr><td><code>skb_reserve(n)</code></td><td><code>data</code> 与 <code>tail</code> 同向后移 n</td><td>分配时预留头部空间</td></tr>
+<tr><td><code>skb_push(n)</code></td><td><code>data</code> 前移 n</td><td>压入协议头</td></tr>
+<tr><td><code>skb_pull(n)</code></td><td><code>data</code> 后移 n</td><td>接收时剥掉协议头</td></tr>
+<tr><td><code>skb_put(n)</code></td><td><code>tail</code> 后移 n</td><td>追加数据</td></tr>
+<tr><td><code>skb_clone()</code></td><td>新建 skb，共享数据区</td><td>一份数据要发给多个目的地</td></tr>
+<tr><td><code>skb_copy()</code></td><td>连数据一起复制</td><td>需要独立修改内容时</td></tr>
+</tbody></table>
+
+<div class="cal warn"><span class="h">误解：skb 是「包」，改了它就改了网络上的包</span>skb 只是内存里的描述。真正发出去要等驱动 DMA 读完。也正因如此，发送完成后驱动必须等 DMA 结束才能释放 skb，否则就是 use-after-free——这类 bug 在内核里非常典型。</div>
+
+<h2 id="s5">四、Nagle 与延迟 ACK 的「40 毫秒之谜」</h2>
+
+<p>两个优化撞在一起会产生经典现象：Nagle 算法说「有未确认的小包就先攒着」，延迟 ACK 说「收到数据等 40 ms 再确认，也许能搭个便车」。结果是小包互相等，每次交互多出 40 ms。</p>
+
+<p>判断方法：<code>ss -i</code> 看 <code>rtt</code> 很小但应用层延迟稳定在 40 ms 左右，基本就是这个组合。解决不是无脑开 <code>TCP_NODELAY</code>（那会增加小包数量），而是让应用一次写够一个 MSS，或者改用批量协议。</p>
+
+<h2 id="s6">动手（可选）：让状态机在你眼前跑</h2>
+
+<div class="cal q"><span class="h">只在 🔧 实作模式展开</span>PC 上即可。</div>
+
+<ol>
+  <li>开两个终端，一个 <code>nc -l 9000</code>，一个 <code>nc 127.0.0.1 9000</code>。第三个终端 <code>watch -n0.5 "ss -tan | grep 9000"</code>。</li>
+  <li>在服务端终端 <code>Ctrl-C</code>，观察 <code>CLOSE_WAIT</code> / <code>FIN_WAIT_2</code> / <code>TIME_WAIT</code> 的出现与消失。</li>
+  <li>用 <code>ss -tan state time-wait | wc -l</code> 数 TIME_WAIT；再写个循环建连的小脚本，看它涨。</li>
+  <li>抓包 <code>tcpdump -i lo -n 'port 9000' -w t.pcap</code>，用 Wireshark 看序号、窗口、重传，和上面的状态图对照。</li>
+</ol>
+
+<h2 id="s7">离开这一篇，你应该能</h2>
+
+<ul class="qa">
+  <li>不看书画出十一状态图，并指出 CLOSE_WAIT 与 TIME_WAIT 各自意味着什么。</li>
+  <li>解释 <code>ack</code> 的含义，以及为什么窗口会变成 0。</li>
+  <li>用 BDP 算出「多少窗口才能跑满 100 Mbps / 40 ms」，并解释 skb 加头为什么是 O(1)。</li>
+</ul>
+
+<p>TCP 之下还有 IP、路由、邻居与网卡。下一篇把「包怎么出门又怎么回来」这条链走完。</p>
+
+
+<nav class="dp-nav">
+  <a href="d06-01.html"><span>← 上一篇</span>从 socket 到协议栈：套接字、sock、传输层入口</a>
+  <a href="d06-03.html" class="nxt"><span>下一篇 →</span>IP、路由与网卡驱动：包怎么出了门又回来</a>
+</nav>
+<footer class="dp-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线。文中的「动手」段落只在 🔧 实作模式下展开，纯读可整篇跳过。</footer>
+</main>
+</div></body></html>

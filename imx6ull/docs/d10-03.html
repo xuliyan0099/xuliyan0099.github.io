@@ -1,0 +1,156 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>socket 与 epoll：一个能扛住千连接的事件循环 · 卷 10 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j10.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 10 · 用户态</div>
+<ol><li><a href="d10-01.html">
+  <span class="no">01</span><span>文件 IO 与 mmap：从 read 到直接映射寄存器<span class="sub">约 2 小时</span></span></a></li>
+<li><a href="d10-02.html">
+  <span class="no">02</span><span>多线程与锁：pthread、条件变量、常见死锁<span class="sub">约 2 小时</span></span></a></li>
+<li><a href="d10-03.html" class="active">
+  <span class="no">03</span><span>socket 与 epoll：一个能扛住千连接的事件循环<span class="sub">约 2 小时 · 当前</span></span></a></li>
+<li><a href="d10-04.html">
+  <span class="no">04</span><span>进程间通信：管道、共享内存、消息队列、信号<span class="sub">约 2 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j09.html">← 卷 09</a>
+  <a href="../juan/j11.html">卷 11 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 10<span>·</span>用户态<span>·</span>第 03 篇</div>
+  <h1>socket 与 epoll：一个能扛住千连接的事件循环</h1>
+  <p class="lede">一万个连接不需要一万个线程。epoll 把「等」从每个线程里拿出来，交给内核一张表。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 2 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+<p class=\"lead\">一万个连接不需要一万个线程。线程的成本不在创建，而在<strong>每个线程一份栈、一次上下文切换、一把调度锁</strong>。事件循环把这三种成本压成一份。</p>
+
+<p><code>epoll</code> 的全部价值可以用一句话说清：它把「哪些 fd 就绪」这件事，从「每次遍历所有 fd」变成了「内核维护一张就绪链表」。</p>
+
+<h2 id="s1">先玩一下：一个事件循环在干什么</h2>
+
+<p>看这条循环：注册 → 等 → 处理 → 再等。注意第 4 步只处理「就绪的」，没就绪的 fd 一个都不碰。</p>
+
+<div class="ikit" data-type="seq" data-json='{"title":"epoll 事件循环（三个连接）","badge":"seq",
+"actors":[{"name":"主线程","start":"epoll_wait"},{"name":"内核就绪链表","start":"空"}],
+"steps":[
+{"label":"epoll_ctl(ADD, fd1..fd3, EPOLLIN)","states":["注册","记录 3 个"],"note":"每个 fd 只注册一次，之后不必重复传。"},
+{"label":"epoll_wait(timeout=-1)","states":["睡着","等待事件"],"note":"没有事件时线程真的睡眠，不占 CPU。"},
+{"label":"fd2 收到数据 → 内核挂入就绪链表","states":["被唤醒","1 个就绪"],"note":"由网卡中断/协议栈触发，不需要你轮询。"},
+{"label":"epoll_wait 返回 events=[fd2]","states":["处理 fd2","清空"],"note":"只返回就绪的，O(1) 取出。"},
+{"label":"read(fd2) → EAGAIN","states":["读完","空"],"note":"ET 模式下必须读到 EAGAIN，否则剩余数据不再通知。"},
+{"label":"再次 epoll_wait","states":["睡着","等待"],"note":"循环。fd1/fd3 依然安静，本轮到它们零成本。"}]}'></div>
+
+<p>和「一个连接一个线程」相比，差别不在快慢，而在<strong>可预测性</strong>：线程数随连接数线性增长，内存与切换开销也跟着涨；事件循环的连接数增长几乎只增加内核里的几个结构体。</p>
+
+<h2 id="s2">一、四个调用，三种触发</h2>
+
+<table>
+<thead><tr><th>调用</th><th>做什么</th><th>注意</th></tr></thead>
+<tbody>
+<tr><td><code>epoll_create1(0)</code></td><td>创建 epoll 实例（一个内核对象 + 红黑树 + 就绪链表）</td><td>用完要 <code>close</code></td></tr>
+<tr><td><code>epoll_ctl(ADD/MOD/DEL)</code></td><td>注册/修改/删除关注的 fd 与事件</td><td>ADD 同一个 fd 两次会 <code>EEXIST</code></td></tr>
+<tr><td><code>epoll_wait()</code></td><td>取出就绪事件数组</td><td>返回的是「个数」，不是「所有 fd」</td></tr>
+<tr><td><code>EPOLL_CTL_MOD</code></td><td>改关注的事件掩码</td><td>ET + ONESHOT 常用它重新武装</td></tr>
+</table>
+
+<ul>
+  <li><b>水平触发（LT，默认）</b>：只要 fd 还有数据，每次 wait 都会返回它。写起来简单，但可能反复空转。</li>
+  <li><b>边沿触发（ET）</b>：状态变化才通知一次。必须配非阻塞 fd，并且读到 <code>EAGAIN</code>。</li>
+  <li><b>EPOLLONESHOT</b>：触发一次后自动失效，处理完要 MOD 重新注册。多线程处理同一连接时用它避免两个线程同时读。</li>
+</ul>
+
+<h2 id="s3">二、一个能跑的骨架</h2>
+
+<div class="ikit" data-type="code" data-json='{"title":"ET 模式服务端骨架","badge":"code",
+"regs":[{"n":"nfds","v":"0"},{"n":"fd","v":"3"},{"n":"ret","v":"0"}],
+"lines":[
+{"c":"epfd = epoll_create1(0);","set":{"ret":"4"},"note":"一个实例可以管成千上万个 fd。"},
+{"c":"ev.events = EPOLLIN | EPOLLET; ev.data.fd = listen_fd;","set":{"ret":"0"},"note":"监听 fd 也用 ET，accept 要循环到 EAGAIN。"},
+{"c":"epoll_ctl(epfd, EPOLL_CTL_ADD, listen_fd, &amp;ev);","set":{"ret":"0"},"note":"注册一次即可。"},
+{"c":"nfds = epoll_wait(epfd, evs, MAX, -1);","set":{"nfds":"2"},"note":"阻塞等；-1 表示不限时。返回就绪个数。"},
+{"c":"for (i=0;i&lt;nfds;i++) if (evs[i].data.fd==listen_fd) accept_loop();","set":{"ret":"0"},"note":"accept 循环直到 EAGAIN，否则会漏连接。"},
+{"c":"else read_until_eagain(evs[i].data.fd);","set":{"ret":"0"},"note":"ET 的核心纪律：一次读干净。"}]}'></div>
+
+<div class="cal warn"><span class="h">ET 的三个必踩坑</span>1）accept 只调一次 → 漏连接；2）read 只读一次 → 剩余数据永久挂起；3）用阻塞 fd → 最后一次 read 把线程卡死。三个坑都源于同一个误解：把 ET 当成 LT 用。</div>
+
+<p>另一个常见问题是「惊群」：多个线程/进程等同一个 listen fd，新连接到达时全部被唤醒，只有一个 accept 成功。解法是 <code>EPOLLEXCLUSIVE</code>（较新内核）或 <code>SO_REUSEPORT</code> 让每个线程各有一个监听 socket。</div>
+
+<h2 id="s4">三、连接数 × 缓冲 = 内存</h2>
+
+<div class="ikit" data-type="param" data-json='{"title":"一万连接要多少内存","badge":"param",
+"fields":[{"k":"conn","label":"连接数","min":100,"max":20000,"step":100,"val":5000,"unit":"个"},
+{"k":"buf","label":"每连接缓冲","min":1,"max":64,"step":1,"val":8,"unit":"KB"},
+{"k":"thr","label":"若用线程模型","min":1,"max":5000,"step":1,"val":1000,"unit":"线程"}],
+"outs":[
+{"label":"缓冲总量","expr":"V.conn * V.buf / 1024","unit":" MB"},
+{"label":"线程栈总量（8 MB/线程）","expr":"V.thr * 8 / 1024","unit":" GB"},
+{"label":"若每连接一线程","expr":"V.conn * 8 / 1024","unit":" GB"},
+{"label":"事件循环相对节省","expr":"(V.conn * 8 / 1024) - (V.conn * V.buf / 1024)","unit":" GB"}],
+"bar":{"expr":"min(V.conn * V.buf / 1024 / 64 * 100, 100)"},
+"verdict":{"expr":"V.conn * V.buf / 1024 < 64","ok":"内存可控","bad":"缓冲太大：缩小每连接缓冲，或改成按需分配"},
+"note":"线程栈默认 8 MB（虚拟，实际按需），但一万个线程的调度与切换开销是实打实的。这就是「C10K 问题」的算术起点。"}'></div>
+
+<h2 id="s5">动手（可选）：压到一千连接</h2>
+
+<div class="cal q"><span class="h">只在 🔧 实作模式展开</span>PC 上即可，不需要板子。</div>
+
+<ol>
+  <li>写一个 epoll ET 服务端，只回显；用 <code>ulimit -n 4096</code> 提高 fd 上限。</li>
+  <li>用一个 Python 脚本开 1000 个非阻塞连接，各发一条消息，统计往返延迟与内存（<code>ps -o rss</code>）。</li>
+  <li>把 ET 改成 LT，观察 CPU 占用变化（LT 下空闲 fd 不会空转，但忙时会反复唤醒）。</li>
+  <li>故意把 read 只读一次，制造「剩余数据不触发」的现象，再用 <code>strace</code> 看到底卡在哪。</li>
+</ol>
+
+<h2 id="s6">离开这一篇，你应该能</h2>
+
+<ul class="qa">
+  <li>说清 epoll 的三件内核结构，以及它比 select 省在哪。</li>
+  <li>列出 ET 模式的三个必踩坑与对应纪律。</li>
+  <li>估算一万连接的缓冲内存，并说明线程模型的代价。</li>
+</ul>
+
+<p>连接之间要传数据，同一台机器上的进程之间也要。下一篇讲四种 IPC 的取舍。</p>
+
+
+<nav class="pager">
+  <a href="d10-02.html"><span>← 上一篇</span><b>多线程与锁：pthread、条件变量、常见死锁</b></a>
+  <a class="nx" href="d10-04.html"><span>下一篇 →</span><b>进程间通信：管道、共享内存、消息队列、信号</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

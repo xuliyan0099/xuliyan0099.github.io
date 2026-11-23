@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第 08 章 · 工具与六个实验 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/doc-compat.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+<link rel="stylesheet" href="../../assets/asm.css">
+</head><body style="--acc:#ffb545">
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../../index.html">☰ 六个入口</a>
+  <a class="home hide-sm" href="../../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">硬件是怎么工作的 · 9 篇</div>
+    <ol>
+      <li><a href="index.html"><span class="no">⌂</span><span>路口目录<span class="sub">篇目总览与读法</span></span></a></li>
+      <li><a href="b0.html"><span class="no">00</span><span>先修：怎么学才算学会<span class="sub">三条判断标准，和一条错的路径</span></span></a></li>
+      <li><a href="b1.html"><span class="no">01</span><span>电的四个字：电压、电流、电阻、功率<span class="sub">欧姆定律、串并联、LED 限流实算</span></span></a></li>
+      <li><a href="b2.html"><span class="no">02</span><span>无源五件套：电阻、电容、电感、二极管、晶振<span class="sub">每个元件都在解决一个具体问题</span></span></a></li>
+      <li><a href="b3.html"><span class="no">03</span><span>有源器件：三极管与 MOS 管<span class="sub">为什么一个「开关」需要三个脚</span></span></a></li>
+      <li><a href="b4.html"><span class="no">04</span><span>数字电路的骨架：电平、门、组合、时序<span class="sub">五种门、真值表、加法器、触发器</span></span></a></li>
+      <li><a href="b5.html"><span class="no">05</span><span>时间：时钟、建立保持、抖动、消抖<span class="sub">为什么电路需要「等一会儿」</span></span></a></li>
+      <li><a href="b6.html"><span class="no">06</span><span>总线到底是什么<span class="sub">地址、数据、控制，与片选、时序</span></span></a></li>
+      <li><a href="b7.html"><span class="no">07</span><span>回到这块板子：元件对号入座<span class="sub">电源树、晶振、DDR、eMMC、按键、LED</span></span></a></li>
+      <li><a href="b8.html" class="active"><span class="no">08</span><span>工具与六个实验<span class="sub">万用表、示波器、逻辑分析仪怎么用</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="../index.html">硬件入口</a><a href="../../juan/index.html">十四卷总览</a></div>
+  </aside>
+  <main class="doc">
+    <div class="doc-kicker">硬件基础课 · 从一颗电阻开始 <span>·</span> 第 08 章</div>
+    <div class="ch-head">
+      <h1>工具与六个实验</h1>
+      <div class="ch-meta"><span class="hot">第 08 章</span><span>约 22 分钟</span><span>★ 必读</span></div>
+    </div>
+<h2 id="s1">三件工具，三种证据</h2>
+<table class="regtbl"><thead><tr><th>工具</th><th>给你什么证据</th><th>什么时候用</th></tr></thead><tbody><tr><td class="nm">万用表</td><td>静态电压、通断、电阻</td><td>80% 的诊断从这里开始</td></tr><tr><td class="nm">逻辑分析仪</td><td>数字波形与协议解码</td><td>「寄存器说发了，脚上有没有」</td></tr><tr><td class="nm">示波器</td><td>模拟波形、边沿、毛刺</td><td>前两者都说不清的时候</td></tr></tbody></table>
+<p>一条原则：<b>先用最便宜的工具排除最大的可能</b>。万用表量一个电压只要 10 秒，逻辑分析仪接线要 10 分钟。</p>
+<h2 id="s2">万用表的四个用法</h2>
+<p><b>（1）直流电压档</b>：黑笔接 GND，红笔点测量点。</p>
+<ul>
+<li>量电源轨：确认 3.3V 是 3.3V 而不是 2.6V（欠压会让芯片行为异常）。</li>
+<li>量 GPIO：确认「软件说高，脚上真是高」。这是区分软硬问题最快的一步。</li>
+</ul>
+<p><b>（2）通断档（蜂鸣档）</b>：查「这根线到底连没连」。</p>
+<ul>
+<li>量原理图上标着相连的两个点，不响就是断线/虚焊。</li>
+<li>量「不该连的两点」，响就是短路。</li>
+</ul>
+<p><b>（3）电阻档</b>：断电后量上拉是否存在、电阻值是否对。</p>
+<p><b>（4）二极管档</b>：量 LED 与二极管的方向（正向有压降、反向开路）。</p>
+<h2 id="s3">逻辑分析仪：抓「软件看不见的那一层」</h2>
+<p>典型用法：I2C 或 SPI 通信失败。</p>
+<pre class="asm"><code>接线：GND 必接，SCL/SDA（或 SCLK/MOSI/MISO/CS）各一路
+采样率：至少 4–10 倍于总线频率（100kHz I2C 用 1MHz 采样就够）
+解码：软件里选 I2C/SPI 协议，直接出字节</code></pre>
+<p><b>看到什么就能定位什么</b>：</p>
+<table class="regtbl"><thead><tr><th>波形</th><th>结论</th></tr></thead><tbody><tr><td class="nm">完全没波形</td><td>引脚复用/时钟/驱动没使能</td></tr><tr><td class="nm">有 SCLK 无数据</td><td>MOSI 线接错或 MOSI 没复用</td></tr><tr><td class="nm">有数据但从机不应答</td><td>地址错、从机没供电、上拉缺失</td></tr><tr><td class="nm">数据错一位</td><td>SPI 模式（CPOL/CPHA）配错</td></tr></tbody></table>
+<p>这是唯一能把「软件配置」和「物理信号」对上的工具，值得花半天学会。</p>
+<h2 id="s4">示波器：只在需要看「过程」时用</h2>
+<p>数字信号用逻辑分析仪就够；示波器的价值在三个地方：</p>
+<ul>
+<li><b>上升沿太慢</b>（信号是「斜的」）→ 线与负载电容太大、驱动太弱。</li>
+<li><b>毛刺</b>（极窄的尖峰）→ 电源噪声、串扰，逻辑分析仪常常采不到。</li>
+<li><b>电源纹波</b> → 用 AC 耦合看 mV 级波动。</li>
+</ul>
+<h2 id="s5">六个实验，都能在自己的板子上做</h2>
+<p><b>实验 1：量三路电源</b> 用万用表量 5V 入口、3.3V、DDR 电压。记录数值，偏差超过 5% 就要查。</p>
+<p><b>实验 2：LED 限流实测</b> 把限流电阻换成两个不同值，用万用表量 LED 两端电压与电阻两端电压，反算电流，与 01 章的计算对照。<b>这一步会让你真正相信欧姆定律。</b></p>
+<p><b>实验 3：按键波形</b> 逻辑分析仪抓按键引脚，按一次看抖动。数一数抖动持续多久——这就是消抖时间该取多长的依据。</p>
+<p><b>实验 4：UART 自发自收</b> 串口 TX 与 RX 短接（回环），发一串字节看是否原样返回。通了说明 UART 配置与引脚都对。</p>
+<p><b>实验 5：I2C 扫地址</b> 用 <code>i2cdetect</code> 扫一遍总线，看哪些地址有应答。应答的地址与原理图上的器件对上，说明总线与上拉都没问题。</p>
+<p><b>实验 6：GPIO 翻转测频率</b> 软件里快速翻转一个 GPIO，用示波器/逻辑分析仪量方波频率，与「循环次数 ÷ 指令周期」估算对照。<b>这是理解「CPU 到底多快」的最好办法</b>，也会让你知道中断里不能写延时循环。</p>
+<h2 id="s6">诊断的固定顺序</h2>
+<p>把六个实验串成一条排查链，遇到任何「不工作」都按这个顺序：</p>
+<pre class="asm"><code>① 电压对不对（万用表）
+② 时钟起没起（示波器/晶振脚）
+③ 复位放没放（万用表）
+④ 引脚复用对不对（读寄存器 / pinmux-pins）
+⑤ 信号有没有出来（逻辑分析仪）
+⑥ 协议对不对（解码）</code></pre>
+<p><b>每一步都是一个「是否」，不要跳步。</b> 跳过 ①② 直接查 ⑤，是最常见的浪费时间方式。</p>
+<h2 id="s7">本篇验收</h2>
+<ul>
+<li>能说出三件工具各自给什么证据，以及「先用哪个」的原则。</li>
+<li>能用万用表完成「量电压、量通断、量电阻、量二极管」四种操作。</li>
+<li>能说出逻辑分析仪采样率怎么定，以及四种波形对应四种结论。</li>
+<li>能说出示波器相对逻辑分析仪的独有价值（边沿、毛刺、纹波）。</li>
+<li>完成六个实验中的至少四个，并记录数据。</li>
+<li>能默写六步排查顺序。</li>
+</ul>
+<h2 id="s8">回到路口</h2>
+<p>硬件基础课九章到此结束。往下走有两条：<code>manual</code> 路口把「手册怎么查」补上，<code>asm</code> 路口把「寄存器怎么改」练成肌肉记忆。三条路合起来，你就能从「板子上一个不亮的灯」一路推到「哪一位没写对」。</p>
+<div class="pager">
+      <a href="b7.html"><span>上一篇</span><b>← 07 回到这块板子：元件对号入座</b></a>
+      <a href="index.html"><span>目录</span><b>篇目总览</b></a>
+      <a class="nx" href="../../manual/index.html"><span>继续</span><b>手册研读 → →</b></a>
+    </div>
+  </main>
+</div>
+<script src="../../assets/hw-tools.js"></script>
+</body>
+</html>

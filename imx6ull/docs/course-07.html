@@ -1,0 +1,232 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>补码与减法器 · 卷 01 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j01.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 01 · 机器与指令</div>
+<ol><li><a href="course-00.html">
+  <span class="no">01</span><span>计算机只是一台会照抄指令的机器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-01.html">
+  <span class="no">02</span><span>为什么偏偏是二进制<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-02.html">
+  <span class="no">03</span><span>一个字节能装什么<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-03.html">
+  <span class="no">04</span><span>从按键到屏幕<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-04.html">
+  <span class="no">05</span><span>一个开关能做什么<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-05.html">
+  <span class="no">06</span><span>与、或、非<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-06.html">
+  <span class="no">07</span><span>从半加器到全加器<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-07.html" class="active">
+  <span class="no">08</span><span>补码与减法器<span class="sub">约 1 小时 · 当前</span></span></a></li>
+<li><a href="course-08.html">
+  <span class="no">09</span><span>时钟与触发器<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-09.html">
+  <span class="no">10</span><span>冯诺依曼五件事<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-10.html">
+  <span class="no">11</span><span>PC 与指令寄存器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-11.html">
+  <span class="no">12</span><span>ALU 与标志位<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-12.html">
+  <span class="no">13</span><span>一条指令的完整旅程<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-13.html">
+  <span class="no">14</span><span>流水线<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-14.html">
+  <span class="no">15</span><span>机器码的位段<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-15.html">
+  <span class="no">16</span><span>九种寻址方式<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-16.html">
+  <span class="no">17</span><span>汇编只有四类动作<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-17.html">
+  <span class="no">18</span><span>函数调用与 ABI<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-18.html">
+  <span class="no">19</span><span>从 C 到汇编<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th18.html">
+  <span class="no">20</span><span>CPU 是怎么执行一行代码的（详解）<span class="sub">约 3 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j00.html">← 卷 00</a>
+  <a href="../juan/j02.html">卷 02 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 01<span>·</span>机器与指令<span>·</span>第 08 篇</div>
+  <h1>补码与减法器</h1>
+  <p class="lede">CPU 里只有一个加法器，却能做减、乘、除、比较、取负。秘密在于补码：把一个数「取反加一」，它就变成了相反数，于是 A - B 直接变成 A + (-B)。这一课讲透这个技巧，以及它带来的两个后果：为什么 -2147483648 取负还是它自己，为什么有符号溢出要看符号位。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+
+    <div class="anim2" data-json='{"title":"补码与减法器：减法根本不需要减法器","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"B 取反"},{"k":"Cin 置 1"},{"k":"加法"},{"k":"出标志"}],"frames":[{"i":0,"d":"32 个 XOR 门，控制位=1 时翻转"},{"i":1,"d":"加法器的进位输入接控制位"},{"i":2,"d":"A + ~B + 1，一次普通加法"},{"i":3,"d":"C=借位取反，V=符号位翻覆"}]}'></div>
+
+    <div class="viz" data-kind="bits" data-title="32 位补码：最高位的「权值」是负的" data-sub="这是理解补码最有效的一张图" data-json='{"w":32,"fields":[{"n":"b31 符号位","lo":31,"hi":31,"c":"rd","t":"权值 -2^31，不是 +2^31"},{"n":"b30","lo":30,"hi":30,"c":"or","t":"权值 +2^30"},{"n":"b29..b24","lo":24,"hi":29,"c":"vi","t":"权值 +2^24 ~ +2^29"},{"n":"b23..b16","lo":16,"hi":23,"c":"cy","t":"权值 +2^16 ~ +2^23"},{"n":"b15..b8","lo":8,"hi":15,"c":"cy","t":"权值 +2^8 ~ +2^15"},{"n":"b7..b0","lo":0,"hi":7,"c":"gr","t":"权值 +2^0 ~ +2^7"}],"note":"把每一位当成一个「权值」乘以其比特值再相加，就得到这个二进制串代表的数值。b31 的权值是负的——这一句就是补码的全部定义。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 钟表为什么能解释负数？② 补码的定义到底是什么？③ 为什么「取反加一」等于取负？④ 减法指令在硬件上怎么走？⑤ V 标志为什么是「最高进位 XOR 次高进位」？</p>
+    </div>
+
+    <h2 id="s1">1. 直觉：钟表倒拨三小时 = 正拨九小时</h2>
+
+    <p>钟面上没有「-3」，但你可以把指针往前拨 9 小时，效果一样。因为钟面是<b>循环的</b>：12 个小时一圈，12 就是「模」。同理，8 位计数器有 256 个状态，256 就是模：<b><code>-3</code> 等价于 <code>253</code></b>（256-3）。</p>
+
+    <p>这就是补码：<code>-x</code> 用 <code>2^n - x</code> 表示。它不是一个「符号标记方案」，而是<b>让加法自动完成减法</b>的方案。</p>
+
+    <p><b>失效处</b>：模运算只在「不越界」时成立。一旦越界，就会从最大值瞬间跳到最小值——这就是溢出，也是 C 语言里 <code>INT_MAX + 1</code> 属于未定义行为的物理根源。</p>
+
+    <h2 id="s2">2. 硬件上：一个加法器包打天下</h2>
+
+    <pre><code>减法：A - B  =  A + (-B)
+           =  A + (~B + 1)        （取反加一）
+           =  A + (~B) + Cin(1)   （Cin 就是那个 +1）</code></pre>
+
+    <p>于是一条 <code>sub</code> 指令在数据通路上的动作只有三步：</p>
+
+    <div class="viz" data-kind="flow" data-title="sub 指令的硬件三步：没有任何「减法器」" data-sub="全部复用加法器，只多了一个反相器和一个控制位" data-json='{"steps":[{"n":"B 取反","d":"32 个 XOR 门，控制位=1 时翻转"},{"n":"Cin 置 1","d":"加法器的进位输入接控制位"},{"n":"加法","d":"A + ~B + 1，一次普通加法"},{"n":"出标志","d":"C=借位取反，V=符号位翻覆"}],"note":"注意那个控制位：sub 时=1（取反且进位1），add 时=0（不取反且进位0）。同一个加法器，一根控制线，就变成了减法器。硬件设计的核心技巧叫「复用」。"}'></div>
+
+    <p>同理，<code>cmp</code> 就是 <code>subs</code>（做减法、丢结果、只留标志），<code>neg</code> 就是 <code>rsb r0, r0, #0</code>（0 减它）。你在反汇编里看到的一切「减法」，本质都是一次加法。</p>
+
+    <div class="viz" data-kind="compare" data-title="三种负数表示法：为什么只有补码赢了" data-sub="同一个 -3，在 8 位里的三种写法" data-json='{"bad":{"t":"原码 / 反码（历史方案）","items":["原码：1000 0011，符号位 + 绝对值","问题1：有两个零（0000 0000 与 1000 0000）","问题2：加法器要额外判断符号，不能直接加","问题3：减法要单独的减法电路"]},"good":{"t":"补码（现代方案）","items":["补码：1111 1101（= 256 - 3）","只有一个零，没有 -0","加减乘除全部复用同一个加法器","范围不对称：-128 ~ +127，多出的那个给最小值"]},"note":"补码唯一「不完美」的地方是负数比正数多一个（-2^31 没有对应的正数），这直接导致 -INT_MIN 溢出——你在写代码时必须知道这件事。"}'></div>
+
+    <h2 id="s3">3. 为什么 V 是「最高进位 XOR 次高进位」</h2>
+
+    <p>有符号溢出只会在一种情况发生：<b>两个同号数相加，结果反号</b>。用进位来描述：</p>
+
+    <ul>
+      <li>正 + 正 越界 → 进位从 bit30 进到 bit31，但 bit31 没有继续进位 → 两次进位不同 → 符号位被顶成 1（变负）。</li>
+      <li>负 + 负 越界 → 相反方向 → 符号位被顶成 0（变正）。</li>
+    </ul>
+
+    <p>所以 <code>V = C31 XOR C30</code>（最高位的进位 与 次高位的进位 异或）。这个公式一行就能实现，代价几乎为零——所以几乎所有的 ALU 都免费提供 V。</p>
+
+    <h2 id="s4">4. 补码的三个实际后果</h2>
+
+    <table>
+      <thead><tr><th>现象</th><th>原因</th><th>你要怎么做</th></tr></thead>
+      <tbody>
+        <tr><td><code>-INT_MIN</code> 还是 <code>INT_MIN</code></td><td>+2^31 超出范围，取负后仍在范围内「绕回」</td><td>取绝对值前先判范围，或用 <code>long long</code></td></tr>
+        <tr><td><code>0xFFFFFFFF</code> 既可能是 -1 也可能是 4294967295</td><td>同一串位，两种解释</td><td>看类型的符号性，别看数值；有符号/无符号混用是 bug 温床</td></tr>
+        <tr><td>右移负数补 1</td><td>算术右移（ASR）保留符号位</td><td>想逻辑右移用 <code>LSR</code> / 无符号类型</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s5">5. 实验：看见补码</h2>
+
+    <pre><code>def show(x, bits=8):
+    mask = (1 << bits) - 1
+    raw  = x & mask
+    print("%5d -> 0x%0*X (%s)" % (x, bits//4, raw, format(raw, "0%db" % bits)))
+
+for v in (3, -3, 127, -128, -1, 0):
+    show(v)
+
+# 取反加一验证
+def neg(x, bits=8):
+    return (~x + 1) & ((1<<bits)-1)
+print("neg(3) =", neg(3), "-> 应为 253 (0xFD)")
+
+# 溢出演示：8 位有符号 127 + 1
+a, b = 127, 1
+r = (a + b) & 0xFF
+print("127+1 =", r, "作为有符号解释是", r - 256)
+# 结果 -128：正+正得负 → V=1
+
+# C 里的未定义行为（Ubuntu 上试）
+# int x = 2147483647; x = x + 1;  // UB，别写这种代码
+# 用 -fwrapv 或改用无符号/更大类型</code></pre>
+
+    <p>这段跑完，你应该能一眼看懂为什么 <code>0xFFFFFFFD</code> 是 -3，也能回答面试常问的「为什么补码能统一加减」。</p>
+
+    <h2 id="s6">6. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于补码的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["补码是「用最高位表示符号」的编码","CPU 里有一个减法器和一个加法器","溢出是硬件错误，会被检测并阻止"]},"good":{"t":"实际","items":["补码是「最高位权值为负」的加权表示，没有专门的符号位","只有一个加法器，减法靠取反加一复用","硬件只置 V 标志，不阻止；是否处理由软件决定"]},"note":"「符号位」是个方便说法，不是硬件实现。你如果把它当成真实存在的开关，就会在符号扩展、比较、移位上反复犯错。"}'></div>
+
+    <h2 id="s7">7. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>8 位下 -5 的补码是多少？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>256-5 = 251 = <code>0xFB</code> = <code>1111 1011</code>。验证：取反加一 <code>~5=250</code>，<code>250+1=251</code>。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>为什么补码没有 -0？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>因为 0 的补码就是 0 本身（取反加一后仍为 0），状态数 2^n 被完整分配：0 一个，负数 2^(n-1) 个，正数 2^(n-1)-1 个。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>8 位下 -128 的相反数是多少？说明后果。</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>还是 -128（+128 超出范围）。后果：<code>abs(INT_MIN)</code> 返回负数，若不判范围会导致后续逻辑错误。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>一条 <code>sub r0, r1, r2</code> 在硬件上用到几个加法器？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>一个。r2 取反（XOR 门），Cin=1，然后走加法器。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>为什么两个同号数相加才可能溢出？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>异号相加结果绝对值一定变小，不可能超出范围；只有同号相加才可能越界并翻转符号位。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>跑 Python 脚本，把 -128 ~ 127 全部打印成二进制，找出「突变点」。</li>
+        <li>在 Ubuntu 上用 <code>gcc -S</code> 看 <code>a-b</code> 生成的是 <code>sub</code> 还是别的指令。</li>
+        <li>写一段代码触发有符号溢出，用 <code>-fsanitize=signed-integer-overflow</code> 看它报什么。</li>
+        <li>用 <code>objdump -d</code> 找一条 <code>cmp</code>，确认它其实是 <code>subs</code>。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      到现在所有电路都是「组合逻辑」——输入变，输出立刻跟着变，没有记忆。但 CPU 必须记住「现在执行到第几条指令」。第 08 课讲时钟和触发器，让电路拥有记忆。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="slider" data-iviz="1" data-json='{"title":"拖到负数，看补码长什么样","hint":"-128 到 127","label":"十进制值","unit":"","min":-128,"max":127,"step":1,"value":-1,"presets":[{"t":"0","v":0},{"t":"-1","v":-1},{"t":"-128（边界）","v":-128},{"t":"127（边界）","v":127}],"note":"0 的相反数还是 0，-128 没有对应的正数。补码不是「对称的」，它的范围是 -128 到 127，这就是溢出检查必须单独做的原因。","out":[{"k":"8 位原样","expr":"bin(v, 8)"},{"k":"十六进制","expr":"hex(v, 2)"},{"k":"取相反数","expr":"hex(-v, 2)"},{"k":"当无符号读","expr":"v < 0 ? v + 256 : v"}]}'></div>
+  
+
+<nav class="pager">
+  <a href="course-06.html"><span>← 上一篇</span><b>从半加器到全加器</b></a>
+  <a class="nx" href="course-08.html"><span>下一篇 →</span><b>时钟与触发器</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

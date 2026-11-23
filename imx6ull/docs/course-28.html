@@ -1,0 +1,224 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>fork 与 exec · 卷 04 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j04.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 04 · 操作系统</div>
+<ol><li><a href="course-th01.html">
+  <span class="no">01</span><span>操作系统与 Linux 的分层<span class="sub">约 3 小时</span></span></a></li>
+<li><a href="course-27.html">
+  <span class="no">02</span><span>进程、线程与 task_struct<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-28.html" class="active">
+  <span class="no">03</span><span>fork 与 exec<span class="sub">约 1 小时 · 当前</span></span></a></li>
+<li><a href="course-29.html">
+  <span class="no">04</span><span>特权级与异常<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-30.html">
+  <span class="no">05</span><span>中断<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-31.html">
+  <span class="no">06</span><span>调度<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-32.html">
+  <span class="no">07</span><span>上下文切换<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-33.html">
+  <span class="no">08</span><span>同步<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th02.html">
+  <span class="no">09</span><span>进程、线程与调度（详解）<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="course-th06.html">
+  <span class="no">10</span><span>中断、并发与同步（详解）<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-th15.html">
+  <span class="no">11</span><span>内核全貌：子系统如何协作<span class="sub">◆ · 约 4 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j03.html">← 卷 03</a>
+  <a href="../juan/j05.html">卷 05 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 04<span>·</span>操作系统<span>·</span>第 03 篇</div>
+  <h1>fork 与 exec</h1>
+  <p class="lede">Linux 创建进程的方式很怪：没有「创建一个新程序」的系统调用。只有 fork（复制一个自己）和 exec（把自己的身体换掉）。要启动一个新程序，必须先复制自己，再换掉身体——这就是 shell 每次执行命令时做的两件事。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+
+    <div class="anim2" data-json='{"title":"fork 与 exec：进程怎么「生」出来的","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"shell 调 fork"},{"k":"子进程调 exec"},{"k":"内核加载 ELF"},{"k":"子进程开始执行"},{"k":"ls 退出"},{"k":"shell 回收"}],"frames":[{"i":0,"d":"复制出一个几乎一样的自己"},{"i":1,"d":"把地址空间换成 /bin/ls"},{"i":2,"d":"重建 mm、映射代码与库"},{"i":3,"d":"从 ls 的入口开始跑"},{"i":4,"d":"变僵尸，等 shell wait"},{"i":5,"d":"wait 拿到退出码，僵尸消失"}]}'></div>
+
+    <div class="viz" data-kind="flow" data-title="fork + exec 的完整生命周期" data-sub="一个 shell 执行 ls 的全过程" data-json='{"steps":[{"n":"shell 调 fork","d":"复制出一个几乎一样的自己"},{"n":"子进程调 exec","d":"把地址空间换成 /bin/ls"},{"n":"内核加载 ELF","d":"重建 mm、映射代码与库"},{"n":"子进程开始执行","d":"从 ls 的入口开始跑"},{"n":"ls 退出","d":"变僵尸，等 shell wait"},{"n":"shell 回收","d":"wait 拿到退出码，僵尸消失"}],"note":"注意 fork 与 exec 之间那段：子进程还拥有 shell 的地址空间（COW 共享），只跑几条指令就 exec——这正是 COW 几乎「零成本」的场景。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① fork 到底复制了什么？② 为什么 fork 有两次返回？③ exec 保留了哪些东西？④ 僵尸进程是什么，怎么回收？⑤ 孤儿进程谁来管？</p>
+    </div>
+
+    <h2 id="s1">1. fork：复制「身份证」，共享「身体」</h2>
+
+    <table>
+      <thead><tr><th>复制</th><th>共享（COW）</th><th>保留</th></tr></thead>
+      <tbody>
+        <tr><td>task_struct、内核栈</td><td>物理内存页（只读，写入时复制）</td><td>打开的文件（引用计数 +1）</td></tr>
+        <tr><td>页表（新的一份）</td><td>文件内容（页缓存）</td><td>工作目录、信号处理设置</td></tr>
+        <tr><td>fd 表（新的一份）</td><td>—</td><td>—</td></tr>
+      </tbody>
+    </table>
+
+    <pre><code>pid_t pid = fork();
+if (pid == 0) {
+    // 子进程：这里是新任务，跑自己的逻辑
+    execvp("ls", argv);       // 通常立刻 exec
+} else if (pid &gt; 0) {
+    // 父进程：pid 是子进程号，用 wait 等它
+    waitpid(pid, &amp;status, 0);
+} else {
+    // fork 失败（内存/进程数限制）
+    perror("fork");
+}</code></pre>
+
+    <p>「两次返回」不是魔法：fork 之后有两个 task 从同一个返回点继续执行，各自拿到不同的返回值（子得 0，父得 pid）。</p>
+
+    <h2 id="s2">2. exec：不换身份，只换身体</h2>
+
+    <div class="viz" data-kind="compare" data-title="exec 保留什么、替换什么" data-sub="理解这张表，就理解了「进程」与「程序」的区别" data-json='{"bad":{"t":"被替换","items":["代码段、数据段、堆、栈全部重建","旧的 mm_struct 被销毁","大部分内存映射被解除"]},"good":{"t":"被保留","items":["PID（进程号不变）","已打开的文件描述符（除非带 CLOEXEC）","工作目录、环境变量、信号掩码"]},"note":"所以「进程」是容器，「程序」是内容。exec 是换内容不换容器。这就是为什么守护进程重启自己（exec 新版本）时 PID 不变。"}'></div>
+
+    <pre><code>// 一个真实的技巧：进程自我重启（热升级）
+// 重新 exec 自身，PID 不变，fd 保留
+execv("/proc/self/exe", argv);
+
+// fd 泄漏的常见坑：exec 前要关闭不需要的 fd
+// 或者创建时加 O_CLOEXEC
+int fd = open(path, O_RDONLY | O_CLOEXEC);</code></pre>
+
+    <h2 id="s3">3. 僵尸与孤儿</h2>
+
+    <table>
+      <thead><tr><th>类型</th><th>成因</th><th>现象</th><th>处理</th></tr></thead>
+      <tbody>
+        <tr><td><b>僵尸 Z</b></td><td>子进程退出，父进程没 wait</td><td>ps 里一堆 Z，占 PID 但不占内存</td><td>父进程 wait；或父进程退出后由 init 收养</td></tr>
+        <tr><td><b>孤儿</b></td><td>父进程先死</td><td>被 init（PID 1）收养并 wait</td><td>通常自动解决</td></tr>
+      </tbody>
+    </table>
+
+    <p>僵尸不占内存却占 PID。PID 上限通常 32768，<b>僵尸堆积到上限后就无法创建新进程</b>——这是「系统突然不能 fork」的经典原因。</p>
+
+    <pre><code># 找僵尸
+ps -eo pid,ppid,stat,comm | awk '$3 ~ /Z/'
+# 找它们的父进程，看为什么没 wait
+ps -eo pid,ppid,stat,comm | grep -w Z</code></pre>
+
+    <h2 id="s4">4. vfork 与 posix_spawn</h2>
+
+    <p><code>vfork</code> 是老优化：父子共享地址空间，子进程必须立刻 exec（否则会破坏父进程）。现代系统上性能优势已不明显，且危险，<b>能不使用就不用</b>。</p>
+
+    <p><code>posix_spawn</code> 是把 fork+exec 打包成一个系统调用，内部可能用 vfork 或 clone 优化。glibc 的 <code>system()</code> 最终也是走这条路。</p>
+
+    <h2 id="s5">5. 实验：自己实现一个 mini shell</h2>
+
+    <pre><code>// 最简 shell（200 行内可写完）
+while (1) {
+    printf("$ ");
+    fflush(stdout);
+    char line[256];
+    if (!fgets(line, sizeof(line), stdin)) break;
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        execlp("/bin/sh", "sh", "-c", line, NULL);
+        _exit(127);                 // exec 失败
+    }
+    int st;
+    waitpid(pid, &amp;st, 0);
+    printf("[exit %d]\n", WEXITSTATUS(st));
+}</code></pre>
+
+    <p>写完这个，你就真正理解 shell 了：它不过是一个「fork + exec + wait」的循环，再加上一些管道与重定向的处理。</p>
+
+    <h2 id="s6">6. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于 fork/exec 的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["fork 会复制整个内存，所以很慢","exec 会创建新进程","僵尸进程占大量内存，必须重启"]},"good":{"t":"实际","items":["COW 让 fork 只复制页表，与内存大小近似无关","exec 不创建进程，只是替换地址空间","僵尸只占 PID 与一个 task_struct，但堆积会耗尽 PID"]},"note":"第一条在「fork 大内存进程」时特别明显：你会惊讶地发现 fork 只花了几十微秒——因为一页都没复制。"}'></div>
+
+    <h2 id="s7">7. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>fork 返回 0 和返回正数分别代表什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>0 = 当前是子进程；正数 = 当前是父进程，值是子进程 PID；负数 = 失败。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>exec 之后 PID 会变吗？fd 会关吗？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>PID 不变；fd 默认保留（带 CLOEXEC 的会被关闭）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>僵尸进程占什么资源？有什么危害？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>占 PID 和一个 task_struct；堆积会导致无法创建新进程（PID 耗尽）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>孤儿进程会被谁收养？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>由 init（PID 1，现代系统可能是 systemd）收养并最终 wait。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>为什么「fork 大进程」并不慢？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>COW：物理页共享且只读，只复制页表；真正复制只在某一方写入时按页发生。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>写一个 fork 后打印 PID 的程序，验证两次返回。</li>
+        <li>写 mini shell，执行 <code>ls</code> 与 <code>sleep 2</code>。</li>
+        <li>故意不 wait，制造僵尸并用 ps 找出它。</li>
+        <li>用 <code>strace -f</code> 跟一个 shell 命令，看到 clone/execve/wait4 序列。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      用户程序凭什么不能直接写内核内存？第 29 课讲特权级与异常：ARM 的几种模式、SVC 指令怎么切权限、以及向量表长什么样。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"fork 之后，父子各走各的","hint":"逐步看","note":"fork 不是复制内存，是先复制页表、把页标成只读，谁写谁才真复制（COW）。所以 fork 一个占 1GB 的进程，代价并不高。","steps":[{"t":"① 复制 task_struct","d":"内核为新进程建一份任务结构，复制父进程的几乎所有字段，包括地址空间描述。"},{"t":"② 复制页表，标记 COW","d":"父子共享同一批物理页，两边页表项都设成只读。谁先写，谁触发缺页去复制一份。"},{"t":"③ 返回两次","d":"fork 在父进程返回子进程 PID，在子进程返回 0。同一行代码，两个不同的返回值——这是区分父子的唯一办法。"},{"t":"④ 子进程 exec","d":"子进程通常立刻 exec：丢掉自己的地址空间，装载新程序，从入口重新开始跑。"}]}'></div>
+  
+
+<nav class="pager">
+  <a href="course-27.html"><span>← 上一篇</span><b>进程、线程与 task_struct</b></a>
+  <a class="nx" href="course-29.html"><span>下一篇 →</span><b>特权级与异常</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

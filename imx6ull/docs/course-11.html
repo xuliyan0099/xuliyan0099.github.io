@@ -1,0 +1,229 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ALU 与标志位 · 卷 01 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j01.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 01 · 机器与指令</div>
+<ol><li><a href="course-00.html">
+  <span class="no">01</span><span>计算机只是一台会照抄指令的机器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-01.html">
+  <span class="no">02</span><span>为什么偏偏是二进制<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-02.html">
+  <span class="no">03</span><span>一个字节能装什么<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-03.html">
+  <span class="no">04</span><span>从按键到屏幕<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-04.html">
+  <span class="no">05</span><span>一个开关能做什么<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-05.html">
+  <span class="no">06</span><span>与、或、非<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-06.html">
+  <span class="no">07</span><span>从半加器到全加器<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-07.html">
+  <span class="no">08</span><span>补码与减法器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-08.html">
+  <span class="no">09</span><span>时钟与触发器<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-09.html">
+  <span class="no">10</span><span>冯诺依曼五件事<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-10.html">
+  <span class="no">11</span><span>PC 与指令寄存器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-11.html" class="active">
+  <span class="no">12</span><span>ALU 与标志位<span class="sub">约 1 小时 · 当前</span></span></a></li>
+<li><a href="course-12.html">
+  <span class="no">13</span><span>一条指令的完整旅程<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-13.html">
+  <span class="no">14</span><span>流水线<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-14.html">
+  <span class="no">15</span><span>机器码的位段<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-15.html">
+  <span class="no">16</span><span>九种寻址方式<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-16.html">
+  <span class="no">17</span><span>汇编只有四类动作<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-17.html">
+  <span class="no">18</span><span>函数调用与 ABI<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-18.html">
+  <span class="no">19</span><span>从 C 到汇编<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th18.html">
+  <span class="no">20</span><span>CPU 是怎么执行一行代码的（详解）<span class="sub">约 3 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j00.html">← 卷 00</a>
+  <a href="../juan/j02.html">卷 02 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 01<span>·</span>机器与指令<span>·</span>第 12 篇</div>
+  <h1>ALU 与标志位</h1>
+  <p class="lede">ALU 是 CPU 里唯一「真的在算数」的部件。但它不是一堆独立电路，而是一组电路 + 一个多路选择器：opcode 决定选哪一路输出。这一课讲 ALU 的内部结构，讲五个标志位怎么被算术「顺手」产出，再讲 ARM 最漂亮的特性——条件执行：不跳转也能分支。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+
+    <div class="anim2" data-json='{"title":"ALU 与标志位","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"操作数 A / B"},{"k":"五路并行计算"},{"k":"多路选择器"},{"k":"标志位生成"},{"k":"输出 Y"}],"frames":[{"i":0,"d":"来自寄存器堆或立即数"},{"i":1,"d":"加、减、与、或、异或、移位"},{"i":2,"d":"按 opcode 位选一路"},{"i":3,"d":"N/Z/C/V 从结果取"},{"i":4,"d":"进寄存器堆 / 地址 / 分支判断"}]}'></div>
+
+    <div class="viz" data-kind="flow" data-title="ALU 内部：五路并行，一路胜出" data-sub="所有电路都在同时算，opcode 只决定「听谁的」" data-json='{"steps":[{"n":"操作数 A / B","d":"来自寄存器堆或立即数"},{"n":"五路并行计算","d":"加、减、与、或、异或、移位"},{"n":"多路选择器","d":"按 opcode 位选一路"},{"n":"标志位生成","d":"N/Z/C/V 从结果取"},{"n":"输出 Y","d":"进寄存器堆 / 地址 / 分支判断"}],"note":"「并行算、选择输出」这个结构是 ALU 设计的核心思想：不需要为每个功能单独走一遍时序，面积换速度。代价是布线复杂度与功耗。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① ALU 为什么能一个周期做多种运算？② 五个标志位分别从哪来？③ 条件执行怎么做到「不跳转就分支」？④ 为什么 ARM 的移位器是「免费」的？⑤ 一条 <code>adds</code> 和一条 <code>add</code> 差了什么？</p>
+    </div>
+
+    <h2 id="s1">1. 直觉：一排计算器，一个开关</h2>
+
+    <p>想象五台计算器并排放在桌上：一台只做加法、一台只做减法、一台做与、一台做或、一台移位。你把同样的两个数同时喂给五台，然后<b>按一个开关只让其中一台的结果登上屏幕</b>。这就是 ALU。</p>
+
+    <p><b>失效处</b>：五台同时算，功耗是五份（虽然翻转少时耗电也少）。所以现代 ALU 会做「功能分组复用」——比如加法器同时兼做减法、比较、加一、减一，靠控制位切换。</p>
+
+    <h2 id="s2">2. 硬件上：ALU 的输入输出</h2>
+
+    <table>
+      <thead><tr><th>端口</th><th>内容</th><th>来源</th></tr></thead>
+      <tbody>
+        <tr><td>A</td><td>32 位被操作数</td><td>寄存器 Rn</td></tr>
+        <tr><td>B</td><td>32 位操作数</td><td>寄存器 Rm（可先经移位器）</td></tr>
+        <tr><td>op</td><td>4~5 位功能码</td><td>译码器</td></tr>
+        <tr><td>Cin</td><td>进位输入</td><td>减法/带进位加</td></tr>
+        <tr><td>Y</td><td>32 位结果</td><td>→ 寄存器堆 / 地址 / 分支</td></tr>
+        <tr><td>N Z C V</td><td>4 个标志</td><td>→ CPSR</td></tr>
+      </tbody>
+    </table>
+
+    <p>ARM 的移位器接在 B 端口前：<code>add r0, r1, r2, lsl #3</code> 的意思是 <code>r0 = r1 + (r2 &lt;&lt; 3)</code>，<b>移位不占额外指令、不占额外周期</b>。这就是「免费移位」的由来，也是 ARM 代码密度高的一个重要原因。</p>
+
+    <div class="viz" data-kind="bars" data-title="同一件事的三种写法：指令数与周期数" data-sub="示意量级，用来说明「融合」的价值" data-json='{"items":[{"n":"lsl + add（两条）","v":2,"c":"rd"},{"n":"add 带移位（一条）","v":1,"c":"gr"},{"n":"条件执行（无跳转）","v":1,"c":"cy"},{"n":"if + 跳转（含惩罚）","v":4,"c":"or"}],"unit":"周期","max":4,"note":"注意最后两根：一个简单的 if 如果不满足，跳转会造成流水线清空（分支惩罚）。条件执行把「分支」变成「一条可能不写回结果的指令」，代价几乎为零——这是 ARM 在嵌入式里效率高的关键之一。"}'></div>
+
+    <h2 id="s3">3. 标志位是被「顺手」产生的</h2>
+
+    <p>N、Z、C、V 在第 06 课已经讲过来源。这里要强调的是它们的<b>使用方式</b>：它们只在下一条指令执行前有效，是「一次性」的。所以代码里常见的模式是紧挨着写的：</p>
+
+    <pre><code>cmp  r0, #0        ; 做 r0 - 0，只更新标志，不写结果
+beq  zero_label    ; 若 Z=1（相等）则跳
+addne r1, r1, #1   ; 若不相等才执行这条加法</code></pre>
+
+    <p>注意第三条：<code>addne</code> 是「条件执行的加法」——条件不满足时它<b>不写结果、不更新标志</b>，但也不跳转，流水线不打断。</p>
+
+    <div class="viz" data-kind="matrix" data-title="ARM 的 16 种条件码：一张表看完全部" data-sub="条件执行与条件分支共用这一张表" data-json='{"corner":"cond","cols":["助记符","含义","标志"],"rows":[{"n":"0000","c":"gray","cells":["eq","相等","Z=1"]},{"n":"0001","c":"cy","cells":["ne","不等","Z=0"]},{"n":"0010","c":"cy","cells":["cs/hs","无符号 ≥","C=1"]},{"n":"0011","c":"cy","cells":["cc/lo","无符号 &lt;","C=0"]},{"n":"0100","c":"vi","cells":["mi","负","N=1"]},{"n":"0101","c":"vi","cells":["pl","非负","N=0"]},{"n":"0110","c":"or","cells":["vs","溢出","V=1"]},{"n":"0111","c":"or","cells":["vc","未溢出","V=0"]},{"n":"1000","c":"rd","cells":["hi","无符号 &gt;","C=1 且 Z=0"]},{"n":"1001","c":"rd","cells":["ls","无符号 ≤","C=0 或 Z=1"]},{"n":"1010","c":"gr","cells":["ge","有符号 ≥","N=V"]},{"n":"1011","c":"gr","cells":["lt","有符号 &lt;","N≠V"]},{"n":"1100","c":"gr","cells":["gt","有符号 &gt;","Z=0 且 N=V"]},{"n":"1101","c":"gr","cells":["le","有符号 ≤","Z=1 或 N≠V"]},{"n":"1110","c":"gray","cells":["al","总是","—"]},{"n":"1111","c":"gray","cells":["nv","永不","（保留）"]}],"note":"只用 4 位就表达了「无符号比较」与「有符号比较」两套语义——因为它们看的是不同标志。这解释了为什么 C 里 signed 与 unsigned 比较会在某些边界值上给出相反结果。"}'></div>
+
+<h2 id="s4">4. 为什么 <code>adds</code> 和 <code>add</code> 不同</h2>
+
+    <p>ARM 的数据处理指令有一个 <b>S 位</b>：置 1 时才更新标志。这个位不是「小细节」，而是性能设计：循环里大部分加法不需要标志（省下写 CPSR 的动作，也避免标志依赖串行化）。编译器会聪明地只在真正需要时加 S。</p>
+
+    <p>反过来说，<b>标志位写回是流水线里一个讨厌的依赖点</b>：如果每条指令都写 CPSR，下一条读 CPSR 就得等，形成长依赖链。这是「为什么不要滥用条件执行」的原因之一——现代 CPU 里条件执行过多反而会因为依赖链变慢。</p>
+
+    <h2 id="s5">5. 实验：用 Python 造一个 8 位 ALU</h2>
+
+    <pre><code>def alu(a, b, op, cin=0, bits=8):
+    mask = (1 &lt;&lt; bits) - 1
+    if   op == "add": r = a + b + cin
+    elif op == "sub": r = a + (~b &amp; mask) + 1
+    elif op == "and": r = a &amp; b
+    elif op == "or":  r = a | b
+    elif op == "xor": r = a ^ b
+    elif op == "lsl": r = a &lt;&lt; b
+    else: raise ValueError(op)
+    res = r &amp; mask
+    c = 1 if r &gt; mask else 0                # 无符号进位
+    n = (res &gt;&gt; (bits-1)) &amp; 1               # 符号位
+    z = 1 if res == 0 else 0
+    # 溢出：两操作数同号且结果异号
+    sa, sb = (a &gt;&gt; (bits-1)) &amp; 1, (b &gt;&gt; (bits-1)) &amp; 1
+    v = 1 if (sa == sb and ((res &gt;&gt; (bits-1)) &amp; 1) != sa) else 0
+    return res, {"N":n, "Z":z, "C":c, "V":v}
+
+for op in ("add","sub","and","or","xor"):
+    print(op, alu(0b0111_1000, 0b0000_1001, op))
+print("有符号溢出案例:", alu(127, 1, "add"))</code></pre>
+
+    <p>最后一条会给出 <code>res=128, V=1</code>。这一行就是「为什么 CPU 需要 V 标志」的代码级证明。</p>
+
+    <h2 id="s6">6. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于 ALU 的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["ALU 有很多种，一种运算一个电路，各走各的","标志位是「额外」算出来的，很贵","条件执行总是比分支快"]},"good":{"t":"实际","items":["一组运算电路并行 + 一个选择器，opcode 选一路","标志位是运算的副产物，几乎免费（V 只多一个异或）","条件执行省掉跳转惩罚，但会引入标志依赖；现代 CPU 上要权衡"]},"note":"这也是嵌入式与高性能两种场景的差别：MCU 上分支惩罚小而代码密度重要，条件执行更划算；高主频超深流水上，分支预测往往比条件执行更优。"}'></div>
+
+    <h2 id="s7">7. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>ALU 为什么能「一个周期做多种运算」？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>各功能电路并行工作，多路选择器按 opcode 只输出一路——不是「依次尝试」，而是「同时算、选一个」。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>为什么 ARM 的移位「免费」？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>移位器串接在操作数 B 的路径上，与 ALU 同一周期完成，不需要额外指令或周期。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>无符号比较用哪几个标志？有符号呢？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>无符号看 C 与 Z（hi / ls）；有符号看 N、V、Z（ge / lt / gt / le）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p><code>cmp</code> 为什么不写结果？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>它的目标是「产生标志位」而不是保存差值；硬件上 Rd 设为 PC 之外的无效目标，只更新 CPSR。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>条件执行不满足时，指令做了什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>什么也不做：不写目标寄存器、不更新标志，但已占用了一个指令槽——所以它「不改变状态」但「占时间」。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>跑 Python ALU 脚本，验证 127+1 的 V=1。</li>
+        <li>用 <code>objdump</code> 找一条 <code>adds</code> 和一条 <code>add</code>，对比机器码里的 S 位（第 20 位）。</li>
+        <li>写两个版本的绝对值函数，一个用分支，一个用条件执行，比较周期数（用 <code>perf stat</code>）。</li>
+        <li>把 <code>add r0,r1,r2,lsl #3</code> 写成三条普通指令，看代码长了多少。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      零件都齐了：门、加法器、触发器、PC、ALU。第 12 课把一条指令从取指到写回的<b>完整旅程</b>逐拍走一遍，你会看到每一个控制信号在什么时候、由谁发出。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="slider" data-iviz="1" data-json='{"title":"结果一变，标志位跟着变","hint":"看 N / Z / V / C","label":"加法结果（4 位示意）","unit":"","min":-8,"max":8,"step":1,"value":3,"presets":[{"t":"结果为 0","v":0},{"t":"结果为负","v":-3},{"t":"溢出","v":8}],"note":"标志位从来不是「算完再判断」，而是 ALU 算的时候顺手产出的副产品。cmp 之所以能当条件跳转用，就是因为它只算不写回，专门为了让标志位变化。","out":[{"k":"N 负","expr":"v < 0 ? 1 : 0"},{"k":"Z 零","expr":"v === 0 ? 1 : 0"},{"k":"V 溢出","expr":"v > 7 || v < -8 ? 1 : 0"},{"k":"C 进位","expr":"v > 7 ? 1 : 0"}]}'></div>
+  
+
+<nav class="pager">
+  <a href="course-10.html"><span>← 上一篇</span><b>PC 与指令寄存器</b></a>
+  <a class="nx" href="course-12.html"><span>下一篇 →</span><b>一条指令的完整旅程</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

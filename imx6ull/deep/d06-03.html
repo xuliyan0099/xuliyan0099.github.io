@@ -1,0 +1,159 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IP、路由与网卡驱动：包怎么出了门又回来 · 卷 06 | i.MX6ULL</title>
+<meta name="description" content="一个包出门要查路由、找 MAC、排队、进 DMA；回来时正好相反，还要经过中断、NAPI 和协议栈层层上交。">
+<link rel="stylesheet" href="../assets/deep.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/deep.js" defer></script>
+</head><body>
+<div class="dp-prog"><i></i></div>
+<div class="dp">
+<header class="dp-top">
+  <div class="dp-crumbs">
+    <a href="../../index.html">知识库</a><span>/</span>
+    <a href="../index.html">i.MX6ULL</a><span>/</span>
+    <a href="../juan/index.html">十四卷</a><span>/</span>
+    <a href="../juan/j06.html">卷 06</a>
+  </div>
+  <div class="dp-tools">
+    <a href="../juan/j06.html">☰ 卷 06 目录</a>
+    <a href="../juan/index.html">◫ 十四卷总览</a>
+  </div>
+</header>
+
+<div class="dp-hero">
+  <div class="dp-kicker">卷 06<span>·</span>第 06·03 篇</div>
+  <h1>IP、路由与网卡驱动：包怎么出了门又回来</h1>
+  <p class="dp-lede">一个包出门要查路由、找 MAC、排队、进 DMA；回来时正好相反，还要经过中断、NAPI 和协议栈层层上交。</p>
+  <div class="dp-chips">
+    <span class="c hot">★ 一读</span>
+    <span class="c">纯读约 2 小时</span>
+    <span class="c">理论为主 · 实作可跳</span>
+    <span class="c">配 3–4 个互动演示</span>
+  </div>
+</div>
+
+<aside class="dp-toc"><div class="dp-toc-h">本页目录</div><a href="#s1"><span>01</span>先玩一下：出门的四道关</a><a href="#s2"><span>02</span>一、路由：不是「查表」，是「最长前缀匹配」</a><a href="#s3"><span>03</span>二、邻居：知道 IP，但不知道 MAC</a><a href="#s4"><span>04</span>三、qdisc：交通管制，也是丢包的第一现场</a><a href="#s5"><span>05</span>四、出门与回来：完整的一条链</a><a href="#s6"><span>06</span>五、MTU 与开销：小包为什么贵</a><a href="#s7"><span>07</span>六、三个常见误判</a><a href="#s8"><span>08</span>动手（可选）：看一次真实的收包</a><a href="#s9"><span>09</span>离开这一篇，你应该能</a></aside>
+<main class="dp-main">
+<p class="lead">一个包出门要过四道关：<strong>查路由、找 MAC、排队、交给网卡</strong>。回来时要过相反的关，还要多一道「中断 → 软中断 → 协议栈」。这一篇把这条链走完，顺便解释为什么 <code>ping</code> 通不代表端口通。</p>
+
+<h2 id="s1">先玩一下：出门的四道关</h2>
+
+<p>把卡片拖成正确顺序。注意「查路由」在「找 MAC」之前——路由决定从哪张网卡出去，邻居子系统才知道该问谁的 MAC。</p>
+
+<div class="ikit" data-type="drag" data-json='{"title":"发包路径：六步","badge":"drag",
+"items":[{"id":"rt","text":"查路由表：目的 IP → 出口网卡 + 下一跳"},{"id":"arp","text":"邻居子系统：下一跳的 MAC 在缓存里吗"},{"id":"qdisc","text":"qdisc 排队：可能整形、可能直接丢"},{"id":"ndo","text":"调用网卡 ndo_start_xmit，把 skb 交给驱动"},{"id":"dma","text":"驱动把帧描述符交给 DMA，硬件发上 wire"},{"id":"irq","text":"发送完成中断：回收描述符与 skb"}],
+"answer":["rt","arp","qdisc","ndo","dma","irq"],
+"explain":"路由是「策略」，ARP 是「地址翻译」，qdisc 是「交通管制」，驱动是「执行」。四件事分属四个子系统，靠 dst_entry 串在一起。"}'></div>
+
+<h2 id="s2">一、路由：不是「查表」，是「最长前缀匹配」</h2>
+
+<p><code>ip route</code> 打印出来的每一行都是「网络/掩码 → 出口」。查表时内核不是线性扫，而是找<strong>匹配位数最多的那一条</strong>：<code>192.168.1.0/24</code> 与 <code>0.0.0.0/0</code> 同时匹配时，选前者。</p>
+
+<table>
+<thead><tr><th>路由类型</th><th>含义</th><th>典型输出</th></tr></thead>
+<tbody>
+<tr><td>local</td><td>本机地址，包不进网卡，直接回环</td><td><code>local 127.0.0.1 dev lo</code></td></tr>
+<tr><td>unicast</td><td>普通单播，走某张网卡</td><td><code>192.168.1.0/24 dev eth0</code></td></tr>
+<tr><td>default</td><td>兜底，前缀长度 0</td><td><code>default via 192.168.1.1</code></td></tr>
+<tr><td>unreachable / blackhole</td><td>明确拒绝，用于策略</td><td><code>blackhole 10.0.0.0/8</code></td></tr>
+</tbody></table>
+
+<p>路由结果不是一个 IP，而是一个 <code>struct dst_entry</code>：它记着出口设备、下一跳、MTU、以及一组输出函数（<code>output</code> 指针）。所以「路由缓存」缓存的不是表项，而是这个已经准备好的「出行方案」。</p>
+
+<h2 id="s3">二、邻居：知道 IP，但不知道 MAC</h2>
+
+<p>以太网发帧需要 6 字节 MAC。IP 层只知道下一跳的 IP，于是要向<strong>邻居子系统</strong>要 MAC。它维护一张 ARP 缓存，条目有状态：</p>
+
+<div class="layers">
+  <div class="ly"><b>INCOMPLETE</b><span>刚发出 ARP 请求，还没人回答。此时 skb 被挂在这个邻居项的等待队列里。</span></div>
+  <div class="ly hi"><b>REACHABLE</b><span>确认可用，正常发包。有超时，超时后转 STALE。</span></div>
+  <div class="ly"><b>STALE</b><span>可能过期，但还能用。下次发包时先发一个探测，不阻塞。</span></div>
+  <div class="ly"><b>FAILED</b><span>问了几次没人答。后续包直接返回「主机不可达」。</span></div>
+</div>
+
+<p><code>ip neigh</code> 看的就是这张表。板子上「能 ping 网关、不能 ping 同网段设备」时，先看这里有没有 <code>FAILED</code>，再看交换机/网线——比怀疑驱动快得多。</p>
+
+<h2 id="s4">三、qdisc：交通管制，也是丢包的第一现场</h2>
+
+<p>驱动发送环很小（i.MX6ULL 的 FEC 只有几十个描述符）。上层发得比网卡快，就必须排队，这就是 qdisc（queue discipline）。默认是 <code>fq_codel</code>（较新内核）或 <code>pfifo_fast</code>。</p>
+
+<ul>
+  <li>队列满时的默认动作是 <strong>drop tail</strong>：丢掉最新来的包。TCP 会因此重传，行为上表现为「吞吐上不去、延迟抖」。</li>
+  <li><code>tc -s qdisc show dev eth0</code> 能看到 <code>dropped</code> 计数。这个数字持续增长，说明瓶颈在出口，不在应用。</li>
+  <li>想优先保障某类流量，用 <code>tc</code> 建 class + filter；嵌入式产品里更常见的做法是「把非关键流量限速」，而不是做复杂调度。</li>
+</ul>
+
+<h2 id="s5">四、出门与回来：完整的一条链</h2>
+
+<div class="ikit" data-type="hop" data-json='{"title":"一个包的一生（出与回）","badge":"hop","packet":"skb",
+"nodes":[{"n":"应用","s":"send"},{"n":"协议栈","s":"TCP/IP"},{"n":"qdisc","s":"排队"},{"n":"网卡","s":"DMA"},{"n":"对端","s":"wire"},{"n":"本机网卡","s":"RX 中断"},{"n":"NAPI","s":"软中断"},{"n":"socket","s":"唤醒"}],
+"hops":[
+{"at":"应用","pkt":"DATA","label":"下行开始","note":"进入发送队列，两次拷贝的第一半。"},
+{"at":"协议栈","pkt":"帧","label":"加头、算校验","note":"校验和可以只算「伪头」，剩下的交给网卡 offload。"},
+{"at":"qdisc","pkt":"排队","label":"等发送环空位","note":"满了就丢，drop 计数在这里加一。"},
+{"at":"网卡","pkt":"DMA","label":"描述符交给硬件","note":"CPU 的工作到此结束，之后是纯硬件。"},
+{"at":"对端","pkt":"ACK","label":"对端回包","note":"回程与去程路径无关，可能走完全不同的路由。"},
+{"at":"本机网卡","pkt":"RX","label":"收到帧，触发中断","note":"中断里只做最少的事：关中断、napi_schedule。"},
+{"at":"NAPI","pkt":"批量","label":"软中断里批量收包","note":"net_rx_action 按 budget 轮询，避免中断风暴。"},
+{"at":"socket","pkt":"可读","label":"交给 TCP，唤醒进程","note":"tcp_v4_rcv 找到对应 sock，数据入接收队列，唤醒等待者。"}]}'></div>
+
+<p>这条链上最容易被忽略的是第 6–7 站的分工：<strong>硬中断只负责「叫醒」</strong>，真正的收包在软中断里批量做。原因很直接：千兆线速下每秒上百万个包，每个包一次完整中断会让 CPU 完全陷在中断上下文里，应用没机会跑。</p>
+
+<p>NAPI 的 <code>budget</code>（默认 300 个包/轮，<code>netdev_budget</code>）就是「一次最多处理多少」，处理不完就把软中断交给 <code>ksoftirqd</code> 线程，让出 CPU。你在 <code>top</code> 里看到的 <code>ksoftirqd</code> 占用高，往往就是收包压力的直接体现。</p>
+
+<h2 id="s6">五、MTU 与开销：小包为什么贵</h2>
+
+<p>以太网 MTU 1500，IPv4 头 20，TCP 头 20，于是 MSS 通常 1460。每个包固定背 40 字节头，包越小，头的占比越高。</p>
+
+<div class="ikit" data-type="param" data-json='{"title":"payload 大小 → 头开销占比","badge":"param",
+"fields":[{"k":"pay","label":"每包应用数据","min":16,"max":1460,"step":16,"val":256,"unit":"B"},
+{"k":"ip","label":"IP 头","min":20,"max":60,"step":20,"val":20,"unit":"B"},
+{"k":"tcp","label":"TCP 头","min":20,"max":32,"step":12,"val":20,"unit":"B"}],
+"outs":[
+{"label":"每包总长","expr":"V.pay + V.ip + V.tcp","unit":" B"},
+{"label":"头开销占比","expr":"(V.ip + V.tcp) / (V.pay + V.ip + V.tcp) * 100","unit":" %"},
+{"label":"发 1 MB 需要多少包","expr":"ceil(1048576 / V.pay)","unit":" 个"},
+{"label":"1 MB 实际上线字节","expr":"ceil(1048576 / V.pay) * (V.pay + V.ip + V.tcp)","unit":" B"}],
+"bar":{"expr":"(V.ip + V.tcp) / (V.pay + V.ip + V.tcp) * 100"},
+"verdict":{"expr":"(V.ip + V.tcp) / (V.pay + V.ip + V.tcp) < 0.05","ok":"开销可接受","bad":"小包太多：考虑合并写、批量协议或减少往返"},
+"note":"把 payload 从 1460 拖到 64，你会看到将近 40% 的带宽被头吃掉。这是「批量发送」最硬的算术理由。"}'></div>
+
+<h2 id="s7">六、三个常见误判</h2>
+
+<div class="cal warn"><span class="h">「ping 通，端口就一定通」</span>ping 走 ICMP，端口走 TCP/UDP，可能被防火墙、可能没有监听、也可能 backlog 满了。四件事要分开查：路由（<code>ip route</code>）、邻居（<code>ip neigh</code>）、监听（<code>ss -lntp</code>）、队列丢弃（<code>ss -lnt</code> 的 Send-Q 与 <code>nstat</code>）。</div>
+
+<div class="cal warn"><span class="h">「MTU 调大一定更快」</span>路径上任何一跳 MTU 更小都会导致分片或 PMTUD 黑洞。看到「小包能过、大包卡住」，先怀疑 MTU，而不是应用。</div>
+
+<div class="cal tip"><span class="h">板子上的顺序</span>网卡不通时按这个顺序查：<code>ip link</code>（PHY 是否 link up）→ <code>ethtool -S eth0</code>（错误计数）→ <code>ip addr</code> → <code>ip route</code> → <code>ip neigh</code> → <code>ping</code> → <code>tcpdump</code>。这条顺序能把「驱动没起来」和「网络配错」分开。</div>
+
+<h2 id="s8">动手（可选）：看一次真实的收包</h2>
+
+<div class="cal q"><span class="h">只在 🔧 实作模式展开</span>PC 上做，或板子上做，结论一致。</div>
+
+<ol>
+  <li><code>nstat -az | head -30</code> 先记一份基线（尤其 <code>IpInReceives</code>、<code>TcpInErrs</code>、<code>UdpInErrors</code>）。</li>
+  <li><code>tcpdump -i any -n -c 100 port 22</code> 抓 100 个包，再 <code>nstat -az</code> 对比增量。</li>
+  <li><code>tc -s qdisc show dev eth0</code> 看 <code>dropped</code>；用 <code>iperf3</code> 打满出口再看一次。</li>
+  <li>板子上用 <code>cat /proc/interrupts | grep eth</code> 看中断计数，配合 <code>top</code> 看 <code>ksoftirqd</code>——这就是 NAPI 在工作的证据。</li>
+</ol>
+
+<h2 id="s9">离开这一篇，你应该能</h2>
+
+<ul class="qa">
+  <li>按顺序说出出包的六步，并指出哪一步会丢包。</li>
+  <li>解释「最长前缀匹配」与 dst_entry 的关系。</li>
+  <li>说清硬中断与 NAPI 的分工，以及 <code>ksoftirqd</code> 高占用意味着什么。</li>
+</ul>
+
+<p>网络栈这一卷到此收口。接下来回到板子本身：卷 07 讲芯片、时钟、总线，卷 08 讲从通电到 shell 的启动链。</p>
+
+<nav class="dp-nav">
+  <a href="d06-02.html"><span>← 上一篇</span>TCP 状态机与 sk_buff：一次数据往返的完整路径</a>
+  <a href="d09-01.html" class="nxt"><span>下一篇 →</span>platform 总线模型：probe、匹配、资源与设备树</a>
+</nav>
+<footer class="dp-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线。文中的「动手」段落只在 🔧 实作模式下展开，纯读可整篇跳过。</footer>
+</main>
+</div></body></html>

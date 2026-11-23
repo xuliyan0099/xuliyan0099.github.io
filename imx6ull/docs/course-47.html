@@ -1,0 +1,185 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>I2C 设备驱动 · 卷 09 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j09.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 09 · 驱动体系</div>
+<ol><li><a href="course-th05.html">
+  <span class="no">01</span><span>设备模型与驱动框架<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="course-45.html">
+  <span class="no">02</span><span>写一个字符设备<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-46.html">
+  <span class="no">03</span><span>pinctrl 与 GPIO<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-47.html" class="active">
+  <span class="no">04</span><span>I2C 设备驱动<span class="sub">约 1 小时 · 当前</span></span></a></li>
+<li><a href="course-48.html">
+  <span class="no">05</span><span>中断的上半部与下半部<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-ch12.html">
+  <span class="no">06</span><span>驱动开发入门<span class="sub">约 20 小时</span></span></a></li>
+<li><a href="d09-01.html">
+  <span class="no">07</span><span>platform 总线模型：probe、匹配、资源与设备树<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="d09-02.html">
+  <span class="no">08</span><span>阻塞 IO 与等待队列：poll / select / epoll 的驱动侧<span class="sub">约 3 小时</span></span></a></li>
+<li><a href="d09-03.html">
+  <span class="no">09</span><span>SPI 子系统：控制器驱动与设备驱动<span class="sub">◆ · 约 3 小时</span></span></a></li>
+<li><a href="d09-04.html">
+  <span class="no">10</span><span>块设备与 eMMC：gendisk、请求队列与分区<span class="sub">◆ · 约 4 小时</span></span></a></li>
+<li><a href="d09-05.html">
+  <span class="no">11</span><span>DMA 与 Cache 一致性：谁负责 flush，谁负责 invalidate<span class="sub">◆ · 约 3 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j08.html">← 卷 08</a>
+  <a href="../juan/j10.html">卷 10 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 09<span>·</span>驱动体系<span>·</span>第 04 篇</div>
+  <h1>I2C 设备驱动</h1>
+  <p class="lede">GPIO 是一个引脚管一件事，I2C 是两根线管一串设备——靠 7 位地址点名。这一课把「总线 → 控制器 → 设备 → 驱动」这条链拆开，讲清 i2c_client 是谁创建的、probe 里第一个寄存器该读什么、为什么老手都用 regmap、以及接上传感器后 i2cdetect 扫不到地址时该怎</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+
+    <div class="anim2" data-json='{"title":"I2C 设备驱动：两条线挂一串设备","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"① 匹配"},{"k":"② probe"},{"k":"③ 读 WHO_AM_I"},{"k":"④ 注册字符设备 / input"}],"frames":[{"i":0,"d":"设备树节点的 compatible 与驱动里的 of_device_id 表比对成功，内核为设备创建 i2c_client，挂到对应 i2c_adapter 上。"},{"i":1,"d":"驱动拿到 client，用 devm_ioremap 或 regmap 准备好访问通道，然后开始碰硬件。"},{"i":2,"d":"先读标识寄存器确认芯片真的在、型号对。读回 0xFF 通常是上拉没接或地址错，不是驱动问题。"},{"i":3,"d":"把读到的数据变成用户能用的东西：/dev/xxx 或 input 事件，之后应用就能消费。"}]}'></div>
+
+    <div class="viz" data-kind="tree" data-title="一条 I2C 总线上的四层对象" data-sub="设备树写在哪层，驱动就在哪层匹配" data-json='{"nodes":[{"n":"i2c1 控制器","d":"SoC 内部，管时钟与波形","c":"cy","ch":[{"n":"设备 0x68（RTC）","d":"i2c_client，由设备树生成","c":"gr","ch":[{"n":"driver: rtc-ds1307","d":"probe 时注册","c":"vi"}]},{"n":"设备 0x1e（加速度计）","d":"另一个 i2c_client","c":"or","ch":[{"n":"driver: my_accel","d":"你自己的驱动","c":"rd"}]}]}],"note":"控制器只有一个，设备可以挂十几个。匹配靠的是设备树节点的 compatible 与驱动里的 of_device_id 表，不是地址。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 地址 0x68 是谁分配的？② 为什么设备树里写 <code>reg = &lt;0x68&gt;</code> 就够了，不用写「怎么发开始位」？③ <code>i2c_client</code> 和 <code>i2c_driver</code> 谁先谁后？④ 为什么推荐 regmap？⑤ <code>i2cdetect -y 1</code> 扫不到设备时，先怀疑什么？</p>
+    </div>
+
+    <h2 id="s1">1. 直觉：一条只有两根线的「广播总线」</h2>
+    <p>SCL 打拍子，SDA 传数据。主机先说「我要找 0x68」，然后读写。所有设备都听得到，但只有地址对上的那个应答。地址是芯片出厂定的（有的可由 ADDR 引脚改 2 档）。</p>
+    <p><b>类比失效处</b>：广播这个比喻会让人以为「可以同时发」。实际是一条线一个时刻只能有一个主设备在驱动，两个主机同时发就是总线冲突，波形会糊掉——I2C 没有冲突检测，只能事后发现数据不对。</p>
+
+    <div class="viz" data-kind="seq" data-title="读一个寄存器要发两轮" data-sub="写地址+寄存器号（第一轮），再读数据（第二轮）" data-json='{"slots":["START","地址+W","寄存器号","重复START","地址+R","数据","STOP"],"sigs":[{"n":"SCL","w":[1,1,1,1,1,1,1],"c":"cy","note":"每拍一个时钟"},{"n":"SDA","w":[0,1,1,1,1,0,1],"c":"gr","note":"数据在 SCL 高电平期间稳定"}],"note":"这就是为什么 read 一个字节要调用两次传输：先告诉它「我要哪个寄存器」，再把它吐出来。regmap 把这两步封装成一次 regmap_read。"}'></div>
+
+    <h2 id="s2">2. 硬件：上拉电阻不是可选项</h2>
+    <p>I2C 是开漏输出，只能拉低不能拉高。总线空闲时靠两个上拉电阻（常见 4.7k）把线拉回高电平。没有上拉，波形永远起不来；上拉太小（如 1k）会增加功耗并让低电平拉不下去；线太长（>30cm）分布电容会把上升沿拖成斜坡，表现为「偶尔读到全 0xFF」。</p>
+    <h2 id="s3">3. 软件：设备树给「设备」，驱动给「行为」</h2>
+<pre><code>&amp;i2c1 {
+    clock-frequency = &lt;400000&gt;;          /* 400kHz 快速模式 */
+    status = "okay";
+
+    myaccel: accel@1e {
+        compatible = "demo,myaccel";
+        reg = &lt;0x1e&gt;;                     /* 7 位地址，不写读写位 */
+        interrupt-parent = &lt;&amp;gpio1&gt;;
+        interrupts = &lt;9 IRQ_TYPE_EDGE_FALLING&gt;;
+    };
+};</code></pre>
+<pre><code>#include &lt;linux/i2c.h&gt;
+#include &lt;linux/regmap.h&gt;
+
+static const struct regmap_config cfg = {
+    .reg_bits = 8, .val_bits = 8, .max_register = 0x7F,
+};
+
+static int my_probe(struct i2c_client *cli)
+{
+    struct regmap *map = devm_regmap_init_i2c(cli, &amp;cfg);
+    int id;
+    if (IS_ERR(map)) return PTR_ERR(map);
+    regmap_read(map, 0x0F, &amp;id);          /* WHO_AM_I */
+    dev_info(&amp;cli-&gt;dev, "chip id = 0x%02x\n", id);
+    return 0;
+}
+
+static const struct of_device_id my_of[] = {
+    { .compatible = "demo,myaccel" }, { }
+};
+MODULE_DEVICE_TABLE(of, my_of);
+
+static struct i2c_driver my_drv = {
+    .driver = { .name = "myaccel", .of_match_table = my_of },
+    .probe = my_probe,
+    .id_table = NULL,
+};
+module_i2c_driver(my_drv);</code></pre>
+    <p>顺序是：i2c 控制器先注册 → 解析设备树时创建 <code>i2c_client</code>（带地址）→ 驱动模块加载时用 <code>compatible</code> 匹配 → 匹配成功才调 <code>probe</code>。所以「驱动加载了但 probe 没跑」几乎总是 <code>compatible</code> 字符串不一致，不是地址错。</p>
+
+    <div class="viz" data-kind="compare" data-title="regmap vs 手写 smbus 调用" data-sub="同一个意思，两种写法" data-json='{"bad":{"t":"直接调 smbus","items":["i2c_smbus_read_byte_data(cli, 0x0F)","每个芯片一套调用，换芯片就重写","没有缓存，没有统一错误处理","并发访问要自己加锁"]},"good":{"t":"用 regmap","items":["regmap_read(map, 0x0F, &amp;v)","同一套 API 覆盖 I2C/SPI/MMIO","可选缓存、统一错误码","内部已有锁，支持多上下文"]},"note":"regmap 的价值不在少写一行，而在「同一份驱动逻辑可以换到 SPI 版本」——很多传感器芯片两种接口都支持。"}'></div>
+
+    <h2 id="s4">4. 三条误解</h2>
+    <ul>
+      <li><b>「reg 要写 8 位地址」</b>：设备树里 <code>reg</code> 是 7 位地址（0x1E），读写位由控制器自动加。写成 0x3C（8 位形式）会扫不到。</li>
+      <li><b>「i2cdetect 扫不到就是驱动问题」</b>：扫描发生在应用层，跟你的驱动无关。扫不到先查硬件：上拉电阻、供电、ADDR 引脚、地址是否被别的设备占用。</li>
+      <li><b>「probe 里可以随便忙等」</b>：probe 在进程上下文，可以 msleep；但如果你在中断上下文调 i2c 传输，必须用 <code>i2c_transfer</code> 的非睡眠版本或干脆挪到工作队列。</li>
+    </ul>
+
+    <h2 id="s5">5. 五题自测</h2>
+    <div class="q"><span class="n">1</span><p>设备树里 <code>reg = &lt;0x1e&gt;</code> 和驱动里的 <code>compatible</code> 各决定什么？</p></div>
+    <details class="ans"><summary>看答案</summary><p><code>reg</code> 决定「跟哪个地址通信」，<code>compatible</code> 决定「由哪个驱动接管」。两者独立：地址对但 compatible 不匹配，probe 不会跑。</p></details>
+
+    <div class="q"><span class="n">2</span><p>为什么读一个 8 位寄存器要两轮传输？</p></div>
+    <details class="ans"><summary>看答案</summary><p>第一轮写「地址 + 寄存器号」，第二轮用重复 START 切到读模式取数据。芯片不会记住上一次的寄存器号，除非它支持 auto-increment 且你连续读。</p></details>
+
+    <div class="q"><span class="n">3</span><p><code>i2cdetect -y 1</code> 全是 <code>--</code>，可能原因按概率排序？</p></div>
+    <details class="ans"><summary>看答案</summary><p>① 没上拉电阻或没供电 ② 总线号用错（i2c-1 未必是板上的 I2C1）③ 设备地址是 8 位写法 ④ SDA/SCL 接反 ⑤ 引脚没复用成 I2C 功能。</p></details>
+
+    <div class="q"><span class="n">4</span><p><code>regmap_read</code> 返回负值，通常是什么？</p></div>
+    <details class="ans"><summary>看答案</summary><p><code>-ENXIO</code>/-<code>-EREMOTEIO</code> 表示设备没应答（NAK），多半是地址错或设备没上电；<code>-ETIMEDOUT</code> 是总线被拉死（某个设备把 SDA 拉低不放）。</p></details>
+
+    <div class="q"><span class="n">5</span><p>设备树里 <code>clock-frequency</code> 改了 400k，为什么有的从设备反而不工作？</p></div>
+    <details class="ans"><summary>看答案</summary><p>老器件只支持 100k；另外上拉电阻与线长在 400k 下更容易造成上升沿过慢。降回 100k 一试就知道。</p></details>
+
+    <h2 id="s6">6. 动手（40 分钟）</h2>
+    <div class="steps">
+      <p>1. <code>i2cdetect -l</code> 列出总线，<code>i2cdetect -y &lt;n&gt;</code> 扫地址，把扫到的表贴出来。</p>
+      <p>2. 用 <code>i2cget -y &lt;n&gt; 0x1e 0x0F</code> 读 WHO_AM_I，和手册比对。</p>
+      <p>3. 写一个最小 i2c 驱动，probe 里打印芯片 ID，确认 <code>dmesg</code> 里出现你那一行。</p>
+      <p>4. 故意把设备树 <code>compatible</code> 改错一个字母，重新启动，确认「驱动在、probe 不在」——这是最常见的一种静默失败。</p>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      传感器会读了，可它是「数据准备好了才通知你」，不是你去问。第 48 课讲中断的上半部与下半部：为什么中断里不能睡、tasklet 与工作队列怎么选、按键抖动该怎么处理。
+    </div>
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"一个 I2C 驱动，四步跑起来","hint":"逐步看","note":"多数 I2C 读不到数据，不是驱动写错，是设备树里的 reg 地址或 compatible 写错——先 i2cdetect 确认设备在总线上，再谈驱动。","steps":[{"t":"① 匹配","d":"设备树节点的 compatible 与驱动里的 of_device_id 表比对成功，内核为设备创建 i2c_client，挂到对应 i2c_adapter 上。"},{"t":"② probe","d":"驱动拿到 client，用 devm_ioremap 或 regmap 准备好访问通道，然后开始碰硬件。"},{"t":"③ 读 WHO_AM_I","d":"先读标识寄存器确认芯片真的在、型号对。读回 0xFF 通常是上拉没接或地址错，不是驱动问题。"},{"t":"④ 注册字符设备 / input","d":"把读到的数据变成用户能用的东西：/dev/xxx 或 input 事件，之后应用就能消费。"}]}'></div>
+  
+
+<nav class="pager">
+  <a href="course-46.html"><span>← 上一篇</span><b>pinctrl 与 GPIO</b></a>
+  <a class="nx" href="course-48.html"><span>下一篇 →</span><b>中断的上半部与下半部</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

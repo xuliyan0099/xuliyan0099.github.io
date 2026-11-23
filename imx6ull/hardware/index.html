@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>硬件入口 · 认识这块 i.MX6ULL 板子 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<style>
+/* ---------- 硬件页专用 ---------- */
+.hw-cta{margin:0 0 26px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:1100px){.hw-cta{grid-template-columns:1fr}}
+.hw-cta a{display:flex;flex-direction:column;gap:4px;padding:14px 18px;border-radius:13px;border:1px solid rgba(61,219,217,.35);background:linear-gradient(120deg,rgba(61,219,217,.12),rgba(139,123,255,.1));text-decoration:none}
+.hw-cta a:hover{border-color:rgba(61,219,217,.7)}
+.hw-cta b{color:#eafdff;font-size:15px}
+.hw-cta span{color:#a9b8d2;font-size:12.5px}
+.hw-hero{margin:0 0 26px;padding:22px 22px 20px;border:1px solid rgba(110,168,254,.22);border-radius:16px;background:linear-gradient(150deg,rgba(61,219,217,.08),rgba(139,123,255,.07) 60%,rgba(8,12,24,.6))}
+.hw-hero h2{margin:0 0 8px;font-size:21px;color:#eaf3ff;border:0;padding:0}
+.hw-hero p{margin:0;color:#a9b8d2;font-size:14px;line-height:1.85}
+.hw-hero .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+.hw-hero .chips span{font-size:11.5px;color:#cfdcf7;border:1px solid rgba(120,150,200,.28);border-radius:999px;padding:4px 10px;background:rgba(255,255,255,.03)}
+
+/* 板子地图 */
+.board{display:grid;grid-auto-rows:minmax(58px,auto);grid-template-columns:repeat(6,1fr);gap:8px;margin:16px 0 6px;padding:14px;border:1px solid rgba(110,168,254,.2);border-radius:14px;background:
+  repeating-linear-gradient(0deg,rgba(120,150,200,.06) 0 1px,transparent 1px 26px),
+  repeating-linear-gradient(90deg,rgba(120,150,200,.06) 0 1px,transparent 1px 26px),#0a0f1c}
+.b-chip{grid-column:span 1;min-height:58px;display:flex;flex-direction:column;justify-content:center;cursor:pointer;border:1px solid rgba(120,150,200,.24);border-radius:10px;background:rgba(15,21,34,.9);padding:9px 10px;text-align:left;color:#cfdcf7;transition:border-color .15s,background .15s}
+.b-chip b{display:block;font-size:12.5px;margin-bottom:3px}
+.b-chip s{text-decoration:none;font-size:10.5px;color:#6f7f9c;line-height:1.4}
+.b-chip:hover{border-color:rgba(61,219,217,.55)}
+.b-chip.on{border-color:#3ddbd9;background:rgba(61,219,217,.12);box-shadow:0 0 0 1px rgba(61,219,217,.25) inset}
+.b-chip.soc{grid-column:span 2;border-color:rgba(139,123,255,.45)}
+.b-chip.wide{grid-column:span 2}
+.puzzle{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin:16px 0 12px}
+.pz{border:1px solid rgba(120,150,200,.24);border-left:3px solid var(--gr);border-radius:11px;background:rgba(255,255,255,.03);padding:12px 13px}
+.pz b{display:block;font-size:13.5px;color:#eaf3ff;margin-bottom:6px}
+.pz span{display:block;font-size:12.5px;color:#a9b8d2;line-height:1.6}
+.pz i{display:block;font-style:normal;font-size:11.5px;color:#7f90ad;margin-top:7px}
+.pz.or{border-left-color:#ffb84d}.pz.cy{border-left-color:#3ddbd9}.pz.vi{border-left-color:#8b7bff}.pz.gr{border-left-color:#5ce1a0}
+.board-note{font-size:11.5px;color:#6f7f9c;margin:8px 2px 0;line-height:1.7}
+.b-detail{margin:14px 0 4px;padding:13px 15px;border-radius:12px;border:1px solid rgba(61,219,217,.3);background:rgba(61,219,217,.07);min-height:96px}
+.b-detail b{color:#eaf3ff;font-size:13.5px}
+.b-detail dl{margin:8px 0 0;display:grid;grid-template-columns:74px 1fr;gap:6px 10px;font-size:13px}
+.b-detail dt{color:#8fa3c4}
+.b-detail dd{margin:0;color:#cfdcf7;line-height:1.65}
+
+/* 启动模式 */
+.boot-row{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 0}
+.boot-btn{cursor:pointer;font-size:12.5px;color:#cfdcf7;background:rgba(255,255,255,.04);border:1px solid rgba(120,150,200,.28);border-radius:10px;padding:9px 13px}
+.boot-btn.on{border-color:#ffb84d;background:rgba(255,184,77,.13);color:#ffe0b0}
+.boot-out{margin:12px 0 0;padding:12px 14px;border-radius:10px;border:1px solid rgba(120,150,200,.22);background:rgba(255,255,255,.02);font-size:13px;line-height:1.8;color:#cfdcf7;min-height:84px}
+.boot-out .k{color:#ffb84d}
+
+/* 复用实验室 */
+.mux{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0 0}
+.mux-card{padding:12px 14px;border-radius:12px;border:1px solid rgba(120,150,200,.22);background:rgba(255,255,255,.03)}
+.mux-card h4{margin:0 0 8px;font-size:13px;color:#8fa3c4;letter-spacing:.04em}
+.pad{font-family:ui-monospace,Consolas,monospace;color:#3ddbd9;font-size:13px}
+.mux-ctl{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0 0}
+.mux-ctl select{font-size:12.5px;padding:6px 9px;border-radius:8px;background:#0d1422;color:#cfdcf7;border:1px solid rgba(120,150,200,.3)}
+.mux-log{margin:10px 0 0;font-family:ui-monospace,Consolas,monospace;font-size:12px;line-height:1.8;color:#a9b8d2;background:rgba(0,0,0,.25);border-radius:9px;padding:9px 11px;white-space:pre-wrap}
+.mux-log .hl{color:#3ddbd9}
+@media(min-width:1180px){.puzzle{grid-template-columns:repeat(5,1fr)}}
+@media(max-width:760px){
+  .board{grid-template-columns:repeat(2,1fr)}
+  .b-chip.soc,.b-chip.wide{grid-column:span 2}
+  .mux{grid-template-columns:1fr}
+}
+</style>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="index.html">☰ 六个入口</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">硬件入口 · 这块板子</div>
+    <ol>
+      <li><a href="basics/index.html"><span class="no">↗</span><span>硬件基础课<span class="sub">从电阻到总线，8 章</span></span></a></li>
+      <li><a href="../asm/index.html"><span class="no">↗</span><span>手写汇编练习<span class="sub">20 道题，配单步台</span></span></a></li>
+      <li><a href="#s0" class="active"><span class="no">01</span><span>先认板子<span class="sub">它到底由哪几块拼成</span></span></a></li>
+      <li><a href="#s1"><span class="no">02</span><span>板子地图<span class="sub">点方块看元件</span></span></a></li>
+      <li><a href="#s2"><span class="no">03</span><span>SoC 里面有什么<span class="sub">Cortex-A7 + 外设</span></span></a></li>
+      <li><a href="#s3"><span class="no">04</span><span>上电到启动<span class="sub">谁先动，串口说什么</span></span></a></li>
+      <li><a href="#s4"><span class="no">05</span><span>三种启动方式<span class="sub">eMMC / TF / USB</span></span></a></li>
+      <li><a href="#s5"><span class="no">06</span><span>引脚复用实验室<span class="sub">一个脚只能有一个主人</span></span></a></li>
+      <li><a href="#s6"><span class="no">07</span><span>硬件故障对照表<span class="sub">不启动先查这三样</span></span></a></li>
+      <li><a href="#s7"><span class="no">08</span><span>上手清单<span class="sub">今天就能做的 6 件</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="index.html">☰ 入口</a><a href="../juan/j00.html">卷 00 →</a></div>
+  </aside>
+
+  <main class="doc">
+    <div class="doc-kicker">硬件入口 <span>·</span> 你手上的 i.MX6ULL</div>
+    <h1>先认识这块板子，再谈驱动</h1>
+    <p class="lede">软件跑不起来，九成不是代码的问题，是板子上的某一环没到位：电没上去、时钟没起、启动脚拨错、串口接错线。这一页只干一件事——让你看着这块板子，能说出每块芯片是干什么的、上电后先发生什么、出问题时先量哪里。</p>
+
+    <div class="hw-hero">
+      <h2>一句话：这是一台「能自己启动的小电脑」</h2>
+      <p>i.MX6ULL 是 NXP 的一颗 ARM Cortex-A7 单核 SoC，主频通常 528MHz，片内集成 DDR 控制器、eMMC/NAND 控制器、以太网 MAC、USB、UART、I2C、SPI、LCD、ADC、CAN。开发板做的事就是把它需要的「电、时钟、存储、调试口」都焊在周围，让它能从上电一路跑到 Linux 命令行。</p>
+      <div class="chips"><span>Cortex-A7 · 528MHz</span><span>DDR3L 512MB（常见）</span><span>eMMC 8GB / NAND</span><span>UART1 115200 调试口</span><span>10/100M 以太网</span><span>USB OTG 烧录</span></div>
+    </div>
+
+    <div class="hw-cta"><a href="basics/index.html"><b>硬件基础课 · 从电阻到总线</b><span>元器件 → 数字电路 → 时序 → 总线 → 这块板子，9 篇独立文章</span></a><a href="../asm/index.html"><b>手写汇编 · 从 mov 到点灯</b><span>寄存器、栈、AAPCS、条件码、位操作，10 节 + 20 道练习，配单步台</span></a><a href="../manual/index.html"><b>芯片手册研读 · 从文档到寄存器</b><span>六份文档分工、RM 骨架、寄存器逐列读、四个真实例子与查表路径</span></a></div>
+
+    <h2 id="s0">1. 先给一个能记住的模型：五块拼图</h2>
+    <p>任何一块 i.MX6ULL 开发板，拆开看都是这五块，名字各家不同，作用一模一样：</p>
+
+    <div class="puzzle">
+      <div class="pz or"><b>电源</b><span>5V 进 → 3.3V / 1.35V(DDR) / 1.1~1.3V(内核)</span><i>坏了：灯不亮、反复重启、芯片发烫</i></div>
+      <div class="pz cy"><b>时钟</b><span>24MHz 晶振 → PLL 倍频，给所有人发节拍</span><i>坏了：串口乱码、网口不通</i></div>
+      <div class="pz vi"><b>存储</b><span>eMMC 放系统，DDR 当运行内存</span><i>坏了：卡在 Starting kernel、随机死机</i></div>
+      <div class="pz gr"><b>调试口</b><span>UART1 + USB OTG，你和板子唯一的对话通道</span><i>坏了：上电一个字都没有</i></div>
+      <div class="pz gr"><b>外设</b><span>网口 / LCD / 按键 / TF / 排针</span><i>坏了：单点失灵，网口灯不亮、屏幕花</i></div>
+    </div>
+    <p class="note">记法：电源管「活不活」，时钟管「准不准」，存储管「记不记得住」，调试口管「你听不听得见」，外设管「能不能跟外界打交道」。</p>
+
+    <h2 id="s1">2. 板子地图：点方块，看它是谁</h2>
+    <p>下面这张图是按典型 i.MX6ULL 开发板（正点原子 / 野火这一类的 MINI 或 ALPHA 板）画的布局示意，不是某一家的精确丝印。点任意方块，下面告诉你：它是什么、坏了什么症状、怎么用万用表或命令验证。</p>
+
+    <div class="board" id="boardMap">
+      <button class="b-chip soc" data-k="soc"><b>SoC · i.MX6ULL</b><s>BGA 焊死，板子的心脏</s></button>
+      <button class="b-chip" data-k="ddr"><b>DDR3L</b><s>512MB 运行内存</s></button>
+      <button class="b-chip" data-k="emmc"><b>eMMC / NAND</b><s>8GB，放系统</s></button>
+      <button class="b-chip" data-k="pmic"><b>电源 DC-DC</b><s>5V → 3.3 / 1.35 / 1.2V</s></button>
+      <button class="b-chip" data-k="clk"><b>晶振</b><s>24MHz + 32.768kHz</s></button>
+      <button class="b-chip wide" data-k="uart"><b>调试串口 UART1</b><s>115200 8N1 · 上电第一句话</s></button>
+      <button class="b-chip wide" data-k="usb"><b>USB OTG / Host</b><s>烧录口 + 接 U 盘键鼠</s></button>
+      <button class="b-chip" data-k="eth"><b>以太网</b><s>10/100M PHY（RJ45）</s></button>
+      <button class="b-chip" data-k="lcd"><b>LCD 接口</b><s>RGB 并口 FPC 座</s></button>
+      <button class="b-chip" data-k="sd"><b>TF 卡槽</b><s>SD1，可整机从卡启动</s></button>
+      <button class="b-chip" data-k="key"><b>按键 / LED</b><s>复位、ON/OFF、心跳灯</s></button>
+      <button class="b-chip wide" data-k="pin"><b>2×20 排针</b><s>GPIO / I2C / SPI / UART</s></button>
+      <button class="b-chip wide" data-k="boot"><b>启动拨码</b><s>决定从哪儿加载系统</s></button>
+    </div>
+    <div class="board-note">不同板厂的丝印、位置、芯片型号都会变（比如有的用 NAND 不用 eMMC、有的带音频 codec、有的把 USB 做成 Type-C）。认元件的方法不变：看芯片丝印 → 查原理图 → 找它的电源脚和信号脚。</div>
+
+    <div class="b-detail" id="boardDetail">
+      <b>点上面的方块看细节</b>
+      <dl><dt>提示</dt><dd>先点「SoC」，再点「电源」和「调试串口」，这三块是新手排障最常用的。</dd></dl>
+    </div>
+
+    <h2 id="s2">3. SoC 里面到底有什么</h2>
+    <p>板子上最贵的那颗 BGA 就是 i.MX6ULL。它不是「一个 CPU」，而是「一个 CPU 加一堆外设控制器」焊在同一块硅片上：</p>
+
+    <table>
+      <thead><tr><th>片内模块</th><th>干什么</th><th>对应到板子上的谁</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">Cortex-A7 核</td><td>执行指令，带 32KB L1 指令/数据 Cache、128KB L2</td><td>就是它自己在跑 Linux</td></tr>
+        <tr><td class="nm">MMU / Cache</td><td>虚拟地址翻译、内存保护</td><td>没它 Linux 跑不起来（要开 MMU）</td></tr>
+        <tr><td class="nm">DDR 控制器（MMDC）</td><td>直接管 DDR3L 颗粒的时序</td><td>DDR 颗粒；时序配错就死在 uboot</td></tr>
+        <tr><td class="nm">SD/MMC 控制器 ×2</td><td>SD1 接 TF 卡，SD2 接 eMMC</td><td>TF 卡槽、eMMC 芯片</td></tr>
+        <tr><td class="nm">UART ×8</td><td>串口，UART1 通常做调试口</td><td>板上 USB 转串口那颗小芯片</td></tr>
+        <tr><td class="nm">以太网 MAC ×2</td><td>MAC 在片内，PHY 在板外</td><td>KSZ8081 之类的 PHY + RJ45</td></tr>
+        <tr><td class="nm">USB OTG / Host</td><td>OTG 做烧录与 gadget，Host 接外设</td><td>MicroUSB / Type-C / USB-A</td></tr>
+        <tr><td class="nm">LCD / CSI / I2C / SPI / PWM / ADC / CAN</td><td>显示、摄像头、传感器总线、背光、采样、车载总线</td><td>FPC 座、排针、板载传感器</td></tr>
+        <tr><td class="nm">IOMUXC</td><td>把上面这些信号「接到具体的物理引脚」</td><td>排针上那一堆复用脚</td></tr>
+      </tbody>
+    </table>
+    <p class="note">i.MX6ULL 和 i.MX6UL 的差别主要在主频与部分外设；写驱动时以你板子上那颗的具体型号（丝印如 <code>MCIMX6Y2CVM05AB</code>）查 NXP 参考手册，别拿别的型号的表硬套。</p>
+
+    <h2 id="s3">4. 上电以后，谁先动</h2>
+    <p>按下电源，到你能在串口敲命令，中间是固定的一条链，任何一环断都会「卡住不动」，而且卡在不同地方对应不同故障：</p>
+
+    <div class="viz" data-kind="flow" data-title="从 5V 到 shell：五段路" data-sub="卡在哪一段，就知道该查什么" data-json='{"steps":[{"n":"电源就绪","d":"5V 进，DC-DC 依次出 3.3V / 1.35V / 内核电压，复位释放"},{"n":"Boot ROM","d":"SoC 内部固化的第一段代码，按启动拨码/熔丝去读存储"},{"n":"uboot","d":"初始化 DDR、时钟、串口，打印 U-Boot 与板子信息"},{"n":"内核","d":"解压并启动 Linux，接管 MMU、驱动、根文件系统"},{"n":"用户空间","d":"挂载根文件系统，起 init，最后给你一个登录提示符"}],"note":"串口是唯一可靠的「进度条」：没输出 = 电源/时钟/启动脚；有 uboot 没内核 = 存储或镜像；进内核卡住 = DDR 时序或设备树。"}'></div>
+
+    <table>
+      <thead><tr><th>卡住的位置</th><th>串口最后一行</th><th>先查什么</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">一点输出都没有</td><td>（空白）</td><td>电源电压、晶振起振、启动拨码、串口线是否 TX/RX 交叉、波特率 115200</td></tr>
+        <tr><td class="nm">反复重启</td><td>只闪几个字符</td><td>电源带载能力（换 5V/2A 电源）、DDR 供电、复位脚被拉低</td></tr>
+        <tr><td class="nm">停在 uboot</td><td><code>U-Boot SPL ...</code> 或 <code>Starting kernel ...</code> 之后无输出</td><td>镜像是否完整、设备树是否匹配板型、内核串口配置</td></tr>
+        <tr><td class="nm">内核 panic</td><td><code>Unable to mount root fs</code> / <code>mmc ... error</code></td><td>eMMC/TF 分区、根文件系统、启动参数 <code>root=</code></td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s4">5. 三种启动方式，别再拔错开关</h2>
+    <p>i.MX6ULL 上电时只看几个引脚的电平（BOOT_MODE 拨码 / eFuse），决定 Boot ROM 去哪儿找系统。点一个模式看它的行为：</p>
+
+    <div class="boot-row" id="bootRow">
+      <button class="boot-btn on" data-b="emmc">从 eMMC 启动（正常使用）</button>
+      <button class="boot-btn" data-b="sd">从 TF 卡启动（试新系统）</button>
+      <button class="boot-btn" data-b="usb">USB 下载模式（救砖）</button>
+    </div>
+    <div class="boot-out" id="bootOut"></div>
+
+    <h2 id="s5">6. 引脚复用实验室：一个脚只能有一个主人</h2>
+    <p>i.MX6ULL 的引脚比外设少，所以几乎每个物理脚都挂了 8 个候选功能（ALT0–ALT7）。同一时刻只能选一个：选了 UART1_TXD，它就不是 GPIO 了。这就是「复用」。</p>
+
+    <div class="mux">
+      <div class="mux-card">
+        <h4>你选的引脚</h4>
+        <div class="pad" id="muxPad">UART1_TXD</div>
+        <div class="mux-ctl">
+          <select id="muxSel">
+            <option value="uart">当 UART1 的发送脚</option>
+            <option value="gpio">当普通 GPIO 输出</option>
+            <option value="i2c">当 I2C1 的时钟脚</option>
+            <option value="spi">当 SPI1 的片选脚</option>
+          </select>
+        </div>
+        <p style="font-size:12.5px;color:#8fa3c4;margin:10px 0 0;line-height:1.75">写驱动的顺序永远是：<b>查 IOMUXC 表 → 写 MUX 选 ALT → 写 PAD_CTL 设电气属性 → 开时钟 → 配外设</b>。少一步就「没反应」，而不是「报错」。</p>
+      </div>
+      <div class="mux-card">
+        <h4>这样配置会发生什么</h4>
+        <div class="mux-log" id="muxLog"></div>
+      </div>
+    </div>
+
+    <h2 id="s6">7. 硬件故障对照表</h2>
+    <p>先在硬件层面排除，再怀疑内核和驱动。下表按「现象」倒查，从上往下是最常见的顺序：</p>
+
+    <table>
+      <thead><tr><th>现象</th><th>最可能的原因</th><th>一分钟验证</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">上电全无反应，灯不亮</td><td>5V 电源不够 / 电源口虚焊 / 保险丝</td><td>万用表量电源口 5V；换一个 5V/2A 电源</td></tr>
+        <tr><td class="nm">有电，串口无输出</td><td>启动拨码错、串口 TX/RX 接反、波特率不对</td><td>把拨码拨到 TF 卡模式再上电；确认 115200 8N1，TX 接板子 RX</td></tr>
+        <tr><td class="nm">串口输出乱码方块</td><td>波特率不匹配 / 地线没接 / 晶振异常</td><td>换 115200；USB-TTL 的 GND 必须接板子 GND</td></tr>
+        <tr><td class="nm">网口灯不亮</td><td>PHY 没供电、网线、MAC 没初始化</td><td>换网线；进系统 <code>ip link</code> 看接口是否存在</td></tr>
+        <tr><td class="nm">屏幕花屏/不亮</td><td>FPC 没插紧、背光没开、时序参数不对</td><td>重新插 FPC；量背光使能脚；换官方设备树试</td></tr>
+        <tr><td class="nm">插 TF 卡没反应</td><td>卡不是 FAT32 / 卡槽供电 / SD1 引脚被复用</td><td>换一张 8GB FAT32 卡；<code>dmesg | grep mmc</code></td></tr>
+        <tr><td class="nm">跑一会儿死机</td><td>DDR 时序余量不足 / 供电跌落 / 散热</td><td>降频或换官方 DDR 参数；摸 SoC 与 DDR 温度</td></tr>
+        <tr><td class="nm">USB 烧录认不到设备</td><td>没进下载模式 / 驱动没装 / 线只有充电功能</td><td>拨到 USB 下载模式重新上电；换数据线；看设备管理器有没有 HID/Freescale 设备</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s7">8. 上手清单：今天就能做的六件事</h2>
+    <p>不用等学完理论，先把这六件做完，你对这块板子的感觉就从「一块绿板子」变成「一台机器」：</p>
+    <ol class="qa">
+      <li><b>认电源。</b>找到 5V 输入口、电源开关、复位键；量一次 5V 与 3.3V，记住它们的位置。</li>
+      <li><b>接串口。</b>USB-TTL 的 GND 接板子 GND，TX 接板子 RX，RX 接板子 TX；开 115200 8N1，上电看第一行字。</li>
+      <li><b>玩拨码。</b>分别在 eMMC 与 TF 卡模式下上电，对比串口输出有什么不同。</li>
+      <li><b>认存储。</b>看丝印分辨 eMMC 与 DDR；进系统后 <code>lsblk</code>、<code>cat /proc/meminfo</code> 对一遍容量。</li>
+      <li><b>点一个灯。</b>从排针找一个 GPIO，用 <code>/sys/class/gpio</code> 或 <code>gpioset</code> 让它闪，再用万用表量电平。</li>
+      <li><b>插一次网线。</b>看 PHY 灯、<code>ip addr</code>、<code>ping</code> 网关，把「板子能上网」这件事跑通。</li>
+    </ol>
+
+    <div class="card">
+      <h4>接下来读哪儿</h4>
+      <p>硬件认完，回到主线：<a href="../juan/j00.html">卷 00 · 起步与实验台</a> 搭环境；想直接看启动链与驱动，去 <a href="../ref/index.html">参考卷</a> 的 T/C 系列；想拖着玩时钟树、MMU、GPIO 复用，去 <a href="../viz/index.html">互动台</a>。</p>
+    </div>
+
+    <div class="pager">
+      <a href="index.html"><span>返回</span><b>← 六个入口</b></a>
+      <a class="nx" href="../juan/j00.html"><span>开始</span><b>卷 00 · 起步与实验台 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  var DATA={
+    soc:{t:'SoC · i.MX6ULL（BGA 焊死）',d:[['是什么','整块板子的 CPU：Cortex-A7 单核 + DDR 控制器 + 一堆外设控制器，528MHz 常见'],['坏了会怎样','完全不启动、串口无输出；BGA 虚焊表现为时好时坏、轻压就好'],['怎么验','量它的各路供电（3.3V / 1.35V / 内核）、24MHz 晶振是否起振；串口有没有字']]},
+    ddr:{t:'DDR3L 颗粒（运行内存）',d:[['是什么','程序的运行内存，常见 512MB；由 SoC 内部的 MMDC 控制器直接驱动'],['坏了会怎样','uboot 阶段就死、随机死机、内存测试报错'],['怎么验','uboot 里通常有内存测试；系统里 cat /proc/meminfo 看容量']]},
+    emmc:{t:'eMMC / NAND（系统存储）',d:[['是什么','放 uboot、内核、根文件系统；eMMC 走 SD2，NAND 走 NAND 控制器'],['坏了会怎样','卡在 Starting kernel、挂载根文件系统失败、文件系统变只读'],['怎么验','uboot 里 mmc list / mmc info；系统里 lsblk、dmesg | grep mmc']]},
+    pmic:{t:'电源部分（DC-DC + 电感 + 电容）',d:[['是什么','5V 转出 3.3V（外设）、1.35V（DDR）、1.1~1.3V（内核），上电顺序有讲究'],['坏了会怎样','灯不亮、反复重启、芯片发烫、电压跌落'],['怎么验','万用表量 5V / 3.3V / DDR 电压；上电瞬间看是否掉压']]},
+    clk:{t:'晶振（24MHz 与 32.768kHz）',d:[['是什么','24MHz 给 SoC 做 PLL 参考，32.768kHz 给 RTC'],['坏了会怎样','串口乱码、网口不通、USB 认不到、时间不走'],['怎么验','示波器看 24MHz 波形；没有示波器就看串口波特率是否整体偏']]},
+    uart:{t:'调试串口 UART1（115200 8N1）',d:[['是什么','你和板子对话的唯一通道，板上一般是一颗 USB 转串口芯片 + 排针/Type-C'],['坏了会怎样','没有输出或只有乱码，后面所有调试都失明'],['怎么验','TX/RX 交叉、GND 共地、波特率 115200；上电看有没有 U-Boot 字样']]},
+    usb:{t:'USB OTG / Host',d:[['是什么','OTG 用于烧录（下载模式）和 gadget；Host 接 U 盘、键鼠'],['坏了会怎样','烧录工具认不到板子；U 盘插上无反应'],['怎么验','换数据线；拨到下载模式重新上电；看设备管理器是否出现新设备']]},
+    eth:{t:'以太网（MAC 在片内，PHY 在板外）',d:[['是什么','10/100M，常见 PHY 是 KSZ8081 一类，RMII 接 SoC'],['坏了会怎样','网口灯不亮、能连不通、丢包'],['怎么验','看 PHY 灯；系统 ip link / ethtool；换网线换交换机口']]},
+    lcd:{t:'LCD 接口（RGB 并口 FPC）',d:[['是什么','24 位 RGB 并口 + 背光使能 + 触摸（I2C）'],['坏了会怎样','花屏、偏色、不亮、触摸无反应'],['怎么验','重插 FPC；量背光使能；换官方设备树对比']]},
+    sd:{t:'TF 卡槽（SD1）',d:[['是什么','可以整机从卡启动，用来试新系统而不动 eMMC'],['坏了会怎样','插卡无反应、启动失败'],['怎么验','换 FAT32 卡；dmesg | grep mmc 看有没有识别']]},
+    key:{t:'按键与 LED',d:[['是什么','复位键、ON/OFF 键、心跳灯、用户灯'],['坏了会怎样','按了没反应、灯不亮'],['怎么验','量按键两端电平变化；LED 看限流电阻与 GPIO 配置']]},
+    pin:{t:'2×20 排针（复用脚都在这儿）',d:[['是什么','把 SoC 的 GPIO / I2C / SPI / UART / PWM / ADC 引出来'],['坏了会怎样','接上去没反应——多半是引脚复用没配对'],['怎么验','查原理图确认脚号；用 gpioinfo 看占用；量电平']]},
+    boot:{t:'启动拨码（BOOT_MODE）',d:[['是什么','上电瞬间决定从 eMMC / TF / USB 哪个介质加载系统'],['坏了会怎样','明明烧好了却起不来；烧录模式进不去'],['怎么验','对照原理图看拨码定义；两种模式各上电一次对比串口']]}
+  };
+  var detail=document.getElementById('boardDetail');
+  document.getElementById('boardMap').addEventListener('click',function(e){
+    var b=e.target.closest('.b-chip'); if(!b) return;
+    Array.prototype.forEach.call(this.querySelectorAll('.b-chip'),function(x){x.classList.remove('on')});
+    b.classList.add('on');
+    var d=DATA[b.dataset.k]; if(!d) return;
+    var rows=d.d.map(function(r){return '<dt>'+r[0]+'</dt><dd>'+r[1]+'</dd>'}).join('');
+    detail.innerHTML='<b>'+d.t+'</b><dl>'+rows+'</dl>';
+  });
+
+  var BOOT={
+    emmc:{t:'从 eMMC 启动',d:'<span class="k">Boot ROM</span> 读 eFuse/拨码 → 初始化 SD2 → 读 eMMC 第一个扇区 → 加载 uboot → 正常进系统。<br>适用：日常使用；烧好系统后就该拨到这里。<br>串口：上电 1 秒内出现 <code>U-Boot ...</code>。'},
+    sd:{t:'从 TF 卡启动',d:'<span class="k">Boot ROM</span> → 初始化 SD1 → 读 TF 卡 → 加载卡上的 uboot。<br>适用：试新系统、救砖，不动 eMMC 里的正式系统。<br>串口：卡没做好会直接停在 <code>Card did not respond</code> 一类提示。'},
+    usb:{t:'USB 下载模式（救砖）',d:'<span class="k">Boot ROM</span> 不读存储，直接在 USB OTG 上等主机下发镜像（MFG Tool / uuu）。<br>适用：eMMC 被写坏、系统完全起不来。<br>串口：可能只有一行 ROM 提示，主要看 PC 端工具是否认到设备。'}
+  };
+  var out=document.getElementById('bootOut'), row=document.getElementById('bootRow');
+  function paintBoot(k){ out.innerHTML='<b style="color:#ffd79a">'+BOOT[k].t+'</b><br>'+BOOT[k].d; }
+  row.addEventListener('click',function(e){
+    var b=e.target.closest('.boot-btn'); if(!b) return;
+    Array.prototype.forEach.call(this.querySelectorAll('.boot-btn'),function(x){x.classList.remove('on')});
+    b.classList.add('on'); paintBoot(b.dataset.b);
+  });
+  paintBoot('emmc');
+
+  var MUX={
+    uart:{pad:'UART1_TXD',log:'IOMUXC_SW_MUX_CTL_PAD_… = ALT0  <span class="hl">// 选 UART 功能</span>\nIOMUXC_SW_PAD_CTL_PAD_… = 驱动强度 / 上下拉\nCCM_CCGR 打开 UART1 时钟\nUART1_UCR 设 115200 8N1\n<span class="hl">结果：脚上出现串口波形，能打印字</span>'},
+    gpio:{pad:'GPIO1_IOxx（同一个物理脚）',log:'IOMUXC_SW_MUX_CTL_PAD_… = ALT5  <span class="hl">// 切到 GPIO</span>\nGPIO1_GDIR 设输出方向\nGPIO1_DR 写 1 / 0\n<span class="hl">结果：串口立刻断了——这个脚已经归 GPIO，不再是 UART</span>'},
+    i2c:{pad:'I2C1_SCL',log:'IOMUXC_SW_MUX_CTL_PAD_… = ALT0  <span class="hl">// I2C 功能</span>\nPAD_CTL 打开开漏 / 上拉（I2C 必须）\nCCM_CCGR 打开 I2C1 时钟\nI2C1_IADR 设从机地址\n<span class="hl">结果：能读写传感器；忘了上拉就是一直 NACK</span>'},
+    spi:{pad:'SPI1_CS0',log:'IOMUXC_SW_MUX_CTL_PAD_… = ALT0  <span class="hl">// SPI 片选</span>\nPAD_CTL 设驱动强度（片选要快）\nCCM_CCGR 打开 ECSPI1 时钟\nECSPI1_ECSPI1CON 设字长 / 时钟极性\n<span class="hl">结果：能选通从设备；极性和相位配错就是读回全 0 或全 1</span>'}
+  };
+  var padEl=document.getElementById('muxPad'), logEl=document.getElementById('muxLog'), sel=document.getElementById('muxSel');
+  function paintMux(k){ padEl.textContent=MUX[k].pad; logEl.innerHTML=MUX[k].log; }
+  sel.addEventListener('change',function(){ paintMux(this.value); });
+  paintMux('uart');
+})();
+</script>
+</body>
+</html>

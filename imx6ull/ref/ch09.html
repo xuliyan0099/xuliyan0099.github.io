@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=../docs/course-ch09.html">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第 09 章 · U-Boot 与烧写 | i.MX6ULL Linux 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="../assets/viz.css">
+  <link rel="stylesheet" href="../assets/iviz.css">
+  <link rel="stylesheet" href="../assets/anim2.css">
+  <script src="../assets/readmode.js" defer></script>
+</head>
+<body data-page="ch09">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>09 · U-Boot 与烧写</h1>
+    <p class="lede">U-Boot 是板子的「BIOS + GRUB」。它只做四件事：初始化硬件、读环境变量、搬运镜像、跳进内核。学会它，你就不再依赖烧写工具。</p>
+    <div class="viz" data-kind="flow" data-title="U-Boot 在板子上干的四件事" data-sub="它不是操作系统，是给操作系统搬家的" data-json='{"play":true,"steps":[{"n":"初始化 DDR","d":"没有内存，后面什么都加载不了"},{"n":"配好串口与网口","d":"能对话、能下载"},{"n":"读 bootargs 与设备树","d":"决定内核从哪儿来、参数是什么"},{"n":"跳转内核入口","d":"把 CPU 交给 Linux，自己退出历史"}],"note":"U-Boot 命令行里那几个变量，就是内核的「出生证明」：bootargs 决定根文件系统在哪、串口控制台是几号、内存多大。改错一个字，内核就 panic。"}'></div>
+
+
+    <div class="card">
+      <h4>本章目标</h4>
+      <p>① 会用 U-Boot 的查看/设置/保存环境变量；② 会从 MMC、TFTP 加载镜像；③ 看懂 bootcmd 与 bootargs 每一段；④ 能独立烧写一套系统；⑤ 知道板子刷死后怎么救。</p>
+    </div>
+
+    <div class="anim2" data-json='{"title":"U-Boot 命令行怎么把系统拉起来","hint":"bootargs 错一个空格就挂不上","nodes":[{"k":"命令行","s":"打断倒计时"},{"k":"printenv","s":"看 bootargs"},{"k":"tftp","s":"拉 zImage/dtb"},{"k":"bootm","s":"跳进内核"}],"frames":[{"i":0,"d":"上电按键打断 autoboot，进入 U-Boot 命令行。"},{"i":1,"d":"printenv 看 bootcmd 与 bootargs：内核地址、dtb 地址、rootfs 位置全在里面。"},{"i":2,"d":"tftp 把 zImage 与 dtb 拉到 DDR 指定地址，或用 mmc read 从卡里读。"},{"i":3,"d":"bootm 跳到内核入口，控制权交给内核，U-Boot 使命结束。"}],"kind":"flow"}'></div>
+
+    <h2>9.1 U-Boot 的位置</h2>
+
+    <p>U-Boot 全称 Universal Boot Loader，是开源的引导程序。<strong>它运行在内核之前</strong>，负责把代码从存储介质搬进 DDR，并把控制权交给内核。在 i.MX6ULL 上，它是启动链的第 3–4 级。</p>
+
+    <pre><code>u-boot/
+├── arch/arm/cpu/armv7/mx6/    <span class="c"># i.MX6 系列芯片初始化代码（时钟、DDR）</span>
+├── board/freescale/mx6ull.../ <span class="c"># 板级代码（对应你的板子）</span>
+├── drivers/mmc/               <span class="c"># SD/eMMC 驱动</span>
+├── drivers/net/               <span class="c"># 网卡驱动</span>
+├── include/configs/mx6ull...h <span class="c"># 板级配置头文件</span>
+├── common/                    <span class="c"># 命令实现，main.c 是入口</span>
+└── .config                    <span class="c"># 编译配置</span></code></pre>
+
+    <h2>9.2 环境变量：U-Boot 的大脑</h2>
+
+    <p>环境变量存在存储介质的一个固定区域里，U-Boot 每次启动先读它，按里面的脚本执行。<strong>板子「启动不了」很多时候不是镜像坏了，是环境变量被改坏了。</strong></p>
+
+    <pre><code>=&gt; printenv                    <span class="c"># 打印全部（内容很多，按空格翻页）</span>
+=&gt; printenv bootcmd
+=&gt; printenv bootargs
+=&gt; setenv ipaddr 192.168.1.101
+=&gt; setenv serverip 192.168.1.100
+=&gt; saveenv                     <span class="c"># 写入存储，不执行就只在本次生效</span>
+=&gt; setenv foo bar; printenv foo
+=&gt; setenv foo                  <span class="c"># 不赋值 = 删除</span></code></pre>
+
+    <table>
+      <thead><tr><th>变量</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td><code>bootcmd</code></td><td>倒计时结束自动执行的命令序列</td></tr>
+        <tr><td><code>bootargs</code></td><td><b>传给内核的启动参数</b>，决定根文件系统从哪挂、控制台用哪个串口</td></tr>
+        <tr><td><code>ipaddr</code> / <code>serverip</code></td><td>板子自己的 IP / PC（TFTP 服务器）的 IP</td></tr>
+        <tr><td><code>ethaddr</code></td><td>MAC 地址</td></tr>
+        <tr><td><code>baudrate</code></td><td>串口波特率，默认 115200</td></tr>
+        <tr><td><code>filesize</code></td><td>最近一次下载的文件大小（只读，脚本里常用）</td></tr>
+      </tbody>
+    </table>
+
+    <div class="warn">
+      <b>改坏 bootcmd 的后果</b>
+      板子会一直重启或停在 U-Boot。<b>改之前先 <code>printenv bootcmd</code> 抄到记事本里</b>，改坏了还能贴回去。这个习惯值一整个晚上。
+    </div>
+
+    <h2>9.3 常用命令速查</h2>
+    <div class="viz" data-kind="matrix" data-title="四个环境变量，决定能不能启动" data-sub="bootcmd 是脚本，bootargs 是内核参数" data-json='{"corner":"变量","cols":["写的是什么","错在哪会怎样"],"rows":[{"n":"bootcmd","cells":[{"v":"load mmc … ; bootz …","c":"cy"},{"v":"地址错了 → 直接挂","c":"rd"}]},{"n":"bootargs","cells":[{"v":"console=ttyS0 root=/dev/mmcblk1p2","c":"vi"},{"v":"root 错 → VFS unable to mount","c":"rd"}]},{"n":"ipaddr/serverip","cells":[{"v":"板子与服务器 IP","c":"or"},{"v":"错 → tftp/nfs 超时","c":"rd"}]},{"n":"baudrate","cells":[{"v":"115200","c":"gr"},{"v":"错 → 串口全是乱码","c":"rd"}]}],"note":"调试口诀：printenv 看现状、setenv 改一个、saveenv 存盘，改一个就重启验一次，别一次改五个。"}'></div>
+
+
+    <table>
+      <thead><tr><th>类别</th><th>命令</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>查看</td><td><code>version</code> <code>bdinfo</code> <code>mmc list</code> <code>mmc info</code> <code>mmc part</code></td><td>版本、内存信息、设备与分区</td></tr>
+        <tr><td>存储</td><td><code>fatls mmc 1:1</code></td><td>列 FAT 分区文件（SD 卡常用）</td></tr>
+        <tr><td>存储</td><td><code>ext4ls mmc 0:2 /</code></td><td>列 ext4 分区文件（eMMC 常用）</td></tr>
+        <tr><td>加载</td><td><code>fatload mmc 1:1 80800000 zImage</code></td><td>从 FAT 分区读到 DDR</td></tr>
+        <tr><td>加载</td><td><code>ext4load mmc 0:1 80800000 zImage</code></td><td>从 ext4 分区读</td></tr>
+        <tr><td>网络</td><td><code>ping</code> <code>tftp 80800000 zImage</code> <code>dhcp</code></td><td>TFTP 下载（U-Boot 只支持 TFTP）</td></tr>
+        <tr><td>启动</td><td><code>bootz 80800000 - 83000000</code></td><td>启动 zImage，中间 <code>-</code> 表示无 initrd</td></tr>
+        <tr><td>启动</td><td><code>bootm</code> / <code>go</code></td><td>uImage / 裸机程序</td></tr>
+        <tr><td>其他</td><td><code>reset</code> <code>help</code> <code>mmc dev 1</code></td><td>重启、帮助、切换当前 mmc 设备</td></tr>
+      </tbody>
+    </table>
+
+    <div class="tip">
+      <b><code>mmc dev</code> 与 <code>mmc 1:1</code> 的关系</b>
+      <code>mmc dev 1</code> 选设备，<code>mmc 1:1</code> 表示「1 号设备第 1 个分区」。设备编号是 eMMC 还是 SD 卡，取决于板子连线与 U-Boot 配置，<b>用 <code>mmc list</code> 看，别抄教程</b>。
+    </div>
+
+    <h2>9.4 bootcmd 与 bootargs：一行命令决定能不能起</h2>
+
+    <pre><code>=&gt; printenv bootcmd
+mmc dev 1; fatload mmc 1:1 80800000 zImage;
+fatload mmc 1:1 83000000 imx6ull-14x14-evk.dtb;
+bootz 80800000 - 83000000
+
+=&gt; printenv bootargs
+console=ttymxc0,115200 root=/dev/mmcblk1p2 rootwait rw</code></pre>
+
+    <p>分解看：</p>
+
+    <table>
+      <thead><tr><th>片段</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td><code>mmc dev 1</code></td><td>切换到 1 号 MMC 设备（这里假设是 SD 卡）</td></tr>
+        <tr><td><code>fatload ... 80800000 zImage</code></td><td>把内核读到 <code>0x80800000</code></td></tr>
+        <tr><td><code>fatload ... 83000000 xxx.dtb</code></td><td>把设备树读到 <code>0x83000000</code></td></tr>
+        <tr><td><code>bootz 内核地址 - dtb地址</code></td><td>启动；中间的 <code>-</code> 是 initrd 位置，没有就写短横</td></tr>
+        <tr><td><code>console=ttymxc0,115200</code></td><td>内核控制台用 UART1、115200</td></tr>
+        <tr><td><code>root=/dev/mmcblk1p2</code></td><td>根文件系统在第 1 个 mmc 设备的第 2 分区</td></tr>
+        <tr><td><code>rootwait</code></td><td>等存储设备就绪再挂根（eMMC 上必备）</td></tr>
+        <tr><td><code>rw</code></td><td>根文件系统以读写方式挂载</td></tr>
+      </tbody>
+    </table>
+
+    <div class="key">
+      <b>从 NFS 启动（开发期最常用）</b>
+      <pre><code>setenv bootargs console=ttymxc0,115200 root=/dev/nfs rw \
+nfsroot=192.168.1.100:/home/ubuntu/nfsroot,nfsvers=3 \
+ip=192.168.1.101:192.168.1.100:192.168.1.1:255.255.255.0::eth0:off
+saveenv</code></pre>
+      改一个程序只要在 PC 上重新编，板子重启就生效，<b>不用烧写</b>。这是后面第 11、12 章的主要调试方式。
+    </div>
+
+    <h2>9.5 三种烧写方式</h2>
+
+    <h3>方式一：厂商工具（mfgtool / UUU）</h3>
+    <p>把板子拨到 Serial Download 模式，USB 连接 PC，双击工具里的脚本，整套镜像（U-Boot、内核、dtb、rootfs）一次写进去。这是<strong>最快、最不容易错</strong>的方式，适合第一次和救砖。</p>
+
+    <h3>方式二：U-Boot 里直接写</h3>
+    <p>已经能进 U-Boot 时，可以用命令把镜像写到 eMMC：</p>
+
+    <pre><code><span class="c"># 通过 TFTP 下载到 DDR，再写入 eMMC 的某个分区</span>
+=&gt; tftp 80800000 zImage
+=&gt; mmc dev 0
+=&gt; mmc write 80800000 0x800 0x4000    <span class="c"># 地址与长度以块(512B)为单位，慎用</span>
+
+<span class="c"># 更安全的做法：文件系统分区用 fatwrite / ext4write</span>
+=&gt; fatwrite mmc 0:1 80800000 zImage 0x600000</code></pre>
+
+    <div class="warn">
+      <b><code>mmc write</code></b> 写错偏移会覆盖 U-Boot 自己，板子立刻变砖。<b>第一次别碰裸写</b>，用工具烧，或者用 <code>fatwrite</code> 写进文件系统分区。
+    </div>
+
+    <h3>方式三：量产 / 自动化</h3>
+    <p>产线用 UUU 脚本批量烧，或用 <code>dd</code> 把整卡镜像写到 SD 卡。自己学习阶段用不上，知道有这回事即可。</p>
+
+    <h2>9.6 分区：为什么有 FAT 和 ext4</h2>
+    <div class="viz" data-kind="map" data-title="eMMC / SD 卡上的典型分区" data-sub="地址从 0 开始，各单位对齐" data-json='{"rows":[{"segs":[{"n":"分区表","d":"0–1MB","size":1,"c":"gray"},{"n":"U-Boot","d":"1MB–2MB","size":1,"c":"or"},{"n":"kernel+dtb","d":"2MB–18MB","size":3,"c":"cy"},{"n":"rootfs","d":"18MB–剩余","size":5,"c":"gr"}],"from":"0x0","to":"0x4000000"}],"note":"dtb 紧跟 zImage 存放最省事（bootz 一次读两段）；rootfs 单独分区，重刷根文件系统时不会碰内核。"}'></div>
+
+
+    <p>典型的分区布局（以厂商镜像为例，具体以你的板子为准）：</p>
+
+    <table>
+      <thead><tr><th>分区</th><th>格式</th><th>放什么</th></tr></thead>
+      <tbody>
+        <tr><td>裸区（无分区表项）</td><td>raw</td><td>U-Boot 镜像（BootROM 直接读，不能放进文件系统）</td></tr>
+        <tr><td>分区 1</td><td>FAT32</td><td>zImage、dtb（U-Boot 用 fatload 读，简单可靠）</td></tr>
+        <tr><td>分区 2</td><td>ext4</td><td>根文件系统</td></tr>
+      </tbody>
+    </table>
+
+    <p>为什么 U-Boot 那部分必须是裸的？因为 BootROM 只认固定偏移的原始数据，它不懂文件系统。这也是为什么「U-Boot 只能用工具烧，不能简单拖进 SD 卡」。</p>
+
+    <h2>9.7 板子刷死了怎么救</h2>
+
+    <ol class="steps">
+      <li>断电，把 BOOT 拨码拨到 Serial Download。</li>
+      <li>USB OTG 接 PC，上电，PC 应识别到一个 USB 设备（可能显示为 HID 或串口）。</li>
+      <li>打开厂商烧写工具，加载配置，执行烧写，串口应能看到进度。</li>
+      <li>烧完断电，拨码拨回内部 Boot，重新上电。</li>
+      <li>串口能看到 U-Boot 日志 = 救回来了。</li>
+    </ol>
+
+    <h2>9.8 动手任务</h2>
+    <ul class="steps">
+      <li>进 U-Boot，<code>printenv</code> 全部抄进笔记（这是你板子的「出厂配置」）。</li>
+      <li>用 <code>mmc list</code>、<code>mmc info</code>、<code>mmc part</code> 搞清每个设备是什么、几个分区。</li>
+      <li>先 <code>setenv</code> 改 bootargs 加一个无害参数（如 <code>loglevel=7</code>），<code>saveenv</code>，重启验证；再改回原样。</li>
+      <li>用 TFTP 在 U-Boot 里下载一次 zImage，<code>bootz</code> 启动成功。</li>
+      <li>把 bootargs 改成 NFS 根文件系统，启动成功后在板子上 <code>df -h</code> 确认根是 NFS。</li>
+      <li>查厂商文档，找到 BOOT 拨码位置和烧写工具的下载链接，写进笔记。</li>
+    </ul>
+
+    <h2>9.9 验收标准</h2>
+    <ul class="checklist">
+      <li>会 printenv / setenv / saveenv，知道不 save 只在本次生效</li>
+      <li>能读懂 bootcmd 的每一段，并能自己改加载地址</li>
+      <li>能说出 bootargs 里 console、root、rootwait、rw 各是什么</li>
+      <li>能从 eMMC 和从 NFS 各启动一次</li>
+      <li>能用厂商工具完整烧写一套系统</li>
+      <li>知道 Serial Download 模式怎么进，能独立救砖</li>
+    </ul>
+
+    <footer id="pager"></footer>
+  
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"U-Boot 的四种用法","items":[{"b":"命令行","d":"printenv 看变量、setenv 改、saveenv 存。bootargs 和 bootcmd 是最关键的两个变量。"},{"b":"网络加载","d":"tftp 拉内核、nfs 挂 rootfs。改代码只重启，不碰存储卡。开发期首选。"},{"b":"烧写存储","d":"把镜像写进 eMMC 或 SD。量产阶段的常规动作，写完记得校验。"},{"b":"OTG 下载","d":"板子进下载模式，用上位机工具通过 USB 灌 U-Boot。砖了也能救回来。"}],"note":"bootargs 里一个空格错位就会让内核找不到 rootfs。改完先 printenv 回读一遍，再 boot。"}'></div>
+  </main>
+</div>
+<script src="../assets/nav.js"></script>
+<script src="../assets/viz.js"></script>
+<script src="../assets/iviz.js"></script>
+<script src="../assets/anime.iife.min.js"></script>
+<script src="../assets/anim2.js"></script>
+</body>
+</html>

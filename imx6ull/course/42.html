@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=../docs/course-42.html">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>42 · 做出一块能跑的系统</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/viz.css">
+<link rel="stylesheet" href="assets/iviz.css">
+<link rel="stylesheet" href="assets/anim2.css">
+  <script src="assets/readmode.js" defer></script>
+</head>
+<body data-page="42">
+<header id="topbar"></header>
+<div class="shell">
+  <aside id="sidebar"></aside>
+  <main class="doc">
+
+    <h1>第 42 课 · 从零做出一块能跑的系统</h1>
+    <p class="lede">前面 41 课都是零件。这一课把它们拼起来：分区怎么划、镜像怎么烧、上电看到什么才算成功。整个过程只有六步，但每一步都有明确的「验证点」——<b>按顺序验证，出问题时你就知道卡在哪一步。</b></p>
+
+    <div class="anim2" data-json='{"title":"从零做出一块能跑的系统","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"1 分区"},{"k":"2 烧 bootloader"},{"k":"3 放内核与 dtb"},{"k":"4 放 rootfs"},{"k":"5 设启动参数"},{"k":"6 上电验证"}],"frames":[{"i":0,"d":"boot 区放 u-boot、kernel、dtb；rootfs 区放根文件"},{"i":1,"d":"写到 SD/eMMC 的固定偏移（含 IVT）"},{"i":2,"d":"放 boot 分区，路径与 bootcmd 一致"},{"i":3,"d":"解压或 dd 到 rootfs 分区"},{"i":4,"d":"bootargs 里的 root= 与分区名必须对上"},{"i":5,"d":"串口看到 login 或 shell 提示符"}]}'></div>
+
+    <div class="viz" data-kind="flow" data-title="六步做出一个能跑的系统" data-sub="每一步都有可验证的输出" data-json='{"steps":[{"n":"1 分区","d":"boot 区放 u-boot、kernel、dtb；rootfs 区放根文件"},{"n":"2 烧 bootloader","d":"写到 SD/eMMC 的固定偏移（含 IVT）"},{"n":"3 放内核与 dtb","d":"放 boot 分区，路径与 bootcmd 一致"},{"n":"4 放 rootfs","d":"解压或 dd 到 rootfs 分区"},{"n":"5 设启动参数","d":"bootargs 里的 root= 与分区名必须对上"},{"n":"6 上电验证","d":"串口看到 login 或 shell 提示符"}],"note":"第 2 步的「固定偏移」是关键：i.MX 系列 u-boot.imx 必须写到 SD 卡的 1KB 偏移处（不是分区里），Boot ROM 直接按字节偏移读。写错位置就是「完全无输出」。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 分区怎么划？② u-boot 写到哪？③ root= 该怎么填？④ 上电看不到输出怎么查？⑤ 怎么快速迭代（不改卡也能换内核）？</p>
+    </div>
+
+    <h2>1. 分区与烧写</h2>
+
+    <pre><code># 在 Linux PC 上对 SD 卡操作（/dev/sdX 一定要确认对！）
+sudo dd if=u-boot.imx of=/dev/sdX bs=1k seek=1 conv=fsync
+
+# 分区（举例）
+# p1: FAT32, 64MB   → zImage + dtb
+# p2: ext4, 剩余     → rootfs
+
+sudo mkfs.vfat /dev/sdX1
+sudo mkfs.ext4 /dev/sdX2
+sudo mount /dev/sdX1 /mnt/boot
+cp zImage imx6ull-xxx.dtb /mnt/boot/
+sudo tar xf rootfs.tar.gz -C /mnt/root   # 或 dd 镜像</code></pre>
+
+    <p><b><code>seek=1</code> 的含义是「跳过 1KB」</b>，这正是 i.MX 的要求。<code>conv=fsync</code> 保证写完真的落盘——不加它，拔卡时数据可能还在缓存里，导致「明明烧了却启动不了」。</p>
+
+    <h2>2. bootargs 与分区名的对应</h2>
+
+    <pre><code># eMMC/SD 的设备名规则
+/dev/mmcblk0      # 整卡
+/dev/mmcblk0p1    # 第 1 分区
+/dev/mmcblk1p2    # 第 2 张卡的第 2 分区
+
+# 板子上常见是 mmcblk1（因为 mmcblk0 是 eMMC）
+bootargs=console=ttymxc0,115200 root=/dev/mmcblk1p2 rootwait rw</code></pre>
+
+    <p>写错一位就是 <code>Waiting for root device</code>。<b>不确定时，先进 u-boot 的 shell，用 <code>mmc list</code> 与 <code>mmc part</code> 查真实编号。</b></p>
+
+    <h2>3. 快速迭代的两个技巧</h2>
+
+    <div class="viz" data-kind="compare" data-title="两种开发期迭代方式" data-sub="不要每次都拔卡重烧" data-json='{"bad":{"t":"拔卡重烧","items":["每次改内核都要拔卡插 PC","一轮 5~10 分钟","容易忘 sync 或写错卡","适合首次部署"]},"good":{"t":"网络加载（tftp/nfs）","items":["u-boot 从 tftp 取内核，rootfs 走 NFS","改完重启几秒即可","不必碰 SD 卡","需要网线与 PC 同网段"]},"note":"开发后期几乎所有人都会切到「tftp 内核 + NFS 根」模式。这也是为什么 u-boot 里要配 ipaddr/serverip 这些环境变量。"}'></div>
+
+    <pre><code># u-boot 里配网络启动（示例）
+setenv ipaddr 192.168.1.20
+setenv serverip 192.168.1.10
+setenv bootcmd 'tftp 0x80800000 zImage; tftp 0x83000000 dtb; bootz 0x80800000 - 0x83000000'
+setenv bootargs 'console=ttymxc0,115200 root=/dev/nfs rw nfsroot=192.168.1.10:/nfs/rootfs ip=192.168.1.20'
+saveenv</code></pre>
+
+    <h2>4. 上电验证清单</h2>
+
+    <table>
+      <thead><tr><th>现象</th><th>下一步查</th></tr></thead>
+      <tbody>
+        <tr><td>串口无任何字符</td><td>电源、晶振、启动引脚、串口接线</td></tr>
+        <tr><td>只有乱码</td><td>波特率、晶振频率、PLL 配置</td></tr>
+        <tr><td>停在 <code>=&gt;</code></td><td>bootcmd 是否被改坏；<code>printenv</code></td></tr>
+        <tr><td>Waiting for root device</td><td>root= 分区名、存储驱动、卡是否识别</td></tr>
+        <tr><td>Kernel panic - not syncing</td><td>前面的日志才是原因，往上翻</td></tr>
+        <tr><td>有日志但没有 shell</td><td>init 是否存在/可执行、inittab</td></tr>
+      </tbody>
+    </table>
+
+    <p>这张表值得打印出来。<b>「往上翻日志」是最重要的一条经验：panic 的那一行几乎从不是根因。</b></p>
+
+    <h2>5. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于烧写的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["u-boot 烧到 boot 分区里就行","dd 写完马上拔卡没问题","同型号板子的分区名一定一样"]},"good":{"t":"实际","items":["必须写到卡的固定字节偏移（i.MX 是 1KB 处）","不加 conv=fsync 可能丢数据","mmcblk 编号取决于设备枚举顺序，要实测"]},"note":"第一条是新手最常见的失败：把 u-boot 拷进 FAT 分区，Boot ROM 根本不会去那儿读，结果「完全无输出」。"}'></div>
+
+    <h2>6. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>i.MX6ULL 的 u-boot.imx 写到卡的什么位置？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>偏移 1KB（1024 字节）处，即 <code>dd ... seek=1 bs=1k</code>。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>为什么 dd 要加 conv=fsync？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>强制把缓存刷到设备，避免拔卡时数据丢失。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>怎么确认分区名对不对？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>在 u-boot 里 <code>mmc list</code> / <code>mmc part</code>，或在内核启动后用 <code>ls /dev/mmcblk*</code>。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>为什么 panic 那一行不是根因？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>panic 是「已经无法继续」时的最后反应，真正原因在前面的警告或错误日志里。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>网络启动需要哪几个环境变量？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>ipaddr、serverip、bootcmd（tftp 加载）、bootargs（nfsroot 与 ip）。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>按六步做一次完整烧写，每步记录验证结果。</li>
+        <li>故意把 u-boot 写到分区里（不 seek），观察「无输出」。</li>
+        <li>配一次 tftp + NFS 启动，测一次迭代时间。</li>
+        <li>把上电验证清单抄下来，下次排障直接对照。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      系统跑起来了，接下来一定会遇到各种「不工作」。第 43 课讲排障方法论：怎么从「现象」收敛到「原因」，而不是乱试。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"从零做一个能跑的系统，六步","hint":"这是全课程的综合","note":"每一步都能单独验证，不要一口气做完再一起调——那样出错时你分不清是哪一层坏了。","steps":[{"t":"① 点亮板子","d":"先只验证电源、时钟、串口输出。能打印一行字，说明芯片活着。"},{"t":"② 跑通 DDR","d":"用厂商提供的 DDR 测试程序或 memtester，跑到几十轮不报错再往下走。"},{"t":"③ 编译 U-Boot","d":"配好 defconfig、改 DDR 参数和设备树，能进命令行、能读 eMMC 才算成功。"},{"t":"④ 编译内核","d":"裁剪配置，打开需要的驱动，产出 zImage 和设备树 dtb。"},{"t":"⑤ 做根文件系统","d":"BusyBox + 库 + init 脚本，打包成可挂载的镜像。"},{"t":"⑥ 串起来启动","d":"U-Boot 通过 bootargs 指定根文件系统位置，内核挂载后拉起 init，看到登录提示符。"}]}'></div>
+  </main>
+</div>
+<script src="assets/cnav.js"></script>
+<script src="assets/viz.js"></script>
+<script src="assets/iviz.js"></script>
+<script src="assets/anime.iife.min.js"></script>
+<script src="assets/anim2.js"></script>
+</body>
+</html>

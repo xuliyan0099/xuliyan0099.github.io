@@ -1,0 +1,201 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>中断 · 卷 04 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j04.html">☰ 本卷目录</a>
+  <a class="home hide-sm" href="../juan/index.html">十四卷总览</a>
+  <a class="home" href="../../index.html">手册总入口</a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 04 · 操作系统</div>
+<ol><li><a href="course-th01.html">
+  <span class="no">01</span><span>操作系统与 Linux 的分层<span class="sub">约 3 小时</span></span></a></li>
+<li><a href="course-27.html">
+  <span class="no">02</span><span>进程、线程与 task_struct<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-28.html">
+  <span class="no">03</span><span>fork 与 exec<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-29.html">
+  <span class="no">04</span><span>特权级与异常<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-30.html" class="active">
+  <span class="no">05</span><span>中断<span class="sub">约 1 小时 · 当前</span></span></a></li>
+<li><a href="course-31.html">
+  <span class="no">06</span><span>调度<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-32.html">
+  <span class="no">07</span><span>上下文切换<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-33.html">
+  <span class="no">08</span><span>同步<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th02.html">
+  <span class="no">09</span><span>进程、线程与调度（详解）<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="course-th06.html">
+  <span class="no">10</span><span>中断、并发与同步（详解）<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-th15.html">
+  <span class="no">11</span><span>内核全貌：子系统如何协作<span class="sub">◆ · 约 4 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j03.html">← 卷 03</a>
+  <a href="../juan/j05.html">卷 05 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 04<span>·</span>操作系统<span>·</span>第 05 篇</div>
+  <h1>中断</h1>
+  <p class="lede">CPU 不可能一直轮询每个外设，那太浪费。它选择被打断：外设有事就拉一根线，CPU 立刻放下手里的事去处理。这一课把链路从「外设置位」走到「你的 handler 执行」，并讲清一条铁律：中断里不能睡觉。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+
+    <div class="anim2" data-json='{"title":"中断：让 CPU 被外部世界打断","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"外设置位"},{"k":"GIC 汇总"},{"k":"CPU 响应"},{"k":"跳向量表"},{"k":"识别中断号"},{"k":"调用 handler"}],"frames":[{"i":0,"d":"UART 收到字节，置状态位"},{"i":1,"d":"中断控制器排队、定优先级"},{"i":2,"d":"完成当前指令，检查 IRQ"},{"i":3,"d":"保存 CPSR/PC，进 IRQ 模式"},{"i":4,"d":"读 GIC 的 IAR，得知中断源"},{"i":5,"d":"执行注册的 ISR"}]}'></div>
+
+    <div class="viz" data-kind="flow" data-title="一次中断的完整链路" data-sub="从「外设拉线」到「你的 ISR 执行」" data-json='{"steps":[{"n":"外设置位","d":"UART 收到字节，置状态位"},{"n":"GIC 汇总","d":"中断控制器排队、定优先级"},{"n":"CPU 响应","d":"完成当前指令，检查 IRQ"},{"n":"跳向量表","d":"保存 CPSR/PC，进 IRQ 模式"},{"n":"识别中断号","d":"读 GIC 的 IAR，得知中断源"},{"n":"调用 handler","d":"执行注册的 ISR"}],"note":"GIC 是关键中间层：几十上百个中断源汇成一根线交给 CPU。没有它，CPU 就得有上百个中断引脚。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 链路每一步做什么？② 为什么中断里不能睡眠？③ 上半部与下半部怎么分工？④ 中断返回地址为什么要减 4？⑤ 中断风暴怎么产生？</p>
+    </div>
+
+    <h2 id="s1">1. 上半部与下半部</h2>
+
+    <div class="viz" data-kind="compare" data-title="上半部 hardirq 与下半部" data-sub="核心原则：上半部尽量短，把重活推后" data-json='{"bad":{"t":"上半部 hardirq","items":["中断上下文，不能睡眠、不能拿 mutex","只做「清标志 + 记录 + 唤醒下半部」","典型耗时几微秒","太长会丢其它中断"]},"good":{"t":"下半部 softirq / workqueue","items":["softirq：中断返回时执行，仍不能睡眠","workqueue：交给内核线程，可以睡眠","处理耗时逻辑、拷贝大数据、调可能阻塞的 API","典型耗时毫秒级"]},"note":"为什么要分开：长时间占用中断会让其它中断丢失、系统响应变差。「短上半部」是内核铁律，不是建议。"}'></div>
+
+    <pre><code>static irqreturn_t my_isr(int irq, void *dev)
+{
+    u32 st = readl(base + STATUS);
+    if (!(st &amp; RX_READY)) return IRQ_NONE;
+    readl(base + CLEAR);          // 清中断标志，必须做
+    schedule_work(&amp;my_work);      // 重活交给 workqueue
+    return IRQ_HANDLED;
+}
+
+static void my_work_fn(struct work_struct *w)
+{
+    msleep(10);                   // 这里可以睡眠
+    process_big_buffer();
+}</code></pre>
+
+    <h2 id="s2">2. 为什么中断里不能睡眠</h2>
+
+    <ul>
+      <li><b>没有 task 可挂起</b>：中断不属于任何进程，谁来恢复它？</li>
+      <li><b>可能持锁</b>：若还握着自旋锁睡过去，别的核死等，直接死锁。</li>
+      <li><b>栈不独立</b>：在中断栈上，没有 task_struct 支撑恢复。</li>
+    </ul>
+
+    <p>所以内核 API 分两套：<code>spin_lock</code>（可用在中断上下文）、<code>mutex</code>（只能进程上下文）。在中断里误用 mutex，会立刻报 <code>sleeping function called from invalid context</code>。</p>
+
+    <h2 id="s3">3. 那个 <code>sub lr, lr, #4</code> 是干什么的</h2>
+
+    <pre><code>irq_handler:
+    sub  lr, lr, #4        ; 修正返回地址！
+    srsdb sp!, #0x13       ; 保存 lr 与 spsr 到 SVC 栈
+    ...                    ; 调用 C 语言 handler
+    rfeia sp!              ; 恢复并返回</code></pre>
+
+    <p>原因：ARM 在中断时保存的是「已取指但未执行」的那条（PC+4 语义），而实际要返回的是「被打断的那条」。所以必须减 4 修正。<b>不修正就会跳过一条指令——那种 bug极难查，因为只在特定时序下出现。</b></p>
+
+    <h2 id="s4">4. 中断风暴</h2>
+
+    <p>如果 handler 没清中断标志，硬件会立刻再报一次，CPU 就陷入「进中断 → 返回 → 立刻再进」的死循环，用户态完全得不到执行。</p>
+
+    <p>现象：系统卡死、<code>top</code> 里 <code>si</code>（软中断）或 <code>hi</code>（硬中断）占用接近 100%、串口打不出字。<b>排查第一步永远是确认「标志清了没有、电平中断是否已释放」。</b></p>
+
+    <h2 id="s5">5. 与 Linux 的接缝：tick 也是一次中断</h2>
+
+    <p>内核的「时间感」来自周期性中断：i.MX6ULL 用 GPT/EPIT 定时器，每 1/HZ 秒（常见 100~1000Hz）打断一次，更新 jiffies、检查调度、统计时间。</p>
+
+    <pre><code># 看当前 HZ 与中断分布
+cat /proc/interrupts        # 每个中断源的计数
+grep CONFIG_HZ /boot/config-$(uname -r)
+
+# 若某中断计数疯长，基本就是「没清标志 / 电平没释放」
+watch -n1 'cat /proc/interrupts'</code></pre>
+
+    <p><code>/proc/interrupts</code> 是排障时最有用的一个文件：<b>它能立刻告诉你「是哪个中断在发疯」</b>。</p>
+
+    <h2 id="s6">6. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于中断的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["中断处理越短越好，所以什么都不做最安全","中断里可以用 mutex，只要不睡太久","共享中断不能注册多个 handler"]},"good":{"t":"实际","items":["必须清标志、必须把数据取走，否则丢事件或风暴","mutex 会睡眠，中断上下文里直接报错","IRQF_SHARED 允许多个 handler 共享一根线，各自判 IRQ_NONE"]},"note":"第一条的反面同样危险：handler 太短到「没把硬件数据读走」，FIFO 溢出，后续数据全丢。这不是性能问题，是功能 bug。"}'></div>
+
+    <h2 id="s7">7. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>中断链路里 GIC 的作用？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>汇总多路中断、定优先级、向 CPU 提供中断号（读 IAR），并支持屏蔽与清除。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>为什么 <code>sub lr, lr, #4</code> 必须做？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>中断保存的返回地址超前了一条指令，减 4 才是被打断那条，否则会跳过指令。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>softirq 与 workqueue 的关键区别？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>softirq 在中断返回路径执行、不能睡眠；workqueue 由内核线程执行、可以睡眠。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>中断风暴的典型成因与现象？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>没清标志或电平中断未释放；现象是系统卡死、/proc/interrupts 计数暴涨。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>共享中断时 handler 返回 IRQ_NONE 意味着什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>「这个中断不是我的」，内核会继续调用同一条线上的下一个 handler。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>写一个 GPIO 按键中断驱动，打印时间戳，观察抖动。</li>
+        <li>在 handler 里故意不清标志，观察中断风暴。</li>
+        <li>用 <code>cat /proc/interrupts</code> 找出你系统里最忙的中断。</li>
+        <li>把耗时逻辑改成 workqueue，比较系统响应。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      中断每秒打断几千次，为什么你的程序还能「看起来在连续运行」？第 31 课讲调度：内核怎么在几十个任务之间分配 CPU，以及 CFS 到底在公平什么。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"一次中断，从拉线到执行","hint":"逐步看","note":"中断和异常共用同一套入口，区别只在「谁触发」：异常是执行指令引起的，中断是外部硬件引起的。","steps":[{"t":"① 设备拉线","d":"外设把中断线拉高，送到 GIC 的某个输入脚。此时 CPU 还在跑别的代码。"},{"t":"② GIC 仲裁","d":"GIC 按优先级挑一个，记下中断号，向 CPU 发 IRQ 信号。"},{"t":"③ CPU 响应","d":"CPU 执行完当前指令，保存 CPSR 和返回地址，切到 IRQ 模式，跳到向量表。"},{"t":"④ 保存现场","d":"把 r0–r12、lr 压栈。这一步决定中断处理能不能安全返回。"},{"t":"⑤ 分发 handler","d":"读 GIC 的中断应答寄存器拿到中断号，查表调用对应驱动的 handler。"}]}'></div>
+  
+
+<nav class="pager">
+  <a href="course-29.html"><span>← 上一篇</span><b>特权级与异常</b></a>
+  <a class="nx" href="course-31.html"><span>下一篇 →</span><b>调度</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>
