@@ -24,6 +24,7 @@
     <span class="tb-sp"></span>
     <a class="tb" href="index.html">总览</a>
     <a class="tb" href="../../index.html">知识库</a>
+    <a class="tb" href="sitemap.html">目录</a>
   </div>
 </header>
 
@@ -37,7 +38,19 @@
     <span class="chip">未知名字返回 NULL/nullptr</span>
   </div>
 
-  <section class="sec">
+    <nav class="toc" aria-label="本页目录">
+    <div class="toc-h"><b>本页目录</b><span>6 节 · 点标题跳转</span></div>
+    <ul class="toc-l">
+      <li><a href="#s1"><i>01</i>问题：新增一个型号就要改 switch</a></li>
+      <li><a href="#s2"><i>02</i>结构：一张表、两个方向</a></li>
+      <li><a href="#s3"><i>03</i>两份实现</a></li>
+      <li><a href="#s4"><i>04</i>按名字取驱动，包括一个不存在的名字</a></li>
+      <li><a href="#s5"><i>05</i>C 与 C++：一张表，两种造法</a></li>
+      <li><a href="#s6"><i>06</i>代价与坑</a></li>
+    </ul>
+  </nav>
+
+<section class="sec" id="s1">
     <h2><span class="n">01</span>问题：新增一个型号就要改 switch</h2>
     <div class="prose">
       <p>最直接的写法是一个大 <code>if/else</code>：名字是 <code>"sht3x"</code> 就 <code>new Sht3x</code>，是 <code>"ntc"</code> 就 <code>new Ntc</code>。它的问题不在“难写”，而在<b>它必须知道所有产品</b>：</p>
@@ -50,7 +63,7 @@
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s2">
     <h2><span class="n">02</span>结构：一张表、两个方向</h2>
     <p class="subh">向下：工厂按名字查表，调构造函数拿到产品；向上：产品在静态初始化阶段把自己登记进表。点方框看谁在什么时候做了什么。</p>
 
@@ -126,7 +139,7 @@
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s3">
     <h2><span class="n">03</span>两份实现</h2>
     <p class="subh">C 版是一张固定长度的结构体数组 + <code>driver_t *(*)(void)</code> 函数指针；C++ 版是 <code>map&lt;string, std::function&lt;unique_ptr&lt;Driver&gt;()&gt;&gt;</code>，自注册收在一个模板里。两边的“登记先于创建”完全一样。</p>
 
@@ -345,7 +358,7 @@ create("bme280"):
     </div>
     <p class="hintline">第一行 <code>register ntc</code> 出现在 <code>main</code> 之前——C 版靠 <code>__attribute__((constructor))</code>，C++ 版两个都在 main 前完成；C 版第二个 sht3x 是 <code>main</code> 里显式注册的，所以落到了“启动后注册表”的打印之后。</p>
   </section>
-  <section class="sec">
+  <section class="sec" id="s4">
     <h2><span class="n">04</span>按名字取驱动，包括一个不存在的名字</h2>
     <p class="subh">三个按钮对应三条配置。注册表里只有 ntc 与 sht3x；bme280 是故意写错的名字，用来看“未注册”时上层收到什么。</p>
 
@@ -364,7 +377,7 @@ create("bme280"):
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s5">
     <h2><span class="n">05</span>C 与 C++：一张表，两种造法</h2>
     <div class="tbl">
       <table>
@@ -381,7 +394,7 @@ create("bme280"):
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     <div class="prose">
       <ul>
@@ -459,3 +472,4 @@ create("bme280"):
 </script>
 </body>
 </html>
+

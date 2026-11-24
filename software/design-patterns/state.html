@@ -34,6 +34,7 @@
     <span class="tb-sp"></span>
     <a class="tb" href="index.html">总览</a>
     <a class="tb" href="../../index.html">知识库</a>
+    <a class="tb" href="sitemap.html">目录</a>
   </div>
 </header>
 
@@ -47,7 +48,19 @@
     <span class="chip">C++ 状态类 · 无动态分配</span>
   </div>
 
-  <section class="sec">
+    <nav class="toc" aria-label="本页目录">
+    <div class="toc-h"><b>本页目录</b><span>6 节 · 点标题跳转</span></div>
+    <ul class="toc-l">
+      <li><a href="#s1"><i>01</i>问题：switch 里再套 if，非法组合没人管</a></li>
+      <li><a href="#s2"><i>02</i>结构：五个状态，十二种合法走法</a></li>
+      <li><a href="#s3"><i>03</i>两份实现</a></li>
+      <li><a href="#s4"><i>04</i>点事件，看状态怎么走、怎么被拒</a></li>
+      <li><a href="#s5"><i>05</i>C 与 C++：同一张表，两种摆放</a></li>
+      <li><a href="#s6"><i>06</i>代价与坑</a></li>
+    </ul>
+  </nav>
+
+<section class="sec" id="s1">
     <h2><span class="n">01</span>问题：switch 里再套 if，非法组合没人管</h2>
     <div class="prose">
       <p>常见的写法是：<code>switch (state)</code> 里对每个事件写一段 <code>if</code>，命中就改 <code>state</code>。它能跑，但三个问题会慢慢长出来：</p>
@@ -60,7 +73,7 @@
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s2">
     <h2><span class="n">02</span>结构：五个状态，十二种合法走法</h2>
     <p class="subh">只画主干：前进链、超温进故障、回断电。完整的 12 条在下方的矩阵和演示里。点方框看每个状态的边界。</p>
 
@@ -134,7 +147,7 @@
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s3">
     <h2><span class="n">03</span>两份实现</h2>
     <p class="subh">C 版把 30 个格子摊成一张常量二维数组，<code>-1</code> 表示“这个状态下不接受这个事件”；C++ 版把每一行搬进一个状态类，返回 <code>nullptr</code> 表示拒绝。分派形式不同，拒绝点完全一致。</p>
 
@@ -373,7 +386,7 @@ int main() {
     </div>
     <p class="hintline">逐行一致：C++ 版没有多印一行，也没有在拒绝之后偷偷改状态。差别只在“谁持有这张表”。</p>
   </section>
-  <section class="sec">
+  <section class="sec" id="s4">
     <h2><span class="n">04</span>点事件，看状态怎么走、怎么被拒</h2>
     <p class="subh">六个事件按钮对应真实操作。点一下：合法就转移并在矩阵里跳行；非法则原状态不动，只记一笔拒绝。矩阵里高亮的是<b>当前状态那一行</b>，绿格是能去的地方。</p>
 
@@ -392,7 +405,7 @@ int main() {
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s5">
     <h2><span class="n">05</span>C 与 C++：同一张表，两种摆放</h2>
     <div class="tbl">
       <table>
@@ -410,7 +423,7 @@ int main() {
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     <div class="prose">
       <ul>
@@ -524,3 +537,4 @@ int main() {
 </script>
 </body>
 </html>
+

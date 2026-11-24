@@ -28,6 +28,7 @@
     <span class="tb-sp"></span>
     <a class="tb" href="index.html">总览</a>
     <a class="tb" href="../../index.html">知识库</a>
+    <a class="tb" href="sitemap.html">目录</a>
   </div>
 </header>
 
@@ -41,7 +42,19 @@
     <span class="chip">终止 = 不碰 next</span>
   </div>
 
-  <section class="sec">
+    <nav class="toc" aria-label="本页目录">
+    <div class="toc-h"><b>本页目录</b><span>6 节 · 点标题跳转</span></div>
+    <ul class="toc-l">
+      <li><a href="#s1"><i>01</i>问题：嵌套 if 会越写越深</a></li>
+      <li><a href="#s2"><i>02</i>结构：一条单向链，四道关</a></li>
+      <li><a href="#s3"><i>03</i>两份实现</a></li>
+      <li><a href="#s4"><i>04</i>发一帧，看它死在哪一节</a></li>
+      <li><a href="#s5"><i>05</i>C 与 C++：谁负责“记得转 next”</a></li>
+      <li><a href="#s6"><i>06</i>代价与坑</a></li>
+    </ul>
+  </nav>
+
+<section class="sec" id="s1">
     <h2><span class="n">01</span>问题：嵌套 if 会越写越深</h2>
     <div class="prose">
       <p>报文过滤最直觉的写法是层层嵌套：长度对了才查 CRC，CRC 对了才查白名单，白名单过了才交给业务。三个检查就已经三层缩进，再加“频率限制”“报文年龄”“安全访问”就往右顶到屏幕外面。</p>
@@ -50,7 +63,7 @@
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s2">
     <h2><span class="n">02</span>结构：一条单向链，四道关</h2>
     <p class="subh">每节节点做两件事：判断自己，决定是否调用 next。点方框看每一节“知道什么、不知道什么”。</p>
 
@@ -126,7 +139,7 @@
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s3">
     <h2><span class="n">03</span>两份实现</h2>
     <p class="subh">C 版把链做成结构体里的 <code>next</code> 指针，转发是节点自己写的一句递归调用；C++ 版把“转发”提到基类 <code>run()</code> 里，子类只实现 <code>check()</code>，从结构上保证每个节点都不会忘记转 next。</p>
 
@@ -367,7 +380,7 @@ frame 0x100 len=8 crc=09
     </div>
     <p class="hintline">四帧各死在一节：长度、CRC、白名单——最后一帧才走完全链。被丢弃的帧，后面的节点一行日志都没有，这就是“终止”与“拒绝”的区别。</p>
   </section>
-  <section class="sec">
+  <section class="sec" id="s4">
     <h2><span class="n">04</span>发一帧，看它死在哪一节</h2>
     <p class="subh">点四个预设帧中的任意一个，报文会从链首逐节往下走。通过的节点变绿，丢它的节点变红，后面的节点保持灰——不再被调用。</p>
 
@@ -387,7 +400,7 @@ frame 0x100 len=8 crc=09
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s5">
     <h2><span class="n">05</span>C 与 C++：谁负责“记得转 next”</h2>
     <div class="tbl">
       <table>
@@ -404,7 +417,7 @@ frame 0x100 len=8 crc=09
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     <div class="prose">
       <ul>
@@ -543,3 +556,4 @@ frame 0x100 len=8 crc=09
 </script>
 </body>
 </html>
+

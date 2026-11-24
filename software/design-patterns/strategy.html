@@ -32,6 +32,7 @@
     <span class="tb-sp"></span>
     <a class="tb" href="index.html">总览</a>
     <a class="tb" href="../../index.html">知识库</a>
+    <a class="tb" href="sitemap.html">目录</a>
   </div>
 </header>
 
@@ -45,7 +46,19 @@
     <span class="chip">C++ 版 unique_ptr 持有</span>
   </div>
 
-  <section class="sec">
+    <nav class="toc" aria-label="本页目录">
+    <div class="toc-h"><b>本页目录</b><span>6 节 · 点标题跳转</span></div>
+    <ul class="toc-l">
+      <li><a href="#s1"><i>01</i>问题：三种规则堆进同一个循环</a></li>
+      <li><a href="#s2"><i>02</i>结构：上下文只持有一个“会算下一步”的东西</a></li>
+      <li><a href="#s3"><i>03</i>两份实现</a></li>
+      <li><a href="#s4"><i>04</i>把队列交给不同策略</a></li>
+      <li><a href="#s5"><i>05</i>同一组角色，两种写法</a></li>
+      <li><a href="#s6"><i>06</i>代价与坑</a></li>
+    </ul>
+  </nav>
+
+<section class="sec" id="s1">
     <h2><span class="n">01</span>问题：三种规则堆进同一个循环</h2>
     <div class="prose">
       <p>先看没上模式的写法：<code>drain()</code> 里先 <code>if (mode == FIFO)</code> 取队首，<code>else if (mode == EDF)</code> 扫一遍最小截止，<code>else</code> 再扫一遍最小 ID。三段代码各自维护一个小循环，看起来也能跑。</p>
@@ -58,7 +71,7 @@
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s2">
     <h2><span class="n">02</span>结构：上下文只持有一个“会算下一步”的东西</h2>
     <p class="subh">点方框看职责。注意箭头的方向：上下文指向策略，而不是反过来——策略不知道谁在用它。</p>
 
@@ -125,7 +138,7 @@
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s3">
     <h2><span class="n">03</span>两份实现</h2>
     <p class="subh">C 版把接口做成 <code>{name, fn}</code> 常量，C++ 版做成纯虚基类。两边都保留同一份队列和同一套输出，便于逐行对照。</p>
     <div class="codes">
@@ -310,7 +323,7 @@ PRIO  -&gt; 0A0 120 180 210 305</pre>
     <p class="hintline">三行输出完全一致，说明两条实现路径在行为上等价；差别只在分派方式和所有权。</p>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s4">
     <h2><span class="n">04</span>把队列交给不同策略</h2>
     <p class="subh">队列里五帧，三种规则看到的是不同的“下一帧”。点策略切换，或者一帧一帧发，看选中的理由。</p>
 
@@ -337,7 +350,7 @@ PRIO  -&gt; 0A0 120 180 210 305</pre>
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s5">
     <h2><span class="n">05</span>同一组角色，两种写法</h2>
     <table class="tbl">
       <thead><tr><th style="width:88px">角色</th><th>职责</th><th>C 的落地</th><th>C++ 的落地</th></tr></thead>
@@ -352,7 +365,7 @@ PRIO  -&gt; 0A0 120 180 210 305</pre>
     <div class="key"><b>值得注意的一处差别。</b>C 版把策略直接做成函数指针，比“对象 + 虚表”少一级间接；代价是没有地方挂策略自己的状态。如果某个策略真需要状态（比如老化计数），C 版就得多传一个 <code>void *self</code>，或者干脆为策略建一个结构体——那时它才真正变成“对象”。</div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     <div class="pit"><b>1. 策略和状态别混。</b>策略由外部注入（“用哪种算法”是调用方的决定）；状态由对象自己迁移（“我现在处于哪个状态”是对象内部的事实）。判断标准：谁有权改它。</div>
     <div class="pit"><b>2. 无状态策略才能共享。</b>三个策略对象被多个上下文共用时，千万别在策略里写可变成员；C 版的函数指针天然无状态，一旦加了 <code>self</code> 就要考虑每个上下文一份。</div>
@@ -452,3 +465,4 @@ PRIO  -&gt; 0A0 120 180 210 305</pre>
 </script>
 </body>
 </html>
+

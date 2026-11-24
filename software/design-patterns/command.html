@@ -27,6 +27,7 @@
     <span class="tb-sp"></span>
     <a class="tb" href="index.html">总览</a>
     <a class="tb" href="../../index.html">知识库</a>
+    <a class="tb" href="sitemap.html">目录</a>
   </div>
 </header>
 
@@ -40,7 +41,19 @@
     <span class="chip">C++ 版由历史栈持有所有权</span>
   </div>
 
-  <section class="sec">
+    <nav class="toc" aria-label="本页目录">
+    <div class="toc-h"><b>本页目录</b><span>6 节 · 点标题跳转</span></div>
+    <ul class="toc-l">
+      <li><a href="#s1"><i>01</i>问题：直接调用，就没有“以后”和“回退”</a></li>
+      <li><a href="#s2"><i>02</i>结构：调用者、命令、接收者</a></li>
+      <li><a href="#s3"><i>03</i>两份实现</a></li>
+      <li><a href="#s4"><i>04</i>自己排一次队，再撤两次</a></li>
+      <li><a href="#s5"><i>05</i>C 与 C++：同一套队列，两种所有权</a></li>
+      <li><a href="#s6"><i>06</i>代价与坑</a></li>
+    </ul>
+  </nav>
+
+<section class="sec" id="s1">
     <h2><span class="n">01</span>问题：直接调用，就没有“以后”和“回退”</h2>
     <div class="prose">
       <p>最省事的写法是直接 <code>dev.gain = 20;</code>。它有三个躲不开的后果：</p>
@@ -53,7 +66,7 @@
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s2">
     <h2><span class="n">02</span>结构：调用者、命令、接收者</h2>
     <p class="subh">三个角色各管一段：调用者管“什么时候执行”，命令管“怎么执行、怎么回退”，接收者只管“被改”。点方框看边界。</p>
 
@@ -138,7 +151,7 @@
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s3">
     <h2><span class="n">03</span>两份实现</h2>
     <p class="subh">C 版靠“基类结构体放第一位 + <code>ops</code> 函数表”做多态，命令对象就是一段能强转的结构体内存；C++ 版靠虚函数，命令对象由 <code>unique_ptr</code> 在队列与历史之间搬家，所有权始终唯一。</p>
 
@@ -388,7 +401,7 @@ int main() {
     </div>
     <p class="hintline">注意第二条 <code>exec SetGain(20)</code> 的旧值是 12，不是 0：旧值是在执行那一刻取的，所以排队再久也能正确回退到上一条命令的结果。</p>
   </section>
-  <section class="sec">
+  <section class="sec" id="s4">
     <h2><span class="n">04</span>自己排一次队，再撤两次</h2>
     <p class="subh">先按几个命令按钮入队（不会立刻生效），再点“执行队列”。执行过的命令进历史；撤销只从历史尾部取，所以顺序一定是反的。</p>
 
@@ -418,7 +431,7 @@ int main() {
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s5">
     <h2><span class="n">05</span>C 与 C++：同一套队列，两种所有权</h2>
     <div class="tbl">
       <table>
@@ -435,7 +448,7 @@ int main() {
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     <div class="prose">
       <ul>
@@ -547,3 +560,4 @@ int main() {
 </script>
 </body>
 </html>
+

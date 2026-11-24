@@ -23,6 +23,7 @@
     <span class="tb-sp"></span>
     <a class="tb" href="index.html">总览</a>
     <a class="tb" href="../../index.html">知识库</a>
+    <a class="tb" href="sitemap.html">目录</a>
   </div>
 </header>
 
@@ -36,7 +37,19 @@
     <span class="chip warn">测试之间会互相污染</span>
   </div>
 
-  <section class="sec">
+    <nav class="toc" aria-label="本页目录">
+    <div class="toc-h"><b>本页目录</b><span>6 节 · 点标题跳转</span></div>
+    <ul class="toc-l">
+      <li><a href="#s1"><i>01</i>问题：要么到处传，要么到处复制</a></li>
+      <li><a href="#s2"><i>02</i>结构：一个入口，一个对象</a></li>
+      <li><a href="#s3"><i>03</i>两份实现</a></li>
+      <li><a href="#s4"><i>04</i>点三次“取实例”，看初始化次数</a></li>
+      <li><a href="#s5"><i>05</i>C 与 C++：同一份唯一，两种保证</a></li>
+      <li><a href="#s6"><i>06</i>代价与坑</a></li>
+    </ul>
+  </nav>
+
+<section class="sec" id="s1">
     <h2><span class="n">01</span>问题：要么到处传，要么到处复制</h2>
     <div class="prose">
       <p>假设有一份运行配置：超时 500 ms、日志级别 2。不做单例，通常只有两种下场：</p>
@@ -48,7 +61,7 @@
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s2">
     <h2><span class="n">02</span>结构：一个入口，一个对象</h2>
     <p class="subh">三个调用点（a / b / c）走同一扇门，门后只有一个对象；拷贝构造被删掉，所以“再造一个”在编译期就不成立。点方框看各自边界。</p>
 
@@ -111,7 +124,7 @@
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s3">
     <h2><span class="n">03</span>两份实现</h2>
     <p class="subh">C 版是“静态结构 + ready 标志”，写法最省但完全没有并发保护；C++ 版是函数内局部静态，构造与访问同一处完成，且拷贝构造被显式删除。</p>
 
@@ -226,7 +239,7 @@ a 与 b 是同一块内存：是</pre>
     </div>
     <p class="hintline">C 版多了“访问次数 / 初始化次数”两个计数器，是因为它需要证明“只初始化一次”；C++ 版由局部静态的语义直接保证，静态构造函数只跑一次，不需要额外标志位。</p>
   </section>
-  <section class="sec">
+  <section class="sec" id="s4">
     <h2><span class="n">04</span>点三次“取实例”，看初始化次数</h2>
     <p class="subh">取实例、改超时、再取——观察“初始化次数”是不是只在第一次增加。最后那个“reset”模拟测试框架在用例之间重置，它留下的污染在日志里。</p>
 
@@ -249,7 +262,7 @@ a 与 b 是同一块内存：是</pre>
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s5">
     <h2><span class="n">05</span>C 与 C++：同一份唯一，两种保证</h2>
     <div class="tbl">
       <table>
@@ -266,7 +279,7 @@ a 与 b 是同一块内存：是</pre>
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     <div class="prose">
       <ul>
@@ -345,3 +358,4 @@ a 与 b 是同一块内存：是</pre>
 </script>
 </body>
 </html>
+

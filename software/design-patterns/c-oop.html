@@ -30,6 +30,7 @@
     <span class="tb-sp"></span>
     <a class="tb" href="index.html">总览</a>
     <a class="tb" href="../../index.html">知识库</a>
+    <a class="tb" href="sitemap.html">目录</a>
   </div>
 </header>
 
@@ -43,7 +44,19 @@
     <span class="chip">无堆分配</span>
   </div>
 
-  <section class="sec">
+    <nav class="toc" aria-label="本页目录">
+    <div class="toc-h"><b>本页目录</b><span>6 节 · 点标题跳转</span></div>
+    <ul class="toc-l">
+      <li><a href="#s1"><i>01</i>问题：同一段代码，两种形状</a></li>
+      <li><a href="#s2"><i>02</i>结构：对象里只有一个指针是真的“类型信息”</a></li>
+      <li><a href="#s3"><i>03</i>两份实现：C 的手工虚表 vs C++ 的 virtual</a></li>
+      <li><a href="#s4"><i>04</i>单步看一次分派</a></li>
+      <li><a href="#s5"><i>05</i>四个零件，两种语言</a></li>
+      <li><a href="#s6"><i>06</i>代价与坑</a></li>
+    </ul>
+  </nav>
+
+<section class="sec" id="s1">
     <h2><span class="n">01</span>问题：同一段代码，两种形状</h2>
     <div class="prose">
       <p>没有多态时，调用方只有两个选择：要么写 <code>switch (kind)</code>，要么为每种形状复制一份同样的循环。加第三种形状，就得到处补分支——这就是“结构病”的起点。</p>
@@ -51,7 +64,7 @@
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s2">
     <h2><span class="n">02</span>结构：对象里只有一个指针是真的“类型信息”</h2>
     <p class="subh">点方框看每个角色负责什么。注意偏移：vptr 在 0，派生类的 base 也在 0——这就是为什么可以把 <code>rect_t*</code> 直接当 <code>shape_t*</code> 用。</p>
 
@@ -136,7 +149,7 @@
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s3">
     <h2><span class="n">03</span>两份实现：C 的手工虚表 vs C++ 的 virtual</h2>
     <p class="subh">同一件事写两遍，第二遍只看编译器替你做了哪些事。源码在 <code>src/coop.c</code> 与 <code>src/coop.cpp</code>。</p>
     <div class="codes">
@@ -259,7 +272,7 @@ sizeof(Rect)=24  sizeof(Circle)=16  sizeof(void*)=8
     <p class="hintline">24 = 8 字节 vptr + 两个 double；16 = 8 + 一个 double。C 版和 C++ 版在这台机器上大小完全一致，因为编译器也是这么排的。</p>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s4">
     <h2><span class="n">04</span>单步看一次分派</h2>
     <p class="subh">选一个对象，然后一步步走：取 vptr → 按偏移取函数地址 → 传 self 进去。右侧日志会说清每一步拿到了什么。</p>
 
@@ -289,7 +302,7 @@ sizeof(Rect)=24  sizeof(Circle)=16  sizeof(void*)=8
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s5">
     <h2><span class="n">05</span>四个零件，两种语言</h2>
     <p class="subh">把“面向对象”拆成四件事看，就很容易判断 C 版缺了什么。</p>
     <table class="tbl">
@@ -304,7 +317,7 @@ sizeof(Rect)=24  sizeof(Circle)=16  sizeof(void*)=8
     <div class="key"><b>一句话。</b>C 的“对象”就是一个结构体 + 一张函数表 + 一群第一个参数叫 <code>self</code> 的普通函数。C++ 把这三样藏进了语法，代价是你要理解它藏了什么；C 把它摊在桌面上，代价是每一处都得自己写对。</div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     <div class="pit">
       <b>1. base 不在偏移 0，强转就是未定义行为。</b>不要为了“省几个字节”把 base 放到中间；需要多重继承的布局时，老老实实算偏移或改用接口表 + 独立字段。
@@ -398,3 +411,4 @@ sizeof(Rect)=24  sizeof(Circle)=16  sizeof(void*)=8
 </script>
 </body>
 </html>
+

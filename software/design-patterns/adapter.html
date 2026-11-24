@@ -25,6 +25,7 @@ input[type=range]{width:100%;accent-color:#43d6a8;margin:6px 0 2px}
     <span class="tb-sp"></span>
     <a class="tb" href="index.html">总览</a>
     <a class="tb" href="../../index.html">知识库</a>
+    <a class="tb" href="sitemap.html">目录</a>
   </div>
 </header>
 
@@ -38,7 +39,19 @@ input[type=range]{width:100%;accent-color:#43d6a8;margin:6px 0 2px}
     <span class="chip">能力缺失要如实报</span>
   </div>
 
-  <section class="sec">
+    <nav class="toc" aria-label="本页目录">
+    <div class="toc-h"><b>本页目录</b><span>6 节 · 点标题跳转</span></div>
+    <ul class="toc-l">
+      <li><a href="#s1"><i>01</i>问题：差异会一路渗到业务层</a></li>
+      <li><a href="#s2"><i>02</i>结构：目标接口在前，适配器在中间</a></li>
+      <li><a href="#s3"><i>03</i>两份实现</a></li>
+      <li><a href="#s4"><i>04</i>改原始值，看适配器怎么翻译</a></li>
+      <li><a href="#s5"><i>05</i>C 与 C++：同一层翻译，两种代价</a></li>
+      <li><a href="#s6"><i>06</i>代价与坑</a></li>
+    </ul>
+  </nav>
+
+<section class="sec" id="s1">
     <h2><span class="n">01</span>问题：差异会一路渗到业务层</h2>
     <div class="prose">
       <p>两个传感器的驱动 API 完全不一样：</p>
@@ -51,7 +64,7 @@ input[type=range]{width:100%;accent-color:#43d6a8;margin:6px 0 2px}
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s2">
     <h2><span class="n">02</span>结构：目标接口在前，适配器在中间</h2>
     <p class="subh">上层只看 <code>ISensor</code>；两个适配器各自包住一个旧驱动，把它的返回值翻译成统一读数。点方框看每一层负责什么。</p>
 
@@ -133,7 +146,7 @@ input[type=range]{width:100%;accent-color:#43d6a8;margin:6px 0 2px}
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s3">
     <h2><span class="n">03</span>两份实现</h2>
     <p class="subh">C 版的目标是“一个 ops 表 + 一个 impl 指针”，适配器结构体把 <code>sensor_t base</code> 放在第一位再强转回来；C++ 版是标准的对象适配器：适配器内部持有一个旧驱动对象，对外实现 <code>read()</code>。</p>
 
@@ -324,7 +337,7 @@ NTC  : temp=27.6C hum=&lt;不支持&gt;</pre>
     </div>
     <p class="hintline">两行完全一致。NTC 的 27.6 来自 <code>25 + (2100-2048)×0.05</code>；湿度那一格没有变成 0.0，而是明确写“不支持”——这是适配器最容易被写错的地方。</p>
   </section>
-  <section class="sec">
+  <section class="sec" id="s4">
     <h2><span class="n">04</span>改原始值，看适配器怎么翻译</h2>
     <p class="subh">拖动滑块改变驱动吐出的原始值。SHT3x 走 ×100 换算，NTC 走分压表近似；NTC 的湿度永远走“不支持”这条分支，而不是编一个数出来。</p>
 
@@ -350,7 +363,7 @@ NTC  : temp=27.6C hum=&lt;不支持&gt;</pre>
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s5">
     <h2><span class="n">05</span>C 与 C++：同一层翻译，两种代价</h2>
     <div class="tbl">
       <table>
@@ -367,7 +380,7 @@ NTC  : temp=27.6C hum=&lt;不支持&gt;</pre>
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     <div class="prose">
       <ul>
@@ -441,3 +454,4 @@ NTC  : temp=27.6C hum=&lt;不支持&gt;</pre>
 </script>
 </body>
 </html>
+

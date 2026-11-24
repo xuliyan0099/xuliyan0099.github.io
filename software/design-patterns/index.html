@@ -42,6 +42,7 @@
     <a class="brand" href="index.html"><i></i>设计模式<small>C / C++ 双实现</small></a>
     <span class="tb-sp"></span>
     <a class="tb" href="../../index.html">知识库</a>
+    <a class="tb" href="sitemap.html">目录</a>
   </div>
 </header>
 
@@ -56,7 +57,18 @@
     <span class="chip">单页静态 · 无第三方请求</span>
   </div>
 
-  <section class="sec">
+    <nav class="toc" aria-label="本页目录">
+    <div class="toc-h"><b>本页目录</b><span>5 节 · 点标题跳转</span></div>
+    <ul class="toc-l">
+      <li><a href="#s1"><i>01</i>先按症状找，别按名字背</a></li>
+      <li><a href="#s2"><i>02</i>九个页面</a></li>
+      <li><a href="#s3"><i>03</i>三分钟看完 23 个 GoF 模式</a></li>
+      <li><a href="#s4"><i>04</i>三条读法</a></li>
+      <li><a href="#s5"><i>05</i>经典出处与本节的取舍</a></li>
+    </ul>
+  </nav>
+
+<section class="sec" id="s1">
     <h2><span class="n">01</span>先按症状找，别按名字背</h2>
     <p class="subh">模式的名字不值钱，值钱的是“出现什么症状时该动结构”。选一个你正在遇到的问题。</p>
 
@@ -79,7 +91,7 @@
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s2">
     <h2><span class="n">02</span>九个页面</h2>
     <p class="subh">每个页面都是同一套骨架：问题 → 结构图 → C / C++ 实现 → 运行结果 → 交互演示 → 代价与坑。</p>
     <div class="cards">
@@ -95,7 +107,7 @@
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s3">
     <h2><span class="n">03</span>三分钟看完 23 个 GoF 模式</h2>
     <p class="subh">本站已展开的给链接；没展开的也留一句话，方便你知道该往哪找。分类沿用 GoF 的三分法。</p>
     <table class="tbl">
@@ -130,7 +142,7 @@
     </table>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s4">
     <h2><span class="n">04</span>三条读法</h2>
     <div class="prose">
       <p><b>从地基开始（推荐给写 C 的人）。</b>先看 <a href="c-oop.html">C 也能面向对象</a>，弄清“vptr 在第 0 字节”这件事，再按顺序读策略 → 观察者 → 状态。C 版的每个模式，本质都是这一页的排列组合。</p>
@@ -140,7 +152,7 @@
     <div class="key"><b>看图的约定。</b>实线箭头 = 调用或持有；虚线箭头 = 实现或订阅关系；方框里第一行是类型名，第二行斜体是它的角色，第三行等宽字体是它暴露的方法。点任意方框，图下方的说明栏会换成那个角色的职责。</div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s5">
     <h2><span class="n">05</span>经典出处与本节的取舍</h2>
     <div class="prose">
       <p>目录结构和“意图 / 问题 / 结构 / 代价”的讲法，沿用 <a href="https://refactoring.guru/design-patterns">Refactoring.Guru</a> 的设计模式目录；C++ 全 23 个模式的可运行示例在 GitHub：<a href="https://github.com/RefactoringGuru/design-patterns-cpp">RefactoringGuru/design-patterns-cpp</a>（每个模式都有 Conceptual 与 RealWorld 两套）。C 侧“用结构体 + 函数指针表实现封装、继承、多态”的原典是 Axel-Tobias Schreiner 的《Object-Oriented Programming with ANSI-C》，有 <a href="https://gitee.com/jiahelinyula/ooc">中文社区译本</a>。</p>
@@ -222,3 +234,4 @@
 </script>
 </body>
 </html>
+

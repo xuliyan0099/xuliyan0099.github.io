@@ -35,6 +35,7 @@
     <span class="tb-sp"></span>
     <a class="tb" href="index.html">总览</a>
     <a class="tb" href="../../index.html">知识库</a>
+    <a class="tb" href="sitemap.html">目录</a>
   </div>
 </header>
 
@@ -48,7 +49,19 @@
     <span class="chip">C++ 版 shared_ptr 续命</span>
   </div>
 
-  <section class="sec">
+    <nav class="toc" aria-label="本页目录">
+    <div class="toc-h"><b>本页目录</b><span>6 节 · 点标题跳转</span></div>
+    <ul class="toc-l">
+      <li><a href="#s1"><i>01</i>问题：通知名单被焊死在采样函数里</a></li>
+      <li><a href="#s2"><i>02</i>结构：发布者只发事件，订阅者各自处理</a></li>
+      <li><a href="#s3"><i>03</i>两份实现：一份故意先写错</a></li>
+      <li><a href="#s4"><i>04</i>亲手踩一次“通知中退订”</a></li>
+      <li><a href="#s5"><i>05</i>同一组角色，两种写法</a></li>
+      <li><a href="#s6"><i>06</i>代价与坑</a></li>
+    </ul>
+  </nav>
+
+<section class="sec" id="s1">
     <h2><span class="n">01</span>问题：通知名单被焊死在采样函数里</h2>
     <div class="prose">
       <p>最直白的写法是：<code>on_sample()</code> 里依次调 <code>gauge_update()</code>、<code>recorder_write()</code>、<code>diag_check()</code>。能跑，但每次加一个消费者就要改这个函数；三个消费者的顺序、错误码、是否阻塞也全挤在一起。</p>
@@ -57,7 +70,7 @@
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s2">
     <h2><span class="n">02</span>结构：发布者只发事件，订阅者各自处理</h2>
     <p class="subh">点方框看职责。虚线表示“订阅关系”，它由订阅者发起，发布者只维护名单。</p>
 
@@ -126,7 +139,7 @@
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s3">
     <h2><span class="n">03</span>两份实现：一份故意先写错</h2>
     <p class="subh">C 版同时给出“朴素”和“安全”两条路径，输出里能直接看到 diag 被跳过；C++ 版用 <code>shared_ptr</code> + 通知前拷贝，顺手解决生命周期。</p>
 
@@ -396,7 +409,7 @@ int main() {
     <p class="hintline">朴素版不是“少了一个人”这么简单：diag 之后每一轮都不会再收到通知，直到下一次压缩数组。它不崩溃，只是悄悄失效。</p>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s4">
     <h2><span class="n">04</span>亲手踩一次“通知中退订”</h2>
     <p class="subh">默认三个订阅者都开着，Recorder 会在收到事件后退订自己。切换朴素 / 安全两种通知方式，各触发一次，看 Diag 收不收到。</p>
 
@@ -422,7 +435,7 @@ int main() {
     </div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s5">
     <h2><span class="n">05</span>同一组角色，两种写法</h2>
     <table class="tbl">
       <thead><tr><th style="width:96px">环节</th><th>C 版</th><th>C++ 版</th><th style="width:230px">要防的事</th></tr></thead>
@@ -437,7 +450,7 @@ int main() {
     <div class="key"><b>为什么 C++ 版能顺手解决生命周期？</b>拷贝 <code>slots_</code> 时，<code>shared_ptr</code> 的引用计数 +1；即使订户在回调里退订，对象也活到本轮通知结束。C 版要等价，得自己做引用计数，或者约定“销毁前必须先 detach”。</div>
   </section>
 
-  <section class="sec">
+  <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     <div class="pit"><b>1. 通知是同步的。</b><code>notify()</code> 返回时所有回调已经跑完。订阅者里做阻塞 IO、等锁、甚至再触发一次 notify，都会把发布者卡住或造成重入。实时系统里通常改成“入队 + 另一线程分发”。</div>
     <div class="pit"><b>2. 退订要“延迟生效”。</b>本轮通知已经决定要叫谁，中途删掉会让后面的人收不到（本页演示的正是这个）。墓碑 + 结束压缩是最小改动的解法。</div>
@@ -567,3 +580,4 @@ int main() {
 </script>
 </body>
 </html>
+
