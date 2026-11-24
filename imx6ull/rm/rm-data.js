@@ -182,8 +182,9 @@ window.RM =
                   "时序：POL/PHA 四模式、SS_CTL 波形、SPI_RDY 与等待",
                   "流程与判据：EN/XCH/TC、RX 溢出，以及四路 SPI 的引脚冲突"] },
         { "n": 22, "zh": "以太网 MAC ENET", "en": "10/100-Mbps Ethernet MAC", "pp": "885–1034", "pages": 150, "pri": "read", "batch": 5,
-          "line": "不是「网口」两个字：BD 描述符环、MDIO、RMII 参考时钟才是关键。",
-          "pts": ["发送/接收 BD 环与中断收包", "MDIO 读写 PHY 寄存器、PHY 地址", "RMII 时序与外接 50MHz/25MHz 时钟"] },
+"line": "不是「网口」两个字：BD 描述符环、MDIO、RMII 参考时钟才是关键。",
+"pts": ["六个子单元：MAC/uDMA/FIFO/MDIO/PTP/MIB 的交接点", "基址 0x0218_8000 与常用寄存器偏移表", "ECR/RCR/TCR 四个必配位：ETHEREN、MII_MODE、RMII_MODE、FDEN", "MDIO 事务：MMFR 位域与 MSCR 的 2.5 MHz 上限", "32 字节描述符：R/E/L/W 位与环的 wrap", "十步初始化顺序与 EIR 中断位", "RMII 板级现实：KSZ8081、50 MHz 参考时钟、PHY 地址", "七条排查判据：内环回、link、ARP 三段法"],
+"ready": true },
         { "n": 26, "zh": "CAN 控制器 FLEXCAN", "en": "Flexible Controller Area Network", "pp": "1245–1324", "pages": 80, "pri": "read", "batch": 2,
           "line": "邮箱、Rx FIFO、位时序三件事，车载开发绕不过去。",
           "pts": ["MB 结构与 ID 过滤、发送优先级", "位时序（PROP_SEG/PHASE_SEG）与波特率计算", "错误状态、Bus-Off 与恢复"] },
@@ -199,7 +200,7 @@ window.RM =
         { "n": 56, "zh": "USB 控制器：主机、设备与 OTG", "en": "Universal Serial Bus Controller", "pp": "3641–3900", "pages": 260, "pri": "table", "batch": 5,
           "line": "260 页分三套：主机 EHCI、设备端点、OTG 状态机；按需查，不硬读。",
           "pts": ["设备端端点与传输描述符（dTD/dQH）", "主机 EHCI 寄存器与端口状态", "OTG 会话、ID 脚与角色切换"] },
-        { "n": 57, "zh": "USB 2.0 PHY", "en": "USB 2.0 Integrated PHY", "pp": "3901–3946", "pages": 46, "pri": "opt", "batch": 5,
+        { "n": 57, "zh": "USB 2.0 PHY", "en": "USB 2.0 Integrated PHY", "pp": "3901–3946", "pages": 46, "pri": "opt", "batch": 5, "ready": true,
           "line": "PHY 的断开检测、chirp 握手与校准，USB 识别不了时查这里。",
           "pts": ["连接/断开检测与 VBUS 相关位", "高速 chirp 握手与眼图校准"] }
       ]
