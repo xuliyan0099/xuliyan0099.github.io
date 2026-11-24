@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4.4 去耦与 PDN | 第四篇 · 设计与计算 | i.MX6ULL 学习手册</title>
+<meta name="description" content="目标阻抗、容值组合、并联反谐振、安装电感与平面电容；用 1.35V/1A 的 SoC 轨走一遍 PDN 设计。">
+<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第四篇 · 设计与计算</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第四篇 · 设计</span><span class="sep">/</span>第 4 章<span class="sep">/</span>约 28 分钟</div>
+    <h1>去耦与 PDN：让电源在芯片眼里是「短路」</h1>
+    <p class="lede">芯片在高频翻转时，电流是<b>纳秒级脉冲</b>，远处的稳压器根本来不及响应。这时靠的是「芯片脚边那一小片电容 + 平面电容」，把电源在芯片眼里维持在低阻抗——这就是 PDN（Power Delivery Network）设计。</p>
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>用 Z<sub>target</sub> = ΔV/ΔI 定出目标阻抗</li>
+        <li>解释「容值组合」为什么不是随便并几颗，而要考虑反谐振</li>
+        <li>说清安装电感（过孔/走线）如何毁掉一颗好电容</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">4.4.1</span>目标阻抗：先定指标</h2>
+    <p style="text-align:center">Z<sub>target</sub> = (允许的电压波动) / (负载电流阶跃)</p>
+    <p>以 1.35V 内核轨、允许 ±5%（67mV）、阶跃 0.5A 为例：Z<sub>target</sub> = 67mV/0.5A ≈ 134mΩ。整条 PDN 在关注频段内（通常几十 kHz 到几百 MHz）的阻抗都要低于这个值。</p>
+    <p>这个数决定了「要并多少电容」：单颗 0.1µF 的谷底阻抗约等于它的 ESR（几 mΩ 到几十 mΩ），但离开谐振点就上升。所以需要<b>多容值、多封装并联</b>，把整个频段的阻抗压下去。</p>
+
+    <h2><span class="n">4.4.2</span>并联反谐振：并得越多不一定越好</h2>
+    <p>两颗不同容值的电容并联，在某个频率上会形成<b>LC 并联谐振</b>：一颗呈感性、另一颗呈容性，二者「互相抵消」不掉，阻抗出现尖峰。这个峰可能比单颗的谷底高一个量级。</p>
+    <p>对策：① 选用 ESR 稍大的电容（阻尼谐振）；② 容值不要跨太多倍（如 0.1µF 与 10µF 之间加一颗 1µF）；③ 用平面电容/多过孔降低高频阻抗。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="16" y="16" width="420" height="210" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="32" y="40" fill="#eaf3ff" font-size="11">PDN 阻抗曲线与目标线</text>
+        <line x1="50" y1="160" x2="400" y2="160" stroke="#3a4560"/>
+        <line x1="50" y1="60" x2="50" y2="160" stroke="#3a4560"/>
+        <line x1="50" y1="110" x2="400" y2="110" stroke="#ffb84d" stroke-dasharray="4 3"/>
+        <text x="330" y="104" fill="#ffd79a" font-size="9">Z target</text>
+        <path d="M54 150 C 90 148 130 130 160 118 C 190 108 210 112 240 118 C 270 128 300 140 340 146" stroke="#5ff1ef" stroke-width="2" fill="none"/>
+        <text x="180" y="100" fill="#9df5f4" font-size="9">谷底：电容有效区</text>
+        <text x="250" y="176" fill="#6f7f9c" font-size="9">高频段靠平面与小封装电容</text>
+        <text x="32" y="196" fill="#9fb0c7" font-size="9">目标：全频段低于虚线</text>
+
+        <rect x="456" y="16" width="400" height="210" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="472" y="40" fill="#eaf3ff" font-size="11">安装电感：最常见的「白装」</text>
+        <text x="472" y="72" fill="#9fb0c7" font-size="10">过孔约 0.3–0.5nH/个</text>
+        <text x="472" y="96" fill="#9fb0c7" font-size="10">1mm 走线约 1nH</text>
+        <text x="472" y="120" fill="#9fb0c7" font-size="10">0.1µF + 1nH → f0 约 16MHz</text>
+        <text x="472" y="144" fill="#9fb0c7" font-size="10">0.1µF + 5nH → f0 约 7MHz</text>
+        <text x="472" y="170" fill="#9df3c2" font-size="10">结论：贴得近，比买得贵更重要</text>
+        <text x="472" y="192" fill="#6f7f9c" font-size="9">BGA 背面直贴 + 就近过孔是最优解</text>
+
+        <text x="16" y="256" fill="#9fb0c7" font-size="10.5">容值组合建议：10µF（低频）/1µF（中频）/0.1µF（高频）按数量递减，每档都靠近对应的引脚。</text>
+        <text x="16" y="280" fill="#6f7f9c" font-size="10">DDR 与 SoC 的每个电源脚都要有 0.1µF；大容值可几个脚共用一颗，但 0.1µF 不能共用。</text>
+        <text x="16" y="304" fill="#ff9c9c" font-size="10">坑：电容放在芯片另一侧、靠长走线连过去，等于把 ESL 放大 10 倍。</text>
+      </svg>
+      <figcaption><b>图 4-4</b>　PDN 目标阻抗与安装电感的影响。</figcaption>
+    </figure>
+
+    <div class="demo">
+      <div class="dh"><b>PDN 目标阻抗计算器</b><span>给电压、允许波动与阶跃电流，算 Z<sub>target</sub> 与所需并联数</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div><div style="font-size:12px;color:#9fb0c7">电压 <b id="vv" style="color:#5ff1ef">1.35</b> V</div><input id="v" type="range" min="0.9" max="5" step="0.05" value="1.35" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">允许波动 <b id="pv" style="color:#5ff1ef">5</b> %</div><input id="p" type="range" min="1" max="10" step="1" value="5" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">阶跃电流 <b id="iv" style="color:#5ff1ef">0.5</b> A</div><input id="i" type="range" min="0.05" max="3" step="0.05" value="0.5" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="pdnOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h2><span class="n">4.4.3</span>布局五条硬规则</h2>
+    <ol class="steps">
+      <li><b>0.1µF 贴脚</b>：电容焊盘到引脚的距离 ≤2mm，过孔直接打在焊盘旁。</li>
+      <li><b>大容值靠外</b>：10µF/22µF 可以稍远，但要靠近该域的入口。</li>
+      <li><b>地过孔不共用</b>：每颗电容至少一个独立地过孔，回到完整地平面。</li>
+      <li><b>电源平面成对</b>：电源层与地平面相邻，形成平面电容（高频去耦的「隐形电容」）。</li>
+      <li><b>不要跨分割</b>：电容的地必须回到同一个地平面，跨分割等于加了个电感。</li>
+    </ol>
+
+    <div class="box pit">
+      <h5>三个「明明放了很多电容还是不稳」的原因</h5>
+      <p><b>1. 安装电感太大：</b>电容在板子另一侧，走线 10mm，f0 掉到几 MHz。</p>
+      <p><b>2. 反谐振峰：</b>0.1µF 与 10µF 并联在中间频段出现尖峰，正好落在负载跳变的频谱上。</p>
+      <p><b>3. 地不完整：</b>电容的地过孔落在被分割的岛上，回流路径长。</p>
+    </div>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>1.8V 轨、允许 3%、阶跃 1A，Z<sub>target</sub> 是多少？</summary><div class="ans">允许波动 54mV，Z=54mV/1A=54mΩ。整条 PDN 在该频段都要低于 54mΩ，通常需要多颗低 ESL 电容并联并保证平面完整。</div></details>
+    <details class="quiz"><summary>为什么 0.1µF 的安装电感从 1nH 增到 5nH，效果差很多？</summary><div class="ans">自谐振频率从约 16MHz 降到约 7MHz，意味着 10MHz 以上它已经呈感性，不再起旁路作用，高频噪声直接透到芯片。</div></details>
+    <details class="quiz"><summary>平面电容为什么对高频有用？</summary><div class="ans">相邻电源/地平面构成一个大面积平板电容，虽然容值小（nF 级），但 ESL 极低，能在几百 MHz 以上继续提供低阻抗。</div></details>
+
+    <div class="ch-nav"><a href="c03.html"><span>上一章</span><b>← 4.3 LDO 热设计</b></a>
+      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>4.5 上下拉与终端取值 →</b></a></div>
+  </main>
+</div>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+<script>
+renderPart('p4','c04.html');
+(function(){
+  function calc(){
+    var v=+document.getElementById('v').value, p=+document.getElementById('p').value/100, i=+document.getElementById('i').value;
+    document.getElementById('vv').textContent=v.toFixed(2);
+    document.getElementById('pv').textContent=(p*100).toFixed(0);
+    document.getElementById('iv').textContent=i.toFixed(2);
+    var dv=v*p, z=dv/i;
+    var n=Math.max(1,Math.ceil(0.02/z));
+    document.getElementById('pdnOut').innerHTML=
+      '<b style="color:#eaf3ff;font-size:15px">允许波动 '+(dv*1000).toFixed(0)+' mV　Z target ≈ '+(z*1000).toFixed(0)+' mΩ</b><br>'+
+      '若单颗电容谷底约 20mΩ，至少并 '+n+' 颗（还要覆盖频段，实际更多）<br>'+
+      '<span style="color:#6f7f9c;font-size:11.5px">只按谷底估算，未计反谐振与安装电感；工程上用 10µF/1µF/0.1µF 三档组合，再按仿真/实测修正。</span><br>'+
+      '<span style="color:#9fb0c7">关注频段：负载跳变的上升沿越陡，需要覆盖的频率越高（tr=10ns 对应约 35MHz 以上）。</span>';
+  }
+  ['v','p','i'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+</body></html>

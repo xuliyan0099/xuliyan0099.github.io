@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4.3 LDO 热设计 | 第四篇 · 设计与计算 | i.MX6ULL 学习手册</title>
+<meta name="description" content="耗散公式、结温计算、SOT-23/SOT-89/DFN 热阻对照、铜箔与过孔、降额规则；用 U12 与 DCJ5060 实例核算。">
+<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第四篇 · 设计与计算</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第四篇 · 设计</span><span class="sep">/</span>第 3 章<span class="sep">/</span>约 24 分钟</div>
+    <h1>LDO 热设计：算完再决定封装</h1>
+    <p class="lede">LDO 的电气设计很简单，<b>难的是热</b>。同一颗芯片，SOT-23 只能散 0.3W，SOT-89 能散 1W，DFN 带散热焊盘能散 2W 以上。选错封装，电路「能工作」但三个月后批量失效。</p>
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>用 P = (V<sub>in</sub>−V<sub>out</sub>)I + V<sub>in</sub>I<sub>q</sub> 算耗散</li>
+        <li>用 T<sub>j</sub> = T<sub>a</sub> + P·R<sub>θJA</sub> 判断是否超 125°C</li>
+        <li>说出加大铜箔、散热过孔、降压差三种降温手段的效果差异</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">4.3.1</span>两个公式够了</h2>
+    <p style="text-align:center">P = (V<sub>in</sub> − V<sub>out</sub>) × I<sub>out</sub> + V<sub>in</sub> × I<sub>q</sub><br>T<sub>j</sub> = T<sub>a</sub> + P × R<sub>θJA</sub></p>
+    <table>
+      <thead><tr><th>封装</th><th>R<sub>θJA</sub>（典型，无散热铜箔）</th><th>有铜箔/散热焊盘</th><th>可用耗散（T<sub>a</sub>=40°C，T<sub>j</sub>≤125°C）</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">SOT-23</td><td>约 200°C/W</td><td>150°C/W</td><td>约 0.4–0.55W</td></tr>
+        <tr><td class="nm">SOT-89</td><td>约 100°C/W</td><td>60°C/W</td><td>约 0.85–1.4W</td></tr>
+        <tr><td class="nm">DFN + 散热焊盘</td><td>约 60°C/W</td><td>30°C/W</td><td>约 1.4–2.8W</td></tr>
+        <tr><td class="nm">TO-252（DPAK）</td><td>约 50°C/W</td><td>25°C/W</td><td>约 1.7–3.4W</td></tr>
+      </tbody>
+    </table>
+    <p>注意：这些 R<sub>θJA</sub> 都依赖铜箔面积与层数。规格书常标「1 平方英寸 2oz 铜」，小板上达不到，要按实际打折（可能差 2 倍）。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="16" y="16" width="410" height="180" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="32" y="40" fill="#eaf3ff" font-size="11">耗散与压差的关系</text>
+        <line x1="60" y1="150" x2="390" y2="150" stroke="#3a4560"/>
+        <line x1="60" y1="60" x2="60" y2="150" stroke="#3a4560"/>
+        <line x1="60" y1="150" x2="200" y2="118" stroke="#5ff1ef" stroke-width="2"/>
+        <line x1="60" y1="150" x2="200" y2="86" stroke="#ffb84d" stroke-width="2"/>
+        <line x1="60" y1="150" x2="200" y2="62" stroke="#ff9c9c" stroke-width="2"/>
+        <text x="210" y="116" fill="#9df5f4" font-size="9">0.1A</text>
+        <text x="210" y="86" fill="#ffd79a" font-size="9">0.3A</text>
+        <text x="210" y="62" fill="#ff9c9c" font-size="9">0.6A</text>
+        <text x="60" y="166" fill="#6f7f9c" font-size="9">横轴：压差 0–2V</text>
+        <text x="32" y="184" fill="#9fb0c7" font-size="9">同样压差，电流翻倍 → 耗散翻倍</text>
+
+        <rect x="446" y="16" width="410" height="180" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="462" y="40" fill="#eaf3ff" font-size="11">三种降温手段的实际效果</text>
+        <text x="462" y="72" fill="#9df5f4" font-size="10">① 加大铜箔</text>
+        <text x="462" y="92" fill="#9fb0c7" font-size="9.5">RθJA 可降 30–50%，成本最低</text>
+        <text x="462" y="118" fill="#9df5f4" font-size="10">② 散热过孔阵列</text>
+        <text x="462" y="138" fill="#9fb0c7" font-size="9.5">把热传到内层地平面，降 20–40%</text>
+        <text x="462" y="164" fill="#9df5f4" font-size="10">③ 降低压差</text>
+        <text x="462" y="184" fill="#9fb0c7" font-size="9.5">前面加 DCDC，效果最直接</text>
+
+        <text x="16" y="226" fill="#9fb0c7" font-size="10.5">实例：U12（XC6206P282MR）3.3V→2.8V、100mA：P=0.05W，SOT-23 温升仅 10°C，安全。</text>
+        <text x="16" y="250" fill="#6f7f9c" font-size="10">反例：5V→1.8V、300mA：P=0.96W，SOT-23 温升 190°C，必然烧毁——必须改 DCDC。</text>
+        <text x="16" y="274" fill="#ff9c9c" font-size="10">判据：Tj 估算 ≤125°C（留 25°C 余量）；批量产品建议 ≤110°C。</text>
+      </svg>
+      <figcaption><b>图 4-3</b>　耗散随压差与电流变化，以及三种降温手段。</figcaption>
+    </figure>
+
+    <div class="demo">
+      <div class="dh"><b>LDO 结温计算器</b><span>给工况与热阻，直接判断封装是否够</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
+          <div><div style="font-size:12px;color:#9fb0c7">Vin <b id="iv" style="color:#5ff1ef">3.3</b> V</div><input id="vin" type="range" min="1.8" max="24" step="0.1" value="3.3" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">Vout <b id="ov" style="color:#5ff1ef">2.8</b> V</div><input id="vout" type="range" min="0.8" max="12" step="0.1" value="2.8" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">Iout <b id="iov" style="color:#5ff1ef">100</b> mA</div><input id="iout" type="range" min="5" max="500" step="5" value="100" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">RθJA <b id="rv" style="color:#5ff1ef">200</b> °C/W</div><input id="r" type="range" min="20" max="300" step="10" value="200" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="ldoOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h2><span class="n">4.3.2</span>三个设计习惯</h2>
+    <ol class="steps">
+      <li><b>先算热，再画封装</b>：耗散 >0.4W 就别用 SOT-23。</li>
+      <li><b>散热焊盘打过孔</b>：每个过孔约 0.3–0.5°C/W 改善，9 个过孔阵列效果明显。</li>
+      <li><b>远离热源</b>：LDO 紧贴 DCDC 电感，等于给自己加环境温度。</li>
+    </ol>
+    <div class="box tip">
+      <h5>手摸法的边界</h5>
+      <p>手指能长期按住（约 60°C 以下）说明余量很大；烫到不敢碰（&gt;70°C）就要算；闻到味道或变色，说明 T<sub>j</sub> 已远超 125°C。<b>手摸只能定性，不能替代计算。</b></p>
+    </div>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>5V→3.3V、200mA、SOT-23（200°C/W）、T<sub>a</sub>=40°C，安全吗？</summary><div class="ans">P=0.34W，T<sub>j</sub>=40+68=108°C，低于 125°C 但余量不大；批量建议换 SOT-89 或加铜箔，把 T<sub>j</sub> 压到 100°C 以下。</div></details>
+    <details class="quiz"><summary>为什么加大铜箔能降 R<sub>θJA</sub>？</summary><div class="ans">因为热量从结传到引脚再到铜箔，铜箔相当于散热器，面积越大对流与辐射散热越强，热阻下降。</div></details>
+    <details class="quiz"><summary>同样耗散，为什么 DFN 比 SOT-23 凉？</summary><div class="ans">DFN 有裸露散热焊盘，热直接传到 PCB 地平面；SOT-23 只靠引脚传热，路径长、热阻大。</div></details>
+
+    <div class="ch-nav"><a href="c02.html"><span>上一章</span><b>← 4.2 DCDC 外围计算</b></a>
+      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>4.4 去耦与 PDN →</b></a></div>
+  </main>
+</div>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+<script>
+renderPart('p4','c03.html');
+(function(){
+  function calc(){
+    var vin=+document.getElementById('vin').value, vout=+document.getElementById('vout').value;
+    var io=+document.getElementById('iout').value/1000, r=+document.getElementById('r').value;
+    document.getElementById('iv').textContent=vin.toFixed(1);
+    document.getElementById('ov').textContent=vout.toFixed(1);
+    document.getElementById('iov').textContent=(io*1000).toFixed(0);
+    document.getElementById('rv').textContent=r;
+    var p=(vin-vout)*io, tj=40+p*r;
+    var pmax=(125-40)/r;
+    document.getElementById('ldoOut').innerHTML=
+      '<b style="color:#eaf3ff;font-size:15px">耗散 '+(p*1000).toFixed(0)+' mW　结温 ≈ '+tj.toFixed(0)+' °C</b><br>'+
+      '此封装在 40°C 环境下最多散 '+(pmax*1000).toFixed(0)+' mW<br>'+
+      '<span style="color:'+(tj<=110?'#9df3c2':'#ff9c9c')+'">'+(tj<=110?'余量充足（≤110°C）':(tj<=125?'勉强可用，批量建议换封装':'超 125°C，必须改方案'))+'</span><br>'+
+      '<span style="color:#6f7f9c;font-size:11.5px">按 Ta=40°C 估算；实际环境温度按机箱内温度取（常 50–60°C）。RθJA 已含铜箔影响，按实际 Layout 修正。</span>';
+  }
+  ['vin','vout','iout','r'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+</body></html>

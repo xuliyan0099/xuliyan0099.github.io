@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4.2 DCDC 外围计算 | 第四篇 · 设计与计算 | i.MX6ULL 学习手册</title>
+<meta name="description" content="电感取值、输出电容纹波、反馈分压、输入电容 RMS 电流与补偿；用 4.7µH/49.9k/15k 的真实参数走一遍。">
+<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第四篇 · 设计与计算</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第四篇 · 设计</span><span class="sep">/</span>第 2 章<span class="sep">/</span>约 30 分钟</div>
+    <h1>DCDC 外围计算：四个元件定生死</h1>
+    <p class="lede">一颗 DCDC 的外围其实只有四样：<b>电感 L、输出电容 C<sub>out</sub>、反馈分压 R1/R2、输入电容 C<sub>in</sub></b>。规格书给公式，但不给「你的工况」——这一章把四个公式逐个算一遍，并给出取值边界。</p>
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>用 ΔI = V<sub>out</sub>(V<sub>in</sub>−V<sub>out</sub>)/(L·f<sub>s</sub>·V<sub>in</sub>) 反算 L 并核对 I<sub>sat</sub></li>
+        <li>用 ΔV ≈ ΔI/(8·f<sub>s</sub>·C<sub>out</sub>) 估纹波，选出电容组合</li>
+        <li>用 V<sub>out</sub> = V<sub>ref</sub>(1+R1/R2) 算反馈电阻，并解释精度来源</li>
+        <li>算输入电容的 RMS 电流，避免电容过热</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">4.2.1</span>电感：先定纹波比，再反算</h2>
+    <p>目标纹波比 k = ΔI/I<sub>out</sub>，常用 0.2–0.4。则：</p>
+    <p style="text-align:center">L = V<sub>out</sub>(V<sub>in</sub>−V<sub>out</sub>) / (k·I<sub>out</sub>·f<sub>s</sub>·V<sub>in</sub>)</p>
+    <p>以 5V→1.35V、I<sub>out</sub>=1A、f<sub>s</sub>=1MHz、k=0.3 为例：L = 1.35×3.65/(0.3×1×1M×5) ≈ 3.3µH。本板用 2.2µH，对应 k≈0.45，属于「体积优先」的取值，代价是纹波偏大、峰值更高（峰值 1.22A）。</p>
+    <p><b>核对 I<sub>sat</sub>：</b>峰值 = I<sub>out</sub>+ΔI/2 = 1.22A，按 70% 规则，I<sub>sat</sub> 至少 1.75A。</p>
+
+    <h2><span class="n">4.2.2</span>输出电容：纹波与瞬态两条线</h2>
+    <p>连续纹波近似：ΔV ≈ ΔI/(8·f<sub>s</sub>·C<sub>out</sub>)。以 ΔI=0.45A、f<sub>s</sub>=1MHz、要求 ΔV≤20mV 为例：C<sub>out</sub> ≥ 0.45/(8×1M×0.02) ≈ 2.8µF。看起来很小，但还要满足<b>负载阶跃</b>：ΔV = ΔI·Δt/C，环路响应 10µs、阶跃 0.5A 时要 250µF 级——所以实际用 22µF×2 并联，再配 0.1µF 吸高频。</p>
+    <p>注意 MLCC 的直流偏压降容（2.2 章）：标称 22µF/6.3V 在 1.35V 下也许只剩 15µF，算的时候要打折。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="16" y="16" width="420" height="220" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="32" y="40" fill="#eaf3ff" font-size="11">四个公式，一张纸</text>
+        <text x="32" y="72" fill="#9df5f4" font-size="10">L = Vout(Vin−Vout)/(k·Iout·fs·Vin)</text>
+        <text x="32" y="96" fill="#9df5f4" font-size="10">ΔV ≈ ΔI/(8·fs·Cout)</text>
+        <text x="32" y="120" fill="#9df5f4" font-size="10">Vout = Vref(1+R1/R2)</text>
+        <text x="32" y="144" fill="#9df5f4" font-size="10">Icin(rms) ≈ Iout√(D(1−D))</text>
+        <text x="32" y="170" fill="#6f7f9c" font-size="9">D = Vout/Vin（占空比）</text>
+        <text x="32" y="196" fill="#9fb0c7" font-size="9.5">四个公式之外，还要核 I sat、电容降容、反馈精度</text>
+        <text x="32" y="218" fill="#ff9c9c" font-size="9.5">公式给的是「理论最小值」，工程要再加余量</text>
+
+        <rect x="456" y="16" width="400" height="220" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="472" y="40" fill="#eaf3ff" font-size="11">本板 5V→1.35V 的实例</text>
+        <text x="472" y="70" fill="#9fb0c7" font-size="10">L=2.2µH → ΔI≈0.45A（k≈0.45）</text>
+        <text x="472" y="94" fill="#9fb0c7" font-size="10">峰值≈1.22A → I sat 需 ≥1.75A</text>
+        <text x="472" y="118" fill="#9fb0c7" font-size="10">Cout 22µF×2 + 0.1µF</text>
+        <text x="472" y="142" fill="#9fb0c7" font-size="10">反馈 49.9k/15k → 比值 4.327</text>
+        <text x="472" y="166" fill="#9fb0c7" font-size="10">Icin(rms) ≈ 1×√(0.27×0.73) ≈ 0.44A</text>
+        <text x="472" y="192" fill="#6f7f9c" font-size="9">输入电容要按 0.44A 的 RMS 选纹波电流额定</text>
+
+        <text x="16" y="266" fill="#9fb0c7" font-size="10.5">反馈精度：Vref 容差（常见 ±1%）+ 电阻容差（1%×2）+ 温漂，最坏可达 ±3%，精密轨要标定。</text>
+        <text x="16" y="290" fill="#6f7f9c" font-size="10">布局：输入电容紧贴芯片 VIN/GND，反馈走线从输出电容处取，不要从电感端取。</text>
+        <text x="16" y="314" fill="#ff9c9c" font-size="10">坑：反馈从电感前端取，纹波被放大 10 倍，输出抖到示波器都能看见。</text>
+      </svg>
+      <figcaption><b>图 4-2</b>　DCDC 四个公式与本板实例。</figcaption>
+    </figure>
+
+    <div class="demo">
+      <div class="dh"><b>DCDC 外围计算器</b><span>一次算出 L、纹波、峰值、C<sub>out</sub></span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
+          <div><div style="font-size:12px;color:#9fb0c7">Vin <b id="vinv" style="color:#5ff1ef">5</b> V</div><input id="vin" type="range" min="3" max="24" step="0.1" value="5" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">Vout <b id="vov" style="color:#5ff1ef">1.35</b> V</div><input id="vout" type="range" min="0.8" max="12" step="0.05" value="1.35" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">Iout <b id="iov" style="color:#5ff1ef">1</b> A</div><input id="iout" type="range" min="0.1" max="5" step="0.05" value="1" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">L <b id="lv" style="color:#5ff1ef">2.2</b> µH</div><input id="l" type="range" min="0.5" max="22" step="0.1" value="2.2" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="dcOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h2><span class="n">4.2.3</span>四个取值边界</h2>
+    <ol class="steps">
+      <li><b>L 不能太小</b>：ΔI 大 → 峰值高、EMI 强、轻载进入 DCM 时环路易不稳。</li>
+      <li><b>L 不能太大</b>：体积大、DCR 高、瞬态响应慢（电流爬不快）。</li>
+      <li><b>C<sub>out</sub> 不能只看纹波</b>：要满足负载阶跃与环路稳定（有的芯片对 C<sub>out</sub> 范围有硬约束）。</li>
+      <li><b>C<sub>in</sub> 要按 RMS 电流选</b>：否则电容发热、寿命骤降。</li>
+    </ol>
+    <div class="box pit">
+      <h5>三个「算对了却不通」的原因</h5>
+      <p><b>1. 电感饱和：</b>峰值算 1.22A，但启动瞬间到 2A，I<sub>sat</sub> 不够 → 输出塌。</p>
+      <p><b>2. 反馈被噪声污染：</b>FB 走线经过 SW 节点，芯片误判 → 输出抖动。</p>
+      <p><b>3. 输出电容实际容值不足：</b>直流偏压降容后只剩一半，纹波翻倍。</p>
+    </div>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>Vin=5V、Vout=3.3V、Iout=0.5A、fs=1MHz，取 k=0.3 时 L 约多少？</summary><div class="ans">L = 3.3×(5−3.3)/(0.3×0.5×1M×5) ≈ 7.5µH，就近取 6.8µH 或 10µH。</div></details>
+    <details class="quiz"><summary>为什么输入电容要按 RMS 电流选，而不是按容值？</summary><div class="ans">因为输入电容承受的是脉冲电流（占空比 D 的方波），其发热由 I²·ESR 决定。容值只决定电压纹波，RMS 电流决定寿命与温升。</div></details>
+    <details class="quiz"><summary>反馈电阻从 49.9k/15k 改成 47k/15k 会怎样？</summary><div class="ans">比值从 4.327 变 4.133，输出降低约 4.5%（按同 Vref）；同时 47k 是 5% 系列，精度下降。输出电压偏离规格。</div></details>
+
+    <div class="ch-nav"><a href="c01.html"><span>上一章</span><b>← 4.1 电流预算</b></a>
+      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>4.3 LDO 热设计 →</b></a></div>
+  </main>
+</div>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+<script>
+renderPart('p4','c02.html');
+(function(){
+  function calc(){
+    var vin=+document.getElementById('vin').value, vout=+document.getElementById('vout').value;
+    var io=+document.getElementById('iout').value, L=+document.getElementById('l').value*1e-6, fs=1e6;
+    document.getElementById('vinv').textContent=vin.toFixed(1);
+    document.getElementById('vov').textContent=vout.toFixed(2);
+    document.getElementById('iov').textContent=io.toFixed(2);
+    document.getElementById('lv').textContent=(L*1e6).toFixed(1);
+    var dI=vout*(vin-vout)/(L*fs*vin), ipk=io+dI/2, k=dI/io;
+    var cout=dI/(8*fs*0.02)*1e6;
+    var d=vout/vin, irm=io*Math.sqrt(d*(1-d));
+    var isat=ipk/0.7;
+    document.getElementById('dcOut').innerHTML=
+      '<b style="color:#eaf3ff;font-size:15px">ΔI ≈ '+dI.toFixed(2)+' A（k='+k.toFixed(2)+'）　峰值 '+ipk.toFixed(2)+' A</b><br>'+
+      '建议 I sat ≥ '+isat.toFixed(2)+' A　C out ≥ '+cout.toFixed(1)+' µF（按 20mV 纹波）<br>'+
+      '占空比 D ≈ '+(d*100).toFixed(0)+'%　输入电容 RMS ≈ '+irm.toFixed(2)+' A<br>'+
+      '<span style="color:'+(k>0.5?'#ff9c9c':'#9df3c2')+'">'+(k>0.5?'纹波比偏大：峰值高、EMI 强，建议加大 L 或提高 fs':'纹波比合理（目标 0.2–0.4）')+'</span><br>'+
+      '<span style="color:#6f7f9c;font-size:11.5px">再乘降容系数：22µF/6.3V 在低电压下按 60–70% 计；C out 计算值要按有效容值反推标称值。</span>';
+  }
+  ['vin','vout','iout','l'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+</body></html>

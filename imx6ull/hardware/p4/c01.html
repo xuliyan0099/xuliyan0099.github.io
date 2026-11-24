@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4.1 电流预算与选型 | 第四篇 · 设计与计算 | i.MX6ULL 学习手册</title>
+<meta name="description" content="逐路列负载、峰值与效率，反推输入电流与器件选型；30% 余量规则与一张可复用的预算表。">
+<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第四篇 · 设计与计算</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第四篇 · 设计</span><span class="sep">/</span>第 1 章<span class="sep">/</span>约 26 分钟</div>
+    <h1>电流预算：画板前的第一张表</h1>
+    <p class="lede">几乎所有「电源不够」的事故，根源都是<b>没做预算</b>：凭感觉选了一颗 1A 的 DCDC，实际峰值要 1.4A。<b>预算不是估算，是把每一路负载的典型值、峰值、持续时间都写下来，再乘效率反推输入。</b></p>
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>列出六路负载的典型/峰值电流，算出总输入功率</li>
+        <li>用效率反推输入电流，判断保险丝、连接器、电感是否够</li>
+        <li>套用「30% 余量」规则选出 DCDC 与 LDO 的额定值</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">4.1.1</span>预算表的五列</h2>
+    <table>
+      <thead><tr><th>轨</th><th>典型电流</th><th>峰值/持续时间</th><th>电压</th><th>功率</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">VDD_ARM_SOC 1.35V</td><td>0.6A</td><td>1.1A / 10ms（满载瞬间）</td><td>1.35V</td><td>0.8–1.5W</td></tr>
+        <tr><td class="nm">DRAM_1V35</td><td>0.3A</td><td>0.5A / 突发</td><td>1.35V</td><td>0.4–0.7W</td></tr>
+        <tr><td class="nm">DCDC_3V3</td><td>0.4A</td><td>0.8A / 外设全开</td><td>3.3V</td><td>1.3–2.6W</td></tr>
+        <tr><td class="nm">SNVS 3.3V</td><td>3mA</td><td>10mA</td><td>3.3V</td><td>&lt;0.03W</td></tr>
+        <tr><td class="nm">NVCC_CSI 2.8V</td><td>60mA</td><td>120mA</td><td>2.8V</td><td>0.2–0.34W</td></tr>
+        <tr><td class="nm">NVCC_SD</td><td>50mA</td><td>200mA / 写卡</td><td>1.8–3.3V</td><td>0.1–0.66W</td></tr>
+      </tbody>
+    </table>
+    <p>先算<b>输出功率总和</b>，再按每一级效率反推输入功率，逐级相加得到 5V 输入电流。这是「自下而上」的正确顺序；反过来「先定输入 5V/2A 再分配」会导致某一路不够。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="16" y="16" width="420" height="210" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="32" y="40" fill="#eaf3ff" font-size="11">自下而上的预算链</text>
+        <text x="32" y="72" fill="#9fb0c7" font-size="10">① 列每路负载的典型/峰值</text>
+        <text x="32" y="96" fill="#9fb0c7" font-size="10">② 算每路输出功率 P = V×I</text>
+        <text x="32" y="120" fill="#9fb0c7" font-size="10">③ 按效率反推输入功率 Pin = Pout/η</text>
+        <text x="32" y="144" fill="#9fb0c7" font-size="10">④ 逐级相加得 5V 输入电流</text>
+        <text x="32" y="168" fill="#9fb0c7" font-size="10">⑤ 按峰值再核一遍，取大者</text>
+        <text x="32" y="196" fill="#9df3c2" font-size="10">余量：连续负载 ≤ 额定 70%</text>
+        <text x="32" y="216" fill="#ff9c9c" font-size="10">峰值 ≤ 额定 90%，且时间受限</text>
+
+        <rect x="456" y="16" width="400" height="210" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="472" y="40" fill="#eaf3ff" font-size="11">容易漏掉的四项</text>
+        <text x="472" y="72" fill="#9fb0c7" font-size="10">① 效率不是 100%：85–95%</text>
+        <text x="472" y="96" fill="#9fb0c7" font-size="10">② 上拉/终端/指示灯的常态电流</text>
+        <text x="472" y="120" fill="#9fb0c7" font-size="10">③ 电容充电的浪涌（上电瞬间）</text>
+        <text x="472" y="144" fill="#9fb0c7" font-size="10">④ 芯片自身 Iq 与外围损耗</text>
+        <text x="472" y="172" fill="#6f7f9c" font-size="9">例如 10 颗 4.7k 上拉就是 7mA 常态电流</text>
+        <text x="472" y="194" fill="#6f7f9c" font-size="9">浪涌决定保险丝与软启动，而不是稳态</text>
+
+        <text x="16" y="256" fill="#9fb0c7" font-size="10.5">连接器与电感要按「峰值 + 余量」选：连接器每脚 0.5–1A，电感按 I sat 的 70%。</text>
+        <text x="16" y="280" fill="#6f7f9c" font-size="10">预算表做完，选型就已经定了一半：DCDC 的额定电流、电感的 I sat、保险丝的 I²t。</text>
+        <text x="16" y="304" fill="#ff9c9c" font-size="10">坑：只算稳态不算峰值，负载一跳电源就跌，表现为「随机重启」。</text>
+      </svg>
+      <figcaption><b>图 4-1</b>　预算链与四个容易漏掉的项。</figcaption>
+    </figure>
+
+    <div class="demo">
+      <div class="dh"><b>电源预算计算器</b><span>输入各路负载，算总功率与 5V 输入电流</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
+          <div><div style="font-size:12px;color:#9fb0c7">1.35V 电流 <b id="a1v" style="color:#5ff1ef">0.9</b> A</div><input id="a1" type="range" min="0.1" max="2" step="0.05" value="0.9" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">3.3V 电流 <b id="a2v" style="color:#5ff1ef">0.8</b> A</div><input id="a2" type="range" min="0.05" max="2" step="0.05" value="0.8" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">2.8V 电流 <b id="a3v" style="color:#5ff1ef">0.12</b> A</div><input id="a3" type="range" min="0.01" max="0.5" step="0.01" value="0.12" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">效率 <b id="efv" style="color:#5ff1ef">88</b> %</div><input id="ef" type="range" min="70" max="96" step="1" value="88" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="budOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h2><span class="n">4.1.2</span>余量规则与三个判据</h2>
+    <ol class="steps">
+      <li><b>连续负载 ≤ 额定 70%</b>：给温升与寿命留空间。</li>
+      <li><b>峰值 ≤ 额定 90%</b>：且峰值持续时间受限于软启动/输出电容。</li>
+      <li><b>输入侧 ≤ 连接器/保险丝的 80%</b>：接触电阻与浪涌都要留。</li>
+    </ol>
+    <div class="box tip">
+      <h5>一个快速校验</h5>
+      <p>整板输入 5V、总功率 6W，则输入电流约 1.2A（按 90% 效率）。保险丝取 2A、连接器至少两个电源脚并联、输入电容按每安 10µF 配。三条能覆盖大多数小板。</p>
+    </div>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>1.35V/1A 与 3.3V/0.8A 两路，效率 88%，5V 输入电流约多少？</summary><div class="ans">Pout = 1.35 + 2.64 = 3.99W；Pin = 3.99/0.88 ≈ 4.53W；Iin ≈ 4.53/5 ≈ 0.91A。再按峰值乘 1.3–1.5 倍选型。</div></details>
+    <details class="quiz"><summary>为什么上拉电阻也要算进预算？</summary><div class="ans">因为它们是常态负载：10 颗 4.7k 在 3.3V 下就是约 7mA；看起来小，但在 µA 级待机设计里就是致命的。</div></details>
+    <details class="quiz"><summary>峰值 1.4A，选 1.5A 的 DCDC 行不行？</summary><div class="ans">不行。峰值已达额定的 93%，且没算效率与温升降额；应选 2A 级，或加大输出电容/软启动来削峰。</div></details>
+
+    <div class="ch-nav"><a href="../index.html"><span>上一篇</span><b>← 返回总目录</b></a>
+      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>4.2 DCDC 外围计算 →</b></a></div>
+  </main>
+</div>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+<script>
+renderPart('p4','c01.html');
+(function(){
+  function calc(){
+    var i1=+document.getElementById('a1').value, i2=+document.getElementById('a2').value, i3=+document.getElementById('a3').value, ef=+document.getElementById('ef').value/100;
+    document.getElementById('a1v').textContent=i1.toFixed(2);
+    document.getElementById('a2v').textContent=i2.toFixed(2);
+    document.getElementById('a3v').textContent=i3.toFixed(2);
+    document.getElementById('efv').textContent=(ef*100).toFixed(0);
+    var p1=1.35*i1, p2=3.3*i2, p3=2.8*i3, pt=p1+p2+p3;
+    var pin=pt/ef, iin=pin/5;
+    document.getElementById('budOut').innerHTML=
+      '<b style="color:#eaf3ff;font-size:15px">输出总功率 '+(pt).toFixed(2)+' W　输入 '+(pin).toFixed(2)+' W　5V 电流 '+(iin).toFixed(2)+' A</b><br>'+
+      '分项：1.35V '+(p1*1000).toFixed(0)+' mW / 3.3V '+(p2*1000).toFixed(0)+' mW / 2.8V '+(p3*1000).toFixed(0)+' mW<br>'+
+      '按峰值 ×1.4 选型：输入约 '+(iin*1.4).toFixed(2)+' A，保险丝取 '+(Math.ceil(iin*1.4/0.5)*0.5).toFixed(1)+' A<br>'+
+      '<span style="color:#6f7f9c;font-size:11.5px">未含上拉/指示/电容浪涌；实际还要加 5–10% 常态负载与上电浪涌校验。</span>';
+  }
+  ['a1','a2','a3','ef'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+</body></html>
