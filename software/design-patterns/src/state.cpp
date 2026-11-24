@@ -2,12 +2,14 @@
 // 编译：g++ -std=c++17 -Wall -Wextra state.cpp -o state_cpp
 #include <cstdio>
 
-enum class Event { Ign, Start, Stop, OverTemp, Clear };
+enum class Event { Acc, On, Crank, Off, OverTemp, Clear };
+
 const char* evName(Event e) {
     switch (e) {
-        case Event::Ign: return "IGN";
-        case Event::Start: return "START";
-        case Event::Stop: return "STOP";
+        case Event::Acc: return "ACC";
+        case Event::On: return "ON";
+        case Event::Crank: return "CRANK";
+        case Event::Off: return "OFF";
         case Event::OverTemp: return "OVERTEMP";
         case Event::Clear: return "CLEAR";
     }
@@ -27,25 +29,21 @@ public:
     const char* name() const override { return "OFF"; }
     State* on(Event e, Ecu& ctx) override;
 };
-
 class Acc : public State {
 public:
     const char* name() const override { return "ACC"; }
     State* on(Event e, Ecu& ctx) override;
 };
-
 class On : public State {
 public:
     const char* name() const override { return "ON"; }
     State* on(Event e, Ecu& ctx) override;
 };
-
 class Run : public State {
 public:
     const char* name() const override { return "RUN"; }
     State* on(Event e, Ecu& ctx) override;
 };
-
 class Fault : public State {
 public:
     const char* name() const override { return "FAULT"; }
@@ -65,7 +63,8 @@ public:
     void inject(Event e) {
         State* next = st_->on(e, *this);
         if (!next) {
-            std::printf("[ECU] %-5s + %-8s -> 拒绝（该状态下事件非法）\n", st_->name(), evName(e));
+            std::printf("[ECU] %-5s + %-8s -> 拒绝（该状态下事件非法）\n",
+                        st_->name(), evName(e));
             return;
         }
         std::printf("[ECU] %-5s + %-8s -> %s\n", st_->name(), evName(e), next->name());
@@ -77,37 +76,36 @@ private:
 };
 
 State* Off::on(Event e, Ecu&) {
-    if (e == Event::Ign) return &stAcc();
+    if (e == Event::Acc) return &stAcc();
     return nullptr;
 }
 State* Acc::on(Event e, Ecu&) {
     switch (e) {
-        case Event::Ign: return &stOff();
-        case Event::Start: return &stOn();
+        case Event::On: return &stOn();
+        case Event::Off: return &stOff();
         case Event::OverTemp: return &stFault();
         default: return nullptr;
     }
 }
 State* On::on(Event e, Ecu&) {
     switch (e) {
-        case Event::Ign: return &stOff();
-        case Event::Start: return &stRun();
-        case Event::Stop: return &stAcc();
+        case Event::Crank: return &stRun();
+        case Event::Off: return &stOff();
+        case Event::Acc: return &stAcc();
         case Event::OverTemp: return &stFault();
         default: return nullptr;
     }
 }
 State* Run::on(Event e, Ecu&) {
     switch (e) {
-        case Event::Ign: return &stOff();
-        case Event::Stop: return &stOn();
+        case Event::Off: return &stOff();
         case Event::OverTemp: return &stFault();
         default: return nullptr;
     }
 }
 State* Fault::on(Event e, Ecu&) {
     switch (e) {
-        case Event::Ign: return &stOff();
+        case Event::Off: return &stOff();
         case Event::Clear: return &stOff();
         default: return nullptr;
     }
@@ -115,11 +113,11 @@ State* Fault::on(Event e, Ecu&) {
 
 int main() {
     Ecu e(&stOff());
-    const Event seq[] = { Event::Ign, Event::Start, Event::Start, Event::OverTemp,
-                          Event::Start, Event::Clear, Event::Stop };
+    const Event seq[] = { Event::Acc, Event::On, Event::Crank, Event::OverTemp,
+                          Event::Crank, Event::Clear, Event::Crank };
     const char* why[] = {
-        "上电钥匙拧到 ACC", "发动机点火", "运行中再按 START", "冷却液超温",
-        "故障下点火", "故障清除", "已 OFF 再按 STOP"
+        "钥匙拧到 ACC", "再拧到 ON（点火档）", "起动机拖动，发动机运转", "冷却液超温",
+        "已进故障，再打起动机", "故障清除", "已断电，再打起动机"
     };
     for (int i = 0; i < 7; ++i) {
         std::printf("--- %s ---\n", why[i]);

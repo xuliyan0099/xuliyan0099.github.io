@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工厂模式 Factory · C 与 C++ 双实现</title>
+<meta name="description" content="按名字创建驱动：C 用注册表 + 函数指针 + GCC constructor 自注册，C++ 用 map + std::function + AutoReg 模板；含注册表演示。">
+<meta name="theme-color" content="#08090c">
+<link rel="stylesheet" href="assets/pd.css">
+<style>
+.reg{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.reg span{font:11px/1.6 var(--mono);padding:6px 10px;border-radius:6px;border:1px solid var(--line);color:#93a4c4}
+.reg span.hit{border-color:rgba(67,214,168,.6);color:#8ff5d6;background:rgba(67,214,168,.09)}
+.res{font:600 13px/1.9 var(--mono);padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#0d1220;color:#cfe0ff;margin-top:10px}
+.res em{color:#7d8798;font-style:normal}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="index.html"><i></i>设计模式<small>C / C++ 双实现</small></a>
+    <span class="tb-sp"></span>
+    <a class="tb" href="index.html">总览</a>
+    <a class="tb" href="../../index.html">知识库</a>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="kicker"><b>创建型</b><span>·</span><span>08 / 09</span><span>·</span><span>Factory</span></div>
+  <h1>工厂模式<span class="en">FACTORY</span></h1>
+  <p class="lede">配置文件里写着 <code>sensor = "sht3x"</code>，代码里却没有一个 <code>if (name == "sht3x")</code>。答案是一张注册表：每个驱动在自己被链接进来的那一刻就把“名字 → 构造函数”登记进去，上层只按字符串查表，查不到就返回空，由它决定怎么降级。</p>
+  <div class="chips">
+    <span class="chip ok">名字 → 构造函数</span>
+    <span class="chip">自注册在 main 之前</span>
+    <span class="chip">未知名字返回 NULL/nullptr</span>
+  </div>
+
+  <section class="sec">
+    <h2><span class="n">01</span>问题：新增一个型号就要改 switch</h2>
+    <div class="prose">
+      <p>最直接的写法是一个大 <code>if/else</code>：名字是 <code>"sht3x"</code> 就 <code>new Sht3x</code>，是 <code>"ntc"</code> 就 <code>new Ntc</code>。它的问题不在“难写”，而在<b>它必须知道所有产品</b>：</p>
+      <ul>
+        <li>每加一个驱动，这个 switch 就要改一次，哪怕新驱动跟这段代码毫无关系；</li>
+        <li>产品构造逻辑（哪个地址、哪个引脚、要不要先 init）也被写进了选择逻辑里，越写越厚；</li>
+        <li>如果驱动是可选编译的（不同车型带不同传感器），switch 里还得跟一堆 <code>#ifdef</code>。</li>
+      </ul>
+      <p>注册表把“认识所有产品”这件事反转了：不是工厂认识产品，而是产品在启动时告诉工厂“我叫什么、怎么创建我”。工厂退化成一张表和一次字符串查找，新增驱动只需新增一个文件，连 <code>main</code> 都不用动。</p>
+    </div>
+  </section>
+
+  <section class="sec">
+    <h2><span class="n">02</span>结构：一张表、两个方向</h2>
+    <p class="subh">向下：工厂按名字查表，调构造函数拿到产品；向上：产品在静态初始化阶段把自己登记进表。点方框看谁在什么时候做了什么。</p>
+
+    <div class="fig">
+      <div class="fig-h"><b>注册表式工厂</b><span>registry + self-registration</span></div>
+      <div class="diagram">
+        <svg viewBox="0 0 880 340" role="img" aria-label="工厂注册表结构图">
+          <defs>
+            <marker id="ar8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/>
+            </marker>
+            <marker id="ar8d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M0 0 L10 5 L0 10 z" fill="#43d6a8"/>
+            </marker>
+          </defs>
+
+          <g class="node" data-role="cli" data-note="Client：只拿到一个字符串（来自配置、DTC 工单、诊断命令），调用 create(name)。它不 include 任何具体驱动头文件。">
+            <rect x="24" y="118" width="152" height="92" rx="10"/>
+            <text class="nm" x="38" y="142">Client</text>
+            <text class="ty" x="38" y="161">上层</text>
+            <text class="mt" x="38" y="180">create("sht3x")</text>
+            <text class="mt" x="38" y="197">不认识具体类</text>
+          </g>
+
+          <g class="node" data-role="fac" data-note="Factory（DriverFactory / g_reg）：一个静态注册表。create 遍历或查 map；reg 写入一条。工厂本身不含任何产品知识，所以加产品不用改它。">
+            <rect x="216" y="104" width="214" height="120" rx="10"/>
+            <text class="nm" x="230" y="128">Factory</text>
+            <text class="ty" x="230" y="147">注册表 + 查找</text>
+            <text class="mt" x="230" y="166">reg(name, creator)</text>
+            <text class="mt" x="230" y="183">create(name)</text>
+            <text class="mt" x="230" y="200">names()</text>
+          </g>
+
+          <g class="node" data-role="reg" data-note="注册项（entry_t / map 的 value）：name 加一个“创建函数”。C 里是 driver_t *(*)(void)，C++ 里是 std::function<unique_ptr<Driver>()>。它就是“怎么造”的全部信息。">
+            <rect x="500" y="100" width="270" height="128" rx="10"/>
+            <text class="nm" x="514" y="124">registry</text>
+            <text class="ty" x="514" y="143">name → creator</text>
+            <text class="mt" x="514" y="164">"ntc"    → ntc_new</text>
+            <text class="mt" x="514" y="183">"sht3x"  → sht_new</text>
+            <text class="mt" x="514" y="202">"bme280" → （无）</text>
+          </g>
+
+          <g class="node" data-role="sht" data-note="Sht3x：产品。它的静态 AutoReg（C 里是 __attribute__((constructor))）在 main 之前执行，把 creator 塞进表。产品文件可以整体增删，工厂不受影响。">
+            <rect x="470" y="258" width="170" height="64" rx="10"/>
+            <text class="nm" x="484" y="282">Sht3x</text>
+            <text class="ty" x="484" y="301">产品 · addr 0x44</text>
+          </g>
+
+          <g class="node" data-role="ntc" data-note="Ntc：另一个产品，pin 12。它在启动时自注册，不需要任何一处代码显式“记得调用 register”。">
+            <rect x="660" y="258" width="170" height="64" rx="10"/>
+            <text class="nm" x="674" y="282">Ntc</text>
+            <text class="ty" x="674" y="301">产品 · pin 12</text>
+          </g>
+
+          <path class="flow" marker-end="url(#ar8)" d="M176 164 L212 164"/>
+          <text class="lbl" x="170" y="156">按名字</text>
+
+          <path class="flow" marker-end="url(#ar8)" d="M430 164 L496 164"/>
+          <text class="lbl" x="430" y="156">查表</text>
+
+          <path class="flow" marker-end="url(#ar8)" d="M560 228 C 550 246, 550 250, 552 254"/>
+          <text class="lbl" x="556" y="246">creator()</text>
+
+          <path class="flow" marker-end="url(#ar8)" d="M730 228 C 730 246, 730 250, 730 254"/>
+
+          <path class="flow dep" marker-end="url(#ar8d)" d="M770 300 C 820 296, 826 200, 776 190"/>
+          <text class="lbl ok" x="742" y="330">构造时自注册</text>
+
+          <text class="lbl" x="24" y="34">启动顺序：先自注册（main 之前），再 create —— C 版靠 GCC constructor，C++ 版靠静态对象构造</text>
+        </svg>
+      </div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：为什么工厂可以完全不认识产品，为什么未知名字不报错而是返回空。</span></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <h2><span class="n">03</span>两份实现</h2>
+    <p class="subh">C 版是一张固定长度的结构体数组 + <code>driver_t *(*)(void)</code> 函数指针；C++ 版是 <code>map&lt;string, std::function&lt;unique_ptr&lt;Driver&gt;()&gt;&gt;</code>，自注册收在一个模板里。两边的“登记先于创建”完全一样。</p>
+
+    <div class="codes">
+      <div class="codecard">
+        <div class="ch"><span class="lang">C</span><span class="fn">factory.c</span><button class="copy">复制</button></div>
+        <pre><code>/* 工厂模式 · C 实现：按名字创建驱动（注册表 + 构造函数指针）
+ * 编译：gcc -std=c11 -Wall -Wextra factory.c -o factory
+ */
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+
+typedef struct driver driver_t;
+typedef struct {
+    int         (*init)(driver_t *self);
+    const char *(*name)(driver_t *self);
+} driver_ops_t;
+
+struct driver { const driver_ops_t *ops; };
+
+typedef driver_t *(*create_fn)(void);
+
+#define MAX_REG 8
+typedef struct { char name[16]; create_fn create; } entry_t;
+
+static entry_t g_reg[MAX_REG];
+static int     g_reg_n = 0;
+
+static int driver_register(const char *name, create_fn fn)
+{
+    if (g_reg_n &gt;= MAX_REG) return -1;
+    snprintf(g_reg[g_reg_n].name, sizeof g_reg[g_reg_n].name, "%s", name);
+    g_reg[g_reg_n].create = fn;
+    g_reg_n++;
+    printf("  register %-6s  (注册表长度=%d)\n", name, g_reg_n);
+    return 0;
+}
+
+static driver_t *driver_create(const char *name)
+{
+    for (int i = 0; i &lt; g_reg_n; i++)
+        if (strcmp(g_reg[i].name, name) == 0)
+            return g_reg[i].create();
+    return NULL;
+}
+
+/* 具体产品 1 */
+typedef struct { driver_t base; int addr; } sht_drv_t;
+
+static int sht_init(driver_t *self) {
+    sht_drv_t *d = (sht_drv_t *)self;
+    printf("    sht3x init @0x%02X\n", d-&gt;addr);
+    return 0;
+}
+static const char *sht_name(driver_t *self) { (void)self; return "sht3x"; }
+static const driver_ops_t SHT_OPS = { sht_init, sht_name };
+static driver_t *sht_new(void) { static sht_drv_t d = { { &amp;SHT_OPS }, 0x44 }; return &amp;d.base; }
+
+/* 具体产品 2 */
+typedef struct { driver_t base; int pin; } ntc_drv_t;
+
+static int ntc_init(driver_t *self) {
+    ntc_drv_t *d = (ntc_drv_t *)self;
+    printf("    ntc init on pin %d\n", d-&gt;pin);
+    return 0;
+}
+static const char *ntc_name(driver_t *self) { (void)self; return "ntc"; }
+static const driver_ops_t NTC_OPS = { ntc_init, ntc_name };
+static driver_t *ntc_new(void) { static ntc_drv_t d = { { &amp;NTC_OPS }, 12 }; return &amp;d.base; }
+
+/* 链接期自注册：启动时自动登记，不用改 main */
+static void auto_reg_ntc(void) __attribute__((constructor));
+static void auto_reg_ntc(void) { driver_register("ntc", ntc_new); }
+
+int main(void)
+{
+    printf("启动后注册表：\n");
+    for (int i = 0; i &lt; g_reg_n; i++) printf("  [%d] %s\n", i, g_reg[i].name);
+    printf("\n");
+
+    driver_register("sht3x", sht_new);
+
+    const char *wanted[] = { "sht3x", "ntc", "bme280" };
+    for (unsigned i = 0; i &lt; 3; i++) {
+        printf("create(\"%s\"):\n", wanted[i]);
+        driver_t *d = driver_create(wanted[i]);
+        if (!d) { printf("    未注册，返回 NULL（由上层决定降级）\n"); continue; }
+        d-&gt;ops-&gt;init(d);
+        printf("    name=%s\n", d-&gt;ops-&gt;name(d));
+    }
+    return 0;
+}</code></pre>
+      </div>
+
+      <div class="codecard">
+        <div class="ch"><span class="lang">C++</span><span class="fn">factory.cpp</span><button class="copy">复制</button></div>
+        <pre><code>// 工厂模式 · C++ 实现：注册表 + std::function + 自注册模板
+// 编译：g++ -std=c++17 -Wall -Wextra factory.cpp -o factory_cpp
+#include &lt;cstdio&gt;
+#include &lt;functional&gt;
+#include &lt;map&gt;
+#include &lt;memory&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+class Driver {
+public:
+    virtual ~Driver() = default;
+    virtual const char* name() const = 0;
+    virtual bool init() = 0;
+};
+
+class Sht3x final : public Driver {
+public:
+    const char* name() const override { return "sht3x"; }
+    bool init() override { std::printf("    sht3x init @0x44\n"); return true; }
+};
+
+class Ntc final : public Driver {
+public:
+    const char* name() const override { return "ntc"; }
+    bool init() override { std::printf("    ntc init on pin 12\n"); return true; }
+};
+
+class DriverFactory {
+public:
+    using Creator = std::function&lt;std::unique_ptr&lt;Driver&gt;()&gt;;
+
+    static DriverFactory&amp; instance() {      // 函数内静态：规避初始化顺序问题
+        static DriverFactory f;
+        return f;
+    }
+
+    void reg(const std::string&amp; name, Creator c) {
+        map_[name] = std::move(c);
+        std::printf("  register %-6s  (注册表长度=%d)\n", name.c_str(), static_cast&lt;int&gt;(map_.size()));
+    }
+
+    std::unique_ptr&lt;Driver&gt; create(const std::string&amp; name) const {
+        auto it = map_.find(name);
+        if (it == map_.end()) return nullptr;
+        return it-&gt;second();
+    }
+
+    std::vector&lt;std::string&gt; names() const {
+        std::vector&lt;std::string&gt; v;
+        for (const auto&amp; kv : map_) v.push_back(kv.first);
+        return v;
+    }
+
+private:
+    std::map&lt;std::string, Creator&gt; map_;
+};
+
+// 自注册：定义一个静态对象，构造即登记
+template &lt;class T&gt;
+struct AutoReg {
+    explicit AutoReg(const char* name) {
+        DriverFactory::instance().reg(name, [] { return std::make_unique&lt;T&gt;(); });
+    }
+};
+
+static AutoReg&lt;Ntc&gt;   g_reg_ntc("ntc");
+static AutoReg&lt;Sht3x&gt; g_reg_sht("sht3x");
+
+int main() {
+    std::printf("启动后注册表：\n");
+    for (const auto&amp; n : DriverFactory::instance().names()) std::printf("  %s\n", n.c_str());
+    std::printf("\n");
+
+    const char* wanted[] = { "sht3x", "ntc", "bme280" };
+    for (const char* w : wanted) {
+        std::printf("create(\"%s\"):\n", w);
+        auto d = DriverFactory::instance().create(w);
+        if (!d) { std::printf("    未注册，返回 nullptr（由上层决定降级）\n"); continue; }
+        d-&gt;init();
+        std::printf("    name=%s\n", d-&gt;name());
+    }
+    return 0;
+}</code></pre>
+      </div>
+    </div>
+
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>./factory.exe</span></div>
+      <pre>  register ntc     (注册表长度=1)
+启动后注册表：
+  [0] ntc
+
+  register sht3x   (注册表长度=2)
+create("sht3x"):
+    sht3x init @0x44
+    name=sht3x
+create("ntc"):
+    ntc init on pin 12
+    name=ntc
+create("bme280"):
+    未注册，返回 NULL（由上层决定降级）</pre>
+    </div>
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>./factory_cpp.exe</span></div>
+      <pre>  register ntc     (注册表长度=1)
+  register sht3x   (注册表长度=2)
+启动后注册表：
+  ntc
+  sht3x
+
+create("sht3x"):
+    sht3x init @0x44
+    name=sht3x
+create("ntc"):
+    ntc init on pin 12
+    name=ntc
+create("bme280"):
+    未注册，返回 nullptr（由上层决定降级）</pre>
+    </div>
+    <p class="hintline">第一行 <code>register ntc</code> 出现在 <code>main</code> 之前——C 版靠 <code>__attribute__((constructor))</code>，C++ 版两个都在 main 前完成；C 版第二个 sht3x 是 <code>main</code> 里显式注册的，所以落到了“启动后注册表”的打印之后。</p>
+  </section>
+  <section class="sec">
+    <h2><span class="n">04</span>按名字取驱动，包括一个不存在的名字</h2>
+    <p class="subh">三个按钮对应三条配置。注册表里只有 ntc 与 sht3x；bme280 是故意写错的名字，用来看“未注册”时上层收到什么。</p>
+
+    <div class="demo">
+      <div class="demo-h"><b>driver factory</b><span>create(name) 查表</span></div>
+      <div class="stage">
+        <div class="reg" id="regList"></div>
+        <div class="ctl" style="margin-bottom:10px">
+          <button class="btn" data-n="sht3x">create("sht3x")</button>
+          <button class="btn" data-n="ntc">create("ntc")</button>
+          <button class="btn" data-n="bme280">create("bme280")</button>
+        </div>
+        <div class="res" id="resBox">点一个名字，看工厂返回什么。</div>
+        <div class="log" id="faLog"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <h2><span class="n">05</span>C 与 C++：一张表，两种造法</h2>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
+        <tbody>
+          <tr><td>产品接口</td><td><code>driver_ops_t</code>（init / name）</td><td><code>Driver</code> 纯虚类</td><td>同一层间接调用，C 的 ops 表可以 const 放 flash</td></tr>
+          <tr><td>注册项</td><td><code>entry_t{ char name[16]; create_fn }</code></td><td><code>map&lt;string, Creator&gt;</code></td><td>C 定长无分配，名字超过 15 字符会被截断</td></tr>
+          <tr><td>自注册</td><td><code>__attribute__((constructor))</code></td><td><code>static AutoReg&lt;T&gt;</code></td><td>前者是 GCC 扩展，后者是标准 C++，但都依赖“静态初始化先于 main”</td></tr>
+          <tr><td>create 返回</td><td>内部静态对象指针（每次都同一个）</td><td><code>unique_ptr</code>，每次都新建</td><td><b>这是最实质的差别</b>：C 版其实是“按名字取单例”</td></tr>
+          <tr><td>未注册</td><td><code>NULL</code></td><td><code>nullptr</code></td><td>都不报错、不 abort，把降级决策留给上层</td></tr>
+          <tr><td>扩容</td><td><code>MAX_REG 8</code>，满了返回 -1</td><td><code>map</code> 自动扩容</td><td>C 版适合启动期固定集合，运行时动态加要另做内存池</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sec">
+    <h2><span class="n">06</span>代价与坑</h2>
+    <div class="prose">
+      <ul>
+        <li><b>静态初始化顺序。</b>C++ 里两个 <code>AutoReg</code> 对象和工厂单例的构造顺序跨编译单元是不确定的。把工厂写成 <code>instance()</code> 里的函数内静态，能保证“第一次用到时才构造”，避免在工厂还没构造好时就去注册。</li>
+        <li><b>链接器会把自注册对象裁掉。</b><code>--gc-sections</code> / <code>-ffunction-sections</code> 下，没有被任何代码引用的静态对象可能整个被丢弃，表现是“注册表里莫名其妙少了一个驱动”。要么加 <code>KEEP</code> 段，要么改成显式注册。</li>
+        <li><b>C 版 create 不是“新建”。</b><code>sht_new</code> 返回的是函数内静态对象，两次 create 得到同一块内存。若上层以为各自独立、改了其中一个的配置，另一个也变了。要真新建就得给分配器或对象池。</li>
+        <li><b>名字匹配是严格的。</b><code>strcmp</code> 区分大小写，配置里写成 <code>"SHT3X"</code> 或带空格就查不到。要么统一小写化，要么在注册处做别名。</li>
+        <li><b>注册表是全局可变状态。</b>运行时并发注册要加锁；最稳的策略是“只在启动阶段注册，之后只读”。</li>
+        <li><b>未知名字不是错误。</b>返回 <code>NULL</code> 是刻意的：不同车型可以没有某个传感器。但上层必须处理，不能直接解引用。</li>
+        <li><b>销毁顺序。</b>C++ 版 <code>unique_ptr</code> 走虚析构没问题；如果产品里持有互斥量、DMA 通道，要保证工厂/注册表的析构不早于产品使用。</li>
+      </ul>
+    </div>
+  </section>
+
+  <nav class="pager">
+    <a href="adapter.html"><span class="k">← 07</span><b>适配器模式</b><i>两种传感器接同一接口</i></a>
+    <a class="nx" href="singleton.html"><span class="k">09 →</span><b>单例模式</b><i>全局配置只初始化一次</i></a>
+  </nav>
+
+  <footer class="foot">
+    <p><b>设计模式 · C / C++ 双实现</b>　08 / 09　Factory</p>
+    <p>静态页面 · 无统计脚本 · 无第三方请求</p>
+  </footer>
+</div>
+
+<script src="assets/pd.js"></script>
+<script>
+(function () {
+  var REG = {
+    ntc:   { init: 'ntc init on pin 12', name: 'ntc' },
+    sht3x: { init: 'sht3x init @0x44',   name: 'sht3x' }
+  };
+
+  var regList = document.getElementById('regList');
+  var resBox = document.getElementById('resBox');
+  var logEl = document.getElementById('faLog');
+
+  function buildList() {
+    regList.innerHTML = '';
+    Object.keys(REG).forEach(function (k) {
+      var s = document.createElement('span');
+      s.textContent = k;
+      s.id = 'reg-' + k;
+      regList.appendChild(s);
+    });
+  }
+
+  function create(name) {
+    Object.keys(REG).forEach(function (k) {
+      document.getElementById('reg-' + k).classList.remove('hit');
+    });
+    PD.log(logEl, 'create("' + name + '")');
+
+    if (!REG[name]) {
+      resBox.innerHTML = 'create("' + name + '"): <em>未注册</em>，返回 nullptr'
+        + '<br><em>上层决定降级：换备用传感器，或者干脆不带这项功能</em>';
+      PD.log(logEl, '  未注册，返回 nullptr', 'bad');
+      return;
+    }
+    document.getElementById('reg-' + name).classList.add('hit');
+    resBox.innerHTML = 'create("' + name + '"):'
+      + '<br>&nbsp;&nbsp;' + REG[name].init
+      + '<br>&nbsp;&nbsp;name=' + REG[name].name;
+    PD.log(logEl, '  ' + REG[name].init);
+    PD.log(logEl, '  name=' + REG[name].name);
+  }
+
+  document.querySelectorAll('[data-n]').forEach(function (b) {
+    b.onclick = function () { create(b.dataset.n); };
+  });
+
+  buildList();
+  PD.log(logEl, '启动时自注册：ntc、sht3x 已进表。');
+})();
+</script>
+</body>
+</html>

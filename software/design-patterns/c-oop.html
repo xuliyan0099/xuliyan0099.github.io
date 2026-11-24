@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C 也能面向对象 · 设计模式地基</title>
+<meta name="description" content="用结构体首成员 + 函数指针表在 C 里实现封装、继承与多态，并与 C++ 的 vptr / 虚函数逐项对照。">
+<meta name="theme-color" content="#08090c">
+<link rel="stylesheet" href="assets/pd.css">
+<style>
+.flowline{display:flex;align-items:stretch;gap:6px;flex-wrap:wrap}
+.flowline .box{
+  flex:1 1 150px;min-width:140px;display:flex;flex-direction:column;gap:4px;
+  padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:#0d1220;
+  transition:border-color .2s,background .2s;
+}
+.flowline .box b{font-size:12.6px;color:#dbe6ff}
+.flowline .box span{font:10.8px/1.6 var(--mono);color:#8494ad}
+.flowline .box.on{border-color:var(--ac2);background:#0f2320}
+.flowline .box.on b{color:#8ff5d6}
+.flowline .arr{display:flex;align-items:center;font:10.5px/1 var(--mono);color:#6d7f9c}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="index.html"><i></i>设计模式<small>C / C++ 双实现</small></a>
+    <span class="tb-sp"></span>
+    <a class="tb" href="index.html">总览</a>
+    <a class="tb" href="../../index.html">知识库</a>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="kicker"><b>地基</b><span>·</span><span>01 / 09</span><span>·</span><span>COOP</span></div>
+  <h1>C 也能面向对象<span class="en">VTABLE</span></h1>
+  <p class="lede">后面 8 个模式的 C 版，全部建立在这一页的三件东西上：<b>结构体首成员放函数表指针</b>、<b>派生类首成员嵌基类</b>、<b>把基类指针还原成派生类指针</b>。看懂这三步，C 里的“多态”就不再是玄学，而是一次普通的间接跳转。</p>
+  <div class="chips">
+    <span class="chip ok">C / C++ 输出一致</span>
+    <span class="chip">sizeof 实测：24 / 16</span>
+    <span class="chip">无堆分配</span>
+  </div>
+
+  <section class="sec">
+    <h2><span class="n">01</span>问题：同一段代码，两种形状</h2>
+    <div class="prose">
+      <p>没有多态时，调用方只有两个选择：要么写 <code>switch (kind)</code>，要么为每种形状复制一份同样的循环。加第三种形状，就得到处补分支——这就是“结构病”的起点。</p>
+      <p>C++ 的答案你知道：<code>virtual double area()</code>。C 没有这个关键字，但虚函数在机器层面并不神秘：<b>对象里存一个指针，指向一张全是函数指针的表；调用时先取表，再按固定偏移取函数地址，最后把对象自己当第一个参数传进去。</b>这三步手工写出来，就是 C 的多态。</p>
+    </div>
+  </section>
+
+  <section class="sec">
+    <h2><span class="n">02</span>结构：对象里只有一个指针是真的“类型信息”</h2>
+    <p class="subh">点方框看每个角色负责什么。注意偏移：vptr 在 0，派生类的 base 也在 0——这就是为什么可以把 <code>rect_t*</code> 直接当 <code>shape_t*</code> 用。</p>
+
+    <div class="fig">
+      <div class="fig-h"><b>对象 → 虚表 → 代码：一次分派的三个落脚点</b><span>layout</span></div>
+      <div class="diagram">
+        <svg viewBox="0 0 880 400" role="img" aria-label="C 对象内存布局与虚函数分派">
+          <defs>
+            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/>
+            </marker>
+          </defs>
+
+          <g class="node" data-role="rect" data-note="rect_t：base 在偏移 0，后面才是自己的 w / h。所以它的首地址既是 rect_t*，也是合法的 shape_t*。">
+            <rect x="16" y="40" width="250" height="106" rx="9"/>
+            <text class="nm" x="30" y="62">rect_t</text>
+            <text class="ty" x="96" y="62">派生对象</text>
+            <text class="mt" x="30" y="85">vptr</text>
+            <text class="lbl" x="196" y="85">+0x0</text>
+            <text class="mt" x="30" y="107">w = 3.0</text>
+            <text class="lbl" x="196" y="107">+0x8</text>
+            <text class="mt" x="30" y="129">h = 4.0</text>
+            <text class="lbl" x="196" y="129">+0x10</text>
+          </g>
+
+          <g class="node" data-role="circle" data-note="circle_t 同样把 shape_t base 放在最前面。它和 rect_t 在前 8 字节长得一模一样，区别只在 vptr 指向另一张表。">
+            <rect x="16" y="210" width="250" height="86" rx="9"/>
+            <text class="nm" x="30" y="232">circle_t</text>
+            <text class="ty" x="100" y="232">派生对象</text>
+            <text class="mt" x="30" y="255">vptr</text>
+            <text class="lbl" x="196" y="255">+0x0</text>
+            <text class="mt" x="30" y="277">r = 1.0</text>
+            <text class="lbl" x="196" y="277">+0x8</text>
+          </g>
+
+          <g class="node" data-role="rectops" data-note="RECT_OPS 是一张 const 表，放在只读段：两个槽位，area 在 +0，name 在 +8。所有 rect_t 对象共用这一张，不占额外内存。">
+            <rect x="330" y="40" width="250" height="106" rx="9"/>
+            <text class="nm" x="344" y="62">const shape_ops_t</text>
+            <text class="ty" x="470" y="62">RECT_OPS</text>
+            <text class="mt" x="344" y="85">area</text>
+            <text class="lbl" x="520" y="85">+0x0</text>
+            <text class="mt" x="344" y="107">name</text>
+            <text class="lbl" x="520" y="107">+0x8</text>
+          </g>
+
+          <g class="node" data-role="circleops" data-note="CIRCLE_OPS 两个槽位的偏移相同，槽里的地址不同。这正是“同一个接口、不同实现”的全部秘密。">
+            <rect x="330" y="210" width="250" height="86" rx="9"/>
+            <text class="nm" x="344" y="232">const shape_ops_t</text>
+            <text class="ty" x="470" y="232">CIRCLE_OPS</text>
+            <text class="mt" x="344" y="255">area / name</text>
+            <text class="lbl" x="500" y="255">+0x0 / +0x8</text>
+          </g>
+
+          <g class="node" data-role="fn" data-note="rect_area 只做一件事：把 shape_t* 还原成 rect_t* 再读 w/h。这一步“还原”是 C 多态里唯一需要程序员保证的前提——base 必须在偏移 0。">
+            <rect x="640" y="40" width="224" height="50" rx="9"/>
+            <text class="mt" x="654" y="60">rect_area(s)</text>
+            <text class="ty" x="654" y="78">return w * h</text>
+          </g>
+          <g class="node" data-role="fn2" data-note="rect_name 演示第二个槽位：同一个对象、同一张表，取 +0x8 就是另一支函数。">
+            <rect x="640" y="96" width="224" height="50" rx="9"/>
+            <text class="mt" x="654" y="116">rect_name(s)</text>
+            <text class="ty" x="654" y="134">return &quot;rect&quot;</text>
+          </g>
+          <g class="node" data-role="fn3" data-note="circle_area 是同一签名的另一份实现：参数类型一样，行为不一样。调用方完全不用知道进来的是谁。">
+            <rect x="640" y="210" width="224" height="50" rx="9"/>
+            <text class="mt" x="654" y="230">circle_area(s)</text>
+            <text class="ty" x="654" y="248">return πr²</text>
+          </g>
+
+          <path class="flow" marker-end="url(#ar)" d="M266 85 L326 85"/>
+          <path class="flow" marker-end="url(#ar)" d="M266 255 L326 255"/>
+          <path class="flow" marker-end="url(#ar)" d="M580 85 L636 70"/>
+          <path class="flow" marker-end="url(#ar)" d="M580 107 L636 118"/>
+          <path class="flow" marker-end="url(#ar)" d="M580 245 L636 238"/>
+
+          <text class="lbl" x="272" y="34">对象前 8 字节</text>
+          <text class="lbl" x="592" y="34">按偏移取函数地址</text>
+          <text class="lbl" x="16" y="330">同一个 const shape_t *s：s-&gt;vptr-&gt;area(s) 一句，两种实现</text>
+        </svg>
+      </div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点上面的方框（对象 / 虚表 / 函数），这里会说明它在这一跳里干什么。</span></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <h2><span class="n">03</span>两份实现：C 的手工虚表 vs C++ 的 virtual</h2>
+    <p class="subh">同一件事写两遍，第二遍只看编译器替你做了哪些事。源码在 <code>src/coop.c</code> 与 <code>src/coop.cpp</code>。</p>
+    <div class="codes">
+      <div class="codecard">
+        <div class="ch"><span class="lang">C</span><span class="fn">coop.c</span><button class="copy">复制</button></div>
+        <pre><code>/* C 的面向对象地基：vtable + 结构体内嵌 + 指针还原
+ * 编译：gcc -std=c11 -Wall -Wextra coop.c -o coop
+ * 这段是所有 C 版设计模式的地基。
+ */
+#include &lt;stddef.h&gt;
+#include &lt;stdio.h&gt;
+
+typedef struct shape shape_t;
+
+/* 虚函数表：一个结构体，里面全是函数指针 */
+typedef struct {
+    double      (*area)(const shape_t *self);
+    const char *(*name)(const shape_t *self);
+} shape_ops_t;
+
+/* 基类：只有一个 vptr，布局与 C++ 的「有虚函数的类」一致 */
+struct shape { const shape_ops_t *vptr; };
+
+typedef struct { shape_t base; double w, h; } rect_t;
+typedef struct { shape_t base; double r; }     circle_t;
+
+static double rect_area(const shape_t *s) { const rect_t *r = (const rect_t *)s; return r-&gt;w * r-&gt;h; }
+static const char *rect_name(const shape_t *s) { (void)s; return "rect"; }
+static double circle_area(const shape_t *s) { const circle_t *c = (const circle_t *)s; return 3.14159 * c-&gt;r * c-&gt;r; }
+static const char *circle_name(const shape_t *s) { (void)s; return "circle"; }
+
+static const shape_ops_t RECT_OPS   = { rect_area, rect_name };
+static const shape_ops_t CIRCLE_OPS = { circle_area, circle_name };
+
+int main(void)
+{
+    rect_t   r = { { &amp;RECT_OPS }, 3.0, 4.0 };   /* base 必须是第一个成员 */
+    circle_t c = { { &amp;CIRCLE_OPS }, 1.0 };
+
+    /* 同一个接口，两种实现：动态分派发生在 vptr-&gt;area 这一跳 */
+    const shape_t *shapes[] = { (const shape_t *)&amp;r, (const shape_t *)&amp;c };
+    for (int i = 0; i &lt; 2; i++) {
+        const shape_t *s = shapes[i];
+        printf("%-6s area=%6.2f  vptr=%s\n", s-&gt;vptr-&gt;name(s), s-&gt;vptr-&gt;area(s),
+               s-&gt;vptr == &amp;RECT_OPS ? "RECT_OPS" : "CIRCLE_OPS");
+    }
+
+    printf("offsetof(shape_t,vptr)=%u  sizeof(shape_t)=%u\n",
+           (unsigned)offsetof(shape_t, vptr), (unsigned)sizeof(shape_t));
+    printf("sizeof(rect_t)=%u  sizeof(circle_t)=%u\n",
+           (unsigned)sizeof(rect_t), (unsigned)sizeof(circle_t));
+    printf("把 rect_t* 当 shape_t* 用是合法的：base 在偏移 0\n");
+    return 0;
+}</code></pre>
+      </div>
+
+      <div class="codecard">
+        <div class="ch"><span class="lang">C++</span><span class="fn">coop.cpp</span><button class="copy">复制</button></div>
+        <pre><code>// C++ 的对应写法：虚函数由编译器生成 vptr + vtable
+// 编译：g++ -std=c++17 -Wall -Wextra coop.cpp -o coop_cpp
+#include &lt;cstdio&gt;
+
+class Shape {
+public:
+    virtual ~Shape() = default;
+    virtual double area() const = 0;
+    virtual const char* name() const = 0;
+};
+
+class Rect final : public Shape {
+public:
+    Rect(double w, double h) : w_(w), h_(h) {}
+    double area() const override { return w_ * h_; }
+    const char* name() const override { return "rect"; }
+private:
+    double w_, h_;
+};
+
+class Circle final : public Shape {
+public:
+    explicit Circle(double r) : r_(r) {}
+    double area() const override { return 3.14159 * r_ * r_; }
+    const char* name() const override { return "circle"; }
+private:
+    double r_;
+};
+
+int main() {
+    Rect   r(3.0, 4.0);
+    Circle c(1.0);
+
+    Shape* shapes[] = { &amp;r, &amp;c };
+    for (Shape* s : shapes)
+        std::printf("%-6s area=%6.2f\n", s-&gt;name(), s-&gt;area());
+
+    std::printf("sizeof(Rect)=%d  sizeof(Circle)=%d  sizeof(void*)=%d\n",
+                static_cast&lt;int&gt;(sizeof(Rect)), static_cast&lt;int&gt;(sizeof(Circle)),
+                static_cast&lt;int&gt;(sizeof(void*)));
+    std::printf("单继承下 vptr 也在偏移 0：把 Rect* 转 Shape* 不用调整地址\n");
+    return 0;
+}</code></pre>
+      </div>
+    </div>
+
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>gcc -std=c11 -Wall -Wextra coop.c &amp;&amp; ./coop.exe</span></div>
+      <pre>rect   area= 12.00  vptr=RECT_OPS
+circle area=  3.14  vptr=CIRCLE_OPS
+offsetof(shape_t,vptr)=0  sizeof(shape_t)=8
+sizeof(rect_t)=24  sizeof(circle_t)=16
+把 rect_t* 当 shape_t* 用是合法的：base 在偏移 0</pre>
+    </div>
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>g++ -std=c++17 -Wall -Wextra coop.cpp &amp;&amp; ./coop_cpp.exe</span></div>
+      <pre>rect   area= 12.00
+circle area=  3.14
+sizeof(Rect)=24  sizeof(Circle)=16  sizeof(void*)=8
+单继承下 vptr 也在偏移 0：把 Rect* 转 Shape* 不用调整地址</pre>
+    </div>
+    <p class="hintline">24 = 8 字节 vptr + 两个 double；16 = 8 + 一个 double。C 版和 C++ 版在这台机器上大小完全一致，因为编译器也是这么排的。</p>
+  </section>
+
+  <section class="sec">
+    <h2><span class="n">04</span>单步看一次分派</h2>
+    <p class="subh">选一个对象，然后一步步走：取 vptr → 按偏移取函数地址 → 传 self 进去。右侧日志会说清每一步拿到了什么。</p>
+
+    <div class="demo">
+      <div class="demo-h"><b>dispatcher</b><span>三步，没有魔法</span></div>
+      <div class="demo-grid">
+        <div class="stage">
+          <div class="flowline">
+            <div class="box" id="bObj"><b id="objName">rect_t</b><span id="objMem">vptr | w=3.0 | h=4.0</span></div>
+            <div class="arr">vptr →</div>
+            <div class="box" id="bTbl"><b id="tblName">RECT_OPS</b><span>+0 area · +8 name</span></div>
+            <div class="arr">+0 →</div>
+            <div class="box" id="bFn"><b id="fnName">rect_area()</b><span>self 还原成 rect_t*</span></div>
+          </div>
+          <p class="hintline" id="dNote">当前：还没开始。点“下一步”。</p>
+        </div>
+        <div class="side">
+          <div class="ctl">
+            <button class="btn on" id="pickRect">矩形</button>
+            <button class="btn" id="pickCircle">圆</button>
+            <button class="btn ghost" id="step">下一步</button>
+            <button class="btn ghost" id="reset">重置</button>
+          </div>
+          <div class="log" id="dLog"><div class="mute">// 分派日志</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <h2><span class="n">05</span>四个零件，两种语言</h2>
+    <p class="subh">把“面向对象”拆成四件事看，就很容易判断 C 版缺了什么。</p>
+    <table class="tbl">
+      <thead><tr><th style="width:72px">零件</th><th>C 的做法</th><th>C++ 的对应</th><th style="width:200px">C 要自己保证的事</th></tr></thead>
+      <tbody>
+        <tr><td><b>封装</b></td><td>头文件只放不完整类型 <code>typedef struct cfg cfg_t;</code>，成员留在 .c</td><td><code>private</code></td><td>没有访问控制，只能靠不透明指针 + 约定</td></tr>
+        <tr><td><b>继承</b></td><td>派生结构体第一个成员是基类</td><td><code>: public Base</code></td><td>必须偏移 0；多继承要手工算偏移</td></tr>
+        <tr><td><b>多态</b></td><td><code>s-&gt;vptr-&gt;area(s)</code></td><td><code>virtual</code> 调用（隐式 this）</td><td>函数表放 <code>const</code>；self 不能漏传</td></tr>
+        <tr><td><b>销毁</b></td><td>函数表里加 <code>void (*destroy)(shape_t*)</code></td><td><code>virtual ~Shape()</code></td><td>没有虚析构，忘了就漏资源</td></tr>
+      </tbody>
+    </table>
+    <div class="key"><b>一句话。</b>C 的“对象”就是一个结构体 + 一张函数表 + 一群第一个参数叫 <code>self</code> 的普通函数。C++ 把这三样藏进了语法，代价是你要理解它藏了什么；C 把它摊在桌面上，代价是每一处都得自己写对。</div>
+  </section>
+
+  <section class="sec">
+    <h2><span class="n">06</span>代价与坑</h2>
+    <div class="pit">
+      <b>1. base 不在偏移 0，强转就是未定义行为。</b>不要为了“省几个字节”把 base 放到中间；需要多重继承的布局时，老老实实算偏移或改用接口表 + 独立字段。
+    </div>
+    <div class="pit">
+      <b>2. 没有虚析构，基类指针 destroy 会漏资源。</b>C 版必须在 ops 里放 <code>destroy</code>，并且所有释放都走它；不要出现 <code>free(shape)</code> 这种绕过表的写法。
+    </div>
+    <div class="pit">
+      <b>3. 函数表被写坏，整类对象一起崩。</b>ops 表声明成 <code>static const</code>，放在只读段；初始化后不要再去改它。表里少一个槽位，所有派生类都会按错偏移调用。
+    </div>
+    <div class="pit">
+      <b>4. 间接调用挡不住内联。</b>热路径上（比如每帧都跑的插值）用表调用会失去内联机会。C 可以保留一个“已知类型”的直调分支，C++ 可以靠 <code>final</code> / 具体对象让编译器去虚化。
+    </div>
+  </section>
+
+  <nav class="pager">
+    <a href="index.html"><span>PREV</span><b>← 总览</b></a>
+    <a class="nx" href="strategy.html"><span>NEXT</span><b>策略模式 →</b></a>
+  </nav>
+  <div class="foot">
+    <p>源码：<a href="src/coop.c">src/coop.c</a> · <a href="src/coop.cpp">src/coop.cpp</a> ｜ 编译：gcc / g++ 16.2.0（MinGW-W64 x86_64）｜ 输出为本机实测<br>
+    <a href="../../index.html">← 返回个人知识库</a></p>
+  </div>
+</div>
+
+<script src="assets/pd.js"></script>
+<script>
+(function () {
+  var objName = document.getElementById('objName');
+  var objMem = document.getElementById('objMem');
+  var tblName = document.getElementById('tblName');
+  var fnName = document.getElementById('fnName');
+  var note = document.getElementById('dNote');
+  var log = document.getElementById('dLog');
+  var boxes = [document.getElementById('bObj'), document.getElementById('bTbl'), document.getElementById('bFn')];
+  var isRect = true, step = -1;
+
+  var DATA = {
+    rect:   { obj: 'rect_t', mem: 'vptr | w=3.0 | h=4.0', tbl: 'RECT_OPS', fn: 'rect_area()' },
+    circle: { obj: 'circle_t', mem: 'vptr | r=1.0', tbl: 'CIRCLE_OPS', fn: 'circle_area()' }
+  };
+
+  function paint() {
+    boxes.forEach(function (b, i) { b.classList.toggle('on', i === step); });
+    var d = isRect ? DATA.rect : DATA.circle;
+    if (step < 0) {
+      note.textContent = '当前：还没开始。点“下一步”。';
+    } else if (step === 0) {
+      note.textContent = '第 ① 步：对象前 8 字节就是 vptr，指向 ' + d.tbl + '。';
+    } else if (step === 1) {
+      note.textContent = '第 ② 步：vptr + 0 取出 area 槽，里面是 ' + d.fn + ' 的地址。';
+    } else {
+      note.textContent = '第 ③ 步：调用 ' + d.fn + '，把 self 传进去；函数内部把指针还原成具体类型再取字段。';
+    }
+  }
+
+  function nextStep() {
+    var d = isRect ? DATA.rect : DATA.circle;
+    if (step >= 2) { step = -1; PD.clear(log); PD.log(log, '<span class="mute">// 重新开始</span>'); paint(); return; }
+    step++;
+    paint();
+    if (step === 0) PD.log(log, '① 取 <b>s-&gt;vptr</b> → ' + d.tbl + '（对象前 8 字节）');
+    if (step === 1) PD.log(log, '② 偏移 +0 取 <b>area</b> → ' + d.fn + ' 的地址');
+    if (step === 2) PD.log(log, '③ 调用 <b>' + d.fn + '</b>(self)，进入函数体');
+  }
+
+  document.getElementById('step').onclick = nextStep;
+  document.getElementById('reset').onclick = function () {
+    step = -1; PD.clear(log);
+    PD.log(log, '<span class="mute">// 分派日志</span>');
+    paint();
+  };
+  document.getElementById('pickRect').onclick = function () {
+    isRect = true; step = -1;
+    this.classList.add('on'); document.getElementById('pickCircle').classList.remove('on');
+    objName.textContent = DATA.rect.obj; objMem.textContent = DATA.rect.mem;
+    tblName.textContent = DATA.rect.tbl; fnName.textContent = DATA.rect.fn;
+    PD.log(log, '<span class="mute">// 选中 rect_t</span>');
+    paint();
+  };
+  document.getElementById('pickCircle').onclick = function () {
+    isRect = false; step = -1;
+    this.classList.add('on'); document.getElementById('pickRect').classList.remove('on');
+    objName.textContent = DATA.circle.obj; objMem.textContent = DATA.circle.mem;
+    tblName.textContent = DATA.circle.tbl; fnName.textContent = DATA.circle.fn;
+    PD.log(log, '<span class="mute">// 选中 circle_t</span>');
+    paint();
+  };
+  paint();
+})();
+</script>
+</body>
+</html>
