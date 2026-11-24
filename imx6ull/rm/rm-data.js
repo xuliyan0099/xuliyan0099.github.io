@@ -214,7 +214,7 @@ window.RM =
         { "n": 16, "zh": "异步采样率转换 ASRC", "en": "Asynchronous Sample Rate Converter", "pp": "505–562", "pages": 58, "pri": "opt", "batch": 4, "ready": true,
           "line": "48kHz 对 44.1kHz 这种「不同步」的场合，靠它做无损重采样。",
           "pts": ["通道对与比率设置", "启动流程与 FIFO 水位"] },
-        { "n": 17, "zh": "NAND ECC 加速器 BCH", "en": "40-BIT Correcting ECC Accelerator", "pp": "563–624", "pages": 62, "pri": "read", "batch": 3,
+        { "n": 17, "zh": "NAND ECC 加速器 BCH", "en": "40-BIT Correcting ECC Accelerator", "pp": "563–624", "pages": 62, "pri": "read", "batch": 3, "ready": true,
           "line": "40 位纠错怎么配：BCH 与 GPMI 的接口编程，以及 loopback 自测。",
           "pts": ["BCH 参数（纠错位数、块大小）与页面组织", "memory-to-memory loopback 自测法"] },
         { "n": 19, "zh": "CMOS 摄像头接口 CSI", "en": "CMOS Sensor Interface", "pp": "751–790", "pages": 40, "pri": "read", "batch": 4,
