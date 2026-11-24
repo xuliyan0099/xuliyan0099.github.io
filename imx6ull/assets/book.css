@@ -84,6 +84,7 @@ ol.steps>li::before{
 .book table{margin:16px 0 22px;font-size:13.5px}
 .book table th{background:rgba(110,168,254,.08)}
 .book table td.nm{white-space:nowrap;color:#cfe3ff}
+.book table th{white-space:nowrap}
 
 /* 代码 */
 .book pre{margin:16px 0 20px;padding:14px 16px;border-radius:12px;background:#070c17;border:1px solid rgba(110,168,254,.18);overflow:auto}

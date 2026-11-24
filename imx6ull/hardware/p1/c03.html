@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1.3 功率、发热与降额 | 第一篇 · 电学与器件基础 | i.MX6ULL 学习手册</title>
-<meta name="description" content="电阻的额定功率怎么算、LDO 为什么烫、电感的 DCR 损耗、降额规则，以及这块板子上真实元件的发热计算。">
+<title>1.3 功率、发热与降额：一颗 0402 到底能扛多少毫安 | 第一篇 · 电学与器件基础 | i.MX6ULL 学习手册</title>
+<meta name="description" content="从 P=UI=I²R 推到额定功率、降额曲线与结温计算，用本板 LED、BOOT 上拉、eMMC 上拉、DDR VREF、DCDC、LDO 的真实数值算一遍发热。">
 <link rel="stylesheet" href="../../assets/style.css">
 <link rel="stylesheet" href="../../assets/book.css">
 <link rel="stylesheet" href="../../assets/mobile.css">
@@ -18,161 +18,176 @@
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
 
 <div class="shell">
-  <aside id="sidebar">
-    <div class="vol-h">第一篇 · 电学与器件基础</div>
-    <ol id="sideList"></ol>
-    <div class="vol-nav" id="volNav"></div>
-  </aside>
-
+  <aside id="sidebar"><div class="vol-h">第一篇 · 电学与器件基础</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第一篇 · 电学基础</span><span class="sep">/</span>第 3 章<span class="sep">/</span>约 22 分钟</div>
-    <h1>功率、发热与降额</h1>
-    <p class="lede">硬件里绝大多数「用着用着就坏」，不是电压击穿，而是<b>热</b>。一颗电阻、一个 LDO、一段铜皮，都在把电变成热。这一章给你三个式子，让你在上电之前就能判断：这个元件会不会烫，会不会撑不住。</p>
+    <div class="ch-meta"><span class="lv">第一篇 · 电学基础</span><span class="sep">/</span>第 3 章<span class="sep">/</span>约 45 分钟</div>
+    <h1>功率、发热与降额：一颗 0402 到底能扛多少毫安</h1>
+    <p class="lede">「这颗电阻会不会烧」不是靠手感回答的。它等于三道计算：<b>实际功耗 P、降额后的允许功耗 P<sub>allow</sub>、结温 T<sub>j</sub></b>。这一章把这三道算完，并用本板真实位号（R6、R43–R50、R9/R10/R38、U4、U7）各算一遍——算完你会发现，大多数「烧了」不是功率不够，而是<b>没降额、散热没算、或者瞬时脉冲没人管</b>。</p>
 
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>用 P = U·I = I²R = U²/R 算出电阻、LDO、电感上的功耗</li>
-        <li>说出为什么 LDO 比 DCDC 更容易烫，并算出它的结温</li>
-        <li>知道降额规则（电阻用额定功率的 50%、电容电压用 80% 等）</li>
-        <li>用手摸法与万用表判断「这个器件是否已经过热」</li>
+        <li>用 P=UI=I²R=U²/R 三种形式快速算功耗，并知道该选哪个</li>
+        <li>读懂电阻的降额曲线：为什么 70°C 之后额定功率要打折</li>
+        <li>用 T<sub>j</sub> = T<sub>a</sub> + P×θ<sub>JA</sub> 判断「烫不烫、会不会热失控」</li>
+        <li>给本板六个真实功耗点算账：LED、BOOT 上拉、eMMC 上拉、DDR VREF、DCDC、LDO</li>
+        <li>区分「连续功率」与「脉冲能量」，知道 TVS 和浪涌电阻为什么按能量选</li>
       </ol>
     </div>
 
-    <h2><span class="n">1.3.1</span>三个式子，同一个意思</h2>
-    <p style="text-align:center">P = U·I = I²R = U²/R</p>
-    <p>选哪个形式取决于你手上有什么：知道压降和电流用第一个；知道电流和电阻用第二个（最常用于电阻）；知道电压和电阻用第三个（最常用于上拉与分压）。</p>
+    <h2><span class="n">1.3.1</span>三个公式，四种场景</h2>
+    <p>功率的三个等价形式：<b>P = U×I = I²R = U²/R</b>。选哪个，取决于你手上有什么：</p>
+    <ul>
+      <li><b>P = U×I</b>：知道两端电压和流过电流。适合整体评估（这块板一共耗多少）。</li>
+      <li><b>P = I²R</b>：知道电流和电阻。适合<b>算电阻发热</b>，也是「电流翻倍、发热四倍」的来源。</li>
+      <li><b>P = U²/R</b>：知道压降和电阻。适合上拉、限流、分压这类「电压已知」的场合。</li>
+    </ul>
 
+    <h3>场景一：LED 限流电阻（R6 = 510Ω）</h3>
+    <p>MINI 的电源指示灯由 3.3V 经 R6 510Ω 点亮。LED 正向压降 V<sub>f</sub> 约 1.8–2.0V（红光），于是：</p>
+    <p style="text-align:center">I = (3.3 − 2.0)/510 ≈ <b>2.55mA</b><br>P<sub>R6</sub> = I²R = (2.55mA)²×510 ≈ <b>3.3mW</b><br>P<sub>LED</sub> = V<sub>f</sub>×I ≈ 2.0×2.55mA ≈ <b>5.1mW</b></p>
+    <p>3.3mW 对 0402（额定 62.5mW）只有 5%，随便用。<b>但若把它挪到 12V 上</b>：I=(12−2)/510=19.6mA，P=I²R=196mW，已经超过 0805 的 1/8W——这就是「换电压不换电阻」的典型翻车。</p>
+
+    <h3>场景二：上拉阵列（R43–R50）</h3>
+    <p>BOOT 区 2×10k + 6×4.7k 全部上拉到 3.3V（第 1.2 章算过电流）：</p>
+    <p style="text-align:center">I<sub>总</sub> = 2×(3.3/10k) + 6×(3.3/4.7k) ≈ 0.66 + 4.21 = <b>4.87mA</b><br>P<sub>总</sub> = 3.3×4.87mA ≈ <b>16.1mW</b>，单颗最大 3.3²/4.7k ≈ <b>2.3mW</b></p>
+    <p>单颗 2.3mW 毫无压力，但 <b>16mW 是常驻功耗</b>：电池设备待机 30 天，这点电流就要吃掉约 11.5Wh（0.016W×720h）。这就是低功耗设计要把「一直流」的上拉改成可控上拉的原因。</p>
+
+    <h3>场景三：DCDC 的效率损耗（U4）</h3>
+    <p>U4（DC JW5060T_6）把 DCDC_5V 降到 DCDC_3V3。假设负载 1A、效率 88%：</p>
+    <ul>
+      <li>输出功率 P<sub>out</sub> = 3.32×1 = 3.32W；</li>
+      <li>输入功率 P<sub>in</sub> = 3.32/0.88 ≈ 3.77W；</li>
+      <li>损耗 P<sub>loss</sub> ≈ 0.45W：高侧 MOS 导通 + 开关损耗约 0.2W，低侧同步 MOS 约 0.1W，电感 DCR 约 0.1W，静态与驱动约 0.05W。</li>
+    </ul>
+    <p>0.45W 在 SOT-23-6 里是<b>烫手</b>的：θ<sub>JA</sub> 约 200°C/W，温升 90°C。所以这类 DCDC 芯片底下必须有大铜皮/散热焊盘——这也是第 5.6 章单独讲「电源平面与散热」的原因。</p>
+
+    <h3>场景四：LDO 的压差损耗（U7）</h3>
+    <p>U7（ME6209A33）把 5V 降到 3.3V 给 SNVS。LDO 的损耗是「压差 × 电流」，全部变成热：</p>
+    <p style="text-align:center">P = (5 − 3.3) × I<sub>out</sub> + 5×I<sub>q</sub> ≈ 1.7×I<sub>out</sub></p>
+    <p>50mA 时 85mW；150mA 时 255mW。SOT-23-5 的 θ<sub>JA</sub> 约 250°C/W，255mW 就是 +64°C——环境 40°C 时结温 104°C。这就是「能用 LDO 的地方尽量别用大压差」的原因（完整算法见 4.3）。</p>
+
+    <h2><span class="n">1.3.2</span>额定功率的真相：它是在什么条件下测的</h2>
+    <p>数据手册上「0402 1/16W」有一行小字：<b>在 70°C 环境、推荐焊盘、标准测试板上测得</b>。换成你的板子，条件变了，这个数就不再成立。三个变量：</p>
+    <ul>
+      <li><b>焊盘与铜箔面积</b>：焊盘越大、连的铜越多，散热越好；孤立小焊盘可能只有标称的 60%。</li>
+      <li><b>环境温度</b>：70°C 是降额起点，越热可用的功率越小。</li>
+      <li><b>邻近热源</b>：贴着 DCDC 电感、LDO、MOS 的电阻，等效环境温度高得多。</li>
+    </ul>
+    <p>所以工程第一原则是：<b>按额定功率的 50% 用（高温环境 30%）</b>。这不是保守，是把「焊盘、环境、批次」三个不确定量一次性吃掉。</p>
+
+    <h2><span class="n">1.3.3</span>降额曲线：70°C 之后线性打折</h2>
+    <p>厚膜贴片电阻的典型降额曲线：<b>70°C 以下 100%，从 70°C 线性降到 155°C 的 0%</b>。折算系数：</p>
+    <p style="text-align:center">k(T) = (155 − T)/(155 − 70)　（70°C ≤ T ≤ 155°C）</p>
+    <ul>
+      <li>85°C：k = 70/85 ≈ <b>0.82</b> → 0402 只剩 51mW；</li>
+      <li>105°C：k = 50/85 ≈ 0.59 → 37mW；</li>
+      <li>125°C：k = 30/85 ≈ 0.35 → 22mW。</li>
+    </ul>
+    <p>再叠加「50% 工程余量」，85°C 环境下 0402 的实际可用功率约 <b>26mW</b>。回到 R6：3.3mW，余量充足；BOOT 上拉单颗 2.3mW，也没问题；但你要用 0402 做过百毫安的采样电阻就必须换 0805/1206 或并联。</p>
+
+    <div class="box tip">
+      <h5>并联不是「功率相加」那么简单</h5>
+      <p>两颗同阻值并联，总阻减半；同样电流下总功率只有原来一半，每颗承担 1/4——所以并联确实提高功率余量。但 <b>两颗不等值时不会均分</b>：阻值小的分到更多电流、更多热，先烧。做功率分配要么同批同值，要么每颗串一个小均流电阻。</p>
+    </div>
+
+    <h2><span class="n">1.3.4</span>结温：真正决定「会不会烧」的那个数</h2>
+    <p>器件坏不坏，看的是<b>结温（内部芯片温度）</b>，不是外壳、也不是手指摸到的温度：</p>
+    <p style="text-align:center">T<sub>j</sub> = T<sub>a</sub> + P × θ<sub>JA</sub></p>
+    <p>θ<sub>JA</sub> 是「结到环境」热阻（°C/W），由封装、焊盘、铜箔、风道共同决定。常见量级：</p>
     <table>
-      <thead><tr><th>元件</th><th>功耗怎么来</th><th>这块板上的例子</th><th>结果</th></tr></thead>
+      <thead><tr><th>器件</th><th>典型 θ<sub>JA</sub></th><th>含义</th></tr></thead>
       <tbody>
-        <tr><td class="nm">上拉电阻</td><td>(V<sub>DD</sub> − V<sub>in</sub>)²/R，被拉低时才有电流</td><td>4.7k 接 3.3V，拨码接地</td><td>≈ 2.3mW，可忽略</td></tr>
-        <tr><td class="nm">串阻</td><td>I²R，只在信号跳变瞬间有电流</td><td>UART 22Ω，3mA 峰值</td><td>≈ 0.2mW，可忽略</td></tr>
-        <tr><td class="nm">LDO</td><td>(V<sub>in</sub> − V<sub>out</sub>)·I</td><td>5V→3.3V，300mA</td><td><b>0.51W</b>，小封装会烫</td></tr>
-        <tr><td class="nm">DCDC</td><td>P<sub>out</sub>×(1/η − 1)</td><td>5V→1.35V，1A，η=90%</td><td>≈ 0.15W，主要热在电感与芯片</td></tr>
-        <tr><td class="nm">电感</td><td>I²·DCR + 磁损</td><td>2.2µH，DCR 60mΩ，1A</td><td>≈ 0.06W</td></tr>
+        <tr><td class="nm">0402 电阻</td><td>300–400 °C/W</td><td>30mW → 温升 9–12°C</td></tr>
+        <tr><td class="nm">0805 电阻</td><td>200–250 °C/W</td><td>125mW → 温升 25–31°C</td></tr>
+        <tr><td class="nm">SOT-23-5 (LDO)</td><td>200–250 °C/W</td><td>250mW → 温升 50–62°C</td></tr>
+        <tr><td class="nm">SOT-23-6 (DCDC)</td><td>180–220 °C/W</td><td>450mW → 温升 80–99°C</td></tr>
+        <tr><td class="nm">SMA 二极管</td><td>100–150 °C/W</td><td>0.5W → 温升 50–75°C</td></tr>
       </tbody>
     </table>
+    <p>判据：<b>T<sub>j</sub> 要留 20–30°C 余量</b>（商用级上限 125°C，工业级 150°C）。算出来 120°C 就是「已在悬崖边」——环境再高 10°C、负载再重一点就进热失控。</p>
 
     <div class="demo">
-      <div class="dh"><b>功耗与发热计算器</b><span>算元件功耗，再折算成温升，看它撑不撑得住</span></div>
+      <div class="dh"><b>功耗 / 降额 / 结温计算器</b><span>输入电流与压降，选热阻，判断余量</span></div>
       <div class="db">
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-          <button class="mbtn" data-m="ldo" style="cursor:pointer;padding:8px 12px;border-radius:9px;border:1px solid #5ff1ef;background:rgba(95,241,239,.12);color:#eaf3ff;font-size:12.5px">LDO</button>
-          <button class="mbtn" data-m="res" style="cursor:pointer;padding:8px 12px;border-radius:9px;border:1px solid rgba(120,150,200,.26);background:rgba(255,255,255,.04);color:#cfdcf7;font-size:12.5px">电阻</button>
-          <button class="mbtn" data-m="dcdc" style="cursor:pointer;padding:8px 12px;border-radius:9px;border:1px solid rgba(120,150,200,.26);background:rgba(255,255,255,.04);color:#cfdcf7;font-size:12.5px">DCDC</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
+          <div><div style="font-size:12px;color:#9fb0c7">电流 <b id="iv" style="color:#5ff1ef">2.55</b> mA</div><input id="cur" type="range" min="0.1" max="1000" step="0.05" value="2.55" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">压降 <b id="vv" style="color:#5ff1ef">1.30</b> V</div><input id="vol" type="range" min="0" max="12" step="0.05" value="1.3" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">环境温度 <b id="tav" style="color:#5ff1ef">40</b> °C</div><input id="ta" type="range" min="10" max="100" step="1" value="40" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">θ<sub>JA</sub> <b id="thv" style="color:#5ff1ef">350</b> °C/W</div><input id="th" type="range" min="50" max="500" step="10" value="350" style="width:100%;accent-color:#5ff1ef"></div>
         </div>
-        <div id="fields" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px"></div>
         <div id="pOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
       </div>
     </div>
 
-    <h2><span class="n">1.3.2</span>封装决定「能扛多少」</h2>
-    <p>同样 0.5W，放在 0603 上只是温热，放在 SOT-23 的 LDO 上就可能烫到保护。原因是<b>热阻</b>：热量从芯片结（junction）传到环境，要经过一条有阻力的路。</p>
-    <table>
-      <thead><tr><th>封装</th><th>典型热阻 θJA</th><th>0.5W 时结温升</th><th>能长期扛的功耗（按 100℃ 结温）</th></tr></thead>
-      <tbody>
-        <tr><td class="nm">0402 电阻</td><td>—（按额定 1/16W）</td><td>—</td><td>≤ 31mW（留 50% 降额）</td></tr>
-        <tr><td class="nm">0603 电阻</td><td>—（1/10W）</td><td>—</td><td>≤ 50mW</td></tr>
-        <tr><td class="nm">SOT-23</td><td>≈ 200 ℃/W</td><td>+100℃（危险）</td><td>≈ 0.35W</td></tr>
-        <tr><td class="nm">SOT-89</td><td>≈ 60 ℃/W</td><td>+30℃</td><td>≈ 1.2W</td></tr>
-        <tr><td class="nm">SOIC-8（带散热焊盘）</td><td>≈ 40–50 ℃/W</td><td>+20–25℃</td><td>≈ 1.5W</td></tr>
-        <tr><td class="nm">QFN + 铜箔散热</td><td>≈ 25–35 ℃/W</td><td>+12–18℃</td><td>≈ 2W 以上</td></tr>
-      </tbody>
-    </table>
-    <p>换算方式：T<sub>j</sub> = T<sub>a</sub> + P·θ<sub>JA</sub>。T<sub>a</sub> 取 40℃（封闭外壳内），T<sub>j</sub> 不应超过 100–125℃（看规格书）。</p>
+    <h2><span class="n">1.3.5</span>脉冲功率：为什么 TVS 标「峰值 400W」</h2>
+    <p>TVS（MINI p4 的 SMBJ5.0A / SMBJ3.3A）说明书上有吓人的数字：400W 峰值脉冲功率。但它只在 <b>10/1000µs 波形</b>下成立——脉冲很短，热量来不及扩散，芯片能瞬时承受远超连续功率的能量。判据不是功率，而是<b>能量与结温</b>：</p>
+    <p style="text-align:center">E = ∫U(t)·I(t)dt　　ΔT ≈ E / C<sub>th</sub></p>
+    <p>所以选 TVS 看三条：① 钳位电压 V<sub>c</sub> 低于后级耐压；② 峰值脉冲电流 I<sub>PP</sub> 大于浪涌电流；③ <b>波形与重复率</b>匹配（雷击 8/20µs、ESD 接触放电，能量差几个量级）。连续功率那栏（通常几百 mW）只用于「稳态误接」评估。</p>
+    <p>同理，浪涌/限流电阻（RS485 的 R27 22Ω、CAN 的 R57 510Ω）在浪涌瞬间承担的能量也远大于稳态：稳态几毫瓦，一个 8/20µs、10A 的浪涌就能让 22Ω 瞬时吃 2.2kW。选型看脉冲降额曲线，不是额定功率。</p>
+
+    <h2><span class="n">1.3.6</span>怎么在板上验证：四种测法</h2>
+    <ol class="steps">
+      <li><b>算</b>：量压降与电流，P=UI。最准，但要断开回路串表。</li>
+      <li><b>反算</b>：已知阻值，量两端电压，P=U²/R。不用断线，适合上拉、限流电阻。</li>
+      <li><b>摸</b>：手指背轻触 3 秒。能按住 ≈ 低于 60°C；立刻缩手 ≈ 70–80°C；闻到味儿就该断电。<b>只粗判，高压区别摸。</b></li>
+      <li><b>看</b>：热像仪找热点；或热电偶贴器件表面，配合「已知 P 反推 θ<sub>JA</sub>」验证散热是否达标。</li>
+    </ol>
+    <p>一个实用技巧：想知道某一级电路的<b>总损耗</b>，用「输入功率 − 输出功率」作差，比逐个器件算更快。</p>
 
     <div class="box pit">
-      <h5>这块板上三个真实的发热点</h5>
-      <p><b>1. U6 / U1（MT3420B，1.35V 那两路）。</b>效率约 90%，1A 输出时损耗 0.15W，SOT-23-6 封装 + 2.2µH 电感，温热但不烫手是正常的；烫手说明电感饱和或输出短路。</p>
-      <p><b>2. 背光升压。</b>屏幕背光是大电流负载，底板上的升压电路与限流电阻是整板最热的区域之一，摸上去明显温是正常的。</p>
-      <p><b>3. 以太网 PHY 与变压器。</b>100M 链路常通时 PHY 会持续发热，属于正常；但若烫到变色，查供电与端接。</p>
+      <h5>三个真实翻车现场</h5>
+      <p>① 用 0402 0Ω 当跳线过 1A：实测 30mΩ，P=30mW 没事；换成 0603 的「0」是 50mΩ，1.5A 就是 112mW，超过 1/10W 的一半——烫、变色、最终开路。<b>0Ω 也要看额定电流。</b></p>
+      <p>② LDO 从 12V 降到 3.3V 带 200mA：P=1.7W，SOT-23 直接烧。<b>大压差必须用 DCDC。</b></p>
+      <p>③ 三颗 0805 并联做 1A 采样：以为均分 0.33A/颗，实际一颗 0.5A、两颗 0.25A（阻值公差导致），热的那颗先漂移、再正反馈。<b>并联要留均流设计。</b></p>
     </div>
 
-    <h2><span class="n">1.3.3</span>降额：不是「刚好够」，是「留一半」</h2>
-    <p>额定值是在 25℃、理想散热下标出来的。真实板子在封闭外壳里、旁边还有别的热源，所以工程上要降额使用：</p>
-    <ul>
-      <li><b>电阻功率：</b>实际不超过额定的 50%（高温环境 30%）。0402 的 1/16W → 长期只用到 31mW。</li>
-      <li><b>电容电压：</b>实际不超过额定的 80%（MLCC 还要考虑直流偏压降容，见第二篇）。</li>
-      <li><b>LDO 电流：</b>不超过额定的 70%，且必须核算结温。</li>
-      <li><b>电感饱和电流：</b>峰值电流要有 20–30% 余量，否则感值骤降、纹波暴涨。</li>
-      <li><b>连接器电流：</b>不超过额定的 70%，插拔次数也会影响。</li>
-    </ul>
-    <div class="box tip">
-      <h5>手摸法（现场最快的判断）</h5>
-      <p>上电 30 秒后，用指背轻触（不要按）芯片与电感：<b>温热</b>（约 40–50℃）正常；<b>烫手但能按 2 秒</b>（约 60–70℃）需要查；<b>一碰就缩手</b>（&gt;80℃）立刻断电。注意先摸外壳再摸芯片，避免静电与烫伤。</p>
-    </div>
+    <h2><span class="n">1.3.7</span>五个设计误区</h2>
+    <ol>
+      <li><b>只看额定功率，不看降额。</b>85°C 实际只剩 82%，125°C 只剩 35%。</li>
+      <li><b>把「室温手摸不烫」当安全。</b>结温比壳温高几十度。</li>
+      <li><b>忽略邻近热源。</b>贴在电感旁，等效环境温度可能高 20–30°C。</li>
+      <li><b>用连续功率评估脉冲。</b>TVS、浪涌电阻、开机冲击都按能量算。</li>
+      <li><b>忽略铜箔散热。</b>同样封装，1cm² 铜与孤立焊盘，θ<sub>JA</sub> 能差一倍。</li>
+    </ol>
 
-    <h2><span class="n">1.3.4</span>铜也是电阻：走线的压降与发热</h3>
-    <p>PCB 上的铜不是理想导线。1oz 铜厚 35µm，1mm 宽的走线电阻约 <b>0.5mΩ/mm</b>（室温）。1A 电流流过 20mm，就是 10mΩ，压降 10mV、损耗 10mW——看起来很小，但<b>电源路径上很小的压降会直接损失电压余量</b>。</p>
-    <p>判断方法：电源走线宽度按「1A 用 1mm（1oz）」做起点，大电流（3A 以上）用铺铜 + 多过孔；信号线按阻抗要求走，不按载流算。</p>
+    <h3>练习（答案在折叠里）</h3>
+    <details class="quiz"><summary>1. 3.3V 经 510Ω 点亮 V<sub>f</sub>=2.0V 的 LED，电阻功耗多少？</summary><div class="ans">I=(3.3−2.0)/510=2.55mA；P=I²R≈3.3mW。0402 完全够。</div></details>
+    <details class="quiz"><summary>2. 0402（1/16W）放在 105°C 环境，允许功耗约多少？</summary><div class="ans">k=(155−105)/85≈0.59，62.5mW×0.59≈37mW；再按 50% 余量约 18mW。</div></details>
+    <details class="quiz"><summary>3. SOT-23-5 LDO 压差 1.7V、150mA、θ<sub>JA</sub>=250、环境 40°C，结温？</summary><div class="ans">P=255mW；ΔT=0.255×250≈64°C；T<sub>j</sub>≈104°C，接近 125°C 上限，需加铜箔或降流。</div></details>
+    <details class="quiz"><summary>4. 为什么 TVS 的 400W 不能用于稳态？</summary><div class="ans">400W 是 10/1000µs 脉冲峰值，热量来不及扩散；稳态看连续功率（几百 mW）与结温。</div></details>
+    <details class="quiz"><summary>5. 两颗 10k 并联当 5k 用，每颗功耗是原来的多少？</summary><div class="ans">总功率变 1/2，每颗 1/4。阻值不等时电流不均分，阻值小的更热。</div></details>
+    <details class="quiz"><summary>6. 手摸 0805「有点温」，能判断安全吗？</summary><div class="ans">不能。壳温 50°C 时结温可能 80–100°C；要算 T<sub>j</sub>=T<sub>a</sub>+P·θ<sub>JA</sub>，或用热像仪/热电偶。</div></details>
 
-    <h3>自测</h3>
-    <details class="quiz"><summary>5V 降到 3.3V、输出 500mA，LDO 发热多少？能用 SOT-23 吗？</summary><div class="ans">P = (5−3.3)×0.5 = <b>0.85W</b>；SOT-23 热阻约 200℃/W，结温升 170℃——绝对不行。必须换 DCDC，或降低电流/加大封装与散热。</div></details>
-    <details class="quiz"><summary>同样输出 1A，为什么 DCDC 比 LDO 凉很多？</summary><div class="ans">LDO 把多余电压全部变成热：(V<sub>in</sub> − V<sub>out</sub>)·I；DCDC 用开关+电感搬运能量，损耗主要是开关与导通损耗，按效率算 P<sub>in</sub> − P<sub>out</sub>。5V→1.35V、1A 时，LDO 要烧 3.65W，DCDC 只损 0.15W。</div></details>
-    <details class="quiz"><summary>为什么 0402 电阻不能长期跑满 1/16W？</summary><div class="ans">因为额定值通常在 70℃ 以下、良好散热条件下给出，且长期高温会加速阻值漂移与焊点老化。工程上按 50% 降额，留出温度与批次余量。</div></details>
-
-    <div class="ch-nav">
-      <a href="c02.html"><span>上一章</span><b>← 1.2 欧姆定律与分压</b></a>
-      <a class="nx" id="chNavNext" href="c04.html"><span>下一章</span><b>1.4 电容 →</b></a>
-    </div>
+    <div class="ch-nav"><a href="c02.html"><span>上一章</span><b>← 1.2 欧姆定律与分压</b></a>
+      <a class="nx" id="chNavNext" href="c04.html"><span>下一章</span><b>1.4 电容 →</b></a></div>
   </main>
 </div>
-
-<script src="../../assets/parts.js"></script>
-<script src="../../assets/part.js"></script>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
 <script>
 renderPart('p1','c03.html');
 (function(){
-  var M='ldo';
-  var F={
-    ldo:[['vin','输入电压',5,'V',1,12,0.1],['vout','输出电压',1.35,'V',0.6,5,0.05],['cur','输出电流',300,'mA',10,2000,10]],
-    res:[['vin','电阻上压降',3.3,'V',0.1,12,0.1],['rr','阻值',4700,'Ω',10,100000,10]],
-    dcdc:[['vin','输入电压',5,'V',1,12,0.1],['vout','输出电压',1.35,'V',0.6,5,0.05],['cur','输出电流',1000,'mA',50,3000,50]]
-  };
-  function fields(){
-    var f=F[M];
-    document.getElementById('fields').innerHTML=f.map(function(x){
-      return '<div><div style="font-size:12.5px;color:#9fb0c7">'+x[1]+' = <b style="color:#5ff1ef" id="v_'+x[0]+'">'+x[2]+'</b> '+x[3]+
-        '</div><input id="s_'+x[0]+'" type="range" min="'+x[4]+'" max="'+x[5]+'" step="'+x[6]+'" value="'+x[2]+'" style="width:100%;accent-color:#5ff1ef"></div>';
-    }).join('');
-    f.forEach(function(x){ document.getElementById('s_'+x[0]).addEventListener('input',calc) });
-    Array.prototype.forEach.call(document.querySelectorAll('.mbtn'),function(b){
-      var on=b.dataset.m===M; b.style.borderColor=on?'#5ff1ef':'rgba(120,150,200,.26)'; b.style.background=on?'rgba(95,241,239,.12)':'rgba(255,255,255,.04)';
-    });
-    calc();
-  }
   function calc(){
-    var f=F[M]; for (var i=0;i<f.length;i++){ var el=document.getElementById('v_'+f[i][0]); if(el) el.textContent=(+document.getElementById('s_'+f[i][0]).value).toFixed(f[i][0]==='rr'?0:2); }
-    var o=document.getElementById('pOut');
-    if(M==='ldo'){
-      var vin=+document.getElementById('s_vin').value, vout=+document.getElementById('s_vout').value, cur=+document.getElementById('s_cur').value/1000;
-      var p=(vin-vout)*cur, tj=p*200;
-      o.innerHTML='<b style="color:#eaf3ff;font-size:15px">LDO 功耗 '+(p*1000).toFixed(0)+' mW</b>　效率 '+'<b>'+((vout/vin)*100).toFixed(0)+'%</b><br>'+
-        'SOT-23（θJA≈200℃/W）结温升 ≈ '+tj.toFixed(0)+'℃ → <span style="color:'+(tj>60?'#ff9c9c':'#9df3c2')+'">'+(tj>60?'不可接受，换 DCDC 或更大封装':'可以接受')+'</span><br>'+
-        'SOT-89（θJA≈60℃/W）结温升 ≈ '+(p*60).toFixed(0)+'℃<br>'+
-        '<span style="color:#6f7f9c;font-size:11.5px">判据：结温升 &gt; 40℃ 就要考虑散热，&gt; 60℃ 基本不能用；实际还要叠加环境温度。</span>';
-    } else if(M==='res'){
-      var u=+document.getElementById('s_vin').value, r=+document.getElementById('s_rr').value;
-      var p2=u*u/r, i2=u/r;
-      o.innerHTML='<b style="color:#eaf3ff;font-size:15px">电阻功耗 '+(p2*1000).toFixed(1)+' mW</b>　电流 '+(i2*1000).toFixed(2)+' mA<br>'+
-        '占 0402（1/16W=62.5mW）的 '+(p2*1000/62.5*100).toFixed(0)+'%　占 0603（1/10W）的 '+(p2*1000/100*100).toFixed(0)+'%<br>'+
-        '<span style="color:'+(p2*1000>31?'#ffb84d':'#9df3c2')+'">'+(p2*1000>31?'超过 0402 的 50% 降额线，换 0603 或加大阻值':'在 0402 的安全范围内')+'</span><br>'+
-        '<span style="color:#6f7f9c;font-size:11.5px">上拉电阻只有被拉低时才有这个电流；静态时几乎为零，所以 4.7k 上拉实际几乎不耗电。</span>';
-    } else {
-      var vin3=+document.getElementById('s_vin').value, vout3=+document.getElementById('s_vout').value, cur3=+document.getElementById('s_cur').value/1000;
-      var pout=vout3*cur3, pin=pout/0.9, loss=pin-pout;
-      o.innerHTML='<b style="color:#eaf3ff;font-size:15px">输出 '+pout.toFixed(2)+' W，DCDC 自身损耗 '+(loss*1000).toFixed(0)+' mW</b>（按 90% 效率）<br>'+
-        '输入电流 ≈ '+(pin/vin3*1000).toFixed(0)+' mA　若改用 LDO：发热 '+((vin3-vout3)*cur3).toFixed(2)+' W<br>'+
-        '<span style="color:'+(loss>0.5?'#ffb84d':'#9df3c2')+'">'+(loss>0.5?'损耗偏大，注意电感与芯片散热':'损耗可接受')+'</span><br>'+
-        '<span style="color:#6f7f9c;font-size:11.5px">效率随负载变化，轻载时效率会掉到 70–80%；选型要看规格书的效率曲线，不是只看一个数。</span>';
-    }
+    var i=+document.getElementById('cur').value/1000, v=+document.getElementById('vol').value;
+    var ta=+document.getElementById('ta').value, th=+document.getElementById('th').value;
+    document.getElementById('iv').textContent=(i*1000).toFixed(2);
+    document.getElementById('vv').textContent=v.toFixed(2);
+    document.getElementById('tav').textContent=ta;
+    document.getElementById('thv').textContent=th;
+    var p=i*v, tjv=ta+p*th;
+    var k=ta<=70?1:Math.max(0,(155-ta)/85);
+    var rated=62.5*k, use=rated*0.5;
+    var ok=tjv<105, warn=tjv<125;
+    document.getElementById('pOut').innerHTML=
+      '<b style="color:#eaf3ff;font-size:15px">功耗 '+(p*1000).toFixed(1)+' mW　结温 '+tjv.toFixed(0)+' °C</b><br>'+
+      '温升 = P×θ<sub>JA</sub> = '+(p*th).toFixed(0)+' °C　环境 '+ta+' °C<br>'+
+      '0402 降额后额定 ≈ '+rated.toFixed(0)+' mW，50% 余量 ≈ '+use.toFixed(0)+' mW：'+
+      (p*1000<use?'<span style="color:#9df3c2">功率够</span>':'<span style="color:#ff9c9c">功率超标</span>')+'　'+
+      (ok?'<span style="color:#9df3c2">结温安全</span>':(warn?'<span style="color:#ffd27a">接近上限</span>':'<span style="color:#ff9c9c">过温风险</span>'))+'<br>'+
+      '<span style="color:#6f7f9c;font-size:11.5px">θ<sub>JA</sub> 随焊盘铜箔面积变化；铜皮越大，θ 越小。</span>';
   }
-  Array.prototype.forEach.call(document.querySelectorAll('.mbtn'),function(b){
-    b.addEventListener('click',function(){ M=b.dataset.m; fields(); });
-  });
-  fields();
+  ['cur','vol','ta','th'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
 })();
 </script>
-</body>
-</html>
+</body></html>

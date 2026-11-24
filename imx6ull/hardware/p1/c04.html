@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1.4 电容 | 第一篇 · 电学与器件基础 | i.MX6ULL 学习手册</title>
-<meta name="description" content="电容怎么储能、RC 时间常数怎么算、为什么 22µF 与 0.1µF 要成对出现、直流偏压降容与晶振负载电容。">
+<title>1.4 电容：充放电、RC 时间常数，以及 22µF 与 0.1µF 为什么必须并存 | 第一篇 | i.MX6ULL 学习手册</title>
+<meta name="description" content="从 Q=CU 与 i=C·dv/dt 推到阻抗曲线、自谐振、偏压降容，并用 CORE p2 的 C21–C24、VREF 的 C65、晶振的 C12/C13 真实位号算一遍。">
 <link rel="stylesheet" href="../../assets/style.css">
 <link rel="stylesheet" href="../../assets/book.css">
 <link rel="stylesheet" href="../../assets/mobile.css">
@@ -18,159 +18,150 @@
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
 
 <div class="shell">
-  <aside id="sidebar">
-    <div class="vol-h">第一篇 · 电学与器件基础</div>
-    <ol id="sideList"></ol>
-    <div class="vol-nav" id="volNav"></div>
-  </aside>
-
+  <aside id="sidebar"><div class="vol-h">第一篇 · 电学与器件基础</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第一篇 · 电学基础</span><span class="sep">/</span>第 4 章<span class="sep">/</span>约 26 分钟</div>
-    <h1>电容：板子上最多的元件</h1>
-    <p class="lede">一块 i.MX6ULL 核心板上，电容可能有上百颗。它们不是「多放几个保险」，而是各自在管一件很具体的事：储能、滤波、延时、耦合、起振。<b>看懂电容的排布，就读懂了这块板的电源设计。</b></p>
+    <div class="ch-meta"><span class="lv">第一篇 · 电学基础</span><span class="sep">/</span>第 4 章<span class="sep">/</span>约 50 分钟</div>
+    <h1>电容：充放电、RC 时间常数，以及 22µF 与 0.1µF 为什么必须并存</h1>
+    <p class="lede">电容是板上数量最多的元件，也是最容易被当成「贴上去就行」的元件。它到底在干什么？只有两件事：<b>存电荷（Q=CU）</b>、<b>抵抗电压变化（i=C·dv/dt）</b>。把这两件事想清楚，你就能解释：为什么去耦要一大一小、为什么晶振要配 18pF、为什么 10µF 的 0402 实际只有 4µF。</p>
 
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>说出电容的两种基本行为：储能（Q = C·U）与「电压不能突变」（i = C·dv/dt）</li>
-        <li>用 τ = RC 算出复位延时、上电斜率，并判断够不够</li>
-        <li>解释为什么每个电源脚都要 0.1µF，而每路输出还要再配 10–22µF</li>
-        <li>知道 MLCC 的直流偏压降容与温度特性，以及晶振旁 18pF 的真正含义</li>
+        <li>写出 i=C·dv/dt 与 Z=1/(2πfC)，并算出指定频率下的阻抗</li>
+        <li>用 τ=RC 算充放电时间，判断复位、消抖、上电斜率是否够</li>
+        <li>解释「22µF + 0.1µF」并联的物理原因（ESL 与自谐振），而不是背口诀</li>
+        <li>说出 C0G/X5R/X7R/Y5V 的差别，以及偏压降容怎么吃掉你的容值</li>
+        <li>用本板位号验证：C21–C24（SoC 内核）、C65（DDR VREF）、C12/C13（24MHz 晶振）</li>
       </ol>
     </div>
 
-    <h2><span class="n">1.4.1</span>两个式子，解释板上所有电容</h2>
-    <p style="text-align:center">Q = C·U　　i = C·dU/dt　　τ = R·C</p>
-    <p>第一个式子说明「电容存电荷」；第二个说明「想让电压瞬间跳变，需要无限大电流」——所以电容对突变是个缓冲；第三个说明「充电要时间」，这就是复位延时与上电斜率。</p>
+    <h2><span class="n">1.4.1</span>两件事：存电荷，抵抗电压变化</h2>
+    <p>电容的定义式：<b>Q = C·U</b>。给它加电压，它就存电荷；容量 C 的单位是法拉（F），常用 µF（10<sup>-6</sup>）、nF（10<sup>-9</sup>）、pF（10<sup>-12</sup>）。</p>
+    <p>对时间求导就得到最重要的动态方程：</p>
+    <p style="text-align:center"><b>i = C · dv/dt</b></p>
+    <p>这句话的含义是：<b>电容两端的电压不能突变</b>。想让它电压变化，必须灌入/抽出电流；变化越快（dv/dt 越大），需要的电流越大。反过来，电压恒定时（dv/dt=0）电流为零——这就是「隔直通交」的由来，不是电容「挡住了直流」，而是直流下它充满电后就不再吸收电流。</p>
+    <p>同样重要的还有能量：<b>E = ½CU²</b>。22µF 充到 3.3V 存 120µJ；1000µF 充到 12V 存 72mJ——后者在断电瞬间能把一个 LED 点亮一小会儿，也能把一只手烫出泡（所以大电容要泄放电阻）。</p>
 
-    <table>
-      <thead><tr><th>板上位置</th><th>容值</th><th>它在干什么</th><th>拿掉会怎样</th></tr></thead>
-      <tbody>
-        <tr><td class="nm">DCDC 输入（C74、C73）</td><td>10µF + 0.1µF</td><td>吸收开关瞬间的脉冲电流</td><td>输入电压被拉塌，芯片欠压重启</td></tr>
-        <tr><td class="nm">DCDC 输出（C75、C76）</td><td>22µF + 0.1µF</td><td>储能 + 滤掉开关纹波</td><td>纹波变大，DDR/内核不稳</td></tr>
-        <tr><td class="nm">POR_B 上（C14）</td><td>0.1µF</td><td>与 R33（0Ω）+ 芯片内部构成延时</td><td>复位脉宽变短，偶发起不来</td></tr>
-        <tr><td class="nm">晶振旁（C12、C13）</td><td>18pF</td><td>与晶振的 CL 匹配，决定振荡频率</td><td>频率偏几十 ppm，USB/网口不通</td></tr>
-        <tr><td class="nm">DDR VREF（C65、C66）</td><td>2µF + 0.1µF</td><td>稳住 0.675V 参考，抗噪声</td><td>VREF 抖动 → DDR 训练失败</td></tr>
-      </tbody>
-    </table>
+    <h2><span class="n">1.4.2</span>阻抗：Z = 1/(2πfC)，频率越高越「通」</h2>
+    <p>正弦稳态下电容的阻抗：</p>
+    <p style="text-align:center">Z<sub>C</sub> = 1/(j·2πf·C)，模值 |Z| = 1/(2πfC)</p>
+    <p>算几个真实数：</p>
+    <ul>
+      <li>0.1µF 在 1MHz：|Z| = 1/(2π×10<sup>6</sup>×10<sup>-7</sup>) ≈ <b>1.6Ω</b>；在 100MHz 降到 16mΩ（但此时 ESL 开始主导，见 1.4.4）。</li>
+      <li>10µF 在 100Hz：|Z| ≈ <b>159Ω</b>；在 100kHz 降到 0.16Ω。</li>
+      <li>18pF 在 24MHz：|Z| ≈ 368Ω——晶振电路里它不是「滤波」，而是<b>负载电容</b>，与晶体一起决定振荡频率（1.4.6 讲）。</li>
+    </ul>
+    <p>所以「电容滤波」要看你滤什么频率：低频纹波（100Hz 工频）要大容量电解；高频开关噪声（几百 kHz–几十 MHz）要小容量 MLCC 且贴近引脚。</p>
+
+    <h2><span class="n">1.4.3</span>RC 时间常数：τ=RC，5τ 才「到位」</h2>
+    <p>电阻给电容充电，电压按指数上升：</p>
+    <p style="text-align:center">U(t) = U<sub>∞</sub>(1 − e<sup>−t/τ</sup>)，τ = R×C</p>
+    <ul>
+      <li>1τ：到 63%；2τ：86%；3τ：95%；<b>5τ：99.3%</b>——工程上认为「稳定」。</li>
+      <li>放电同理：U(t) = U<sub>0</sub>·e<sup>−t/τ</sup>。</li>
+    </ul>
+    <p>算例：10k 上拉 + 100nF 电容 → τ = 10k×100nF = <b>1ms</b>，5τ = 5ms。这种组合常见于按键消抖与复位延时。</p>
+    <p>再看本板的两个 RC：</p>
+    <ul>
+      <li><b>复位</b>：MAX809R（U2）的 RESET 输出经 R31 0Ω 直连 POR_B，去耦 C13 104。复位脉宽由芯片内部定时（典型 180ms 级），不是 RC 决定；但 POR_B 上的 104 会与上拉 R33 形成 τ=10k×0.1µF=1ms 的边沿，太大会拖慢释放——这就是「复位脚上不能乱加电容」的原因。</li>
+      <li><b>I2C 上拉</b>：4.7k 上拉 + 总线电容 100pF → τ=470ns，上升时间 2.2τ≈1.03µs（第 1.2 章），刚好卡在 100kHz 规范边上。</li>
+    </ul>
+
+    <h2><span class="n">1.4.4</span>为什么必须「22µF + 0.1µF」并存</h2>
+    <p>真实电容不是理想电容，它等效为 <b>C 串 R(ESR) 再串 L(ESL)</b>。于是阻抗曲线是个 V 形：低频段由 C 主导（随频率下降），高频段由 ESL 主导（随频率上升），谷底就是<b>自谐振频率 SRF</b>：</p>
+    <p style="text-align:center">SRF = 1/(2π√(L·C))</p>
+    <p>以 0402 0.1µF（ESL≈0.5nH）为例：SRF ≈ 1/(2π√(0.5nH×0.1µF)) ≈ <b>22MHz</b>。它只在 22MHz 附近阻抗最低；低于这个频率它还行，高于就变成「电感」。而 22µF 的 SRF 只有约 1.5MHz。</p>
+    <p>所以两级分工：<b>22µF 管低频（<1MHz）的大能量缓冲，0.1µF 管高频（10–100MHz）的快速电流</b>。只留 22µF，高频段阻抗下不来；只留 0.1µF，低频段储能不够。两者并联，阻抗曲线在两个 SRF 之间互相填补——这就是「一大一小」的物理原因，不是玄学。</p>
 
     <figure class="fig">
-      <svg viewBox="0 0 900 400" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <!-- 充电曲线 -->
-        <rect x="30" y="26" width="360" height="250" rx="10" fill="#141c2e" stroke="#3a4560"/>
-        <text x="46" y="50" fill="#eaf3ff" font-size="11.5">RC 充电：电压按指数爬升</text>
-        <line x1="60" y1="240" x2="370" y2="240" stroke="#3a4560"/>
-        <line x1="60" y1="240" x2="60" y2="70" stroke="#3a4560"/>
-        <path d="M60 240 C 110 240 120 110 170 110 C 210 110 220 80 250 80 L 360 76" stroke="#5ff1ef" stroke-width="2" fill="none"/>
-        <line x1="60" y1="110" x2="370" y2="110" stroke="#6f7f9c" stroke-dasharray="4 4"/>
-        <text x="300" y="104" fill="#6f7f9c" font-size="9">63%（1τ）</text>
-        <line x1="132" y1="240" x2="132" y2="110" stroke="#8b7bff" stroke-dasharray="3 3"/>
-        <text x="112" y="258" fill="#c8c0ff" font-size="9.5">1τ</text>
-        <text x="46" y="278" fill="#9fb0c7" font-size="10.5">5τ 后基本充满（99.3%）；1τ 只到 63%</text>
-        <text x="46" y="298" fill="#6f7f9c" font-size="10">所以「等 3 倍 RC」是工程上的常用判据</text>
-
-        <!-- 两种容值 -->
-        <rect x="410" y="26" width="220" height="250" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
-        <text x="426" y="50" fill="#eaf3ff" font-size="11.5">为什么成对出现</text>
-        <text x="426" y="80" fill="#9df3c2" font-size="10.5">22µF / 10µF：管中低频</text>
-        <text x="426" y="100" fill="#6f7f9c" font-size="9.5">负载跳变时补电流，压降小</text>
-        <text x="426" y="130" fill="#9df5f4" font-size="10.5">0.1µF：管高频尖峰</text>
-        <text x="426" y="150" fill="#6f7f9c" font-size="9.5">ns 级电流，靠它就近供给</text>
-        <text x="426" y="180" fill="#ffb84d" font-size="10.5">只放大的：高频没人管</text>
-        <text x="426" y="200" fill="#6f7f9c" font-size="9.5">表现为随机死机、复位</text>
-        <text x="426" y="230" fill="#ffb84d" font-size="10.5">只放小的：储能不够</text>
-        <text x="426" y="250" fill="#6f7f9c" font-size="9.5">表现为负载一重就下凹</text>
-
-        <!-- 降容 -->
-        <rect x="650" y="26" width="220" height="250" rx="10" fill="rgba(255,156,156,.06)" stroke="#ff9c9c"/>
-        <text x="666" y="50" fill="#ffc0c0" font-size="11.5">真实的电容会「缩水」</text>
-        <text x="666" y="78" fill="#eaf3ff" font-size="10.5">直流偏压降容</text>
-        <text x="666" y="98" fill="#9fb0c7" font-size="9.5">0402/0603 的 10µF 在 3.3V 下</text>
-        <text x="666" y="116" fill="#9fb0c7" font-size="9.5">可能只剩 40–60%</text>
-        <text x="666" y="144" fill="#eaf3ff" font-size="10.5">温度特性</text>
-        <text x="666" y="164" fill="#9fb0c7" font-size="9.5">X5R：-55~85℃，容值漂 ±15%</text>
-        <text x="666" y="182" fill="#9fb0c7" font-size="9.5">X7R：-55~125℃，稍好</text>
-        <text x="666" y="200" fill="#9fb0c7" font-size="9.5">C0G/NP0：几乎不漂，但容量小</text>
-        <text x="666" y="228" fill="#eaf3ff" font-size="10.5">所以选型要按「实际容值」算</text>
-        <text x="666" y="248" fill="#6f7f9c" font-size="9.5">不是按标称值算</text>
-
-        <text x="30" y="340" fill="#9fb0c7" font-size="10.5">还有一个隐藏参数：ESL（等效串联电感）。大电容的 ESL 大，高频时反而「不像电容」，所以不能用一颗 100µF 替代所有 0.1µF。</text>
-        <text x="30" y="362" fill="#6f7f9c" font-size="10">判据：电容自谐振频率以上，它呈感性；0.1µF 的谐振点通常在几十 MHz，适合数字电路去耦。</text>
-      </svg>
-      <figcaption><b>图 1-3</b>　电容的三种角色：延时（RC）、储能（大容值）、高频旁路（小容值）。</figcaption>
+      <img src="../../assets/img/sch/core_p2_caps.png" alt="CORE V2.0 第 2 页 VDD_SOC_CAP 去耦电容组" loading="lazy">
+      <figcaption><b>图 1-5</b>　CORE V2.0 第 2 页原图：<b>VDD_SOC_CAP1–CAP10 十个球共用一组电容</b>——C21/C22/C23 各 224（= 0.22µF）、C24 一颗 22µF。10 个电源脚对应 4 颗电容，数量不是随便定的：每个球都要有就近回流路径，而大容量只需 1–2 颗。<a class="zoom" href="../../assets/img/sch/core_p2_caps.png" target="_blank" rel="noopener">原图 ↗</a></figcaption>
     </figure>
 
+    <h2><span class="n">1.4.5</span>实际容值：偏压、温度、老化三把刀</h2>
+    <p>标称 10µF 的 X5R 0402，在 3.3V 直流偏压下可能只剩 <b>4–5µF</b>；在 5V 下更少。这叫<b>直流偏压降容（DC bias derating）</b>，是高介电常数介质（X5R/X7R/Y5V）的固有特性，手册里有一条「Cap vs DC Bias」曲线，绝大多数人从来不翻。</p>
+    <ul>
+      <li><b>偏压</b>：电场把介质里的偶极子「钉住」，有效介电常数下降 → 容值下降。X5R 在额定电压附近可能掉 50–70%。</li>
+      <li><b>温度</b>：X7R 在 −55~125°C 内变化 ≤±15%；X5R 是 ±15%（−55~85°C）；Y5V 能到 ±82%。C0G 几乎不变（±30ppm/°C）。</li>
+      <li><b>老化</b>：X5R/X7R 随时间缓慢损失容值（每十倍时间约 −1~−3%），C0G 不老化。</li>
+    </ul>
+    <p>选型结论：<b>定时、滤波、谐振（晶振负载电容）必须 C0G；电源去耦可以用 X5R/X7R，但要把降容算进去</b>——22µF 在 3.3V 下实际可能只有 12–15µF，这也是为什么板上要放好几颗并联，而不是一颗大容量的原因之一。</p>
+
+    <h2><span class="n">1.4.6</span>本板三个真实电容角色</h2>
+    <h3>① 去耦：C21–C24（内核 10 个球）</h3>
+    <p>3 颗 0.22µF + 1 颗 22µF，覆盖 VDD_SOC_CAP1–10。判据：每个电源球都要能在几十纳秒内拿到电荷，走线电感必须小，所以电容要<b>贴着球放</b>；容量按「瞬态电流 × 允许压降」估算：内核 1A 阶跃、允许 50mV、持续 100ns，需要 C ≥ I·t/ΔU = 1×100n/0.05 = 2µF——所以 22µF 是够的，0.22µF 负责更快的部分。</p>
+    <h3>② VREF 滤波：C65 2µF + C66 0.1µF</h3>
+    <p>DDR 的 VREF 由 1.5k/1.5k 分压产生，源阻抗 750Ω（第 1.2 章）。若不接电容，任何耦合噪声都会直接叠在参考上；接了 2µF 后，在 1MHz 处阻抗从 750Ω 降到 0.08Ω（并联效果），噪声被旁路掉。</p>
+    <h3>③ 晶振负载电容：C12/C13 18pF</h3>
+    <p>24MHz 晶振的负载电容 CL 必须与手册一致（这里 18pF）。晶体的振荡频率会随 CL 偏移：<b>CL 偏大 → 频率偏低</b>（典型每 pF 几十 ppm）。18pF 不是「滤波电容」，它和晶体、芯片内部反相器共同构成谐振回路，乱换会导致起振困难或频率偏差，进而让 USB/Ethernet 出错。</p>
+
+    <div class="box pit">
+      <h5>「10µF 的 0402 比 0805 高级」是错的</h5>
+      <p>同容量同介质，封装越小，介质层越薄、层数越多，<b>偏压降容越严重、机械应力越脆弱</b>。0402 10µF 在 3.3V 下可能只剩 4µF，而 0805 10µF 能保住 7µF。电源去耦优先看「实际容值 + ESL + 位置」，不是看封装小。</p>
+    </div>
+
+    <h2><span class="n">1.4.7</span>怎么测：三种手段与一个陷阱</h2>
+    <ol class="steps">
+      <li><b>LCR 表 / 电容档</b>：测容值与 ESR。注意测试频率（1kHz vs 100kHz 结果不同），以及要在<b>拆下来</b>测才准。</li>
+      <li><b>在路测</b>：万用表电容档在路读数会被并联支路拉偏，基本不可信；判断「电容是否短路」用电阻档/二极管档更实用。</li>
+      <li><b>看纹波</b>：示波器 AC 耦合测电源纹波，是最能反映「去耦够不够」的实测手段；换不同容值组合对比，能直接看到效果。</li>
+    </ol>
+    <p>陷阱：<b>MLCC 的失效模式大多是「开裂短路」</b>，而不是容量慢慢衰减。板子摔过、分板应力大、焊接热冲击，都可能在陶瓷体上留下微裂纹，上电后击穿。表现为某路电源短路、发烫。所以「电容坏了」在维修现场通常等于「量到 0Ω」。</p>
+
+    <h2><span class="n">1.4.8</span>五个设计误区</h2>
+    <ol>
+      <li><b>按标称容值做设计</b>，不算偏压降容，结果纹波超标。</li>
+      <li><b>只放一颗大电容</b>，高频段阻抗下不来，EMI 变差。</li>
+      <li><b>电容放得离引脚太远</b>，走线电感把 ESL 从 0.5nH 变成 2nH，SRF 掉到 5MHz。</li>
+      <li><b>把晶振负载电容换成「更大更好」</b>，频率偏移、起振困难。</li>
+      <li><b>大容量电容不做泄放</b>，断电后残留电压，维修时被电到或打坏器件。</li>
+    </ol>
+
     <div class="demo">
-      <div class="dh"><b>RC 时间常数计算器</b><span>调电阻与电容，看充电曲线与到达阈值的时间</span></div>
+      <div class="dh"><b>RC 时间常数与容抗计算器</b><span>拖 R 与 C，看 τ、5τ 与指定频率下的阻抗</span></div>
       <div class="db">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-          <div><div style="font-size:12.5px;color:#9fb0c7">R = <b id="rv" style="color:#5ff1ef">10</b> kΩ</div>
-            <input id="r" type="range" min="0.1" max="1000" step="0.1" value="10" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12.5px;color:#9fb0c7">C = <b id="cv" style="color:#5ff1ef">100</b> nF</div>
-            <input id="c" type="range" min="1" max="100000" step="1" value="100" style="width:100%;accent-color:#5ff1ef"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div><div style="font-size:12px;color:#9fb0c7">R <b id="rv" style="color:#5ff1ef">10</b> kΩ</div><input id="r" type="range" min="0.1" max="1000" step="0.1" value="10" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">C <b id="cv" style="color:#5ff1ef">100</b> nF</div><input id="c" type="range" min="0.1" max="1000" step="0.1" value="100" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">频率 <b id="fv" style="color:#5ff1ef">1</b> kHz</div><input id="f" type="range" min="0.01" max="100000" step="0.01" value="1" style="width:100%;accent-color:#5ff1ef"></div>
         </div>
-        <svg id="curve" viewBox="0 0 700 200" style="width:100%;height:auto;margin-top:12px">
-          <line x1="40" y1="170" x2="670" y2="170" stroke="#3a4560"/>
-          <line x1="40" y1="170" x2="40" y2="20" stroke="#3a4560"/>
-          <path id="cp" d="" stroke="#5ff1ef" stroke-width="2.2" fill="none"/>
-          <text x="46" y="16" fill="#6f7f9c" font-size="10">V(t) / VDD</text>
-        </svg>
-        <div id="rcOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+        <div id="rcOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
       </div>
     </div>
 
-    <h2><span class="n">1.4.2</span>复位延时是算出来的，不是碰巧</h2>
-    <p>核心板第 6 页的复位部分：<b>U3（MAX809R）</b>监测电源，输出 <code>RST</code>；经 <b>R33（0Ω）</b>连到 <code>POR_B</code>，并在该网络上挂 <b>C14（0.1µF）</b>。这个 0Ω + 0.1µF 的组合，就是给 POR_B 加一个小延时，保证电源与时钟都稳了才释放复位。</p>
-    <p>估算：MAX809R 的 RST 输出低电平时经内部下拉，释放后由内部/外部上拉给 C14 充电。若等效上拉按 100kΩ 估，τ = 100kΩ × 0.1µF = 10ms，到阈值就有 5–7ms 的额外延时——正好覆盖电源上升时间。</p>
-    <div class="box pit">
-      <h5>复位电路的三个坑</h5>
-      <p><b>1. 电容太大。</b>0.1µF 改成 1µF，延时变 10 倍，按键复位也会「按了没反应」。</p>
-      <p><b>2. 电容太小或没有。</b>释放太快，电源还没稳就开跑，表现为「偶尔能起，多数不起」。</p>
-      <p><b>3. 复位脚悬空。</b>电平不确定，可能随机进下载模式或反复重启。必须明确上下拉。</p>
-    </div>
+    <h3>练习（答案在折叠里）</h3>
+    <details class="quiz"><summary>1. 10k 与 100nF 组成 RC，τ 是多少？多久稳定？</summary><div class="ans">τ=1ms；5τ=5ms 认为稳定。</div></details>
+    <details class="quiz"><summary>2. 0.1µF 在 10MHz 的容抗？为什么实际可能更低？</summary><div class="ans">|Z|=1/(2π×10M×0.1µ)=0.16Ω。实测可能更低是因为接近自谐振（0402 约 22MHz），ESR 起作用。</div></details>
+    <details class="quiz"><summary>3. 为什么晶振的 18pF 不能换成 22pF？</summary><div class="ans">CL 变大频率偏低（几十 ppm），可能超出 USB/Ethernet 允许的时钟精度，或起振裕度变差。</div></details>
+    <details class="quiz"><summary>4. 22µF X5R 0402 在 3.3V 下实际可能多少？</summary><div class="ans">可能只剩 40–60%，即 9–13µF，具体查手册 DC bias 曲线。</div></details>
+    <details class="quiz"><summary>5. 给 1A 负载做 100ns 的瞬态支撑、允许 50mV 压降，至少需要多少电容？</summary><div class="ans">C ≥ I·t/ΔU = 1×100ns/0.05 = 2µF。实际还要加余量并考虑降容。</div></details>
+    <details class="quiz"><summary>6. 板上某个电容量出 0Ω，说明什么？</summary><div class="ans">多半是 MLCC 陶瓷体开裂击穿短路，需要拆下确认，直接上电会拉垮该路电源。</div></details>
 
-    <h2><span class="n">1.4.3</span>晶振旁的 18pF 不是随便写的</h2>
-    <p>核心板第 6 页：<b>Y2（24MHz）</b>两侧挂 <b>C12、C13 各 18pF</b>。这两个电容与晶振的负载电容 CL 相关：</p>
-    <p style="text-align:center">C<sub>L</sub> = C1·C2/(C1 + C2) + C<sub>stray</sub></p>
-    <p>18pF 并联（串联等效 9pF）+ 杂散约 3–4pF ≈ 12–13pF，正好对上常见的 CL=12pF 规格。这就是「为什么是 18pF 而不是 22pF 或 10pF」——它是按晶振规格反算出来的。</p>
-
-    <h3>自测</h3>
-    <details class="quiz"><summary>R=10kΩ、C=0.1µF，充电到 63% 要多久？到 99% 呢？</summary><div class="ans">τ = 10k×0.1µF = 1ms；63% 约 1ms，99% 约 5ms。这也是「复位要等几毫秒」的来源。</div></details>
-    <details class="quiz"><summary>为什么不能只用一个 100µF 电容替代所有去耦电容？</summary><div class="ans">因为大容值电容的 ESL 大，自谐振频率低，在高频段呈感性，对 ns 级电流尖峰没有旁路作用。必须用小容值（0.1µF）就近提供高频通路，大容值负责中低频储能。</div></details>
-    <details class="quiz"><summary>10µF/0603/X5R 用在 3.3V 上，实际容值大概多少？</summary><div class="ans">按厂家曲线常在 5–6µF（直流偏压降容 40–50%）。所以设计时若需要 10µF 有效容值，实际要选 22µF 或更大封装，或改用钽/聚合物电容。</div></details>
-
-    <div class="ch-nav">
-      <a href="c03.html"><span>上一章</span><b>← 1.3 功率、发热与降额</b></a>
-      <a class="nx" id="chNavNext" href="c05.html"><span>下一章</span><b>1.5 电感与磁珠 →</b></a>
-    </div>
+    <div class="ch-nav"><a href="c03.html"><span>上一章</span><b>← 1.3 功率、发热与降额</b></a>
+      <a class="nx" id="chNavNext" href="c05.html"><span>下一章</span><b>1.5 电感与磁珠 →</b></a></div>
   </main>
 </div>
-
-<script src="../../assets/parts.js"></script>
-<script src="../../assets/part.js"></script>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
 <script>
 renderPart('p1','c04.html');
 (function(){
-  function draw(tau){
-    var pts=[]; for(var i=0;i<=60;i++){ var t=i/60*5; var x=40+t/5*630; var y=170-(1-Math.exp(-t))*150; pts.push(x.toFixed(1)+' '+y.toFixed(1)); }
-    document.getElementById('cp').setAttribute('d','M'+pts.join(' L'));
-  }
   function calc(){
-    var R=+document.getElementById('r').value*1000;
-    var C=+document.getElementById('c').value*1e-9;
-    var tau=R*C;
-    document.getElementById('rv').textContent=(R/1000).toFixed(1);
-    document.getElementById('cv').textContent=(C*1e9).toFixed(0);
-    draw(tau);
+    var r=+document.getElementById('r').value*1000, c=+document.getElementById('c').value*1e-9;
+    var f=+document.getElementById('f').value*1000;
+    document.getElementById('rv').textContent=(r/1000).toFixed(1);
+    document.getElementById('cv').textContent=(c*1e9).toFixed(1);
+    document.getElementById('fv').textContent=(f/1000).toFixed(f<1000?2:0);
+    var tau=r*c, z=1/(2*Math.PI*f*c);
+    var zs = z>1e6? (z/1e6).toFixed(2)+' MΩ' : z>1e3? (z/1e3).toFixed(2)+' kΩ' : z.toFixed(2)+' Ω';
     document.getElementById('rcOut').innerHTML=
-      '<b style="color:#eaf3ff;font-size:15px">τ = '+(tau*1000).toFixed(2)+' ms</b>　63% 用时 '+(tau*1000).toFixed(2)+' ms　99% 用时 '+(tau*5*1000).toFixed(1)+' ms<br>'+
-      '若这是复位延时：脉宽约 '+(tau*0.7*1000).toFixed(1)+' ms，'+(tau*0.7>=0.001?'满足常见 1ms 下限':'不足 1ms，可能释放过早')+'<br>'+
-      '<span style="color:#6f7f9c;font-size:11.5px">估算前提：电源瞬间建立、阈值约 0.5×VDD。真实电路受阈值与上升斜率影响，画板时留 2 倍余量。</span>';
+      '<b style="color:#eaf3ff;font-size:15px">τ = '+ (tau<1e-3? (tau*1e6).toFixed(1)+' µs' : tau<1? (tau*1e3).toFixed(2)+' ms' : tau.toFixed(3)+' s') +'　5τ = '+
+      (5*tau<1e-3? (5*tau*1e6).toFixed(0)+' µs' : 5*tau<1? (5*tau*1e3).toFixed(1)+' ms' : (5*tau).toFixed(2)+' s')+'</b><br>'+
+      '该频率下容抗 |Z<sub>C</sub>| = '+zs+'<br>'+
+      '储能（若充到 3.3V）E = ½CU² = '+(0.5*c*3.3*3.3*1e6).toFixed(1)+' µJ<br>'+
+      '<span style="color:#6f7f9c;font-size:11.5px">提示：实际电容在高频段被 ESL 主导，阻抗会先降后升。</span>';
   }
-  document.getElementById('r').addEventListener('input',calc);
-  document.getElementById('c').addEventListener('input',calc);
+  ['r','c','f'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
   calc();
 })();
 </script>
-</body>
-</html>
+</body></html>
