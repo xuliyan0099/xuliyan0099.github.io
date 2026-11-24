@@ -44,13 +44,13 @@
 
 <div class="shell">
   <aside id="sidebar">
-    <div class="vol-h">设计模式 · C / C++<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
+    <div class="vol-h">设计模式篇 · 10 章<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
     <ol>
-      <li><a href="index.html"><span class="no">00</span><span>导读<span class="sub">为什么用 · 怎么读</span></span></a></li>
-      <li><a href="c-oop.html"><span class="no">01</span><span>C 也能面向对象<span class="sub">手工虚表</span></span></a></li>
-      <li><a href="strategy.html"><span class="no">02</span><span>策略<span class="sub">三种 CAN 调度</span></span></a></li>
-      <li><a href="observer.html"><span class="no">03</span><span>观察者<span class="sub">通知名单解耦</span></span></a></li>
-      <li><a href="state.html" class="active"><span class="no">04</span><span>状态<span class="sub">转移表拒绝非法</span></span></a>
+      <li><a href="index.html"><span class="no">1.1</span><span>导读<span class="sub">为什么用 · 怎么读</span></span></a></li>
+      <li><a href="c-oop.html"><span class="no">1.2</span><span>C 也能面向对象<span class="sub">手工虚表</span></span></a></li>
+      <li><a href="strategy.html"><span class="no">1.3</span><span>策略<span class="sub">三种 CAN 调度</span></span></a></li>
+      <li><a href="observer.html"><span class="no">1.4</span><span>观察者<span class="sub">通知名单解耦</span></span></a></li>
+      <li><a href="state.html" class="active"><span class="no">1.5</span><span>状态<span class="sub">转移表拒绝非法</span></span></a>
         <ol class="side-sub">
           <li><a href="#s1"><i>01</i>问题：switch 里再套 if，非法组合没人管</a></li>
           <li><a href="#s2"><i>02</i>结构：五个状态，十二种合法走法</a></li>
@@ -60,17 +60,17 @@
           <li><a href="#s6"><i>06</i>代价与坑</a></li>
         </ol>
       </li>
-      <li><a href="command.html"><span class="no">05</span><span>命令<span class="sub">队列与撤销</span></span></a></li>
-      <li><a href="chain.html"><span class="no">06</span><span>职责链<span class="sub">四道关</span></span></a></li>
-      <li><a href="adapter.html"><span class="no">07</span><span>适配器<span class="sub">两种传感器</span></span></a></li>
-      <li><a href="factory.html"><span class="no">08</span><span>工厂<span class="sub">注册表取驱动</span></span></a></li>
-      <li><a href="singleton.html"><span class="no">09</span><span>单例<span class="sub">一个入口一个对象</span></span></a></li>
+      <li><a href="command.html"><span class="no">1.6</span><span>命令<span class="sub">队列与撤销</span></span></a></li>
+      <li><a href="chain.html"><span class="no">1.7</span><span>职责链<span class="sub">四道关</span></span></a></li>
+      <li><a href="adapter.html"><span class="no">1.8</span><span>适配器<span class="sub">两种传感器</span></span></a></li>
+      <li><a href="factory.html"><span class="no">1.9</span><span>工厂<span class="sub">注册表取驱动</span></span></a></li>
+      <li><a href="singleton.html"><span class="no">1.10</span><span>单例<span class="sub">一个入口一个对象</span></span></a></li>
     </ol>
     <div class="vol-nav"><a href="sitemap.html">☰ 整节目录</a><a href="command.html">下一节 →</a></div>
   </aside>
 
   <div class="wrap">
-  <div class="kicker"><b>行为型</b><span>·</span><span>04 / 09</span><span>·</span><span>State</span></div>
+  <div class="kicker"><b>设计模式</b><span>·</span><span>第 5 章</span><span>·</span><span>行为型</span></div>
   <h1>状态模式<span class="en">STATE</span></h1>
   <p class="lede">状态机的核心不是“状态”这个词，而是<b>一张显式的转移关系</b>：在当前状态下，哪些事件合法、合法时去哪、非法时怎么办。C 版把这张关系写成 5×6 的表，C++ 版把它拆进五个状态类；两边的行为和拒绝路径完全一致。</p>
   <div class="chips">
@@ -456,12 +456,12 @@ int main() {
   </section>
 
   <nav class="pager">
-    <a href="observer.html"><span class="k">← 03</span><b>观察者模式</b><i>订阅与退订的安全边界</i></a>
-    <a class="nx" href="command.html"><span class="k">05 →</span><b>命令模式</b><i>可撤销的操作队列</i></a>
+    <a href="observer.html"><span class="k">← 1.4</span><b>观察者模式</b><i>订阅与退订的安全边界</i></a>
+    <a class="nx" href="command.html"><span class="k">1.6 →</span><b>命令模式</b><i>可撤销的操作队列</i></a>
   </nav>
 
   <footer class="foot">
-    <p><b>设计模式 · C / C++ 双实现</b>　04 / 09　State</p>
+    <p><b>设计模式 · C / C++ 双实现</b>　第 5 章　State</p>
     <p>静态页面 · 无统计脚本 · 无第三方请求</p>
   </footer>
 </div>
@@ -557,6 +557,8 @@ int main() {
 </script>
 </body>
 </html>
+
+
 
 
 
