@@ -1,0 +1,12 @@
+[NVRAM] write [3] = 11
+[NVRAM] read  [3] = 11
+[PROXY] cache miss [3]
+read1 = 11
+[PROXY] cache hit  [3] = 11
+read2 = 11
+[NVRAM] write [3] = 25
+[PROXY] write-through [3]
+[PROXY] cache hit  [3] = 25
+read3 = 25
+[NVRAM] read  [3] = 25
+真实存储 [3] = 25

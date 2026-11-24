@@ -1,0 +1,4 @@
+hot  temp=105 rpm=700 -> 报警
+idle temp=88 rpm=650 -> 正常
+fast temp=95 rpm=900 -> 正常
+同一棵树，三组输入，不需要重新解析

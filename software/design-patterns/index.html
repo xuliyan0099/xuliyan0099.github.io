@@ -3,74 +3,59 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>设计模式全书 · 三篇 10 章 | C 与 C++ 双实现</title>
-<meta name="description" content="三篇十章：基础（导读、多态）、行为型（策略/观察者/状态/命令/职责链）、结构型与创建型（适配器/工厂/单例）。每个模式一份 C、一份 C++，逐字对应的运行输出与可点演示。">
+<title>设计模式 · 四篇 25 章 · C 与 C++ 双实现</title>
+<meta name="description" content="23 个 GoF 设计模式全部实现：每章问题、结构图、C 与 C++ 两份代码、真实 RUN 输出、可点演示。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="assets/pd.css">
 </head>
 <body>
 <div class="bg" aria-hidden="true"></div>
-
 <header class="topbar">
   <div class="topbar-in">
     <label for="navChk" class="nav-toggle">☰ 目录</label>
     <a class="brand" href="index.html"><i></i>设计模式<small>C / C++ 双实现</small></a>
     <span class="tb-sp"></span>
     <a class="tb" href="p1/c01.html">导读</a>
-    <a class="tb" href="../../index.html">知识库</a>
+    <a class="tb" href="../../../index.html">知识库</a>
+    <a class="tb" href="index.html">目录</a>
   </div>
 </header>
-
 <input type="checkbox" id="navChk" class="nav-chk" hidden>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
-
 <div class="shell">
   <aside id="sidebar">
-    <div class="vol-h">设计模式全书 · 三篇<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
-    <ol>
-      <li><a href="#p1"><span class="no">篇一</span><span>基础<span class="sub">2 章 · 多态与导读</span></span></a></li>
-      <li><a href="#p2"><span class="no">篇二</span><span>行为型<span class="sub">5 章 · 谁在什么时候做什么</span></span></a></li>
-      <li><a href="#p3"><span class="no">篇三</span><span>结构型与创建型<span class="sub">3 章 · 怎么接、怎么造</span></span></a></li>
-    </ol>
-    <div class="vol-nav"><a href="../../index.html">← 知识库</a><a href="p1/c01.html">1.1 →</a></div>
+    <div class="vol-h" id="sideHead">设计模式全书 · 25 章<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
+    <ol id="sideList"></ol>
+    <div class="vol-nav" id="volNav"></div>
   </aside>
+  <div class="wrap">
 
-  <main class="wrap">
-    <div class="ch-meta"><span class="lv">设计模式全书</span><span class="sep">/</span>三篇 10 章<span class="sep">/</span>C 与 C++ 双实现</div>
-    <h1>设计模式：从一张函数表，到一个可替换的对象</h1>
-    <p class="lede">这套东西不背定义。每个模式都走同一条线：<b>先看它在真实代码里长什么样（通常是坏的）</b>，再画清结构，然后给两份实现——一份 C 的（结构体首成员放函数表指针，手工虚表），一份 C++ 的（虚函数 + <code>unique_ptr</code>/<code>shared_ptr</code>）。两份代码用 <code>gcc/g++ -Wall -Wextra</code> 零警告编译，页面上的 RUN 输出就是实际跑出来的结果。场景全部来自车载与嵌入式：CAN 调度、ECU 状态机、报文过滤、驱动注册、传感器适配。</p>
+  <div class="ch-meta"><span class="lv">设计模式全书</span><span class="sep">/</span>四篇 25 章<span class="sep">/</span>C 与 C++ 双实现</div>
+  <h1>设计模式：从一张函数表，到一个可替换的对象</h1>
+  <p class="lede">这套东西不背定义。每个模式都走同一条线：先看它在真实代码里长什么样（通常是坏的），再画清结构，然后给两份实现——一份 C 的（结构体首成员放函数表指针，手工虚表），一份 C++ 的（虚函数 + <code>unique_ptr</code>/<code>shared_ptr</code>）。两份代码用 gcc/g++ <code>-Wall -Wextra</code> 零警告编译，页面上的 RUN 输出就是实际跑出来的结果。场景全部来自车载与嵌入式：CAN 调度、ECU 状态机、报文过滤、驱动注册、传感器适配。</p>
+  <div class="chips"><span class="chip ok">四篇 25 章</span><span class="chip">23 个 GoF 模式全实现</span><span class="chip">每章 6 节</span></div>
 
-    <div class="goals">
-      <h4>这套书的基准</h4>
-      <ul>
-        <li><b>C 版统一写法</b>：静态存储 + 函数指针表（<code>ops</code> / 手工 vtable），不依赖第三方库，单个 <code>.c</code> 就能编译。</li>
-        <li><b>C++ 版统一写法</b>：虚函数、<code>override</code>、<code>unique_ptr</code>/<code>shared_ptr</code>，同样单文件、<code>-std=c++17</code>。</li>
-        <li><b>每章六节</b>：问题 → 结构图（点方框看职责）→ 两份实现 → 真实 RUN 输出 → 纯 JS 交互演示 → 角色对照与代价。</li>
-        <li><b>不承诺“最佳实践”</b>：每章最后一节都写清这个模式带来的间接层、分配、生命周期与可测性代价。</li>
-      </ul>
+  <section class="sec" id="s0">
+    <h2><span class="n">0</span>　四篇的关系</h2>
+    <div class="prose">
+      <p>第一篇不是模式，是地基：1.1 给一条“按症状找模式”的路，1.2 把 C 的多态拆开——对象首字节放函数表指针，调用先取表、再按偏移取地址、最后把对象自己当第一个参数。后面每一章的 C 版，都是这三步的变体。</p>
+      <p>第二篇管“怎么造”：工厂方法按名字取驱动，抽象工厂保证一套零件同代，建造者把拼装拆成步骤，原型用克隆代替重复初始化，单例守住唯一入口。第三篇管“怎么接”：适配器、桥接、组合、装饰、外观、享元、代理。第四篇管“流程与责任”：职责链、命令、解释器、迭代器、中介者、备忘录、观察者、状态、策略、模板方法、访问者。</p>
+      <p>建议顺序读；赶时间就按症状跳，每一章的 01 节都先写“坏代码长什么样”，对上了再往下看。</p>
     </div>
+  </section>
 
-    <h2><span class="n">0</span>　三篇的关系</h2>
-    <p>第一篇不是模式，是地基：<b>1.1 给一条“按症状找模式”的路</b>，<b>1.2 把 C 的多态拆开</b>——对象首字节放函数表指针，调用先取表、再按偏移取地址、最后把对象自己当第一个参数。后面每一章的 C 版，都是这三步的变体。</p>
-    <p>第二篇五个模式解决同一类问题：把“变化的那一段”从流程里拿出来。第三篇三个模式换的是对象本身——接口怎么接（适配器）、对象怎么造（工厂）、全局只留一个（单例）。建议顺序读；赶时间就按症状跳，导读页第一张表就是入口。</p>
+  <div id="toc"></div>
 
-    <div id="toc"></div>
+  <div class="ch-nav">
+    <a href="../../../index.html"><span>返回</span><b>← 知识库</b></a>
+    <a class="nx" href="p1/c01.html"><span>开始</span><b>1.1 导读：为什么用模式 →</b></a>
+  </div>
 
-    <div class="box tip" style="margin-top:28px;padding:14px 16px;border:1px solid rgba(124,156,255,.26);border-radius:12px;background:rgba(124,156,255,.05)">
-      <p><b>怎么读：</b>每章先看第 1 节的“坏代码”，确认自己踩过这个坑；第 3 节两份实现对照着看，差异就在“谁持有那张表”；第 4 节的 RUN 输出逐行对；第 6 节的代价表决定项目里到底该不该用。</p>
-      <p><b>源码在哪：</b>每章代码块的文件名就是 <code>src/</code> 里的文件，页面代码与源码逐字一致，改完直接 <code>gcc</code>/<code>g++</code> 编译即可复现。</p>
-    </div>
-
-    <div class="ch-nav">
-      <a href="../../index.html"><span>返回</span><b>← 个人知识库</b></a>
-      <a class="nx" href="p1/c01.html"><span>开始</span><b>1.1 导读：为什么用模式 →</b></a>
-    </div>
-  </main>
+  </div>
 </div>
-
+<script src="assets/pd.js"></script>
 <script src="assets/dp-data.js"></script>
 <script src="assets/dp-nav.js"></script>
-<script>dpToc();</script>
+<script>dpNav(''); dpToc();</script>
 </body>
 </html>
-

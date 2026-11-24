@@ -3,17 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>3.2 工厂模式 Factory · C 与 C++ 双实现</title>
-<meta name="description" content="按名字创建驱动：C 用注册表 + 函数指针 + GCC constructor 自注册，C++ 用 map + std::function + AutoReg 模板；含注册表演示。">
+<title>3.2 桥接模式 BRIDGE · C 与 C++ 双实现</title>
+<meta name="description" content="桥接：把 UDS/OBD 与 CAN/LIN 两个维度分开，四种组合不必写四份代码。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
-<style>
-.reg{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
-.reg span{font:11px/1.6 var(--mono);padding:6px 10px;border-radius:6px;border:1px solid var(--line);color:#93a4c4}
-.reg span.hit{border-color:rgba(67,214,168,.6);color:#8ff5d6;background:rgba(67,214,168,.09)}
-.res{font:600 13px/1.9 var(--mono);padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#0d1220;color:#cfe0ff;margin-top:10px}
-.res em{color:#7d8798;font-style:normal}
-</style>
+<script src="../assets/dp-demo.js"></script>
 </head>
 <body>
 <div class="bg" aria-hidden="true"></div>
@@ -34,454 +28,265 @@
 
 <div class="shell">
   <aside id="sidebar">
-    <div class="vol-h">篇三 · 结构型与创建型<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
+    <div class="vol-h" id="sideHead">设计模式全书 · 25 章<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
     <ol id="sideList"></ol>
     <div class="vol-nav" id="volNav"></div>
   </aside>
 
   <div class="wrap">
-  <div class="ch-meta"><span class="lv">篇三 · 结构型与创建型</span><span class="sep">/</span>第 2 章<span class="sep">/</span>约 30 分钟</div>
-  <h1>工厂模式<span class="en">FACTORY</span></h1>
-  <p class="lede">配置文件里写着 <code>sensor = "sht3x"</code>，代码里却没有一个 <code>if (name == "sht3x")</code>。答案是一张注册表：每个驱动在自己被链接进来的那一刻就把“名字 → 构造函数”登记进去，上层只按字符串查表，查不到就返回空，由它决定怎么降级。</p>
-  <div class="chips">
-    <span class="chip ok">名字 → 构造函数</span>
-    <span class="chip">自注册在 main 之前</span>
-    <span class="chip">未知名字返回 NULL/nullptr</span>
-  </div>
-<section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：新增一个型号就要改 switch</h2>
-    <div class="prose">
-      <p>最直接的写法是一个大 <code>if/else</code>：名字是 <code>"sht3x"</code> 就 <code>new Sht3x</code>，是 <code>"ntc"</code> 就 <code>new Ntc</code>。它的问题不在“难写”，而在<b>它必须知道所有产品</b>：</p>
-      <ul>
-        <li>每加一个驱动，这个 switch 就要改一次，哪怕新驱动跟这段代码毫无关系；</li>
-        <li>产品构造逻辑（哪个地址、哪个引脚、要不要先 init）也被写进了选择逻辑里，越写越厚；</li>
-        <li>如果驱动是可选编译的（不同车型带不同传感器），switch 里还得跟一堆 <code>#ifdef</code>。</li>
-      </ul>
-      <p>注册表把“认识所有产品”这件事反转了：不是工厂认识产品，而是产品在启动时告诉工厂“我叫什么、怎么创建我”。工厂退化成一张表和一次字符串查找，新增驱动只需新增一个文件，连 <code>main</code> 都不用动。</p>
-    </div>
+  <div class="ch-meta"><span class="lv">篇三 · 结构型</span><span class="sep">/</span>第 2 章<span class="sep">/</span>约 28 分钟</div>
+  <h1>桥接模式<span class="en">BRIDGE</span></h1>
+  <p class="lede">诊断协议有 UDS 和 OBD，物理层有 CAN 和 LIN。若按“协议 + 物理层”各写一个类，就是 2×2 四份几乎重复的代码；再加一种物理层，要新增四份。<b>桥接把两维各自抽象，中间只留一条引用</b>，组合在运行时决定，新增一侧只改一侧。</p>
+  <div class="chips"><span class="chip ok">2×2 组合不写 4 份</span><span class="chip">协议不关心物理层</span><span class="chip">物理层不关心服务</span></div>
+
+  <section class="sec" id="s1">
+    <h2><span class="n">01</span>问题：协议 × 物理层，组合爆炸</h2>
+    
+    
+      <div class="prose">
+        <p>坏写法是把两维焊在一起：</p>
+        <pre><code>void uds_over_can(const char *svc);
+void uds_over_lin(const char *svc);
+void obd_over_can(const char *svc);
+void obd_over_lin(const char *svc);</code></pre>
+        <p>四种组合只是“拼字符串”的差别，却要维护四份函数。真正的问题在后面：</p>
+        <ul>
+          <li><b>加一个物理层就乘二。</b>再来一个 FlexRay，就要补 UDS/FlexRay、OBD/FlexRay 两份；漏一份就是运行时 404。</li>
+          <li><b>协议细节散落。</b>UDS 的会话保持、OBD 的 PID 编码，被复制到每条物理层分支里，改一处要改四遍。</li>
+          <li><b>测试矩阵爆炸。</b>2 个协议 × 3 个物理层 = 6 条路径，每条都要单独写用例。</li>
+        </ul>
+        <p>桥接让协议只依赖“能发一帧”的抽象，物理层只负责“怎么发”。组合放在调用方，两边都能独立扩展。</p>
+      </div>
   </section>
 
   <section class="sec" id="s2">
-    <h2><span class="n">02</span>结构：一张表、两个方向</h2>
-    <p class="subh">向下：工厂按名字查表，调构造函数拿到产品；向上：产品在静态初始化阶段把自己登记进表。点方框看谁在什么时候做了什么。</p>
-
+    <h2><span class="n">02</span>结构：两维各自抽象，中间只连一条线</h2>
+    <p class="subh">左边是协议，右边是物理层，四条线是四种组合；虚线表示同一协议可以换物理层。</p>
+    
+  
     <div class="fig">
-      <div class="fig-h"><b>注册表式工厂</b><span>registry + self-registration</span></div>
+      <div class="fig-h"><b>协议 × 物理层：两维各自抽象</b><span>bridge</span></div>
       <div class="diagram">
-        <svg viewBox="0 0 880 340" role="img" aria-label="工厂注册表结构图">
-          <defs>
-            <marker id="ar8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-              <path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/>
-            </marker>
-            <marker id="ar8d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-              <path d="M0 0 L10 5 L0 10 z" fill="#43d6a8"/>
-            </marker>
-          </defs>
-
-          <g class="node" data-role="cli" data-note="Client：只拿到一个字符串（来自配置、DTC 工单、诊断命令），调用 create(name)。它不 include 任何具体驱动头文件。">
-            <rect x="24" y="118" width="152" height="92" rx="10"/>
-            <text class="nm" x="38" y="142">Client</text>
-            <text class="ty" x="38" y="161">上层</text>
-            <text class="mt" x="38" y="180">create("sht3x")</text>
-            <text class="mt" x="38" y="197">不认识具体类</text>
-          </g>
-
-          <g class="node" data-role="fac" data-note="Factory（DriverFactory / g_reg）：一个静态注册表。create 遍历或查 map；reg 写入一条。工厂本身不含任何产品知识，所以加产品不用改它。">
-            <rect x="216" y="104" width="214" height="120" rx="10"/>
-            <text class="nm" x="230" y="128">Factory</text>
-            <text class="ty" x="230" y="147">注册表 + 查找</text>
-            <text class="mt" x="230" y="166">reg(name, creator)</text>
-            <text class="mt" x="230" y="183">create(name)</text>
-            <text class="mt" x="230" y="200">names()</text>
-          </g>
-
-          <g class="node" data-role="reg" data-note="注册项（entry_t / map 的 value）：name 加一个“创建函数”。C 里是 driver_t *(*)(void)，C++ 里是 std::function<unique_ptr<Driver>()>。它就是“怎么造”的全部信息。">
-            <rect x="500" y="100" width="270" height="128" rx="10"/>
-            <text class="nm" x="514" y="124">registry</text>
-            <text class="ty" x="514" y="143">name → creator</text>
-            <text class="mt" x="514" y="164">"ntc"    → ntc_new</text>
-            <text class="mt" x="514" y="183">"sht3x"  → sht_new</text>
-            <text class="mt" x="514" y="202">"bme280" → （无）</text>
-          </g>
-
-          <g class="node" data-role="sht" data-note="Sht3x：产品。它的静态 AutoReg（C 里是 __attribute__((constructor))）在 main 之前执行，把 creator 塞进表。产品文件可以整体增删，工厂不受影响。">
-            <rect x="470" y="258" width="170" height="64" rx="10"/>
-            <text class="nm" x="484" y="282">Sht3x</text>
-            <text class="ty" x="484" y="301">产品 · addr 0x44</text>
-          </g>
-
-          <g class="node" data-role="ntc" data-note="Ntc：另一个产品，pin 12。它在启动时自注册，不需要任何一处代码显式“记得调用 register”。">
-            <rect x="660" y="258" width="170" height="64" rx="10"/>
-            <text class="nm" x="674" y="282">Ntc</text>
-            <text class="ty" x="674" y="301">产品 · pin 12</text>
-          </g>
-
-          <path class="flow" marker-end="url(#ar8)" d="M176 164 L212 164"/>
-          <text class="lbl" x="170" y="156">按名字</text>
-
-          <path class="flow" marker-end="url(#ar8)" d="M430 164 L496 164"/>
-          <text class="lbl" x="430" y="156">查表</text>
-
-          <path class="flow" marker-end="url(#ar8)" d="M560 228 C 550 246, 550 250, 552 254"/>
-          <text class="lbl" x="556" y="246">creator()</text>
-
-          <path class="flow" marker-end="url(#ar8)" d="M730 228 C 730 246, 730 250, 730 254"/>
-
-          <path class="flow dep" marker-end="url(#ar8d)" d="M770 300 C 820 296, 826 200, 776 190"/>
-          <text class="lbl ok" x="742" y="330">构造时自注册</text>
-
-          <text class="lbl" x="24" y="34">启动顺序：先自注册（main 之前），再 create —— C 版靠 GCC constructor，C++ 版靠静态对象构造</text>
-        </svg>
+<svg viewBox="0 0 880 360" role="img" aria-label="协议 × 物理层：两维各自抽象">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
+  <g class="node" data-role="uds" data-note="UDS 只管服务语义：会话、安全访问、DID 编码；它不知道帧最后走在 CAN 还是 LIN。"><rect x="40" y="70" width="190" height="80" rx="10"/><text class="nm" x="54" y="94">UDS</text><text class="ty" x="54" y="113">诊断协议</text><text class="mt" x="54" y="131">0x22 读数据</text></g>
+  <g class="node" data-role="obd" data-note="OBD 的 PID 编码与 UDS 不同，但同样只依赖“发一帧”的抽象。"><rect x="40" y="220" width="190" height="80" rx="10"/><text class="nm" x="54" y="244">OBD</text><text class="ty" x="54" y="263">排放协议</text><text class="mt" x="54" y="281">PID 0x0C</text></g>
+  <g class="node" data-role="can" data-note="CAN 只负责把字符串变成帧发出去；它不解析 UDS 服务，也不认识 OBD 的 PID。"><rect x="470" y="70" width="190" height="80" rx="10"/><text class="nm" x="484" y="94">CAN</text><text class="ty" x="484" y="113">物理层</text><text class="mt" x="484" y="131">500kbps / 11bit</text></g>
+  <g class="node" data-role="lin" data-note="LIN 的调度表、主从角色都在这一层；换物理层不需要改协议代码。"><rect x="470" y="220" width="190" height="80" rx="10"/><text class="nm" x="484" y="244">LIN</text><text class="ty" x="484" y="263">物理层</text><text class="mt" x="484" y="281">19.2kbps / 主从</text></g>
+  <line x1="230" y1="110" x2="470" y2="110" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="350.0" y="102.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">UDS over CAN</text>
+  <line x1="230" y1="118" x2="470" y2="250" stroke="#5876a4" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+  <text x="350.0" y="176.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">UDS over LIN</text>
+  <line x1="230" y1="250" x2="470" y2="118" stroke="#5876a4" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+  <text x="350.0" y="176.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">OBD over CAN</text>
+  <line x1="230" y1="262" x2="470" y2="262" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="350.0" y="254.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">OBD over LIN</text>
+</svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：为什么工厂可以完全不认识产品，为什么未知名字不报错而是返回空。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：协议与物理层各自只守一边，组合由调用方拼。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
     <h2><span class="n">03</span>两份实现</h2>
-    <p class="subh">C 版是一张固定长度的结构体数组 + <code>driver_t *(*)(void)</code> 函数指针；C++ 版是 <code>map&lt;string, std::function&lt;unique_ptr&lt;Driver&gt;()&gt;&gt;</code>，自注册收在一个模板里。两边的“登记先于创建”完全一样。</p>
-
-    <div class="codes">
+    
+    <p class='subh'>C 版用两张表（link_t、proto_t）在运行时拼；C++ 版用两个抽象基类，组合时只传引用。</p>
       <div class="codecard">
-        <div class="ch"><span class="lang">C</span><span class="fn">factory.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 工厂模式 · C 实现：按名字创建驱动（注册表 + 构造函数指针）
- * 编译：gcc -std=c11 -Wall -Wextra factory.c -o factory
- */
+        <div class="ch"><span class="lang">C</span><span class="fn">bridge.c</span><button class="copy">复制</button></div>
+        <pre><code>/* 桥接：协议和物理层各管各的，四种组合靠两张表拼出来 */
 #include &lt;stdio.h&gt;
 #include &lt;string.h&gt;
 
-typedef struct driver driver_t;
-typedef struct {
-    int         (*init)(driver_t *self);
-    const char *(*name)(driver_t *self);
-} driver_ops_t;
+typedef struct { const char *name; void (*send)(const char *frame); } link_t;
 
-struct driver { const driver_ops_t *ops; };
+static void can_send(const char *f) { printf("[CAN ] %s\n", f); }
+static void lin_send(const char *f) { printf("[LIN ] %s\n", f); }
 
-typedef driver_t *(*create_fn)(void);
+static const link_t LINKS[] = {
+    { "CAN", can_send },
+    { "LIN", lin_send },
+};
 
-#define MAX_REG 8
-typedef struct { char name[16]; create_fn create; } entry_t;
+typedef struct proto proto_t;
+struct proto {
+    const char *name;
+    const link_t *link;
+    void (*request)(const proto_t *self, const char *svc);
+};
 
-static entry_t g_reg[MAX_REG];
-static int     g_reg_n = 0;
-
-static int driver_register(const char *name, create_fn fn)
+static void uds_request(const proto_t *self, const char *svc)
 {
-    if (g_reg_n &gt;= MAX_REG) return -1;
-    snprintf(g_reg[g_reg_n].name, sizeof g_reg[g_reg_n].name, "%s", name);
-    g_reg[g_reg_n].create = fn;
-    g_reg_n++;
-    printf("  register %-6s  (注册表长度=%d)\n", name, g_reg_n);
-    return 0;
+    char buf[64];
+    snprintf(buf, sizeof buf, "UDS %s -&gt; %s", svc, self-&gt;link-&gt;name);
+    self-&gt;link-&gt;send(buf);
 }
-
-static driver_t *driver_create(const char *name)
+static void obd_request(const proto_t *self, const char *svc)
 {
-    for (int i = 0; i &lt; g_reg_n; i++)
-        if (strcmp(g_reg[i].name, name) == 0)
-            return g_reg[i].create();
-    return NULL;
+    char buf[64];
+    snprintf(buf, sizeof buf, "OBD %s -&gt; %s", svc, self-&gt;link-&gt;name);
+    self-&gt;link-&gt;send(buf);
 }
-
-/* 具体产品 1 */
-typedef struct { driver_t base; int addr; } sht_drv_t;
-
-static int sht_init(driver_t *self) {
-    sht_drv_t *d = (sht_drv_t *)self;
-    printf("    sht3x init @0x%02X\n", d-&gt;addr);
-    return 0;
-}
-static const char *sht_name(driver_t *self) { (void)self; return "sht3x"; }
-static const driver_ops_t SHT_OPS = { sht_init, sht_name };
-static driver_t *sht_new(void) { static sht_drv_t d = { { &amp;SHT_OPS }, 0x44 }; return &amp;d.base; }
-
-/* 具体产品 2 */
-typedef struct { driver_t base; int pin; } ntc_drv_t;
-
-static int ntc_init(driver_t *self) {
-    ntc_drv_t *d = (ntc_drv_t *)self;
-    printf("    ntc init on pin %d\n", d-&gt;pin);
-    return 0;
-}
-static const char *ntc_name(driver_t *self) { (void)self; return "ntc"; }
-static const driver_ops_t NTC_OPS = { ntc_init, ntc_name };
-static driver_t *ntc_new(void) { static ntc_drv_t d = { { &amp;NTC_OPS }, 12 }; return &amp;d.base; }
-
-/* 链接期自注册：启动时自动登记，不用改 main */
-static void auto_reg_ntc(void) __attribute__((constructor));
-static void auto_reg_ntc(void) { driver_register("ntc", ntc_new); }
 
 int main(void)
 {
-    printf("启动后注册表：\n");
-    for (int i = 0; i &lt; g_reg_n; i++) printf("  [%d] %s\n", i, g_reg[i].name);
-    printf("\n");
+    proto_t uds = { "UDS", &amp;LINKS[0], uds_request };
+    proto_t obd = { "OBD", &amp;LINKS[1], obd_request };
 
-    driver_register("sht3x", sht_new);
-
-    const char *wanted[] = { "sht3x", "ntc", "bme280" };
-    for (unsigned i = 0; i &lt; 3; i++) {
-        printf("create(\"%s\"):\n", wanted[i]);
-        driver_t *d = driver_create(wanted[i]);
-        if (!d) { printf("    未注册，返回 NULL（由上层决定降级）\n"); continue; }
-        d-&gt;ops-&gt;init(d);
-        printf("    name=%s\n", d-&gt;ops-&gt;name(d));
-    }
+    const proto_t *protos[] = { &amp;uds, &amp;obd };
+    for (size_t i = 0; i &lt; sizeof protos / sizeof protos[0]; i++)
+        for (size_t k = 0; k &lt; sizeof LINKS / sizeof LINKS[0]; k++) {
+            proto_t p = *protos[i];
+            p.link = &amp;LINKS[k];
+            printf("-- %s over %s --\n", p.name, p.link-&gt;name);
+            p.request(&amp;p, "0x22F190");
+        }
+    printf("协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧\n");
     return 0;
 }</code></pre>
       </div>
-
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>./bridge.exe</span></div>
+      <pre>-- UDS over CAN --
+[CAN ] UDS 0x22F190 -&gt; CAN
+-- UDS over LIN --
+[LIN ] UDS 0x22F190 -&gt; LIN
+-- OBD over CAN --
+[CAN ] OBD 0x22F190 -&gt; CAN
+-- OBD over LIN --
+[LIN ] OBD 0x22F190 -&gt; LIN
+协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧</pre>
+    </div>
       <div class="codecard">
-        <div class="ch"><span class="lang">C++</span><span class="fn">factory.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 工厂模式 · C++ 实现：注册表 + std::function + 自注册模板
-// 编译：g++ -std=c++17 -Wall -Wextra factory.cpp -o factory_cpp
+        <div class="ch"><span class="lang">C++</span><span class="fn">bridge.cpp</span><button class="copy">复制</button></div>
+        <pre><code>// 桥接 · C++：Link 与 Protocol 各自抽象，组合时只传引用
+// 编译：g++ -std=c++17 -Wall -Wextra bridge.cpp -o bridge_cpp
 #include &lt;cstdio&gt;
-#include &lt;functional&gt;
-#include &lt;map&gt;
 #include &lt;memory&gt;
 #include &lt;string&gt;
-#include &lt;vector&gt;
 
-class Driver {
+class Link {
 public:
-    virtual ~Driver() = default;
-    virtual const char* name() const = 0;
-    virtual bool init() = 0;
+    virtual ~Link() = default;
+    virtual const char *name() const = 0;
+    virtual void send(const std::string &amp;frame) const = 0;
 };
-
-class Sht3x final : public Driver {
+class CanLink : public Link {
 public:
-    const char* name() const override { return "sht3x"; }
-    bool init() override { std::printf("    sht3x init @0x44\n"); return true; }
+    const char *name() const override { return "CAN"; }
+    void send(const std::string &amp;f) const override { std::printf("[CAN ] %s\n", f.c_str()); }
 };
-
-class Ntc final : public Driver {
+class LinLink : public Link {
 public:
-    const char* name() const override { return "ntc"; }
-    bool init() override { std::printf("    ntc init on pin 12\n"); return true; }
+    const char *name() const override { return "LIN"; }
+    void send(const std::string &amp;f) const override { std::printf("[LIN ] %s\n", f.c_str()); }
 };
 
-class DriverFactory {
+class Protocol {
 public:
-    using Creator = std::function&lt;std::unique_ptr&lt;Driver&gt;()&gt;;
-
-    static DriverFactory&amp; instance() {      // 函数内静态：规避初始化顺序问题
-        static DriverFactory f;
-        return f;
-    }
-
-    void reg(const std::string&amp; name, Creator c) {
-        map_[name] = std::move(c);
-        std::printf("  register %-6s  (注册表长度=%d)\n", name.c_str(), static_cast&lt;int&gt;(map_.size()));
-    }
-
-    std::unique_ptr&lt;Driver&gt; create(const std::string&amp; name) const {
-        auto it = map_.find(name);
-        if (it == map_.end()) return nullptr;
-        return it-&gt;second();
-    }
-
-    std::vector&lt;std::string&gt; names() const {
-        std::vector&lt;std::string&gt; v;
-        for (const auto&amp; kv : map_) v.push_back(kv.first);
-        return v;
-    }
-
-private:
-    std::map&lt;std::string, Creator&gt; map_;
+    explicit Protocol(const Link &amp;l) : link_(l) {}
+    virtual ~Protocol() = default;
+    virtual const char *name() const = 0;
+    virtual void request(const std::string &amp;svc) const = 0;
+    const char *linkName() const { return link_.name(); }
+protected:
+    const Link &amp;link_;
 };
-
-// 自注册：定义一个静态对象，构造即登记
-template &lt;class T&gt;
-struct AutoReg {
-    explicit AutoReg(const char* name) {
-        DriverFactory::instance().reg(name, [] { return std::make_unique&lt;T&gt;(); });
+class Uds : public Protocol {
+public:
+    using Protocol::Protocol;
+    const char *name() const override { return "UDS"; }
+    void request(const std::string &amp;svc) const override
+    {
+        link_.send("UDS " + svc + " -&gt; " + link_.name());
+    }
+};
+class Obd : public Protocol {
+public:
+    using Protocol::Protocol;
+    const char *name() const override { return "OBD"; }
+    void request(const std::string &amp;svc) const override
+    {
+        link_.send("OBD " + svc + " -&gt; " + link_.name());
     }
 };
 
-static AutoReg&lt;Ntc&gt;   g_reg_ntc("ntc");
-static AutoReg&lt;Sht3x&gt; g_reg_sht("sht3x");
+int main()
+{
+    CanLink can;
+    LinLink lin;
+    Uds udsCan(can), udsLin(lin);
+    Obd obdCan(can), obdLin(lin);
 
-int main() {
-    std::printf("启动后注册表：\n");
-    for (const auto&amp; n : DriverFactory::instance().names()) std::printf("  %s\n", n.c_str());
-    std::printf("\n");
-
-    const char* wanted[] = { "sht3x", "ntc", "bme280" };
-    for (const char* w : wanted) {
-        std::printf("create(\"%s\"):\n", w);
-        auto d = DriverFactory::instance().create(w);
-        if (!d) { std::printf("    未注册，返回 nullptr（由上层决定降级）\n"); continue; }
-        d-&gt;init();
-        std::printf("    name=%s\n", d-&gt;name());
+    const Protocol *protos[] = { &amp;udsCan, &amp;udsLin, &amp;obdCan, &amp;obdLin };
+    for (const Protocol *p : protos) {
+        std::printf("-- %s over %s --\n", p-&gt;name(), p-&gt;linkName());
+        p-&gt;request("0x22F190");
     }
+    std::printf("协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧\n");
     return 0;
 }</code></pre>
       </div>
-    </div>
-
     <div class="run">
-      <div class="ch"><b>RUN</b><span>./factory.exe</span></div>
-      <pre>  register ntc     (注册表长度=1)
-启动后注册表：
-  [0] ntc
-
-  register sht3x   (注册表长度=2)
-create("sht3x"):
-    sht3x init @0x44
-    name=sht3x
-create("ntc"):
-    ntc init on pin 12
-    name=ntc
-create("bme280"):
-    未注册，返回 NULL（由上层决定降级）</pre>
+      <div class="ch"><b>RUN</b><span>./bridge_cpp.exe</span></div>
+      <pre>-- UDS over CAN --
+[CAN ] UDS 0x22F190 -&gt; CAN
+-- UDS over LIN --
+[LIN ] UDS 0x22F190 -&gt; LIN
+-- OBD over CAN --
+[CAN ] OBD 0x22F190 -&gt; CAN
+-- OBD over LIN --
+[LIN ] OBD 0x22F190 -&gt; LIN
+协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧</pre>
     </div>
-    <div class="run">
-      <div class="ch"><b>RUN</b><span>./factory_cpp.exe</span></div>
-      <pre>  register ntc     (注册表长度=1)
-  register sht3x   (注册表长度=2)
-启动后注册表：
-  ntc
-  sht3x
-
-create("sht3x"):
-    sht3x init @0x44
-    name=sht3x
-create("ntc"):
-    ntc init on pin 12
-    name=ntc
-create("bme280"):
-    未注册，返回 nullptr（由上层决定降级）</pre>
-    </div>
-    <p class="hintline">第一行 <code>register ntc</code> 出现在 <code>main</code> 之前——C 版靠 <code>__attribute__((constructor))</code>，C++ 版两个都在 main 前完成；C 版第二个 sht3x 是 <code>main</code> 里显式注册的，所以落到了“启动后注册表”的打印之后。</p>
   </section>
-  <section class="sec" id="s4">
-    <h2><span class="n">04</span>按名字取驱动，包括一个不存在的名字</h2>
-    <p class="subh">三个按钮对应三条配置。注册表里只有 ntc 与 sht3x；bme280 是故意写错的名字，用来看“未注册”时上层收到什么。</p>
 
-    <div class="demo">
-      <div class="demo-h"><b>driver factory</b><span>create(name) 查表</span></div>
-      <div class="stage">
-        <div class="reg" id="regList"></div>
-        <div class="ctl" style="margin-bottom:10px">
-          <button class="btn" data-n="sht3x">create("sht3x")</button>
-          <button class="btn" data-n="ntc">create("ntc")</button>
-          <button class="btn" data-n="bme280">create("bme280")</button>
-        </div>
-        <div class="res" id="resBox">点一个名字，看工厂返回什么。</div>
-        <div class="log" id="faLog"></div>
-      </div>
+  <section class="sec" id="s4">
+    <h2><span class="n">04</span>四种组合，只换一侧</h2>
+    
+    
+<div class="demo" id="demo">
+  <div class="demo-h"><b>四种组合，只换一侧</b><span>同一句服务请求，依次走 UDS/OBD 与 CAN/LIN 的组合。</span></div>
+  <div class="stage">
+    <div class="dflow" id="dflow"></div>
+    <div class="dbar" id="dbar">未开始</div>
+    <div class="dctl">
+      <button class="btn" id="dPrev">复位</button>
+      <button class="btn" id="dNext">单步</button>
+      <button class="btn" id="dPlay">自动</button>
+      <button class="btn" id="dReset">清日志</button>
     </div>
+    <div class="dnote" id="dnote">点上面的方框，看它在这次流程里负责什么。</div>
+    <div class="log" id="dlog"></div>
+  </div>
+</div>
+<script>dpDemo({nodes:[{id:'uds',label:'UDS',sub:'服务语义',note:''}, {id:'obd',label:'OBD',sub:'PID 语义',note:''}, {id:'can',label:'CAN',sub:'物理层',note:''}, {id:'lin',label:'LIN',sub:'物理层',note:''}],steps:[{hi:['uds', 'can'],t:'UDS over CAN：协议拼好服务串，交给 CAN 发'}, {hi:['uds', 'lin'],t:'同一份 UDS，只把物理层换成 LIN，协议代码没动'}, {hi:['obd', 'can'],t:'换成 OBD：只换协议侧，CAN 仍然只负责发帧'}, {hi:['obd', 'lin'],t:'OBD over LIN：两侧都换，仍然没有第四份实现'}, {hi:['uds', 'obd', 'can', 'lin'],t:'四种组合共用两条抽象；新增 FlexRay 只需加一个物理层'}]});</script>
+
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>C 与 C++：一张表，两种造法</h2>
+    <h2><span class="n">05</span>C 与 C++：两种解耦</h2>
+    
+    
     <div class="tbl">
       <table>
         <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
-        <tbody>
-          <tr><td>产品接口</td><td><code>driver_ops_t</code>（init / name）</td><td><code>Driver</code> 纯虚类</td><td>同一层间接调用，C 的 ops 表可以 const 放 flash</td></tr>
-          <tr><td>注册项</td><td><code>entry_t{ char name[16]; create_fn }</code></td><td><code>map&lt;string, Creator&gt;</code></td><td>C 定长无分配，名字超过 15 字符会被截断</td></tr>
-          <tr><td>自注册</td><td><code>__attribute__((constructor))</code></td><td><code>static AutoReg&lt;T&gt;</code></td><td>前者是 GCC 扩展，后者是标准 C++，但都依赖“静态初始化先于 main”</td></tr>
-          <tr><td>create 返回</td><td>内部静态对象指针（每次都同一个）</td><td><code>unique_ptr</code>，每次都新建</td><td><b>这是最实质的差别</b>：C 版其实是“按名字取单例”</td></tr>
-          <tr><td>未注册</td><td><code>NULL</code></td><td><code>nullptr</code></td><td>都不报错、不 abort，把降级决策留给上层</td></tr>
-          <tr><td>扩容</td><td><code>MAX_REG 8</code>，满了返回 -1</td><td><code>map</code> 自动扩容</td><td>C 版适合启动期固定集合，运行时动态加要另做内存池</td></tr>
-        </tbody>
+        <tbody><tr><td>协议抽象</td><td><code>proto_t</code> + 函数指针</td><td><code>Protocol</code> 抽象基类</td><td>C 的协议是结构体，C++ 是类型</td></tr><tr><td>物理层抽象</td><td><code>link_t</code> + <code>send()</code></td><td><code>Link</code> 抽象基类</td><td>都只暴露“发一帧”</td></tr><tr><td>组合方式</td><td>运行时给 <code>proto.link</code> 赋值</td><td>构造时传 <code>Link&amp;</code></td><td>C 可换绑，C++ 用引用固定</td></tr><tr><td>新增物理层</td><td>加一个 <code>link_t</code> 表项</td><td>加一个派生类</td><td>两边都不动协议</td></tr><tr><td>生命周期</td><td>静态表，无所有权</td><td>引用，不拥有</td><td>物理层通常比协议活得久</td></tr></tbody>
       </table>
     </div>
   </section>
 
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
-    <div class="prose">
-      <ul>
-        <li><b>静态初始化顺序。</b>C++ 里两个 <code>AutoReg</code> 对象和工厂单例的构造顺序跨编译单元是不确定的。把工厂写成 <code>instance()</code> 里的函数内静态，能保证“第一次用到时才构造”，避免在工厂还没构造好时就去注册。</li>
-        <li><b>链接器会把自注册对象裁掉。</b><code>--gc-sections</code> / <code>-ffunction-sections</code> 下，没有被任何代码引用的静态对象可能整个被丢弃，表现是“注册表里莫名其妙少了一个驱动”。要么加 <code>KEEP</code> 段，要么改成显式注册。</li>
-        <li><b>C 版 create 不是“新建”。</b><code>sht_new</code> 返回的是函数内静态对象，两次 create 得到同一块内存。若上层以为各自独立、改了其中一个的配置，另一个也变了。要真新建就得给分配器或对象池。</li>
-        <li><b>名字匹配是严格的。</b><code>strcmp</code> 区分大小写，配置里写成 <code>"SHT3X"</code> 或带空格就查不到。要么统一小写化，要么在注册处做别名。</li>
-        <li><b>注册表是全局可变状态。</b>运行时并发注册要加锁；最稳的策略是“只在启动阶段注册，之后只读”。</li>
-        <li><b>未知名字不是错误。</b>返回 <code>NULL</code> 是刻意的：不同车型可以没有某个传感器。但上层必须处理，不能直接解引用。</li>
-        <li><b>销毁顺序。</b>C++ 版 <code>unique_ptr</code> 走虚析构没问题；如果产品里持有互斥量、DMA 通道，要保证工厂/注册表的析构不早于产品使用。</li>
-      </ul>
-    </div>
+    
+    <div class="prose"><ul><li><b>桥接不是“多一层就高级”。</b>只有两维确实独立扩展时才值得；如果物理层永远只有 CAN，直接写反而清楚。</li><li><b>别让协议知道帧格式。</b>协议一旦开始拼 CAN ID、算 DLC，桥接就退化成四份实现；协议只该产出“服务 + 参数”。</li><li><b>C 版换绑要防悬空。</b>运行时改 <code>proto.link</code> 指向栈上的 <code>link_t</code>，函数返回后就悬空；物理层应是静态或长生命周期对象。</li><li><b>C++ 引用成员不可重新绑定。</b><code>Protocol</code> 持 <code>Link&amp;</code> 后不能换物理层；需要运行时切换就用指针或 <code>std::reference_wrapper</code>。</li><li><b>组合测试仍要覆盖。</b>代码只有两份，但行为有四种；至少每个组合跑一条真实服务，别只测编译通过。</li></ul></div>
   </section>
-
-  <div class="ch-nav">
-      <a href="../p3/c01.html"><span>上一章</span><b>← 3.1 适配器模式</b></a>
-      <a class="nx" href="../p3/c03.html"><span>下一章</span><b>3.3 单例模式 →</b></a>
-    </div>
-
-  
-</div>
-
+  <div class="ch-nav" id="chNav"></div>
+  </div>
 </div>
 
 <script src="../assets/pd.js"></script>
 <script src="../assets/dp-data.js"></script>
 <script src="../assets/dp-nav.js"></script>
 <script>dpNav('p3');</script>
-<script>
-(function () {
-  var REG = {
-    ntc:   { init: 'ntc init on pin 12', name: 'ntc' },
-    sht3x: { init: 'sht3x init @0x44',   name: 'sht3x' }
-  };
-
-  var regList = document.getElementById('regList');
-  var resBox = document.getElementById('resBox');
-  var logEl = document.getElementById('faLog');
-
-  function buildList() {
-    regList.innerHTML = '';
-    Object.keys(REG).forEach(function (k) {
-      var s = document.createElement('span');
-      s.textContent = k;
-      s.id = 'reg-' + k;
-      regList.appendChild(s);
-    });
-  }
-
-  function create(name) {
-    Object.keys(REG).forEach(function (k) {
-      document.getElementById('reg-' + k).classList.remove('hit');
-    });
-    PD.log(logEl, 'create("' + name + '")');
-
-    if (!REG[name]) {
-      resBox.innerHTML = 'create("' + name + '"): <em>未注册</em>，返回 nullptr'
-        + '<br><em>上层决定降级：换备用传感器，或者干脆不带这项功能</em>';
-      PD.log(logEl, '  未注册，返回 nullptr', 'bad');
-      return;
-    }
-    document.getElementById('reg-' + name).classList.add('hit');
-    resBox.innerHTML = 'create("' + name + '"):'
-      + '<br>&nbsp;&nbsp;' + REG[name].init
-      + '<br>&nbsp;&nbsp;name=' + REG[name].name;
-    PD.log(logEl, '  ' + REG[name].init);
-    PD.log(logEl, '  name=' + REG[name].name);
-  }
-
-  document.querySelectorAll('[data-n]').forEach(function (b) {
-    b.onclick = function () { create(b.dataset.n); };
-  });
-
-  buildList();
-  PD.log(logEl, '启动时自注册：ntc、sht3x 已进表。');
-})();
-</script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-

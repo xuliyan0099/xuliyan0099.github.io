@@ -3,28 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>2.2 观察者模式 Observer · C 与 C++ 双实现</title>
-<meta name="description" content="采样总线与仪表/记录仪/诊断三个订阅者：C 用固定槽位 + id 快照，C++ 用 shared_ptr + 通知拷贝，演示回调中退订为什么漏发。">
+<title>2.2 抽象工厂模式 ABSTRACT FACTORY · C 与 C++ 双实现</title>
+<meta name="description" content="抽象工厂：一个家族同时交付 CAN 驱动与 NVRAM 驱动，避免不同代零件混搭。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
-<style>
-.subs{display:flex;flex-direction:column;gap:7px}
-.subrow{
-  display:grid;grid-template-columns:26px 108px 1fr auto;gap:9px;align-items:center;
-  padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#0d1220;
-  font-size:12.3px;color:#c6d2e4;cursor:pointer;transition:border-color .15s,opacity .15s;
-}
-.subrow .dot{width:8px;height:8px;border-radius:50%;background:#3a4560;justify-self:center}
-.subrow.on .dot{background:var(--ac2);box-shadow:0 0 7px rgba(67,214,168,.7)}
-.subrow.off{opacity:.45}
-.subrow.off .dot{background:#4a4f5c;box-shadow:none}
-.subrow .nm{font:600 12.4px/1 var(--mono);color:#dbe6ff}
-.subrow .desc{color:#93a2ba;font-size:11.8px}
-.subrow .tag{font:600 10px/1 var(--mono);color:#ffcf8f;border:1px solid rgba(255,184,92,.35);
-  border-radius:5px;padding:3px 5px;background:rgba(255,184,92,.08);white-space:nowrap}
-.subrow.hit{border-color:var(--ac2)}
-.subrow.miss{border-color:rgba(255,128,128,.55);background:#1d1114}
-</style>
+<script src="../assets/dp-demo.js"></script>
 </head>
 <body>
 <div class="bg" aria-hidden="true"></div>
@@ -45,554 +28,248 @@
 
 <div class="shell">
   <aside id="sidebar">
-    <div class="vol-h">篇二 · 行为型<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
+    <div class="vol-h" id="sideHead">设计模式全书 · 25 章<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
     <ol id="sideList"></ol>
     <div class="vol-nav" id="volNav"></div>
   </aside>
 
   <div class="wrap">
-  <div class="ch-meta"><span class="lv">篇二 · 行为型</span><span class="sep">/</span>第 2 章<span class="sep">/</span>约 32 分钟</div>
-  <h1>观察者模式<span class="en">OBSERVER</span></h1>
-  <p class="lede">一次采样，仪表要显示、记录仪要落盘、诊断要判阈值。把这些调用全写在采样函数里，加第四方就得改采样；观察者把“通知谁”变成一个订阅列表。<b>但真正难的不是建表，而是两个边界：通知进行中有人退订，以及订阅者先死了。</b></p>
-  <div class="chips">
-    <span class="chip ok">两种实现都跑过</span>
-    <span class="chip warn">C 版对比“朴素/安全”</span>
-    <span class="chip">C++ 版 shared_ptr 续命</span>
-  </div>
-<section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：通知名单被焊死在采样函数里</h2>
-    <div class="prose">
-      <p>最直白的写法是：<code>on_sample()</code> 里依次调 <code>gauge_update()</code>、<code>recorder_write()</code>、<code>diag_check()</code>。能跑，但每次加一个消费者就要改这个函数；三个消费者的顺序、错误码、是否阻塞也全挤在一起。</p>
-      <p>观察者模式把这段拆成两半：<b>发布者只负责“发生了什么”</b>（<code>notify(ev)</code>），<b>订阅者只负责“我关心时做什么”</b>（<code>onEvent</code>）。发布者不再知道谁在听，订阅者也不需要在编译期被点名。</p>
-      <p>代价是列表变成了运行期数据，于是出现两个必答题：通知途中有人退订，数组怎么办？订阅者对象已经销毁，回调里那个指针还指哪儿？这两问在本页的演示里都能亲手踩一次。</p>
-    </div>
+  <div class="ch-meta"><span class="lv">篇二 · 创建型</span><span class="sep">/</span>第 2 章<span class="sep">/</span>约 30 分钟</div>
+  <h1>抽象工厂模式<span class="en">ABSTRACT FACTORY</span></h1>
+  <p class="lede">车型配置里写着 <code>can=bosch</code>、<code>nvram=conti</code>，两行各自看都合法，装到同一辆车上却可能时序对不上、诊断地址对不上。抽象工厂把“同一代的两个零件”绑成一次交付：<b>要 BOSCH 就两个都是 BOSCH，要 CONTI 就两个都是 CONTI</b>。</p>
+  <div class="chips"><span class="chip ok">一个家族两个零件</span><span class="chip">换家族不改调用方</span><span class="chip">C 用函数表家族 · C++ 用抽象基类</span></div>
+
+  <section class="sec" id="s1">
+    <h2><span class="n">01</span>问题：每个车型自己配零件，配错代</h2>
+    
+    
+      <div class="prose">
+        <p>先看坏写法：每个零件各自按名字取。</p>
+        <pre><code>can_t    can   = make_can(cfg-&gt;can);      /* "bosch"  */
+nvram_t  nv    = make_nvram(cfg-&gt;nvram);  /* "conti"  */</code></pre>
+        <p>问题不在“取不到”，而在<b>取到了也能跑，但组合是错的</b>：</p>
+        <ul>
+          <li><b>时序假设不同。</b>BOSCH 的 CAN 驱动默认 500kbps、周期 10ms；CONTI 的 NVRAM 写一次要 8ms。两个各自达标，叠在一起就超周期。</li>
+          <li><b>诊断地址不同。</b>同一份 UDS 服务，两个供应商的 DID 偏移不一样，混搭后读出来的是隔壁字段。</li>
+          <li><b>问题只在实车出现。</b>台架上两个零件都能单测通过，装车才偶发，定位成本极高。</li>
+        </ul>
+        <p>抽象工厂不改零件本身，只改<b>获取方式</b>：家族对象一次返回两个零件，调用方拿不到“单独换一个”的机会。</p>
+      </div>
   </section>
 
   <section class="sec" id="s2">
-    <h2><span class="n">02</span>结构：发布者只发事件，订阅者各自处理</h2>
-    <p class="subh">点方框看职责。虚线表示“订阅关系”，它由订阅者发起，发布者只维护名单。</p>
-
+    <h2><span class="n">02</span>结构：家族一次交付两个零件</h2>
+    <p class="subh">左边是调用方，中间是家族，右边是两个零件。点方框看每一层负责什么。</p>
+    
+  
     <div class="fig">
-      <div class="fig-h"><b>Subject / Observer 接口 / 三个订阅者</b><span>structure</span></div>
+      <div class="fig-h"><b>家族一次交付两个零件</b><span>abstract factory</span></div>
       <div class="diagram">
-        <svg viewBox="0 0 880 340" role="img" aria-label="观察者模式结构图">
-          <defs>
-            <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-              <path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/>
-            </marker>
-            <marker id="tri3" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="10" markerHeight="10" orient="auto">
-              <path d="M1 1 L11 6 L1 11 z" fill="none" stroke="#40536f" stroke-width="1.4"/>
-            </marker>
-          </defs>
-
-          <g class="node" data-role="sub" data-note="SensorBus：只保存槽位数组和通知层数。它不知道 gauge 和 diag 的区别，只按 id 找到回调并调用。">
-            <rect x="24" y="96" width="232" height="130" rx="10"/>
-            <text class="nm" x="40" y="119">SensorBus</text>
-            <text class="ty" x="40" y="137">发布者 Subject</text>
-            <text class="mt" x="40" y="161">attach(id, cb, ctx)</text>
-            <text class="mt" x="40" y="179">detach(id)</text>
-            <text class="mt" x="40" y="197">notify(event)</text>
-            <text class="lbl" x="40" y="216">slot[8] + depth</text>
-          </g>
-
-          <g class="node" data-role="iface" data-note="IObserver / cb_fn：只有一种方法，参数是“事件”。接口越窄，发布者能替订阅者做的决定就越少，耦合也越低。">
-            <rect x="342" y="116" width="206" height="90" rx="10"/>
-            <text class="nm" x="358" y="139">IObserver</text>
-            <text class="ty" x="358" y="157">订阅者接口</text>
-            <text class="mt" x="358" y="181">onEvent(ev)</text>
-            <text class="lbl" x="358" y="196">C 里就是 cb_fn</text>
-          </g>
-
-          <g class="node" data-role="gauge" data-note="Gauge：收到事件就刷新显示。它不关心别的订阅者是否存在，也不该在回调里做耗时工作——通知是同步的，会卡住发布者。">
-            <rect x="626" y="30" width="228" height="74" rx="9"/>
-            <text class="nm" x="642" y="53">Gauge</text>
-            <text class="ty" x="700" y="53">仪表</text>
-            <text class="mt" x="642" y="78">刷新 speed 显示</text>
-          </g>
-          <g class="node" data-role="rec" data-note="Recorder：落盘。它会在收到事件后主动退订自己——这正是朴素数组最容易出错的地方：删掉自己会让后面的元素前移，外层循环的下标却还在往前走。">
-            <rect x="626" y="122" width="228" height="74" rx="9"/>
-            <text class="nm" x="642" y="145">Recorder</text>
-            <text class="ty" x="716" y="145">记录仪</text>
-            <text class="mt" x="642" y="170">写入 + 退订自己</text>
-          </g>
-          <g class="node" data-role="diag" data-note="Diag：判阈值、发故障码。如果它在朴素实现里被“跳过”，故障码就不会产生——这类漏发不会报错，只会让某个功能悄悄不工作。">
-            <rect x="626" y="214" width="228" height="74" rx="9"/>
-            <text class="nm" x="642" y="237">Diag</text>
-            <text class="ty" x="690" y="237">诊断</text>
-            <text class="mt" x="642" y="262">阈值判断</text>
-          </g>
-
-          <path class="flow" marker-end="url(#ar3)" d="M260 161 L338 161"/>
-          <text class="lbl" x="264" y="153">notify 逐个回调</text>
-
-          <path class="dep" marker-end="url(#tri3)" d="M626 67 L552 132"/>
-          <path class="dep" marker-end="url(#tri3)" d="M626 159 L552 161"/>
-          <path class="dep" marker-end="url(#tri3)" d="M626 251 L552 190"/>
-
-          <path class="dep" marker-end="url(#ar3)" d="M700 288 L700 316 L124 316 L124 230"/>
-          <text class="lbl" x="300" y="332">订阅 / 退订：发布者只维护名单，不决定内容</text>
-        </svg>
+<svg viewBox="0 0 880 360" role="img" aria-label="家族一次交付两个零件">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
+  <g class="node" data-role="client" data-note="调用方只说“我要 BOSCH 这一代”，不分别指定 CAN 和 NVRAM，从源头断掉混搭的可能。"><rect x="24" y="140" width="150" height="76" rx="10"/><text class="nm" x="38" y="164">调用方</text><text class="ty" x="38" y="183">业务 / 初始化</text><text class="mt" x="38" y="201">只要一对零件</text></g>
+  <g class="node" data-role="family" data-note="家族是唯一知道“哪两个零件属于同一代”的对象；换家族就是整套换，不存在只换一半。"><rect x="250" y="140" width="190" height="80" rx="10"/><text class="nm" x="264" y="164">family_t / Family</text><text class="ty" x="264" y="183">零件家族</text><text class="mt" x="264" y="201">make_can + make_nvram</text></g>
+  <g class="node" data-role="can" data-note="CAN 驱动只暴露 send；具体用哪家的实现由家族决定，调用方看不到供应商名字。"><rect x="520" y="62" width="190" height="72" rx="10"/><text class="nm" x="534" y="86">can_t / Can</text><text class="ty" x="534" y="105">通信零件</text><text class="mt" x="534" y="123">send(frame)</text></g>
+  <g class="node" data-role="nvram" data-note="NVRAM 与 CAN 同代：写时序、地址布局都按同一份规范来。"><rect x="520" y="212" width="190" height="72" rx="10"/><text class="nm" x="534" y="236">nvram_t / Nvram</text><text class="ty" x="534" y="255">存储零件</text><text class="mt" x="534" y="273">save(value)</text></g>
+  <line x1="174" y1="178" x2="250" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="212.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">取家族</text>
+  <line x1="440" y1="160" x2="520" y2="108" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="126.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">造 CAN</text>
+  <line x1="440" y1="200" x2="520" y2="242" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="213.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">造 NVRAM</text>
+</svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：发布者、接口、三个订阅者各知道什么、不知道什么。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：家族负责“成套”，零件只负责自己的接口。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
-    <h2><span class="n">03</span>两份实现：一份故意先写错</h2>
-    <p class="subh">C 版同时给出“朴素”和“安全”两条路径，输出里能直接看到 diag 被跳过；C++ 版用 <code>shared_ptr</code> + 通知前拷贝，顺手解决生命周期。</p>
-
-    <div class="codes">
+    <h2><span class="n">03</span>两份实现</h2>
+    
+    <p class='subh'>C 版把家族写成“返回两个函数表”的结构；C++ 版把家族写成抽象基类，零件用 unique_ptr 交付。</p>
       <div class="codecard">
-        <div class="ch"><span class="lang">C</span><span class="fn">observer.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 观察者模式 · C 实现：采样总线 + 订阅者表
- * 编译：gcc -std=c11 -Wall -Wextra observer.c -o observer
- * 重点演示「在回调里退订」这一经典崩溃/漏发点。
- */
+        <div class="ch"><span class="lang">C</span><span class="fn">abstract_factory.c</span><button class="copy">复制</button></div>
+        <pre><code>/* 抽象工厂：一次取到“同一代”的两个零件，而不是各取各的 */
 #include &lt;stdio.h&gt;
-#include &lt;string.h&gt;
+#include &lt;stddef.h&gt;
 
-typedef void (*cb_fn)(void *ctx, const char *event);
-
-typedef struct {
-    int   id;            /* -1 表示墓碑：通知中被退订，等通知结束再压缩 */
-    char  name[20];
-    cb_fn fn;
-    void *ctx;
-} sub_t;
+typedef struct { void (*send)(const char *msg); } can_t;
+typedef struct { void (*save)(int value); } nvram_t;
 
 typedef struct {
-    sub_t slot[8];
-    int   n;
-    int   depth;         /* 正在通知的层数 */
-} bus_t;
+    const char *name;
+    can_t   (*make_can)(void);
+    nvram_t (*make_nvram)(void);
+} family_t;
 
-typedef struct { bus_t *bus; int id; } peer_t;
+static void bosch_can_send(const char *m)   { printf("[CAN/BOSCH] %s\n", m); }
+static void bosch_nv_save(int v)            { printf("[NVRAM/BOSCH] save %d\n", v); }
+static void conti_can_send(const char *m)   { printf("[CAN/CONTI] %s\n", m); }
+static void conti_nv_save(int v)            { printf("[NVRAM/CONTI] save %d\n", v); }
 
-static void bus_attach(bus_t *b, int id, const char *name, cb_fn fn, void *ctx)
-{
-    if (b-&gt;n &gt;= 8) return;
-    b-&gt;slot[b-&gt;n].id = id;
-    snprintf(b-&gt;slot[b-&gt;n].name, sizeof b-&gt;slot[b-&gt;n].name, "%s", name);
-    b-&gt;slot[b-&gt;n].fn = fn;
-    b-&gt;slot[b-&gt;n].ctx = ctx;
-    b-&gt;n++;
-}
+static can_t   bosch_can(void)   { can_t c = { bosch_can_send };   return c; }
+static nvram_t bosch_nvram(void) { nvram_t n = { bosch_nv_save }; return n; }
+static can_t   conti_can(void)   { can_t c = { conti_can_send };   return c; }
+static nvram_t conti_nvram(void) { nvram_t n = { conti_nv_save }; return n; }
 
-static void bus_compact(bus_t *b)
-{
-    int w = 0;
-    for (int i = 0; i &lt; b-&gt;n; i++)
-        if (b-&gt;slot[i].id &gt;= 0) b-&gt;slot[w++] = b-&gt;slot[i];
-    b-&gt;n = w;
-}
-
-/* 朴素实现：立刻前移数组 */
-static void bus_detach_raw(bus_t *b, int id)
-{
-    for (int i = 0; i &lt; b-&gt;n; i++)
-        if (b-&gt;slot[i].id == id) {
-            for (int k = i; k &lt; b-&gt;n - 1; k++) b-&gt;slot[k] = b-&gt;slot[k + 1];
-            b-&gt;n--;                     /* 没有 i--，外层循环下一次就跳过了一个 */
-            return;
-        }
-}
-
-/* 朴素通知：边遍历边让 b-&gt;n 变化 */
-static void bus_notify_raw(bus_t *b, const char *ev)
-{
-    for (int i = 0; i &lt; b-&gt;n; i++)
-        b-&gt;slot[i].fn(b-&gt;slot[i].ctx, ev);
-}
-
-/* 安全实现：通知中只打墓碑，不移动元素 */
-static void bus_detach_safe(bus_t *b, int id)
-{
-    int i;
-    for (i = 0; i &lt; b-&gt;n; i++) if (b-&gt;slot[i].id == id) break;
-    if (i == b-&gt;n) return;
-    if (b-&gt;depth &gt; 0) { b-&gt;slot[i].id = -1; return; }
-    for (int k = i; k &lt; b-&gt;n - 1; k++) b-&gt;slot[k] = b-&gt;slot[k + 1];
-    b-&gt;n--;
-}
-
-/* 安全通知：先拍 id 快照，再按 id 找还活着的槽 */
-static void bus_notify_safe(bus_t *b, const char *ev)
-{
-    int ids[8];
-    int m = b-&gt;n;
-    for (int i = 0; i &lt; m; i++) ids[i] = b-&gt;slot[i].id;
-
-    b-&gt;depth++;
-    for (int i = 0; i &lt; m; i++) {
-        for (int k = 0; k &lt; b-&gt;n; k++)
-            if (b-&gt;slot[k].id == ids[i]) {
-                b-&gt;slot[k].fn(b-&gt;slot[k].ctx, ev);
-                break;
-            }
-    }
-    b-&gt;depth--;
-    if (b-&gt;depth == 0) bus_compact(b);
-}
-
-/* 三个订阅者 */
-static void cb_gauge(void *ctx, const char *ev)
-{
-    (void)ctx;
-    printf("  gauge    &lt;- %s\n", ev);
-}
-
-static void cb_diag(void *ctx, const char *ev)
-{
-    (void)ctx;
-    printf("  diag     &lt;- %s\n", ev);
-}
-
-static void cb_recorder_raw(void *ctx, const char *ev)
-{
-    peer_t *p = ctx;
-    printf("  recorder &lt;- %s（收到后退订自己）\n", ev);
-    bus_detach_raw(p-&gt;bus, p-&gt;id);
-}
-
-static void cb_recorder_safe(void *ctx, const char *ev)
-{
-    peer_t *p = ctx;
-    printf("  recorder &lt;- %s（收到后退订自己）\n", ev);
-    bus_detach_safe(p-&gt;bus, p-&gt;id);
-}
+static const family_t FAMILIES[] = {
+    { "BOSCH", bosch_can, bosch_nvram },
+    { "CONTI", conti_can, conti_nvram },
+};
 
 int main(void)
 {
-    bus_t raw = { .n = 0, .depth = 0 };
-    bus_t safe = { .n = 0, .depth = 0 };
-    peer_t r1 = { &amp;raw, 2 }, r2 = { &amp;safe, 2 };
-
-    printf("朴素版本：\n");
-    bus_attach(&amp;raw, 1, "gauge", cb_gauge, NULL);
-    bus_attach(&amp;raw, 2, "recorder", cb_recorder_raw, &amp;r1);
-    bus_attach(&amp;raw, 3, "diag", cb_diag, NULL);
-    bus_notify_raw(&amp;raw, "speed=62");
-    printf("  剩余订阅者=%d（diag 被跳过）\n\n", raw.n);
-
-    printf("安全版本：\n");
-    bus_attach(&amp;safe, 1, "gauge", cb_gauge, NULL);
-    bus_attach(&amp;safe, 2, "recorder", cb_recorder_safe, &amp;r2);
-    bus_attach(&amp;safe, 3, "diag", cb_diag, NULL);
-    bus_notify_safe(&amp;safe, "speed=62");
-    bus_notify_safe(&amp;safe, "speed=63");
-    printf("  剩余订阅者=%d\n", safe.n);
+    const size_t nfam = sizeof FAMILIES / sizeof FAMILIES[0];
+    for (size_t i = 0; i &lt; nfam; i++) {
+        const family_t *f = &amp;FAMILIES[i];
+        can_t   c = f-&gt;make_can();     /* 同一家族：语言一致、时序一致 */
+        nvram_t v = f-&gt;make_nvram();
+        printf("-- family %s --\n", f-&gt;name);
+        c.send("0x18FF50E5");
+        v.save(7);
+    }
+    printf("family 数 %zu，零件组合 2 种\n", nfam);
     return 0;
 }</code></pre>
       </div>
-
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>./abstract_factory.exe</span></div>
+      <pre>-- family BOSCH --
+[CAN/BOSCH] 0x18FF50E5
+[NVRAM/BOSCH] save 7
+-- family CONTI --
+[CAN/CONTI] 0x18FF50E5
+[NVRAM/CONTI] save 7
+family 数 2，零件组合 2 种</pre>
+    </div>
       <div class="codecard">
-        <div class="ch"><span class="lang">C++</span><span class="fn">observer.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 观察者模式 · C++ 实现：shared_ptr 订户 + 通知时拷贝列表
-// 编译：g++ -std=c++17 -Wall -Wextra observer.cpp -o observer_cpp
+        <div class="ch"><span class="lang">C++</span><span class="fn">abstract_factory.cpp</span><button class="copy">复制</button></div>
+        <pre><code>// 抽象工厂 · C++：家族返回 unique_ptr，生命周期跟着走
+// 编译：g++ -std=c++17 -Wall -Wextra abstract_factory.cpp -o abstract_factory_cpp
 #include &lt;cstdio&gt;
 #include &lt;memory&gt;
-#include &lt;string&gt;
-#include &lt;vector&gt;
 
-class Observer {
-public:
-    virtual ~Observer() = default;
-    virtual void onEvent(const std::string&amp; ev) = 0;
+struct Can {
+    virtual ~Can() = default;
+    virtual void send(const char *msg) = 0;
+};
+struct Nvram {
+    virtual ~Nvram() = default;
+    virtual void save(int value) = 0;
 };
 
-class Subject {
+class BoschCan : public Can {
 public:
-    int attach(std::shared_ptr&lt;Observer&gt; o) {
-        slots_.push_back(Slot{ next_id_++, std::move(o) });
-        return slots_.back().id;
-    }
-
-    // 通知中退订：只清空指针，不移动元素
-    void detach(int id) {
-        for (auto&amp; s : slots_) {
-            if (s.id != id) continue;
-            s.obs.reset();
-            if (depth_ == 0) compact();
-            return;
-        }
-    }
-
-    void notify(const std::string&amp; ev) {
-        auto snapshot = slots_;          // 关键：拷贝，通知期间列表不被改动
-        ++depth_;
-        for (auto&amp; s : snapshot)
-            if (s.obs) s.obs-&gt;onEvent(ev);
-        --depth_;
-        if (depth_ == 0) compact();
-    }
-
-private:
-    struct Slot { int id; std::shared_ptr&lt;Observer&gt; obs; };
-    std::vector&lt;Slot&gt; slots_;
-    int next_id_ = 1;
-    int depth_ = 0;
-
-    void compact() {
-        std::vector&lt;Slot&gt; live;
-        for (auto&amp; s : slots_) if (s.obs) live.push_back(std::move(s));
-        slots_ = std::move(live);
-    }
+    void send(const char *m) override { std::printf("[CAN/BOSCH] %s\n", m); }
+};
+class BoschNvram : public Nvram {
+public:
+    void save(int v) override { std::printf("[NVRAM/BOSCH] save %d\n", v); }
+};
+class ContiCan : public Can {
+public:
+    void send(const char *m) override { std::printf("[CAN/CONTI] %s\n", m); }
+};
+class ContiNvram : public Nvram {
+public:
+    void save(int v) override { std::printf("[NVRAM/CONTI] save %d\n", v); }
 };
 
-class Gauge final : public Observer {
-public:
-    void onEvent(const std::string&amp; ev) override { std::printf("  gauge    &lt;- %s\n", ev.c_str()); }
+struct Family {
+    virtual ~Family() = default;
+    virtual const char *name() const = 0;
+    virtual std::unique_ptr&lt;Can&gt; makeCan() const = 0;
+    virtual std::unique_ptr&lt;Nvram&gt; makeNvram() const = 0;
 };
 
-class Diag final : public Observer {
+class BoschFamily : public Family {
 public:
-    void onEvent(const std::string&amp; ev) override { std::printf("  diag     &lt;- %s\n", ev.c_str()); }
+    const char *name() const override { return "BOSCH"; }
+    std::unique_ptr&lt;Can&gt; makeCan() const override { return std::make_unique&lt;BoschCan&gt;(); }
+    std::unique_ptr&lt;Nvram&gt; makeNvram() const override { return std::make_unique&lt;BoschNvram&gt;(); }
+};
+class ContiFamily : public Family {
+public:
+    const char *name() const override { return "CONTI"; }
+    std::unique_ptr&lt;Can&gt; makeCan() const override { return std::make_unique&lt;ContiCan&gt;(); }
+    std::unique_ptr&lt;Nvram&gt; makeNvram() const override { return std::make_unique&lt;ContiNvram&gt;(); }
 };
 
-class Recorder final : public Observer {
-public:
-    explicit Recorder(Subject&amp; s) : s_(s) {}
-    void bind(int id) { id_ = id; }
-    void onEvent(const std::string&amp; ev) override {
-        std::printf("  recorder &lt;- %s（收到后退订自己）\n", ev.c_str());
-        if (id_ &gt; 0) s_.detach(id_);
+int main()
+{
+    std::unique_ptr&lt;Family&gt; fams[] = {
+        std::make_unique&lt;BoschFamily&gt;(), std::make_unique&lt;ContiFamily&gt;()
+    };
+    for (auto &amp;f : fams) {
+        std::printf("-- family %s --\n", f-&gt;name());
+        auto can = f-&gt;makeCan();
+        auto nv = f-&gt;makeNvram();
+        can-&gt;send("0x18FF50E5");
+        nv-&gt;save(7);
     }
-private:
-    Subject&amp; s_;
-    int id_ = 0;
-};
-
-int main() {
-    Subject bus;
-    auto gauge = std::make_shared&lt;Gauge&gt;();
-    auto rec   = std::make_shared&lt;Recorder&gt;(bus);
-    auto diag  = std::make_shared&lt;Diag&gt;();
-
-    bus.attach(gauge);
-    rec-&gt;bind(bus.attach(rec));
-    bus.attach(diag);
-
-    std::printf("安全版本：\n");
-    bus.notify("speed=62");
-    bus.notify("speed=63");
+    std::printf("family 数 2，零件组合 2 种\n");
     return 0;
 }</code></pre>
       </div>
-    </div>
-
     <div class="run">
-      <div class="ch"><b>RUN</b><span>./observer.exe</span></div>
-      <pre>朴素版本：
-  gauge    &lt;- speed=62
-  recorder &lt;- speed=62（收到后退订自己）
-  剩余订阅者=2（diag 被跳过）
-
-安全版本：
-  gauge    &lt;- speed=62
-  recorder &lt;- speed=62（收到后退订自己）
-  diag     &lt;- speed=62
-  gauge    &lt;- speed=63
-  diag     &lt;- speed=63
-  剩余订阅者=2</pre>
+      <div class="ch"><b>RUN</b><span>./abstract_factory_cpp.exe</span></div>
+      <pre>-- family BOSCH --
+[CAN/BOSCH] 0x18FF50E5
+[NVRAM/BOSCH] save 7
+-- family CONTI --
+[CAN/CONTI] 0x18FF50E5
+[NVRAM/CONTI] save 7
+family 数 2，零件组合 2 种</pre>
     </div>
-    <div class="run">
-      <div class="ch"><b>RUN</b><span>./observer_cpp.exe</span></div>
-      <pre>安全版本：
-  gauge    &lt;- speed=62
-  recorder &lt;- speed=62（收到后退订自己）
-  diag     &lt;- speed=62
-  gauge    &lt;- speed=63
-  diag     &lt;- speed=63</pre>
-    </div>
-    <p class="hintline">朴素版不是“少了一个人”这么简单：diag 之后每一轮都不会再收到通知，直到下一次压缩数组。它不崩溃，只是悄悄失效。</p>
   </section>
 
   <section class="sec" id="s4">
-    <h2><span class="n">04</span>亲手踩一次“通知中退订”</h2>
-    <p class="subh">默认三个订阅者都开着，Recorder 会在收到事件后退订自己。切换朴素 / 安全两种通知方式，各触发一次，看 Diag 收不收到。</p>
-
-    <div class="demo">
-      <div class="demo-h"><b>event bus</b><span>点订阅者可开关；触发事件看回调顺序</span></div>
-      <div class="demo-grid">
-        <div class="stage">
-          <div class="subs" id="subStage"></div>
-          <p class="hintline" id="subNote">订阅者 3 个。点一行可以退订 / 重新订阅。</p>
-        </div>
-        <div class="side">
-          <div class="ctl">
-            <button class="btn on" data-mode="raw">朴素实现</button>
-            <button class="btn" data-mode="safe">安全实现</button>
-          </div>
-          <div class="ctl">
-            <button class="btn ghost" id="fire">触发事件</button>
-            <button class="btn ghost" id="resetSub">重置</button>
-          </div>
-          <div class="log" id="subLog"><div class="mute">// 通知日志</div></div>
-        </div>
-      </div>
+    <h2><span class="n">04</span>换一个家族，看零件是否成套</h2>
+    
+    
+<div class="demo" id="demo">
+  <div class="demo-h"><b>换一次家族，看两个零件是否成套</b><span>同一段业务流程，只切换家族；CAN 与 NVRAM 的厂牌始终一致。</span></div>
+  <div class="stage">
+    <div class="dflow" id="dflow"></div>
+    <div class="dbar" id="dbar">未开始</div>
+    <div class="dctl">
+      <button class="btn" id="dPrev">复位</button>
+      <button class="btn" id="dNext">单步</button>
+      <button class="btn" id="dPlay">自动</button>
+      <button class="btn" id="dReset">清日志</button>
     </div>
+    <div class="dnote" id="dnote">点上面的方框，看它在这次流程里负责什么。</div>
+    <div class="log" id="dlog"></div>
+  </div>
+</div>
+<script>dpDemo({nodes:[{id:'fam',label:'家族',sub:'BOSCH / CONTI',note:''}, {id:'can',label:'CAN',sub:'send()',note:''}, {id:'nv',label:'NVRAM',sub:'save()',note:''}, {id:'use',label:'业务流程',sub:'发一帧 + 存一次',note:''}],steps:[{hi:['fam'],t:'选家族 BOSCH：一次拿到 CAN 与 NVRAM 两个零件'}, {hi:['can'],t:'CAN 零件 = BOSCH，波特率 500k、周期 10ms'}, {hi:['nv'],t:'NVRAM 零件 = BOSCH，写周期 8ms，符合同一份时序预算'}, {hi:['use'],t:'业务流程：发送 0x18FF50E5，保存标定值 7'}, {hi:['fam', 'can', 'nv'],t:'切到家族 CONTI：两个零件同时换，业务流程一行不改'}, {hi:['use'],t:'再跑同一段流程：报文与保存都走 CONTI，没有混搭'}]});</script>
+
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>同一组角色，两种写法</h2>
-    <table class="tbl">
-      <thead><tr><th style="width:96px">环节</th><th>C 版</th><th>C++ 版</th><th style="width:230px">要防的事</th></tr></thead>
-      <tbody>
-        <tr><td><b>存订户</b></td><td><code>sub_t slot[8]</code> 固定数组</td><td><code>vector&lt;Slot&gt;</code> 动态</td><td>容量上限 / 扩容时机</td></tr>
-        <tr><td><b>订阅</b></td><td><code>attach(id, cb, ctx)</code></td><td><code>attach(shared_ptr)</code> 返回 id</td><td>重复订阅、id 复用</td></tr>
-        <tr><td><b>通知中退订</b></td><td>打墓碑 <code>id = -1</code>，通知结束再压缩</td><td><code>obs.reset()</code>，通知结束再压缩</td><td>边遍历边移动元素</td></tr>
-        <tr><td><b>通知顺序</b></td><td>按数组顺序，先拍 id 快照</td><td>拷贝 <code>slots_</code> 再遍历</td><td>不许依赖顺序做业务</td></tr>
-        <tr><td><b>生命周期</b></td><td>无保护：ctx 悬垂就是未定义行为</td><td><code>shared_ptr</code> 在通知期间续命</td><td>订户先于发布者销毁</td></tr>
-      </tbody>
-    </table>
-    <div class="key"><b>为什么 C++ 版能顺手解决生命周期？</b>拷贝 <code>slots_</code> 时，<code>shared_ptr</code> 的引用计数 +1；即使订户在回调里退订，对象也活到本轮通知结束。C 版要等价，得自己做引用计数，或者约定“销毁前必须先 detach”。</div>
+    <h2><span class="n">05</span>C 与 C++：两种“成套”</h2>
+    
+    
+    <div class="tbl">
+      <table>
+        <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
+        <tbody><tr><td>家族</td><td><code>family_t</code> 结构 + 两个函数指针</td><td><code>Family</code> 抽象基类</td><td>C 的家族是数据；C++ 的家族是类型</td></tr><tr><td>零件交付</td><td>返回结构体（函数表按值拷贝）</td><td>返回 <code>unique_ptr</code></td><td>C 没有所有权概念，靠约定；C++ 由编译器兜底</td></tr><tr><td>新增家族</td><td>加一组 make_* 函数 + 一条表项</td><td>加一个派生类</td><td>两边都是一处新增，不动调用方</td></tr><tr><td>混搭可能性</td><td>调用方仍可手动取单个零件</td><td>接口上就拿不到单个零件</td><td>C 要靠代码评审守住，C++ 能靠类型挡住</td></tr><tr><td>零件生命周期</td><td>静态/栈对象，谁取谁管</td><td><code>unique_ptr</code> 归调用方</td><td>跨线程共享时要另加锁或引用计数</td></tr></tbody>
+      </table>
+    </div>
   </section>
 
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
-    <div class="pit"><b>1. 通知是同步的。</b><code>notify()</code> 返回时所有回调已经跑完。订阅者里做阻塞 IO、等锁、甚至再触发一次 notify，都会把发布者卡住或造成重入。实时系统里通常改成“入队 + 另一线程分发”。</div>
-    <div class="pit"><b>2. 退订要“延迟生效”。</b>本轮通知已经决定要叫谁，中途删掉会让后面的人收不到（本页演示的正是这个）。墓碑 + 结束压缩是最小改动的解法。</div>
-    <div class="pit"><b>3. 订阅者的生命周期比接口更难。</b>C 里没有 <code>shared_ptr</code>，要么约定销毁顺序，要么在发布者里存“是否还活着”的仲裁位，要么用句柄（不返回裸指针）。</div>
-    <div class="pit"><b>4. 别用通知顺序表达业务。</b>“先仪表后诊断”这种隐含依赖，在加一个订阅者时就崩了。需要顺序就显式分两级总线，或在事件里带序号。</div>
-    <div class="pit"><b>5. 事件对象别传栈上临时值的地址。</b>C 版 <code>ev</code> 是 <code>const char*</code>，回调里若存起来供后续使用，必须自己拷贝；C++ 版用 <code>std::string</code> 按值传，省掉这一类悬垂。</div>
+    
+    <div class="prose"><ul><li><b>家族不是“越多越好”。</b>两个家族刚好；五个家族会让每个新零件都要乘五份实现，先确认真的存在“整代切换”的需求。</li><li><b>别把可变状态塞进家族。</b>家族对象应是只读的“说明书”，当前车速、当前档位属于具体零件或上下文。</li><li><b>C 版函数表按值返回，别存局部指针。</b>函数表里若带指向栈上数据的 <code>void *ctx</code>，返回后会悬空；要么全静态，要么显式传上下文。</li><li><b>C++ 版注意虚析构。</b>基类析构必须是 <code>virtual</code>，否则 <code>unique_ptr</code> 删除派生对象时只析构基类。</li><li><b>测试要成对跑。</b>单测每个零件通过不代表组合通过；至少加一组“同代组合”的集成用例，把时序预算跑满。</li></ul></div>
   </section>
-
-  <div class="ch-nav">
-      <a href="../p2/c01.html"><span>上一章</span><b>← 2.1 策略模式</b></a>
-      <a class="nx" href="../p2/c03.html"><span>下一章</span><b>2.3 状态模式 →</b></a>
-    </div>
-  <div class="foot">
-    <p>源码：<a href="../src/observer.c">src/observer.c</a> · <a href="../src/observer.cpp">src/observer.cpp</a> ｜ 编译：gcc / g++ 16.2.0，输出为本机实测<br>
-    <a href="../../../index.html">← 返回个人知识库</a></p>
+  <div class="ch-nav" id="chNav"></div>
   </div>
-</div>
-
 </div>
 
 <script src="../assets/pd.js"></script>
 <script src="../assets/dp-data.js"></script>
 <script src="../assets/dp-nav.js"></script>
 <script>dpNav('p2');</script>
-<script>
-(function () {
-  var SUBS = [
-    { id: 1, name: 'Gauge', desc: '刷新 speed 显示', unsub: false },
-    { id: 2, name: 'Recorder', desc: '落盘，并在回调里退订自己', unsub: true },
-    { id: 3, name: 'Diag', desc: '阈值判断、发故障码', unsub: false }
-  ];
-  var state = {};
-  SUBS.forEach(function (s) { state[s.id] = { on: true, removed: false }; });
-
-  var stage = document.getElementById('subStage');
-  var note = document.getElementById('subNote');
-  var log = document.getElementById('subLog');
-  var mode = 'raw';
-  var evNo = 61;
-
-  function rowHtml(s) {
-    var st = state[s.id];
-    var cls = 'subrow' + (st.removed ? ' off' : (st.on ? ' on' : ' off'));
-    var status = st.removed ? '已退订' : (st.on ? '订阅中' : '未订阅');
-    return '<div class="' + cls + '" data-id="' + s.id + '">' +
-      '<span class="dot"></span>' +
-      '<span class="nm">' + s.name + '</span>' +
-      '<span class="desc">' + s.desc + '　<i style="font-style:normal;color:#7d8ba1">' + status + '</i></span>' +
-      (s.unsub ? '<span class="tag">回调中退订</span>' : '<span></span>') +
-      '</div>';
-  }
-
-  function render() {
-    stage.innerHTML = SUBS.map(rowHtml).join('');
-    Array.prototype.forEach.call(stage.children, function (row) {
-      row.onclick = function () {
-        var id = +row.dataset.id;
-        var st = state[id];
-        if (st.removed) { st.removed = false; st.on = true; }
-        else { st.on = !st.on; }
-        PD.log(log, '<span class="mute">// ' + (st.on ? '订阅' : '退订') + ' ' + SUBS.filter(function (s) { return s.id === id; })[0].name + '</span>');
-        render();
-      };
-    });
-    var n = SUBS.filter(function (s) { return state[s.id].on && !state[s.id].removed; }).length;
-    note.textContent = '当前订阅者 ' + n + ' 个 · 通知方式：' + (mode === 'raw' ? '朴素（边遍历边删）' : '安全（墓碑 + 快照）');
-  }
-
-  function fire() {
-    var ev = 'speed=' + (evNo++);
-    var order = SUBS.map(function (s) { return s.id; });
-    var calls = [];
-    var skipped = [];
-
-    if (mode === 'raw') {
-      var arr = order.slice();
-      for (var i = 0; i < arr.length; i++) {
-        var id = arr[i];
-        var st = state[id];
-        if (!st.on || st.removed) continue;   // 本来就没订阅，不算漏发
-        calls.push(id);
-        if (SUBS.filter(function (s) { return s.id === id; })[0].unsub) {
-          arr.splice(i, 1);       // 真删：后面的元素前移，i 却继续 +1
-          st.removed = true;
-        }
-      }
-      // 本轮以后仍留在数组里、但这次没被叫到的，就是被“跳过”的
-      order.forEach(function (id) {
-        if (!state[id].removed && state[id].on && calls.indexOf(id) < 0) skipped.push(id);
-      });
-    } else {
-      var snapshot = order.slice();
-      snapshot.forEach(function (id) {
-        var st = state[id];
-        if (!st.on || st.removed) return;
-        calls.push(id);
-        if (SUBS.filter(function (s) { return s.id === id; })[0].unsub) st.on = false;  // 只标记，不动数组
-      });
-    }
-
-    var names = function (ids) {
-      return ids.map(function (id) { return SUBS.filter(function (s) { return s.id === id; })[0].name; }).join(' → ');
-    };
-    PD.log(log, '<b>' + ev + '</b>：回调 ' + calls.length + ' 次　' + names(calls));
-    if (skipped.length) {
-      PD.log(log, '<span class="bad">被跳过：' + names(skipped) + '（数组前移，下标越过了它）</span>');
-    } else {
-      PD.log(log, '<span class="mute">没有漏发</span>');
-    }
-    render();
-  }
-
-  document.querySelectorAll('[data-mode]').forEach(function (b) {
-    b.onclick = function () {
-      document.querySelectorAll('[data-mode]').forEach(function (x) { x.classList.remove('on'); });
-      b.classList.add('on');
-      mode = b.dataset.mode;
-      PD.log(log, '<span class="mute">// 切换为' + (mode === 'raw' ? '朴素实现' : '安全实现') + '</span>');
-      render();
-    };
-  });
-  document.getElementById('fire').onclick = fire;
-  document.getElementById('resetSub').onclick = function () {
-    SUBS.forEach(function (s) { state[s.id] = { on: true, removed: false }; });
-    PD.clear(log);
-    PD.log(log, '<span class="mute">// 通知日志</span>');
-    render();
-  };
-
-  render();
-})();
-</script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-

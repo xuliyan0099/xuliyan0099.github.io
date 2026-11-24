@@ -3,21 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>2.5 职责链模式 Chain of Responsibility · C 与 C++ 双实现</title>
-<meta name="description" content="CAN 报文过滤管道：C 用结构体单向链 + 函数指针，C++ 用模板方法 run()；四帧演示在哪一级被丢弃。">
+<title>2.5 单例模式 SINGLETON · C 与 C++ 双实现</title>
+<meta name="description" content="单例模式：C 与 C++ 双实现，含结构图、运行输出与可点演示。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
-<style>
-.pipe{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 12px}
-.pl{font:600 11px/1.6 var(--mono);padding:7px 11px;border-radius:7px;border:1px solid var(--line);background:#0f1420;color:#93a4c4;transition:all .18s}
-.pl.act{border-color:rgba(124,156,255,.7);background:rgba(124,156,255,.12);color:#cfe0ff}
-.pl.pass{border-color:rgba(67,214,168,.55);color:#8ff5d6;background:rgba(67,214,168,.09)}
-.pl.drop{border-color:rgba(255,128,128,.55);color:#ffb0b0;background:rgba(255,128,128,.09)}
-.pipe .ar{color:#4a5a75;font:11px/1 var(--mono)}
-.fhead{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}
-.fhead span{font:11px/1.6 var(--mono);padding:5px 9px;border-radius:6px;border:1px solid var(--line);color:#9fb0cc}
-.fhead b{color:#8ff5d6;font-weight:600}
-</style>
 </head>
 <body>
 <div class="bg" aria-hidden="true"></div>
@@ -38,535 +27,246 @@
 
 <div class="shell">
   <aside id="sidebar">
-    <div class="vol-h">篇二 · 行为型<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
+    <div class="vol-h" id="sideHead">设计模式全书 · 25 章<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
     <ol id="sideList"></ol>
     <div class="vol-nav" id="volNav"></div>
   </aside>
 
   <div class="wrap">
-  <div class="ch-meta"><span class="lv">篇二 · 行为型</span><span class="sep">/</span>第 5 章<span class="sep">/</span>约 28 分钟</div>
-  <h1>职责链模式<span class="en">CHAIN</span></h1>
-  <p class="lede">把“检查”拆成独立的一节一节，串成一条链：每一节只判断自己关心的那一件事，通过就把报文交给下一节，不通过就就地终止。报文从哪一节被丢，看日志就知道；想加一节过滤，只改装配，不动任何已有节点。</p>
-  <div class="chips">
-    <span class="chip ok">四个节点 · 四种丢弃点</span>
-    <span class="chip">通过 = 转 next</span>
-    <span class="chip">终止 = 不碰 next</span>
-  </div>
-<section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：嵌套 if 会越写越深</h2>
-    <div class="prose">
-      <p>报文过滤最直觉的写法是层层嵌套：长度对了才查 CRC，CRC 对了才查白名单，白名单过了才交给业务。三个检查就已经三层缩进，再加“频率限制”“报文年龄”“安全访问”就往右顶到屏幕外面。</p>
-      <p>更深一层的问题是<b>顺序变成了代码结构</b>：想调换 CRC 与白名单的先后，得把整块代码搬来搬去；想按车型装配不同的过滤组合，只能复制函数再改；想在丢弃时统一记一笔，得在每个 <code>return</code> 前都写一遍。</p>
-      <p>职责链把顺序变成<b>数据</b>：每个检查是一个节点，节点只知道“我通过就转给 next”。装配处把 <code>len → crc → white → app</code> 串起来，顺序一目了然，换顺序就换链。</p>
-    </div>
+  <div class="ch-meta"><span class="lv">篇二 · 创建型</span><span class="sep">/</span>第 5 章<span class="sep">/</span>约 28 分钟</div>
+  <h1>组合模式<span class="en">COMPOSITE</span></h1>
+  <p class="lede">整车自检要遍历“整车 → 总成 → 零件”。如果枝和叶用两套接口，遍历代码就要在每一层判断“这是组还是零件”。<b>组合模式让枝和叶实现同一个接口</b>：组自己递归孩子，叶只报结果，调用方从根调一次就够。</p>
+  <div class="chips"><span class="chip ok">枝与叶同一接口</span><span class="chip">遍历只写一遍</span><span class="chip">增删子树不改调用方</span></div>
+
+  <section class="sec" id="s1">
+    <h2><span class="n">01</span>问题：树形结构，遍历代码越写越像</h2>
+    
+    
+      <div class="prose">
+        <p>坏写法通常是两套结构 + 手写递归：</p>
+        <pre><code>if (node-&gt;is_group) {
+    for (child in node-&gt;children) run_group(child);
+} else {
+    run_leaf(node);
+}</code></pre>
+        <p>这行代码会在每个层级复制一遍，问题随之而来：</p>
+        <ul>
+          <li><b>层级一深就漏。</b>“总成里还有子总成”时，<code>run_group</code> 忘了递归，孙子节点永远不跑。</li>
+          <li><b>统计口径不一。</b>有的分支只算叶子，有的把组也算一项，最后总数对不上。</li>
+          <li><b>新增节点类型要改遍历。</b>加一个“虚拟节点”或“占位节点”，所有遍历函数都要动。</li>
+        </ul>
+        <p>组合把“遍历孩子”收进组自己：组的 <code>run()</code> 负责递归，叶的 <code>run()</code> 只报自己的结果。调用方只看到 <code>run(root)</code>。</p>
+      </div>
   </section>
 
   <section class="sec" id="s2">
-    <h2><span class="n">02</span>结构：一条单向链，四道关</h2>
-    <p class="subh">每节节点做两件事：判断自己，决定是否调用 next。点方框看每一节“知道什么、不知道什么”。</p>
-
+    <h2><span class="n">02</span>结构：枝和叶同一接口</h2>
+    <p class="subh">三层树：整车是根，动力/底盘是枝，发动机、变速箱、ABS 是叶；点方框看每层职责。</p>
+    
+  
     <div class="fig">
-      <div class="fig-h"><b>CAN 报文过滤链</b><span>len → crc → white → app</span></div>
+      <div class="fig-h"><b>整车自检树：枝和叶同一接口</b><span>composite</span></div>
       <div class="diagram">
-        <svg viewBox="0 0 880 330" role="img" aria-label="职责链结构图">
-          <defs>
-            <marker id="ar6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-              <path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/>
-            </marker>
-            <marker id="ar6r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-              <path d="M0 0 L10 5 L0 10 z" fill="#c97a7a"/>
-            </marker>
-          </defs>
-
-          <text class="lbl" x="24" y="34">frame（id / len / crc）进入链首</text>
-
-          <g class="node" data-role="len" data-note="len 节点：只看长度是否等于 8。它不知道 CRC 怎么算，也不知道白名单有哪些；通过就调 next，丢弃就返回 1/Stop。">
-            <rect x="24" y="66" width="170" height="86" rx="10"/>
-            <text class="nm" x="38" y="90">① len</text>
-            <text class="ty" x="38" y="109">长度检查</text>
-            <text class="mt" x="38" y="128">len != 8 → 丢弃</text>
-            <text class="mt" x="38" y="145">next = crc</text>
-          </g>
-
-          <g class="node" data-role="crc" data-note="crc 节点：按约定算高字节 ^ 低字节 ^ 长度，与报文里的 crc 比对。它只依赖 frame 的字段，不依赖前一节是否改过数据。">
-            <rect x="230" y="66" width="170" height="86" rx="10"/>
-            <text class="nm" x="244" y="90">② crc</text>
-            <text class="ty" x="244" y="109">校验</text>
-            <text class="mt" x="244" y="128">crc 不符 → 丢弃</text>
-            <text class="mt" x="244" y="145">next = white</text>
-          </g>
-
-          <g class="node" data-role="white" data-note="white 节点：只放行 0x100 与 0x2A0。白名单是策略，可以做成配置表；节点本身不含业务语义。">
-            <rect x="436" y="66" width="170" height="86" rx="10"/>
-            <text class="nm" x="450" y="90">③ white</text>
-            <text class="ty" x="450" y="109">白名单</text>
-            <text class="mt" x="450" y="128">不在 0x100/0x2A0 → 丢弃</text>
-            <text class="mt" x="450" y="145">next = app</text>
-          </g>
-
-          <g class="node" data-role="app" data-note="app 节点：链尾的业务处理，消费完返回 1/Stop —— 它不是“拒绝”，而是“到此为止，不要再往后传”。">
-            <rect x="642" y="66" width="210" height="86" rx="10"/>
-            <text class="nm" x="656" y="90">④ app</text>
-            <text class="ty" x="656" y="109">业务消费</text>
-            <text class="mt" x="656" y="128">已消费 → 终止</text>
-            <text class="mt" x="656" y="145">next = nullptr</text>
-          </g>
-
-          <path class="flow" marker-end="url(#ar6)" d="M194 104 L226 104"/>
-          <text class="lbl" x="190" y="96">Pass</text>
-
-          <path class="flow" marker-end="url(#ar6)" d="M400 104 L432 104"/>
-          <text class="lbl" x="396" y="96">Pass</text>
-
-          <path class="flow" marker-end="url(#ar6)" d="M606 104 L638 104"/>
-          <text class="lbl" x="602" y="96">Pass</text>
-
-          <path class="flow" marker-end="url(#ar6r)" d="M109 152 L109 192"/>
-          <path class="flow" marker-end="url(#ar6r)" d="M315 152 L315 192"/>
-          <path class="flow" marker-end="url(#ar6r)" d="M521 152 L521 192"/>
-
-          <rect x="88" y="196" width="482" height="56" rx="9" fill="rgba(255,128,128,.05)" stroke="#6b3a44" stroke-width="1.2" stroke-dasharray="5 4"/>
-          <text class="nm" x="104" y="220" style="font-size:12.5px">Stop / 返回 1：就地终止</text>
-          <text class="mt" x="104" y="239">不调用 next，链后面的节点完全不知情</text>
-
-          <text class="lbl" x="24" y="286">C：每个节点 return 1 终止、return 0 继续；C++：run() 统一判断 Result，check() 只管自己的规则</text>
-          <text class="lbl" x="24" y="306">链是单向的：节点只持有 next，不持有 prev —— 想反向回溯要另加字段</text>
-        </svg>
+<svg viewBox="0 0 880 360" role="img" aria-label="整车自检树：枝和叶同一接口">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
+  <g class="node" data-role="root" data-note="根只做一件事：把 depth 传给孩子，收集每个孩子的结果；它自己不判断零件好坏。"><rect x="350" y="34" width="180" height="72" rx="10"/><text class="nm" x="364" y="58">vehicle</text><text class="ty" x="364" y="77">组（根）</text><text class="mt" x="364" y="95">run(depth=0)</text></g>
+  <g class="node" data-role="power" data-note="总成是“组”：它递归两个孩子，任一失败就把失败往上抛。"><rect x="180" y="150" width="180" height="72" rx="10"/><text class="nm" x="194" y="174">powertrain</text><text class="ty" x="194" y="193">组</text><text class="mt" x="194" y="211">engine + gearbox</text></g>
+  <g class="node" data-role="chassis" data-note="同样是组，但只有一个孩子；组合不要求孩子数量一致。"><rect x="520" y="150" width="180" height="72" rx="10"/><text class="nm" x="534" y="174">chassis</text><text class="ty" x="534" y="193">组</text><text class="mt" x="534" y="211">abs</text></g>
+  <g class="node" data-role="eng" data-note="叶不递归，只返回自己的通过/失败；它不知道自己在树的第几层。"><rect x="60" y="268" width="150" height="64" rx="10"/><text class="nm" x="74" y="292">engine</text><text class="ty" x="74" y="311">叶</text><text class="mt" x="74" y="329">PASS</text></g>
+  <g class="node" data-role="gear" data-note="一个叶失败，整棵树的最终结果就是 FAIL；失败原因由调用方按路径定位。"><rect x="230" y="268" width="150" height="64" rx="10"/><text class="nm" x="244" y="292">gearbox</text><text class="ty" x="244" y="311">叶</text><text class="mt" x="244" y="329">FAIL</text></g>
+  <g class="node" data-role="abs" data-note="叶的接口与组完全一致，所以遍历代码不需要类型判断。"><rect x="520" y="268" width="150" height="64" rx="10"/><text class="nm" x="534" y="292">abs</text><text class="ty" x="534" y="311">叶</text><text class="mt" x="534" y="329">PASS</text></g>
+  <line x1="420" y1="106" x2="300" y2="150" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="470" y1="106" x2="580" y2="150" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="250" y1="222" x2="170" y2="268" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="310" y1="222" x2="310" y2="268" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="610" y1="222" x2="595" y2="268" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+</svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：每节只判断一件事，终止与放行由同一处逻辑决定。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：组负责递归，叶负责报结果。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
     <h2><span class="n">03</span>两份实现</h2>
-    <p class="subh">C 版把链做成结构体里的 <code>next</code> 指针，转发是节点自己写的一句递归调用；C++ 版把“转发”提到基类 <code>run()</code> 里，子类只实现 <code>check()</code>，从结构上保证每个节点都不会忘记转 next。</p>
-
-    <div class="codes">
+    
+    <p class='subh'>C 版用孩子数组 + 统一 <code>run_node()</code>；C++ 版用 <code>unique_ptr</code> 容器，析构自动递归。</p>
       <div class="codecard">
-        <div class="ch"><span class="lang">C</span><span class="fn">chain.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 责任链模式 · C 实现：报文过滤管道
- * 编译：gcc -std=c11 -Wall -Wextra chain.c -o chain
- * 每个处理器返回 0 = 放行给下一个，1 = 就地终止。
- */
+        <div class="ch"><span class="lang">C</span><span class="fn">composite.c</span><button class="copy">复制</button></div>
+        <pre><code>/* 组合：一棵诊断树，叶子是零件，枝是分组，遍历代码只写一遍 */
 #include &lt;stdio.h&gt;
+#include &lt;stddef.h&gt;
 
-typedef struct { int id; int len; unsigned char crc; } frame_t;
-
-typedef struct handler handler_t;
-typedef struct {
-    int (*handle)(handler_t *self, const frame_t *f);
-} handler_ops_t;
-
-struct handler {
-    const handler_ops_t *ops;
-    handler_t           *next;
-    const char          *name;
+typedef struct node node_t;
+struct node {
+    const char *name;
+    int is_leaf;
+    int pass;
+    node_t *kids[4];
+    int nkids;
 };
 
-/* ① 长度检查 */
-static int len_handle(handler_t *h, const frame_t *f)
+static int run_node(const node_t *nd, int depth)
 {
-    if (f-&gt;len != 8) {
-        printf("  [%s] 丢弃 0x%03X：长度 %d != 8\n", h-&gt;name, f-&gt;id, f-&gt;len);
-        return 1;
+    for (int i = 0; i &lt; depth; i++) printf("  ");
+    if (nd-&gt;is_leaf) {
+        printf("- %-10s %s\n", nd-&gt;name, nd-&gt;pass ? "PASS" : "FAIL");
+        return nd-&gt;pass;
     }
-    printf("  [%s] 通过\n", h-&gt;name);
-    return h-&gt;next ? h-&gt;next-&gt;ops-&gt;handle(h-&gt;next, f) : 0;
+    printf("+ %s\n", nd-&gt;name);
+    int ok = 1;
+    for (int i = 0; i &lt; nd-&gt;nkids; i++)
+        if (!run_node(nd-&gt;kids[i], depth + 1)) ok = 0;
+    return ok;
 }
-
-/* ② CRC：约定 crc = 高字节 ^ 低字节 ^ 长度 */
-static int crc_handle(handler_t *h, const frame_t *f)
-{
-    unsigned char want = (unsigned char)(((f-&gt;id &gt;&gt; 8) &amp; 0xFF) ^ (f-&gt;id &amp; 0xFF) ^ f-&gt;len);
-    if (f-&gt;crc != want) {
-        printf("  [%s] 丢弃 0x%03X：crc=%02X，应为 %02X\n", h-&gt;name, f-&gt;id, f-&gt;crc, want);
-        return 1;
-    }
-    printf("  [%s] 通过\n", h-&gt;name);
-    return h-&gt;next ? h-&gt;next-&gt;ops-&gt;handle(h-&gt;next, f) : 0;
-}
-
-/* ③ 白名单：只收 0x100 / 0x2A0 */
-static int white_handle(handler_t *h, const frame_t *f)
-{
-    if (!(f-&gt;id == 0x100 || f-&gt;id == 0x2A0)) {
-        printf("  [%s] 丢弃 0x%03X：不在白名单\n", h-&gt;name, f-&gt;id);
-        return 1;
-    }
-    printf("  [%s] 通过\n", h-&gt;name);
-    return h-&gt;next ? h-&gt;next-&gt;ops-&gt;handle(h-&gt;next, f) : 0;
-}
-
-/* ④ 业务处理：链尾 */
-static int app_handle(handler_t *h, const frame_t *f)
-{
-    printf("  [%s] 已消费 0x%03X\n", h-&gt;name, f-&gt;id);
-    return 1;
-}
-
-static const handler_ops_t LEN_OPS   = { len_handle };
-static const handler_ops_t CRC_OPS   = { crc_handle };
-static const handler_ops_t WHITE_OPS = { white_handle };
-static const handler_ops_t APP_OPS   = { app_handle };
 
 int main(void)
 {
-    handler_t h_app   = { &amp;APP_OPS,   NULL, "app"   };
-    handler_t h_white = { &amp;WHITE_OPS, &amp;h_app, "white" };
-    handler_t h_crc   = { &amp;CRC_OPS,   &amp;h_white, "crc" };
-    handler_t h_len   = { &amp;LEN_OPS,   &amp;h_crc, "len" };
+    node_t eng  = { .name = "engine",  .is_leaf = 1, .pass = 1, .kids = {0}, .nkids = 0 };
+    node_t gear = { .name = "gearbox", .is_leaf = 1, .pass = 0, .kids = {0}, .nkids = 0 };
+    node_t abs  = { .name = "abs",     .is_leaf = 1, .pass = 1, .kids = {0}, .nkids = 0 };
+    node_t power = { .name = "powertrain", .is_leaf = 0, .pass = 0, .kids = { &amp;eng, &amp;gear }, .nkids = 2 };
+    node_t chassis = { .name = "chassis", .is_leaf = 0, .pass = 0, .kids = { &amp;abs }, .nkids = 1 };
+    node_t root = { .name = "vehicle", .is_leaf = 0, .pass = 0, .kids = { &amp;power, &amp;chassis }, .nkids = 2 };
 
-    static const frame_t frames[] = {
-        { 0x100, 7, 0x09 },   /* 长度错 */
-        { 0x100, 8, 0x00 },   /* crc 错 */
-        { 0x500, 8, 0x0D },   /* 不在白名单 */
-        { 0x100, 8, 0x09 }    /* 全部通过 */
-    };
-
-    for (unsigned i = 0; i &lt; sizeof frames / sizeof frames[0]; i++) {
-        printf("frame 0x%03X len=%d crc=%02X\n", frames[i].id, frames[i].len, frames[i].crc);
-        h_len.ops-&gt;handle(&amp;h_len, &amp;frames[i]);
-    }
+    int ok = run_node(&amp;root, 0);
+    printf("整车自检：%s\n", ok ? "PASS" : "FAIL");
     return 0;
 }</code></pre>
       </div>
-
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>./composite.exe</span></div>
+      <pre>+ vehicle
+  + powertrain
+    - engine     PASS
+    - gearbox    FAIL
+  + chassis
+    - abs        PASS
+整车自检：FAIL</pre>
+    </div>
       <div class="codecard">
-        <div class="ch"><span class="lang">C++</span><span class="fn">chain.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 责任链模式 · C++ 实现：链式装配 + 每节点自己决定放行或终止
-// 编译：g++ -std=c++17 -Wall -Wextra chain.cpp -o chain_cpp
+        <div class="ch"><span class="lang">C++</span><span class="fn">composite.cpp</span><button class="copy">复制</button></div>
+        <pre><code>// 组合 · C++：Group 持有 unique_ptr，析构自动递归
+// 编译：g++ -std=c++17 -Wall -Wextra composite.cpp -o composite_cpp
 #include &lt;cstdio&gt;
+#include &lt;memory&gt;
 #include &lt;string&gt;
+#include &lt;vector&gt;
 
-struct Frame { int id; int len; unsigned char crc; };
-
-enum class Result { Pass, Stop };
-
-class Handler {
+class Component {
 public:
-    explicit Handler(std::string name) : name_(std::move(name)) {}
-    virtual ~Handler() = default;
-
-    Handler&amp; setNext(Handler&amp; n) { next_ = &amp;n; return n; }
-
-    // 模板方法：先问自己，再决定要不要往后传
-    Result run(const Frame&amp; f) {
-        Result r = check(f);
-        if (r == Result::Stop) return Result::Stop;
-        return next_ ? next_-&gt;run(f) : Result::Pass;
-    }
-
+    explicit Component(std::string name) : name_(std::move(name)) {}
+    virtual ~Component() = default;
+    virtual bool run(int depth) const = 0;
 protected:
-    const std::string&amp; name() const { return name_; }
-
-private:
-    virtual Result check(const Frame&amp; f) = 0;
     std::string name_;
-    Handler* next_ = nullptr;
 };
 
-class LenCheck final : public Handler {
+class Leaf : public Component {
 public:
-    LenCheck() : Handler("len") {}
-protected:
-    Result check(const Frame&amp; f) override {
-        if (f.len != 8) {
-            std::printf("  [%s] 丢弃 0x%03X：长度 %d != 8\n", name().c_str(), f.id, f.len);
-            return Result::Stop;
-        }
-        std::printf("  [%s] 通过\n", name().c_str());
-        return Result::Pass;
+    Leaf(std::string n, bool pass) : Component(std::move(n)), pass_(pass) {}
+    bool run(int depth) const override
+    {
+        for (int i = 0; i &lt; depth; i++) std::printf("  ");
+        std::printf("- %-10s %s\n", name_.c_str(), pass_ ? "PASS" : "FAIL");
+        return pass_;
     }
+private:
+    bool pass_;
 };
 
-class CrcCheck final : public Handler {
+class Group : public Component {
 public:
-    CrcCheck() : Handler("crc") {}
-protected:
-    Result check(const Frame&amp; f) override {
-        unsigned char want = static_cast&lt;unsigned char&gt;(((f.id &gt;&gt; 8) &amp; 0xFF) ^ (f.id &amp; 0xFF) ^ f.len);
-        if (f.crc != want) {
-            std::printf("  [%s] 丢弃 0x%03X：crc=%02X，应为 %02X\n",
-                        name().c_str(), f.id, f.crc, want);
-            return Result::Stop;
-        }
-        std::printf("  [%s] 通过\n", name().c_str());
-        return Result::Pass;
+    explicit Group(std::string n) : Component(std::move(n)) {}
+    Group &amp;add(std::unique_ptr&lt;Component&gt; c) { kids_.push_back(std::move(c)); return *this; }
+    bool run(int depth) const override
+    {
+        for (int i = 0; i &lt; depth; i++) std::printf("  ");
+        std::printf("+ %s\n", name_.c_str());
+        bool ok = true;
+        for (const auto &amp;c : kids_)
+            if (!c-&gt;run(depth + 1)) ok = false;
+        return ok;
     }
+private:
+    std::vector&lt;std::unique_ptr&lt;Component&gt;&gt; kids_;
 };
 
-class WhiteList final : public Handler {
-public:
-    WhiteList() : Handler("white") {}
-protected:
-    Result check(const Frame&amp; f) override {
-        if (!(f.id == 0x100 || f.id == 0x2A0)) {
-            std::printf("  [%s] 丢弃 0x%03X：不在白名单\n", name().c_str(), f.id);
-            return Result::Stop;
-        }
-        std::printf("  [%s] 通过\n", name().c_str());
-        return Result::Pass;
-    }
-};
+int main()
+{
+    auto root = std::make_unique&lt;Group&gt;("vehicle");
+    auto power = std::make_unique&lt;Group&gt;("powertrain");
+    power-&gt;add(std::make_unique&lt;Leaf&gt;("engine", true));
+    power-&gt;add(std::make_unique&lt;Leaf&gt;("gearbox", false));
+    root-&gt;add(std::move(power));
+    auto chassis = std::make_unique&lt;Group&gt;("chassis");
+    chassis-&gt;add(std::make_unique&lt;Leaf&gt;("abs", true));
+    root-&gt;add(std::move(chassis));
 
-class AppSink final : public Handler {
-public:
-    AppSink() : Handler("app") {}
-protected:
-    Result check(const Frame&amp; f) override {
-        std::printf("  [%s] 已消费 0x%03X\n", name().c_str(), f.id);
-        return Result::Stop;
-    }
-};
-
-int main() {
-    LenCheck len;
-    CrcCheck crc;
-    WhiteList white;
-    AppSink app;
-
-    len.setNext(crc).setNext(white).setNext(app);
-
-    const Frame frames[] = {
-        { 0x100, 7, 0x09 },
-        { 0x100, 8, 0x00 },
-        { 0x500, 8, 0x0D },
-        { 0x100, 8, 0x09 }
-    };
-    for (const auto&amp; f : frames) {
-        std::printf("frame 0x%03X len=%d crc=%02X\n", f.id, f.len, f.crc);
-        len.run(f);
-    }
+    bool ok = root-&gt;run(0);
+    std::printf("整车自检：%s\n", ok ? "PASS" : "FAIL");
     return 0;
 }</code></pre>
       </div>
-    </div>
-
     <div class="run">
-      <div class="ch"><b>RUN</b><span>./chain.exe</span></div>
-      <pre>frame 0x100 len=7 crc=09
-  [len] 丢弃 0x100：长度 7 != 8
-frame 0x100 len=8 crc=00
-  [len] 通过
-  [crc] 丢弃 0x100：crc=00，应为 09
-frame 0x500 len=8 crc=0D
-  [len] 通过
-  [crc] 通过
-  [white] 丢弃 0x500：不在白名单
-frame 0x100 len=8 crc=09
-  [len] 通过
-  [crc] 通过
-  [white] 通过
-  [app] 已消费 0x100</pre>
+      <div class="ch"><b>RUN</b><span>./composite_cpp.exe</span></div>
+      <pre>+ vehicle
+  + powertrain
+    - engine     PASS
+    - gearbox    FAIL
+  + chassis
+    - abs        PASS
+整车自检：FAIL</pre>
     </div>
-    <div class="run">
-      <div class="ch"><b>RUN</b><span>./chain_cpp.exe</span></div>
-      <pre>frame 0x100 len=7 crc=09
-  [len] 丢弃 0x100：长度 7 != 8
-frame 0x100 len=8 crc=00
-  [len] 通过
-  [crc] 丢弃 0x100：crc=00，应为 09
-frame 0x500 len=8 crc=0D
-  [len] 通过
-  [crc] 通过
-  [white] 丢弃 0x500：不在白名单
-frame 0x100 len=8 crc=09
-  [len] 通过
-  [crc] 通过
-  [white] 通过
-  [app] 已消费 0x100</pre>
-    </div>
-    <p class="hintline">四帧各死在一节：长度、CRC、白名单——最后一帧才走完全链。被丢弃的帧，后面的节点一行日志都没有，这就是“终止”与“拒绝”的区别。</p>
   </section>
-  <section class="sec" id="s4">
-    <h2><span class="n">04</span>发一帧，看它死在哪一节</h2>
-    <p class="subh">点四个预设帧中的任意一个，报文会从链首逐节往下走。通过的节点变绿，丢它的节点变红，后面的节点保持灰——不再被调用。</p>
 
-    <div class="demo">
-      <div class="demo-h"><b>filter chain</b><span>通过就转 next，终止就不转</span></div>
-      <div class="stage">
-        <div class="fhead" id="fHead"></div>
-        <div class="pipe" id="pipe"></div>
-        <div class="ctl">
-          <button class="btn" data-f="0">长度错：0x100 len=7</button>
-          <button class="btn" data-f="1">CRC 错：0x100 crc=00</button>
-          <button class="btn" data-f="2">非白名单：0x500</button>
-          <button class="btn" data-f="3">合法：0x100 len=8</button>
-        </div>
-        <div class="log" id="pillLog"></div>
-      </div>
+  <section class="sec" id="s4">
+    <h2><span class="n">04</span>自检树从根跑到叶</h2>
+    
+    
+<div class="demo" id="demo">
+  <div class="demo-h"><b>自检树从根跑到叶</b><span>单步看递归顺序：先整车，再动力，最后到底盘。</span></div>
+  <div class="stage">
+    <div class="dflow" id="dflow"></div>
+    <div class="dbar" id="dbar">未开始</div>
+    <div class="dctl">
+      <button class="btn" id="dPrev">复位</button>
+      <button class="btn" id="dNext">单步</button>
+      <button class="btn" id="dPlay">自动</button>
+      <button class="btn" id="dReset">清日志</button>
     </div>
+    <div class="dnote" id="dnote">点上面的方框，看它在这次流程里负责什么。</div>
+    <div class="log" id="dlog"></div>
+  </div>
+</div>
+<script>dpDemo({nodes:[{id:'root',label:'vehicle',sub:'组',note:''}, {id:'power',label:'powertrain',sub:'组',note:''}, {id:'eng',label:'engine',sub:'叶 PASS',note:''}, {id:'gear',label:'gearbox',sub:'叶 FAIL',note:''}, {id:'chassis',label:'chassis',sub:'组',note:''}, {id:'abs',label:'abs',sub:'叶 PASS',note:''}],steps:[{hi:['root'],t:'vehicle.run(0)：打印根，开始遍历孩子'}, {hi:['power'],t:'进入 powertrain：它是组，继续递归'}, {hi:['eng'],t:'engine 是叶：报 PASS，返回到 powertrain'}, {hi:['gear'],t:'gearbox 是叶：报 FAIL，powertrain 记为失败'}, {hi:['chassis'],t:'powertrain 返回后，进入 chassis'}, {hi:['abs'],t:'abs 是叶：报 PASS'}, {hi:['root', 'power'],t:'整车汇总：任一孩子失败 → FAIL，路径可定位到 gearbox'}]});</script>
+
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>C 与 C++：谁负责“记得转 next”</h2>
+    <h2><span class="n">05</span>C 与 C++：谁管孩子</h2>
+    
+    
     <div class="tbl">
       <table>
         <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
-        <tbody>
-          <tr><td>节点接口</td><td><code>handler_ops_t</code> 一个函数指针</td><td><code>Handler</code> 基类 + 纯虚 <code>check</code></td><td>两者都是一个间接层，C 的更轻</td></tr>
-          <tr><td>转发</td><td>每个 <code>handle</code> 末尾自己写</td><td>基类 <code>run()</code> 统一转发</td><td>C 版容易漏写；C++ 版结构上漏不了</td></tr>
-          <tr><td>终止</td><td><code>return 1</code></td><td><code>Result::Stop</code></td><td>C 的 int 没有语义约束，写 <code>-1</code> 也会被当“已处理”</td></tr>
-          <tr><td>装配</td><td><code>{ &amp;OPS, &amp;next, "name" }</code> 逐个初始化</td><td><code>setNext()</code> 链式</td><td>链式写法要注意它返回的是 <code>n</code>，不是自己</td></tr>
-          <tr><td>节点生命周期</td><td colspan="2">都在 <code>main</code> 栈上，链比节点活得短</td><td>谁申请谁释放，链只借指针，不拥有节点</td></tr>
-          <tr><td>加一节</td><td>加一个函数 + 一张 ops 表 + 改装配</td><td>加一个子类 + 改装配</td><td>都只动装配，不动已有节点</td></tr>
-        </tbody>
+        <tbody><tr><td>孩子容器</td><td><code>node_t *kids[4]</code></td><td><code>vector&lt;unique_ptr&lt;Component&gt;&gt;</code></td><td>C 固定上限；C++ 动态扩容且自动释放</td></tr><tr><td>统一接口</td><td>函数指针 <code>run_node</code></td><td>纯虚 <code>run()</code></td><td>都让枝和叶长得一样</td></tr><tr><td>遍历</td><td>组内部递归</td><td>组内部递归</td><td>调用方只调一次根</td></tr><tr><td>失败传播</td><td>返回 int，逐层与</td><td>返回 bool，逐层与</td><td>口径要统一，别有的层吞掉失败</td></tr><tr><td>增删子树</td><td>改数组 + nkids</td><td>push_back / erase</td><td>C 要手维护计数，C++ 容器代劳</td></tr></tbody>
       </table>
     </div>
   </section>
 
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
-    <div class="prose">
-      <ul>
-        <li><b>递归转发会吃栈。</b>C 版每个节点都调 <code>next-&gt;handle</code>，链有 40 节就有 40 层栈。嵌入式任务的栈常常只有几 KB，链一长就炸；改成 <code>while</code> 循环遍历更稳。</li>
-        <li><b>链成环，报文永不停。</b>装配时 <code>app-&gt;next = len</code> 这类手误，运行时表现为“某一帧卡死”。加一个装配期的长度/环路检查，或者把 next 设成只写一次。</li>
-        <li><b>返回值只有两个合法值。</b>C 版返回 <code>-1</code> 或 <code>2</code> 都算“非 0”，调用方当终止处理，日志却写着别的原因。用 <code>enum</code> 或至少断言范围。</li>
-        <li><b>顺序既是性能也是安全。</b>白名单放在 CRC 前，能少算非法 ID 的校验；但若白名单来自可篡改配置，先 CRC 再信 ID 更安全。顺序要写进设计文档，别让它只是“装配时随手一排”。</li>
-        <li><b>节点可以改 frame。</b>谁都能改，后面节点看到的就是改过的数据。约定“检查节点只读”，要改数据就在链尾单独做。</li>
-        <li><b>链尾必须明确终止。</b>业务节点返回 Pass，最后落到 <code>nullptr</code> 也只是“没人处理”，上层无法区分“消费了”和“丢了”。</li>
-        <li><b>C++ 的 <code>setNext</code> 返回引用。</b><code>a.setNext(b).setNext(c)</code> 实际是 <code>a→b、b→c</code>，不是给 a 连两次；读代码时容易看错，写注释或改成 <code>void setNext</code> 更清楚。</li>
-      </ul>
-    </div>
+    
+    <div class="prose"><ul><li><b>别在叶里访问父节点。</b>叶一旦反向依赖父节点，树就变成图，递归容易成环；需要上下文就通过参数往下传。</li><li><b>递归深度要设上限。</b>诊断树通常不深，但配置错误可能造出自引用；入口处限制 depth 或检测环。</li><li><b>组也可以是空组。</b>空组应明确返回“通过”还是“未配置”，别让 0 个孩子默默算 PASS 掩盖配置缺失。</li><li><b>C 版孩子数组要初始化。</b><code>kids</code> 未清零、<code>nkids</code> 又写大了，会读到野指针；统一用指定初始化器。</li><li><b>统计不要混层。</b>“通过率”按叶算还是按组算要写死；否则同一棵树两个报表两个数。</li></ul></div>
   </section>
-
-  <div class="ch-nav">
-      <a href="../p2/c04.html"><span>上一章</span><b>← 2.4 命令模式</b></a>
-      <a class="nx" href="../p3/c01.html"><span>下一篇</span><b>3.1 适配器模式 →</b></a>
-    </div>
-
-  
-</div>
-
+  <div class="ch-nav" id="chNav"></div>
+  </div>
 </div>
 
 <script src="../assets/pd.js"></script>
 <script src="../assets/dp-data.js"></script>
 <script src="../assets/dp-nav.js"></script>
+<script src="../assets/dp-demo.js"></script>
 <script>dpNav('p2');</script>
-<script>
-(function () {
-  var NODES = ['len', 'crc', 'white', 'app'];
-  var FRAMES = [
-    { id: 0x100, len: 7, crc: 0x09, why: '长度错' },
-    { id: 0x100, len: 8, crc: 0x00, why: 'CRC 错' },
-    { id: 0x500, len: 8, crc: 0x0D, why: '非白名单' },
-    { id: 0x100, len: 8, crc: 0x09, why: '全部合法' }
-  ];
-
-  var pipe = document.getElementById('pipe');
-  var fHead = document.getElementById('fHead');
-  var logEl = document.getElementById('pillLog');
-  var busy = false;
-  var timer = [];
-
-  function hex(n, w) { return n.toString(16).toUpperCase().padStart(w, '0'); }
-
-  function buildPipe() {
-    pipe.innerHTML = '';
-    NODES.forEach(function (n, i) {
-      var d = document.createElement('span');
-      d.className = 'pl';
-      d.id = 'pl-' + n;
-      d.textContent = (i + 1) + ' ' + n;
-      pipe.appendChild(d);
-      if (i < NODES.length - 1) {
-        var ar = document.createElement('span');
-        ar.className = 'ar';
-        ar.textContent = '→';
-        pipe.appendChild(ar);
-      }
-    });
-  }
-
-  function reset() {
-    timer.forEach(clearTimeout);
-    timer = [];
-    busy = false;
-    NODES.forEach(function (n) {
-      var el = document.getElementById('pl-' + n);
-      el.className = 'pl';
-    });
-  }
-
-  function runFrame(idx) {
-    if (busy) return;
-    reset();
-    busy = true;
-
-    var f = FRAMES[idx];
-    var want = ((f.id >> 8) & 0xFF) ^ (f.id & 0xFF) ^ f.len;
-    fHead.innerHTML =
-      '<span>id <b>0x' + hex(f.id, 3) + '</b></span>' +
-      '<span>len <b>' + f.len + '</b></span>' +
-      '<span>crc <b>0x' + hex(f.crc, 2) + '</b></span>' +
-      '<span>期望 crc <b>0x' + hex(want, 2) + '</b></span>';
-    PD.clear(logEl);
-    PD.log(logEl, 'frame 0x' + hex(f.id, 3) + ' len=' + f.len + ' crc=' + hex(f.crc, 2));
-
-    var step = 0;
-    function next() {
-      if (step >= NODES.length) { busy = false; return; }
-      var n = NODES[step];
-      var el = document.getElementById('pl-' + n);
-      el.className = 'pl act';
-
-      timer.push(setTimeout(function () {
-        if (n === 'app') {
-          el.className = 'pl pass';
-          PD.log(logEl, '  [app] 已消费 0x' + hex(f.id, 3), '');
-          PD.log(logEl, '链终止：业务节点返回 Stop。');
-          busy = false;
-          return;
-        }
-        var ok;
-        if (n === 'len') ok = (f.len === 8);
-        else if (n === 'crc') ok = (f.crc === want);
-        else ok = (f.id === 0x100 || f.id === 0x2A0);
-
-        if (!ok) {
-          el.className = 'pl drop';
-          var msg;
-          if (n === 'len') msg = '丢弃 0x' + hex(f.id, 3) + '：长度 ' + f.len + ' != 8';
-          else if (n === 'crc') msg = '丢弃 0x' + hex(f.id, 3) + '：crc=' + hex(f.crc, 2) + '，应为 ' + hex(want, 2);
-          else msg = '丢弃 0x' + hex(f.id, 3) + '：不在白名单';
-          PD.log(logEl, '  [' + n + '] ' + msg, 'bad');
-          PD.log(logEl, '链在这里终止：' + n + ' 之后的节点没有被调用。', 'warn');
-          busy = false;
-          return;
-        }
-
-        el.className = 'pl pass';
-        PD.log(logEl, '  [' + n + '] 通过');
-        step++;
-        next();
-      }, 380));
-    }
-    next();
-  }
-
-  document.querySelectorAll('[data-f]').forEach(function (b) {
-    b.onclick = function () { runFrame(+b.dataset.f); };
-  });
-
-  buildPipe();
-  fHead.innerHTML = '<span>点一个预设帧开始</span>';
-  PD.log(logEl, '四帧分别死在 len / crc / white，最后一帧走到底。');
-})();
-</script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-

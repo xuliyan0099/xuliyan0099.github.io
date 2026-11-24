@@ -3,25 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>2.1 策略模式 Strategy · C 与 C++ 双实现</title>
-<meta name="description" content="CAN 发送队列的 FIFO / EDF / 优先级三种调度策略：C 用函数指针表，C++ 用抽象基类，附结构图与可交互演示。">
+<title>2.1 工厂方法模式 FACTORY METHOD · C 与 C++ 双实现</title>
+<meta name="description" content="工厂方法模式：C 与 C++ 双实现，含结构图、运行输出与可点演示。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
-<style>
-.queue{display:flex;flex-direction:column;gap:6px}
-.qrow{display:grid;grid-template-columns:64px 1fr 84px 74px;gap:8px;align-items:center;
-  padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:#0d1220;font:11.5px/1 var(--mono)}
-.qrow .id{color:#9fd8ff}
-.qrow .bar{height:7px;border-radius:4px;background:rgba(124,156,255,.18);position:relative;overflow:hidden}
-.qrow .bar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#3f5fa0,#7c9cff);border-radius:4px}
-.qrow .due{color:#b9c6da;text-align:right}
-.qrow .st{text-align:right;color:#7d8ba1}
-.qrow.on{border-color:var(--ac2);background:#0f2320}
-.qrow.on .id{color:#8ff5d6}
-.qrow.gone{opacity:.42}
-.qrow.gone .st{color:#5f6b80}
-.qrow.gone .bar i{background:#2b3140}
-</style>
 </head>
 <body>
 <div class="bg" aria-hidden="true"></div>
@@ -42,442 +27,266 @@
 
 <div class="shell">
   <aside id="sidebar">
-    <div class="vol-h">篇二 · 行为型<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
+    <div class="vol-h" id="sideHead">设计模式全书 · 25 章<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
     <ol id="sideList"></ol>
     <div class="vol-nav" id="volNav"></div>
   </aside>
 
   <div class="wrap">
-  <div class="ch-meta"><span class="lv">篇二 · 行为型</span><span class="sep">/</span>第 1 章<span class="sep">/</span>约 30 分钟</div>
-  <h1>策略模式<span class="en">STRATEGY</span></h1>
-  <p class="lede">同一个 <code>drain()</code>，队列一样、帧一样，只是“下一帧发谁”的规则不同。策略模式只做一件事：<b>把这条规则从调用点搬到一个可替换的值上</b>，让上下文从此只认一个签名。</p>
-  <div class="chips">
-    <span class="chip ok">运行时可换</span>
-    <span class="chip">C 版少一级间接</span>
-    <span class="chip">C++ 版 unique_ptr 持有</span>
-  </div>
-<section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：三种规则堆进同一个循环</h2>
-    <div class="prose">
-      <p>先看没上模式的写法：<code>drain()</code> 里先 <code>if (mode == FIFO)</code> 取队首，<code>else if (mode == EDF)</code> 扫一遍最小截止，<code>else</code> 再扫一遍最小 ID。三段代码各自维护一个小循环，看起来也能跑。</p>
-      <p>问题在第二次、第三次改动时出现：新加一种“按信号优先级 + 老化”的调度，要动 <code>drain()</code>；测试要覆盖 <code>mode</code> 的组合；某个策略的临时状态（比如老化计数）只能挂在上下文里，越挂越乱。<b>这就是“算法”和“调用流程”被焊死在同一段代码里的典型症状。</b></p>
-      <ul>
-        <li>症状一：同一段流程里出现按类型分支的算法选择；</li>
-        <li>症状二：加一种实现，要改调用方；</li>
-        <li>症状三：算法本身想单独测，却要先把整个上下文搭起来。</li>
-      </ul>
-    </div>
+  <div class="ch-meta"><span class="lv">篇二 · 创建型</span><span class="sep">/</span>第 1 章<span class="sep">/</span>约 30 分钟</div>
+  <h1>桥接模式<span class="en">BRIDGE</span></h1>
+  <p class="lede">诊断协议有 UDS 和 OBD，物理层有 CAN 和 LIN。若按“协议 + 物理层”各写一个类，就是 2×2 四份几乎重复的代码；再加一种物理层，要新增四份。<b>桥接把两维各自抽象，中间只留一条引用</b>，组合在运行时决定，新增一侧只改一侧。</p>
+  <div class="chips"><span class="chip ok">2×2 组合不写 4 份</span><span class="chip">协议不关心物理层</span><span class="chip">物理层不关心服务</span></div>
+
+  <section class="sec" id="s1">
+    <h2><span class="n">01</span>问题：协议 × 物理层，组合爆炸</h2>
+    
+    
+      <div class="prose">
+        <p>坏写法是把两维焊在一起：</p>
+        <pre><code>void uds_over_can(const char *svc);
+void uds_over_lin(const char *svc);
+void obd_over_can(const char *svc);
+void obd_over_lin(const char *svc);</code></pre>
+        <p>四种组合只是“拼字符串”的差别，却要维护四份函数。真正的问题在后面：</p>
+        <ul>
+          <li><b>加一个物理层就乘二。</b>再来一个 FlexRay，就要补 UDS/FlexRay、OBD/FlexRay 两份；漏一份就是运行时 404。</li>
+          <li><b>协议细节散落。</b>UDS 的会话保持、OBD 的 PID 编码，被复制到每条物理层分支里，改一处要改四遍。</li>
+          <li><b>测试矩阵爆炸。</b>2 个协议 × 3 个物理层 = 6 条路径，每条都要单独写用例。</li>
+        </ul>
+        <p>桥接让协议只依赖“能发一帧”的抽象，物理层只负责“怎么发”。组合放在调用方，两边都能独立扩展。</p>
+      </div>
   </section>
 
   <section class="sec" id="s2">
-    <h2><span class="n">02</span>结构：上下文只持有一个“会算下一步”的东西</h2>
-    <p class="subh">点方框看职责。注意箭头的方向：上下文指向策略，而不是反过来——策略不知道谁在用它。</p>
-
+    <h2><span class="n">02</span>结构：两维各自抽象，中间只连一条线</h2>
+    <p class="subh">左边是协议，右边是物理层，四条线是四种组合；虚线表示同一协议可以换物理层。</p>
+    
+  
     <div class="fig">
-      <div class="fig-h"><b>上下文 / 策略接口 / 三个具体策略</b><span>structure</span></div>
+      <div class="fig-h"><b>协议 × 物理层：两维各自抽象</b><span>bridge</span></div>
       <div class="diagram">
-        <svg viewBox="0 0 880 300" role="img" aria-label="策略模式结构图">
-          <defs>
-            <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-              <path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/>
-            </marker>
-            <marker id="tri2" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="10" markerHeight="10" orient="auto">
-              <path d="M1 1 L11 6 L1 11 z" fill="none" stroke="#40536f" stroke-width="1.4"/>
-            </marker>
-          </defs>
-
-          <g class="node" data-role="ctx" data-note="TxQueue：只知道「我有一个 pick(q) 能调」。它保存队列、负责发帧和出队，完全不知道 FIFO / EDF / PRIO 的区别。换策略 = 改一个字段。">
-            <rect x="24" y="92" width="214" height="112" rx="10"/>
-            <text class="nm" x="40" y="115">TxQueue</text>
-            <text class="ty" x="40" y="133">上下文 Context</text>
-            <text class="mt" x="40" y="157">drain()</text>
-            <text class="mt" x="40" y="175">sched : const sched_t*</text>
-          </g>
-
-          <g class="node" data-role="iface" data-note="sched_t 就是「一个名字 + 一个函数指针」。C 里不需要为策略再造对象和虚表：函数指针本身就是接口，调用只多一级间接。">
-            <rect x="330" y="78" width="206" height="130" rx="10"/>
-            <text class="nm" x="346" y="101">sched_t / IScheduler</text>
-            <text class="ty" x="346" y="119">策略接口</text>
-            <text class="mt" x="346" y="143">pick(q, n) → index</text>
-            <text class="mt" x="346" y="161">name() → 标签</text>
-            <text class="lbl" x="346" y="186">一个签名，三个实现</text>
-          </g>
-
-          <g class="node" data-role="fifo" data-note="FIFO：永远返回 0，队首先走。最简单的策略，也最容易被误用——它掩盖了截止时间的堆积。">
-            <rect x="620" y="24" width="230" height="62" rx="9"/>
-            <text class="nm" x="636" y="45">FIFO</text>
-            <text class="ty" x="686" y="45">具体策略</text>
-            <text class="mt" x="636" y="66">return 0；不看参数</text>
-          </g>
-          <g class="node" data-role="edf" data-note="EDF：扫一遍找 due_ms 最小的一帧。它需要看到队列全貌，所以参数里必须带 q 和 n——策略的入参决定了它能做多聪明的事。">
-            <rect x="620" y="106" width="230" height="62" rx="9"/>
-            <text class="nm" x="636" y="127">EDF</text>
-            <text class="ty" x="666" y="127">最早截止优先</text>
-            <text class="mt" x="636" y="148">min due_ms</text>
-          </g>
-          <g class="node" data-role="prio" data-note="PRIO：CAN ID 越小优先级越高，直接扫最小 ID。它和 EDF 用同一个签名，所以上下文可以在运行中随时换掉它。">
-            <rect x="620" y="188" width="230" height="62" rx="9"/>
-            <text class="nm" x="636" y="209">PriorityId</text>
-            <text class="ty" x="726" y="209">按 ID 优先</text>
-            <text class="mt" x="636" y="230">min id</text>
-          </g>
-
-          <path class="flow" marker-end="url(#ar2)" d="M238 148 L326 148"/>
-          <text class="lbl" x="243" y="140">持有 / 可换</text>
-
-          <path class="dep" marker-end="url(#tri2)" d="M620 55 L536 108"/>
-          <path class="dep" marker-end="url(#tri2)" d="M620 137 L536 140"/>
-          <path class="dep" marker-end="url(#tri2)" d="M620 219 L536 180"/>
-          <text class="lbl" x="544" y="252">虚线：实现同一个接口</text>
-          <text class="lbl" x="24" y="238">调用点只写：idx = q-&gt;sched-&gt;pick(q-&gt;frames, q-&gt;n)</text>
-        </svg>
+<svg viewBox="0 0 880 360" role="img" aria-label="协议 × 物理层：两维各自抽象">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
+  <g class="node" data-role="uds" data-note="UDS 只管服务语义：会话、安全访问、DID 编码；它不知道帧最后走在 CAN 还是 LIN。"><rect x="40" y="70" width="190" height="80" rx="10"/><text class="nm" x="54" y="94">UDS</text><text class="ty" x="54" y="113">诊断协议</text><text class="mt" x="54" y="131">0x22 读数据</text></g>
+  <g class="node" data-role="obd" data-note="OBD 的 PID 编码与 UDS 不同，但同样只依赖“发一帧”的抽象。"><rect x="40" y="220" width="190" height="80" rx="10"/><text class="nm" x="54" y="244">OBD</text><text class="ty" x="54" y="263">排放协议</text><text class="mt" x="54" y="281">PID 0x0C</text></g>
+  <g class="node" data-role="can" data-note="CAN 只负责把字符串变成帧发出去；它不解析 UDS 服务，也不认识 OBD 的 PID。"><rect x="470" y="70" width="190" height="80" rx="10"/><text class="nm" x="484" y="94">CAN</text><text class="ty" x="484" y="113">物理层</text><text class="mt" x="484" y="131">500kbps / 11bit</text></g>
+  <g class="node" data-role="lin" data-note="LIN 的调度表、主从角色都在这一层；换物理层不需要改协议代码。"><rect x="470" y="220" width="190" height="80" rx="10"/><text class="nm" x="484" y="244">LIN</text><text class="ty" x="484" y="263">物理层</text><text class="mt" x="484" y="281">19.2kbps / 主从</text></g>
+  <line x1="230" y1="110" x2="470" y2="110" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="350.0" y="102.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">UDS over CAN</text>
+  <line x1="230" y1="118" x2="470" y2="250" stroke="#5876a4" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+  <text x="350.0" y="176.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">UDS over LIN</text>
+  <line x1="230" y1="250" x2="470" y2="118" stroke="#5876a4" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+  <text x="350.0" y="176.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">OBD over CAN</text>
+  <line x1="230" y1="262" x2="470" y2="262" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="350.0" y="254.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">OBD over LIN</text>
+</svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：上下文 / 接口 / 三个具体策略，各自只知道什么、不知道什么。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：协议与物理层各自只守一边，组合由调用方拼。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
     <h2><span class="n">03</span>两份实现</h2>
-    <p class="subh">C 版把接口做成 <code>{name, fn}</code> 常量，C++ 版做成纯虚基类。两边都保留同一份队列和同一套输出，便于逐行对照。</p>
-    <div class="codes">
+    
+    <p class='subh'>C 版用两张表（link_t、proto_t）在运行时拼；C++ 版用两个抽象基类，组合时只传引用。</p>
       <div class="codecard">
-        <div class="ch"><span class="lang">C</span><span class="fn">strategy.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 策略模式 · C 实现：CAN 发送队列的调度策略
- * 编译：gcc -std=c11 -Wall -Wextra strategy.c -o strategy
- * 策略接口只有一个函数指针，上下文不关心是谁实现。
- */
+        <div class="ch"><span class="lang">C</span><span class="fn">bridge.c</span><button class="copy">复制</button></div>
+        <pre><code>/* 桥接：协议和物理层各管各的，四种组合靠两张表拼出来 */
 #include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
 
-typedef struct { int id; int due_ms; } frame_t;
+typedef struct { const char *name; void (*send)(const char *frame); } link_t;
 
-/* 策略 = 一个签名固定的函数指针 */
-typedef int (*pick_fn)(const frame_t *q, int n);
+static void can_send(const char *f) { printf("[CAN ] %s\n", f); }
+static void lin_send(const char *f) { printf("[LIN ] %s\n", f); }
 
-typedef struct {
+static const link_t LINKS[] = {
+    { "CAN", can_send },
+    { "LIN", lin_send },
+};
+
+typedef struct proto proto_t;
+struct proto {
     const char *name;
-    pick_fn    pick;
-} sched_t;
+    const link_t *link;
+    void (*request)(const proto_t *self, const char *svc);
+};
 
-/* 三个具体策略：都返回「下一个该发哪一帧」的下标 */
-static int pick_fifo(const frame_t *q, int n)
+static void uds_request(const proto_t *self, const char *svc)
 {
-    (void)q;
-    return n &gt; 0 ? 0 : -1;
+    char buf[64];
+    snprintf(buf, sizeof buf, "UDS %s -&gt; %s", svc, self-&gt;link-&gt;name);
+    self-&gt;link-&gt;send(buf);
 }
-
-static int pick_edf(const frame_t *q, int n)          /* 最早截止优先 */
+static void obd_request(const proto_t *self, const char *svc)
 {
-    int best = -1;
-    for (int i = 0; i &lt; n; i++)
-        if (best &lt; 0 || q[i].due_ms &lt; q[best].due_ms)
-            best = i;
-    return best;
-}
-
-static int pick_prio(const frame_t *q, int n)         /* CAN ID 越小越优先 */
-{
-    int best = -1;
-    for (int i = 0; i &lt; n; i++)
-        if (best &lt; 0 || q[i].id &lt; q[best].id)
-            best = i;
-    return best;
-}
-
-static const sched_t FIFO = { "FIFO", pick_fifo };
-static const sched_t EDF  = { "EDF",  pick_edf  };
-static const sched_t PRIO = { "PRIO", pick_prio };
-
-/* 上下文：只持有 sched_t 的指针，换策略就是换指针 */
-static void drain(const sched_t *s, frame_t *q, int n)
-{
-    printf("%-5s -&gt;", s-&gt;name);
-    int left = n;
-    while (left &gt; 0) {
-        int i = s-&gt;pick(q, left);
-        if (i &lt; 0) break;
-        printf(" %03X", q[i].id);
-        for (int k = i; k &lt; left - 1; k++)
-            q[k] = q[k + 1];
-        left--;
-    }
-    printf("\n");
+    char buf[64];
+    snprintf(buf, sizeof buf, "OBD %s -&gt; %s", svc, self-&gt;link-&gt;name);
+    self-&gt;link-&gt;send(buf);
 }
 
 int main(void)
 {
-    static const frame_t seed[5] = {
-        { 0x210, 10 }, { 0x120, 4 }, { 0x305, 2 }, { 0x180, 8 }, { 0x0A0, 6 }
-    };
-    frame_t q[5];
+    proto_t uds = { "UDS", &amp;LINKS[0], uds_request };
+    proto_t obd = { "OBD", &amp;LINKS[1], obd_request };
 
-    for (int i = 0; i &lt; 5; i++) q[i] = seed[i];
-    drain(&amp;FIFO, q, 5);
-    for (int i = 0; i &lt; 5; i++) q[i] = seed[i];
-    drain(&amp;EDF, q, 5);
-    for (int i = 0; i &lt; 5; i++) q[i] = seed[i];
-    drain(&amp;PRIO, q, 5);
-
-    printf("sizeof(sched_t)=%u  sizeof(pick_fn)=%u\n",
-           (unsigned)sizeof(sched_t), (unsigned)sizeof(pick_fn));
+    const proto_t *protos[] = { &amp;uds, &amp;obd };
+    for (size_t i = 0; i &lt; sizeof protos / sizeof protos[0]; i++)
+        for (size_t k = 0; k &lt; sizeof LINKS / sizeof LINKS[0]; k++) {
+            proto_t p = *protos[i];
+            p.link = &amp;LINKS[k];
+            printf("-- %s over %s --\n", p.name, p.link-&gt;name);
+            p.request(&amp;p, "0x22F190");
+        }
+    printf("协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧\n");
     return 0;
 }</code></pre>
       </div>
-
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>./bridge.exe</span></div>
+      <pre>-- UDS over CAN --
+[CAN ] UDS 0x22F190 -&gt; CAN
+-- UDS over LIN --
+[LIN ] UDS 0x22F190 -&gt; LIN
+-- OBD over CAN --
+[CAN ] OBD 0x22F190 -&gt; CAN
+-- OBD over LIN --
+[LIN ] OBD 0x22F190 -&gt; LIN
+协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧</pre>
+    </div>
       <div class="codecard">
-        <div class="ch"><span class="lang">C++</span><span class="fn">strategy.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 策略模式 · C++ 实现：同一场景，改用抽象基类 + 虚函数
-// 编译：g++ -std=c++17 -Wall -Wextra strategy.cpp -o strategy_cpp
+        <div class="ch"><span class="lang">C++</span><span class="fn">bridge.cpp</span><button class="copy">复制</button></div>
+        <pre><code>// 桥接 · C++：Link 与 Protocol 各自抽象，组合时只传引用
+// 编译：g++ -std=c++17 -Wall -Wextra bridge.cpp -o bridge_cpp
 #include &lt;cstdio&gt;
 #include &lt;memory&gt;
-#include &lt;vector&gt;
+#include &lt;string&gt;
 
-struct Frame { int id; int due_ms; };
-
-class IScheduler {
+class Link {
 public:
-    virtual ~IScheduler() = default;
-    virtual const char* name() const = 0;
-    virtual int pick(const std::vector&lt;Frame&gt;&amp; q) const = 0;
+    virtual ~Link() = default;
+    virtual const char *name() const = 0;
+    virtual void send(const std::string &amp;frame) const = 0;
+};
+class CanLink : public Link {
+public:
+    const char *name() const override { return "CAN"; }
+    void send(const std::string &amp;f) const override { std::printf("[CAN ] %s\n", f.c_str()); }
+};
+class LinLink : public Link {
+public:
+    const char *name() const override { return "LIN"; }
+    void send(const std::string &amp;f) const override { std::printf("[LIN ] %s\n", f.c_str()); }
 };
 
-class Fifo final : public IScheduler {
+class Protocol {
 public:
-    const char* name() const override { return "FIFO"; }
-    int pick(const std::vector&lt;Frame&gt;&amp; q) const override { return q.empty() ? -1 : 0; }
+    explicit Protocol(const Link &amp;l) : link_(l) {}
+    virtual ~Protocol() = default;
+    virtual const char *name() const = 0;
+    virtual void request(const std::string &amp;svc) const = 0;
+    const char *linkName() const { return link_.name(); }
+protected:
+    const Link &amp;link_;
 };
-
-class Edf final : public IScheduler {
+class Uds : public Protocol {
 public:
-    const char* name() const override { return "EDF"; }
-    int pick(const std::vector&lt;Frame&gt;&amp; q) const override {
-        int best = -1;
-        for (int i = 0; i &lt; static_cast&lt;int&gt;(q.size()); ++i)
-            if (best &lt; 0 || q[i].due_ms &lt; q[best].due_ms) best = i;
-        return best;
+    using Protocol::Protocol;
+    const char *name() const override { return "UDS"; }
+    void request(const std::string &amp;svc) const override
+    {
+        link_.send("UDS " + svc + " -&gt; " + link_.name());
+    }
+};
+class Obd : public Protocol {
+public:
+    using Protocol::Protocol;
+    const char *name() const override { return "OBD"; }
+    void request(const std::string &amp;svc) const override
+    {
+        link_.send("OBD " + svc + " -&gt; " + link_.name());
     }
 };
 
-class PriorityId final : public IScheduler {
-public:
-    const char* name() const override { return "PRIO"; }
-    int pick(const std::vector&lt;Frame&gt;&amp; q) const override {
-        int best = -1;
-        for (int i = 0; i &lt; static_cast&lt;int&gt;(q.size()); ++i)
-            if (best &lt; 0 || q[i].id &lt; q[best].id) best = i;
-        return best;
+int main()
+{
+    CanLink can;
+    LinLink lin;
+    Uds udsCan(can), udsLin(lin);
+    Obd obdCan(can), obdLin(lin);
+
+    const Protocol *protos[] = { &amp;udsCan, &amp;udsLin, &amp;obdCan, &amp;obdLin };
+    for (const Protocol *p : protos) {
+        std::printf("-- %s over %s --\n", p-&gt;name(), p-&gt;linkName());
+        p-&gt;request("0x22F190");
     }
-};
-
-// 上下文持有策略的所有权；换策略即换对象
-class TxQueue {
-public:
-    void set(std::unique_ptr&lt;IScheduler&gt; s) { sched_ = std::move(s); }
-
-    void drain() {
-        std::printf("%-5s -&gt;", sched_-&gt;name());
-        while (!q_.empty()) {
-            int i = sched_-&gt;pick(q_);
-            if (i &lt; 0) break;
-            std::printf(" %03X", q_[static_cast&lt;std::size_t&gt;(i)].id);
-            q_.erase(q_.begin() + i);
-        }
-        std::printf("\n");
-    }
-
-    void reset(const std::vector&lt;Frame&gt;&amp; seed) { q_ = seed; }
-
-private:
-    std::vector&lt;Frame&gt; q_;
-    std::unique_ptr&lt;IScheduler&gt; sched_;
-};
-
-int main() {
-    const std::vector&lt;Frame&gt; seed = {
-        { 0x210, 10 }, { 0x120, 4 }, { 0x305, 2 }, { 0x180, 8 }, { 0x0A0, 6 }
-    };
-    TxQueue q;
-
-    q.reset(seed);   q.set(std::make_unique&lt;Fifo&gt;());       q.drain();
-    q.reset(seed);   q.set(std::make_unique&lt;Edf&gt;());        q.drain();
-    q.reset(seed);   q.set(std::make_unique&lt;PriorityId&gt;()); q.drain();
+    std::printf("协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧\n");
     return 0;
 }</code></pre>
       </div>
-    </div>
-
     <div class="run">
-      <div class="ch"><b>RUN</b><span>./strategy.exe</span></div>
-      <pre>FIFO  -&gt; 210 120 305 180 0A0
-EDF   -&gt; 305 120 0A0 180 210
-PRIO  -&gt; 0A0 120 180 210 305
-sizeof(sched_t)=16  sizeof(pick_fn)=8</pre>
+      <div class="ch"><b>RUN</b><span>./bridge_cpp.exe</span></div>
+      <pre>-- UDS over CAN --
+[CAN ] UDS 0x22F190 -&gt; CAN
+-- UDS over LIN --
+[LIN ] UDS 0x22F190 -&gt; LIN
+-- OBD over CAN --
+[CAN ] OBD 0x22F190 -&gt; CAN
+-- OBD over LIN --
+[LIN ] OBD 0x22F190 -&gt; LIN
+协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧</pre>
     </div>
-    <div class="run">
-      <div class="ch"><b>RUN</b><span>./strategy_cpp.exe</span></div>
-      <pre>FIFO  -&gt; 210 120 305 180 0A0
-EDF   -&gt; 305 120 0A0 180 210
-PRIO  -&gt; 0A0 120 180 210 305</pre>
-    </div>
-    <p class="hintline">三行输出完全一致，说明两条实现路径在行为上等价；差别只在分派方式和所有权。</p>
   </section>
 
   <section class="sec" id="s4">
-    <h2><span class="n">04</span>把队列交给不同策略</h2>
-    <p class="subh">队列里五帧，三种规则看到的是不同的“下一帧”。点策略切换，或者一帧一帧发，看选中的理由。</p>
-
-    <div class="demo">
-      <div class="demo-h"><b>tx queue</b><span>切换策略不重建上下文</span></div>
-      <div class="demo-grid">
-        <div class="stage">
-          <div class="queue" id="qStage"></div>
-          <p class="hintline" id="qNote">当前策略：FIFO（队首先走）。</p>
-        </div>
-        <div class="side">
-          <div class="ctl">
-            <button class="btn on" data-pol="fifo">FIFO</button>
-            <button class="btn" data-pol="edf">EDF</button>
-            <button class="btn" data-pol="prio">PRIO</button>
-          </div>
-          <div class="ctl">
-            <button class="btn ghost" id="send">发下一帧</button>
-            <button class="btn ghost" id="resetQ">重置</button>
-          </div>
-          <div class="log" id="qLog"><div class="mute">// 发送日志</div></div>
-        </div>
-      </div>
+    <h2><span class="n">04</span>四种组合，只换一侧</h2>
+    
+    
+<div class="demo" id="demo">
+  <div class="demo-h"><b>四种组合，只换一侧</b><span>同一句服务请求，依次走 UDS/OBD 与 CAN/LIN 的组合。</span></div>
+  <div class="stage">
+    <div class="dflow" id="dflow"></div>
+    <div class="dbar" id="dbar">未开始</div>
+    <div class="dctl">
+      <button class="btn" id="dPrev">复位</button>
+      <button class="btn" id="dNext">单步</button>
+      <button class="btn" id="dPlay">自动</button>
+      <button class="btn" id="dReset">清日志</button>
     </div>
+    <div class="dnote" id="dnote">点上面的方框，看它在这次流程里负责什么。</div>
+    <div class="log" id="dlog"></div>
+  </div>
+</div>
+<script>dpDemo({nodes:[{id:'uds',label:'UDS',sub:'服务语义',note:''}, {id:'obd',label:'OBD',sub:'PID 语义',note:''}, {id:'can',label:'CAN',sub:'物理层',note:''}, {id:'lin',label:'LIN',sub:'物理层',note:''}],steps:[{hi:['uds', 'can'],t:'UDS over CAN：协议拼好服务串，交给 CAN 发'}, {hi:['uds', 'lin'],t:'同一份 UDS，只把物理层换成 LIN，协议代码没动'}, {hi:['obd', 'can'],t:'换成 OBD：只换协议侧，CAN 仍然只负责发帧'}, {hi:['obd', 'lin'],t:'OBD over LIN：两侧都换，仍然没有第四份实现'}, {hi:['uds', 'obd', 'can', 'lin'],t:'四种组合共用两条抽象；新增 FlexRay 只需加一个物理层'}]});</script>
+
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>同一组角色，两种写法</h2>
-    <table class="tbl">
-      <thead><tr><th style="width:88px">角色</th><th>职责</th><th>C 的落地</th><th>C++ 的落地</th></tr></thead>
-      <tbody>
-        <tr><td><b>上下文</b></td><td>保存业务数据，调用策略，不判断具体策略</td><td><code>const sched_t *</code> 字段</td><td><code>unique_ptr&lt;IScheduler&gt;</code></td></tr>
-        <tr><td><b>策略接口</b></td><td>固定一个签名，让实现可替换</td><td><code>typedef int (*pick_fn)(...)</code></td><td>纯虚函数 <code>pick()</code></td></tr>
-        <tr><td><b>具体策略</b></td><td>只实现算法，不碰队列生命周期</td><td>三个 <code>static</code> 函数 + 三个 <code>const</code> 描述符</td><td>三个 <code>final</code> 类</td></tr>
-        <tr><td><b>切换</b></td><td>运行中换算法，不需要重建上下文</td><td>换一个指针，零分配</td><td><code>move</code> 一个新对象（或换引用）</td></tr>
-        <tr><td><b>开销</b></td><td>一次间接调用</td><td>函数指针：1 次取地址</td><td>虚调用：取 vptr + 取槽 + 跳转</td></tr>
-      </tbody>
-    </table>
-    <div class="key"><b>值得注意的一处差别。</b>C 版把策略直接做成函数指针，比“对象 + 虚表”少一级间接；代价是没有地方挂策略自己的状态。如果某个策略真需要状态（比如老化计数），C 版就得多传一个 <code>void *self</code>，或者干脆为策略建一个结构体——那时它才真正变成“对象”。</div>
+    <h2><span class="n">05</span>C 与 C++：两种解耦</h2>
+    
+    
+    <div class="tbl">
+      <table>
+        <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
+        <tbody><tr><td>协议抽象</td><td><code>proto_t</code> + 函数指针</td><td><code>Protocol</code> 抽象基类</td><td>C 的协议是结构体，C++ 是类型</td></tr><tr><td>物理层抽象</td><td><code>link_t</code> + <code>send()</code></td><td><code>Link</code> 抽象基类</td><td>都只暴露“发一帧”</td></tr><tr><td>组合方式</td><td>运行时给 <code>proto.link</code> 赋值</td><td>构造时传 <code>Link&amp;</code></td><td>C 可换绑，C++ 用引用固定</td></tr><tr><td>新增物理层</td><td>加一个 <code>link_t</code> 表项</td><td>加一个派生类</td><td>两边都不动协议</td></tr><tr><td>生命周期</td><td>静态表，无所有权</td><td>引用，不拥有</td><td>物理层通常比协议活得久</td></tr></tbody>
+      </table>
+    </div>
   </section>
 
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
-    <div class="pit"><b>1. 策略和状态别混。</b>策略由外部注入（“用哪种算法”是调用方的决定）；状态由对象自己迁移（“我现在处于哪个状态”是对象内部的事实）。判断标准：谁有权改它。</div>
-    <div class="pit"><b>2. 无状态策略才能共享。</b>三个策略对象被多个上下文共用时，千万别在策略里写可变成员；C 版的函数指针天然无状态，一旦加了 <code>self</code> 就要考虑每个上下文一份。</div>
-    <div class="pit"><b>3. 策略不该知道上下文的细节。</b>如果实现里开始读 <code>ctx-&gt;queue_len</code>、改上下文状态，它就不再是策略，而是在偷偷做状态机或模板方法。</div>
-    <div class="pit"><b>4. 两个分支不值得。</b>只有 A/B 两种、且以后也不会加时，<code>if</code> 比一个接口更便宜、更好读。模式的价值在“会持续增加第三种、第四种”。</div>
+    
+    <div class="prose"><ul><li><b>桥接不是“多一层就高级”。</b>只有两维确实独立扩展时才值得；如果物理层永远只有 CAN，直接写反而清楚。</li><li><b>别让协议知道帧格式。</b>协议一旦开始拼 CAN ID、算 DLC，桥接就退化成四份实现；协议只该产出“服务 + 参数”。</li><li><b>C 版换绑要防悬空。</b>运行时改 <code>proto.link</code> 指向栈上的 <code>link_t</code>，函数返回后就悬空；物理层应是静态或长生命周期对象。</li><li><b>C++ 引用成员不可重新绑定。</b><code>Protocol</code> 持 <code>Link&amp;</code> 后不能换物理层；需要运行时切换就用指针或 <code>std::reference_wrapper</code>。</li><li><b>组合测试仍要覆盖。</b>代码只有两份，但行为有四种；至少每个组合跑一条真实服务，别只测编译通过。</li></ul></div>
   </section>
-
-  <div class="ch-nav">
-      <a href="../index.html"><span>返回</span><b>← 全书目录</b></a>
-      <a class="nx" href="../p2/c02.html"><span>下一章</span><b>2.2 观察者模式 →</b></a>
-    </div>
-  <div class="foot">
-    <p>源码：<a href="../src/strategy.c">src/strategy.c</a> · <a href="../src/strategy.cpp">src/strategy.cpp</a> ｜ 编译：gcc / g++ 16.2.0，输出为本机实测<br>
-    <a href="../../../index.html">← 返回个人知识库</a></p>
+  <div class="ch-nav" id="chNav"></div>
   </div>
-</div>
-
 </div>
 
 <script src="../assets/pd.js"></script>
 <script src="../assets/dp-data.js"></script>
 <script src="../assets/dp-nav.js"></script>
+<script src="../assets/dp-demo.js"></script>
 <script>dpNav('p2');</script>
-<script>
-(function () {
-  var FRAMES = [
-    { id: 0x210, due: 10 }, { id: 0x120, due: 4 }, { id: 0x305, due: 2 },
-    { id: 0x180, due: 8 },  { id: 0x0A0, due: 6 }
-  ];
-  var NAME = { fifo: 'FIFO', edf: 'EDF', prio: 'PRIO' };
-  var stage = document.getElementById('qStage');
-  var note = document.getElementById('qNote');
-  var log = document.getElementById('qLog');
-  var policy = 'fifo';
-  var sent = [];
-
-  function remaining() {
-    return FRAMES.map(function (f, i) { return i; }).filter(function (i) { return sent.indexOf(i) < 0; });
-  }
-
-  function pick() {
-    var rest = remaining();
-    if (rest.length === 0) return -1;
-    if (policy === 'fifo') return rest[0];
-    var best = rest[0];
-    for (var k = 1; k < rest.length; k++) {
-      var i = rest[k];
-      if (policy === 'edf' && FRAMES[i].due < FRAMES[best].due) best = i;
-      if (policy === 'prio' && FRAMES[i].id < FRAMES[best].id) best = i;
-    }
-    return best;
-  }
-
-  function reason(i) {
-    if (policy === 'fifo') return '队首 0x' + FRAMES[i].id.toString(16).toUpperCase().padStart(3, '0') + '，FIFO 不看截止';
-    if (policy === 'edf') return '0x' + FRAMES[i].id.toString(16).toUpperCase().padStart(3, '0') + ' 的截止还剩 ' + FRAMES[i].due + 'ms，最小';
-    return '0x' + FRAMES[i].id.toString(16).toUpperCase().padStart(3, '0') + ' 的 ID 最小（越小的 ID 越先发）';
-  }
-
-  function render() {
-    var next = pick();
-    stage.innerHTML = '';
-    FRAMES.forEach(function (f, i) {
-      var row = document.createElement('div');
-      row.className = 'qrow' + (sent.indexOf(i) >= 0 ? ' gone' : '') + (i === next ? ' on' : '');
-      var id = '0x' + f.id.toString(16).toUpperCase().padStart(3, '0');
-      row.innerHTML = '<span class="id">' + id + '</span>' +
-        '<span class="bar"><i style="width:' + (f.due * 9 + 10) + '%"></i></span>' +
-        '<span class="due">due ' + f.due + 'ms</span>' +
-        '<span class="st">' + (sent.indexOf(i) >= 0 ? '已发' : (i === next ? '下一个' : '排队')) + '</span>';
-      stage.appendChild(row);
-    });
-    var n = remaining().length;
-    note.textContent = n === 0 ? '队列已空。换策略或重置再看一遍。' : '当前策略：' + NAME[policy] + '（剩余 ' + n + ' 帧，条越长表示留给它的时间越多）。';
-  }
-
-  document.querySelectorAll('[data-pol]').forEach(function (b) {
-    b.onclick = function () {
-      document.querySelectorAll('[data-pol]').forEach(function (x) { x.classList.remove('on'); });
-      b.classList.add('on');
-      var before = remaining().length;
-      policy = b.dataset.pol;
-      PD.log(log, '切换策略 → <b>' + NAME[policy] + '</b>，队列保留 ' + before + ' 帧，上下文没有重建');
-      render();
-    };
-  });
-
-  document.getElementById('send').onclick = function () {
-    var i = pick();
-    if (i < 0) { PD.log(log, '<span class="warn">队列为空，没有可发的帧</span>'); return; }
-    sent.push(i);
-    PD.log(log, '发出 <b>0x' + FRAMES[i].id.toString(16).toUpperCase().padStart(3, '0') + '</b> ｜ ' + reason(i));
-    render();
-  };
-
-  document.getElementById('resetQ').onclick = function () {
-    sent = []; PD.clear(log); PD.log(log, '<span class="mute">// 发送日志</span>'); render();
-  };
-
-  render();
-})();
-</script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-

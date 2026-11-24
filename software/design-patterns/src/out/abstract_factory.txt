@@ -1,0 +1,7 @@
+-- family BOSCH --
+[CAN/BOSCH] 0x18FF50E5
+[NVRAM/BOSCH] save 7
+-- family CONTI --
+[CAN/CONTI] 0x18FF50E5
+[NVRAM/CONTI] save 7
+family 数 2，零件组合 2 种

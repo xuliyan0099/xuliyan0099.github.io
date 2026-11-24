@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>1.2 C 也能面向对象 · 设计模式地基</title>
-<meta name="description" content="用结构体首成员 + 函数指针表在 C 里实现封装、继承与多态，并与 C++ 的 vptr / 虚函数逐项对照。">
+<title>1.2 C 也能面向对象 VTABLE · C 与 C++ 双实现</title>
+<meta name="description" content="C 也能面向对象：C 与 C++ 双实现，含结构图、运行输出与可点演示。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
 <style>
@@ -40,7 +40,7 @@
 
 <div class="shell">
   <aside id="sidebar">
-    <div class="vol-h">篇一 · 基础<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
+    <div class="vol-h" id="sideHead">设计模式全书 · 25 章<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
     <ol id="sideList"></ol>
     <div class="vol-nav" id="volNav"></div>
   </aside>
@@ -331,10 +331,7 @@ sizeof(Rect)=24  sizeof(Circle)=16  sizeof(void*)=8
     </div>
   </section>
 
-  <div class="ch-nav">
-      <a href="../p1/c01.html"><span>上一章</span><b>← 1.1 导读：为什么用模式</b></a>
-      <a class="nx" href="../p2/c01.html"><span>下一篇</span><b>2.1 策略模式 →</b></a>
-    </div>
+  <div class="ch-nav" id="chNav"></div>
   <div class="foot">
     <p>源码：<a href="../src/coop.c">src/coop.c</a> · <a href="../src/coop.cpp">src/coop.cpp</a> ｜ 编译：gcc / g++ 16.2.0（MinGW-W64 x86_64）｜ 输出为本机实测<br>
     <a href="../../../index.html">← 返回个人知识库</a></p>
@@ -346,6 +343,7 @@ sizeof(Rect)=24  sizeof(Circle)=16  sizeof(void*)=8
 <script src="../assets/pd.js"></script>
 <script src="../assets/dp-data.js"></script>
 <script src="../assets/dp-nav.js"></script>
+<script src="../assets/dp-demo.js"></script>
 <script>dpNav('p1');</script>
 <script>
 (function () {

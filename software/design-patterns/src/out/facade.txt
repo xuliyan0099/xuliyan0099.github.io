@@ -1,0 +1,7 @@
+start VIN-0001
+[IGN ] relay -> ON
+[PUMP] pressure 3.0 bar
+[ECU ] seed/key ok
+[READY] engine can crank
+vehicle_start -> 0
+调用方只依赖一个入口，子系统仍可单独测试

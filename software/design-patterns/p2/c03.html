@@ -3,27 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>2.3 状态模式 State · C 与 C++ 双实现</title>
-<meta name="description" content="ECU 电源状态机：C 用 5×6 转移表，C++ 用状态类；非法转移统一拒绝，附可点的状态机演示。">
+<title>2.3 建造者模式 BUILDER · C 与 C++ 双实现</title>
+<meta name="description" content="建造者：把 CAN 帧的 id、数据、CRC 拆成可检查的步骤，最后一次性交付。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
-<style>
-.cur{
-  display:flex;align-items:baseline;gap:10px;padding:8px 10px;margin-bottom:10px;
-  border:1px solid var(--line);border-radius:9px;background:#0d1220;
-}
-.cur span{font:600 10.5px/1 var(--mono);letter-spacing:.08em;color:#8494ad}
-.cur b{font:800 22px/1 var(--mono);letter-spacing:.04em;color:#8ff5d6}
-.cur i{font:11px/1 var(--mono);font-style:normal;color:#8b95a8;margin-left:auto}
-.evrow{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
-.mtx{width:100%;border-collapse:collapse;font:11px/1.5 var(--mono)}
-.mtx th,.mtx td{border:1px solid var(--line);padding:5px 4px;text-align:center;color:#8494ad}
-.mtx th{background:rgba(124,156,255,.05);color:#93a4c4;font-weight:600}
-.mtx td.legal{color:#9fe8c8;background:rgba(67,214,168,.07)}
-.mtx td.cur{outline:1px solid rgba(67,214,168,.55);outline-offset:-1px}
-.mtx tr.on th{color:#8ff5d6}
-.mtx td.bad{color:#ffb0b0;background:rgba(255,128,128,.07)}
-</style>
+<script src="../assets/dp-demo.js"></script>
 </head>
 <body>
 <div class="bg" aria-hidden="true"></div>
@@ -44,509 +28,246 @@
 
 <div class="shell">
   <aside id="sidebar">
-    <div class="vol-h">篇二 · 行为型<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
+    <div class="vol-h" id="sideHead">设计模式全书 · 25 章<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
     <ol id="sideList"></ol>
     <div class="vol-nav" id="volNav"></div>
   </aside>
 
   <div class="wrap">
-  <div class="ch-meta"><span class="lv">篇二 · 行为型</span><span class="sep">/</span>第 3 章<span class="sep">/</span>约 30 分钟</div>
-  <h1>状态模式<span class="en">STATE</span></h1>
-  <p class="lede">状态机的核心不是“状态”这个词，而是<b>一张显式的转移关系</b>：在当前状态下，哪些事件合法、合法时去哪、非法时怎么办。C 版把这张关系写成 5×6 的表，C++ 版把它拆进五个状态类；两边的行为和拒绝路径完全一致。</p>
-  <div class="chips">
-    <span class="chip ok">30 格转移表 · 12 条合法</span>
-    <span class="chip">非法转移统一拒绝</span>
-    <span class="chip">C++ 状态类 · 无动态分配</span>
-  </div>
-<section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：switch 里再套 if，非法组合没人管</h2>
-    <div class="prose">
-      <p>常见的写法是：<code>switch (state)</code> 里对每个事件写一段 <code>if</code>，命中就改 <code>state</code>。它能跑，但三个问题会慢慢长出来：</p>
-      <ul>
-        <li><b>非法组合没人拦。</b>没写的组合直接落到 <code>default</code> 或者什么也不做，故障下按错键也不会报；</li>
-        <li><b>改完状态还继续往下跑。</b>一段处理里改了 <code>state</code>，后面几行仍按旧状态的假设执行，容易出现一次事件跳两步；</li>
-        <li><b>动作和转移混在一起。</b>“进 RUN 要开泵、进 FAULT 要关输出”塞在分支里，想单测转移路径就得把硬件全模拟一遍。</li>
-      </ul>
-      <p>状态模式把<b>转移关系</b>先抽出来，动作再挂到“进入某状态”或“转移成功”上。这样表能被静态检查、能被穷举测试，代码里也不会再有“忘了写某个组合”的洞。</p>
-    </div>
+  <div class="ch-meta"><span class="lv">篇二 · 创建型</span><span class="sep">/</span>第 3 章<span class="sep">/</span>约 28 分钟</div>
+  <h1>建造者模式<span class="en">BUILDER</span></h1>
+  <p class="lede">拼一帧 CAN 报文有七八个字段，顺序错了不一定报错，可能只是 CRC 不对、DLC 不对。<b>建造者把“拼装”变成一条有步骤的流水线</b>：每一步只改一个字段，最后 <code>build()</code> 才交出成品；中途可以校验、可以复用，也可以随时丢弃重来。</p>
+  <div class="chips"><span class="chip ok">步骤可查</span><span class="chip">成品只交付一次</span><span class="chip">复用 builder 不残留上一帧</span></div>
+
+  <section class="sec" id="s1">
+    <h2><span class="n">01</span>问题：一帧报文七八个字段，顺序全靠记</h2>
+    
+    
+      <div class="prose">
+        <p>常见写法是一个大初始化：</p>
+        <pre><code>frame_t f = { id, dlc, {b0,b1,b2}, crc };</p></code></pre>
+        <p>字段一多就出三类问题：</p>
+        <ul>
+          <li><b>顺序靠记。</b>CRC 必须在数据之后算；有人先算 CRC 再填数据，台架上偶尔能过，因为数据恰好没变。</li>
+          <li><b>复用会串味。</b>同一个栈上的 <code>frame_t</code> 反复用，上一帧的 <code>data[3..7]</code> 没清，DLC 又写成 8，发出去就是脏数据。</li>
+          <li><b>中途失败没法收场。</b>拼到一半发现 id 非法，只能 <code>return</code>，已写进去的半成品留在对象里。</li>
+        </ul>
+        <p>建造者把每个字段的写入变成一个显式步骤，并提供 <code>start()</code> 清底、<code>build()</code> 交付。调用方看到的是“开始 → 填 id → 填数据 → 算 CRC → 交付”，而不是一堆裸赋值。</p>
+      </div>
   </section>
 
   <section class="sec" id="s2">
-    <h2><span class="n">02</span>结构：五个状态，十二种合法走法</h2>
-    <p class="subh">只画主干：前进链、超温进故障、回断电。完整的 12 条在下方的矩阵和演示里。点方框看每个状态的边界。</p>
-
+    <h2><span class="n">02</span>结构：步骤可查、成品只交付一次</h2>
+    <p class="subh">四个角色排成一条线：调用方发起，builder 累积，成品交付给发送层。</p>
+    
+  
     <div class="fig">
-      <div class="fig-h"><b>ECU 电源 / 运行状态机</b><span>statechart</span></div>
+      <div class="fig-h"><b>一帧报文的建造流水线</b><span>builder</span></div>
       <div class="diagram">
-        <svg viewBox="0 0 880 360" role="img" aria-label="ECU 状态机图">
-          <defs>
-            <marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-              <path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/>
-            </marker>
-          </defs>
-
-          <g class="node" data-role="off" data-note="OFF：全车断电。唯一合法事件是 ACC；其他事件（包括 CRANK）都被拒绝。它是故障清除后的归宿，也是上电起点。">
-            <rect x="24" y="200" width="150" height="70" rx="10"/>
-            <text class="nm" x="40" y="223">OFF</text>
-            <text class="ty" x="40" y="242">断电</text>
-            <text class="mt" x="40" y="261">只接受 ACC</text>
-          </g>
-
-          <g class="node" data-role="acc" data-note="ACC：附件供电，发动机未转。可以继续拧到 ON，也能直接断电回 OFF；超温时允许直进 FAULT（避免附件负载把电瓶拖垮）。">
-            <rect x="206" y="200" width="150" height="70" rx="10"/>
-            <text class="nm" x="222" y="223">ACC</text>
-            <text class="ty" x="222" y="242">附件供电</text>
-            <text class="mt" x="222" y="261">ON / OFF / 超温</text>
-          </g>
-
-          <g class="node" data-role="on" data-note="ON：点火档，起动机待命。CRANK 才进 RUN；也可以回 ACC 或直接断电。注意这里没有 START 之外的捷径——没经过 CRANK 不会自己变 RUN。">
-            <rect x="388" y="200" width="150" height="70" rx="10"/>
-            <text class="nm" x="404" y="223">ON</text>
-            <text class="ty" x="404" y="242">点火档</text>
-            <text class="mt" x="404" y="261">CRANK / ACC / OFF</text>
-          </g>
-
-          <g class="node" data-role="run" data-note="RUN：发动机运转。只接受熄火（OFF）与超温（FAULT）。这是最“窄”的状态——进入后能做的事反而最少，这是有意的。">
-            <rect x="570" y="200" width="150" height="70" rx="10"/>
-            <text class="nm" x="586" y="223">RUN</text>
-            <text class="ty" x="586" y="242">发动机运转</text>
-            <text class="mt" x="586" y="261">OFF / 超温</text>
-          </g>
-
-          <g class="node" data-role="fault" data-note="FAULT：故障态。只接受 OFF（断电）和 CLEAR（故障清除），两者都回 OFF。它拒绝 CRANK，强制先排除故障再重新上电。">
-            <rect x="388" y="46" width="150" height="68" rx="10"/>
-            <text class="nm" x="404" y="69">FAULT</text>
-            <text class="ty" x="404" y="88">故障</text>
-            <text class="mt" x="404" y="106">OFF / CLEAR</text>
-          </g>
-
-          <path class="flow" marker-end="url(#ar4)" d="M174 232 L202 232"/>
-          <text class="lbl" x="176" y="225">ACC</text>
-
-          <path class="flow" marker-end="url(#ar4)" d="M356 232 L384 232"/>
-          <text class="lbl" x="358" y="225">ON</text>
-
-          <path class="flow" marker-end="url(#ar4)" d="M538 232 L566 232"/>
-          <text class="lbl" x="536" y="225">CRANK</text>
-
-          <path class="flow" marker-end="url(#ar4)" d="M463 198 L463 120"/>
-          <text class="lbl" x="470" y="168">OVERTEMP</text>
-
-          <path class="flow" marker-end="url(#ar4)" d="M604 198 C 600 150, 545 120, 508 112"/>
-          <text class="lbl" x="540" y="140">OVERTEMP</text>
-
-          <path class="flow" marker-end="url(#ar4)" d="M700 274 L700 312 L56 312 L56 276"/>
-          <text class="lbl" x="200" y="330">OFF：ON / RUN / FAULT 断电都回这里；FAULT 另有一条 CLEAR</text>
-
-          <text class="lbl" x="24" y="30">进入 RUN 之前必须经过 CRANK —— 转移表把这些“捷径”堵死</text>
-        </svg>
+<svg viewBox="0 0 880 360" role="img" aria-label="一帧报文的建造流水线">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
+  <g class="node" data-role="client" data-note="调用方只按步骤调用，不直接碰 frame_t 的内部字段，也就不会漏清上一帧。"><rect x="24" y="140" width="150" height="76" rx="10"/><text class="nm" x="38" y="164">调用方</text><text class="ty" x="38" y="183">诊断 / 周期任务</text><text class="mt" x="38" y="201">start → 填字段</text></g>
+  <g class="node" data-role="builder" data-note="builder 持有半成品；每一步只改一个字段，可以在任意一步插入校验。"><rect x="230" y="140" width="200" height="80" rx="10"/><text class="nm" x="244" y="164">builder_t / Builder</text><text class="ty" x="244" y="183">累积状态</text><text class="mt" x="244" y="201">id / data / crc</text></g>
+  <g class="node" data-role="frame" data-note="build() 返回一份完整帧；之后 builder 再 start 不会影响已经交出去的副本。"><rect x="480" y="140" width="170" height="76" rx="10"/><text class="nm" x="494" y="164">frame_t / Frame</text><text class="ty" x="494" y="183">成品</text><text class="mt" x="494" y="201">只读交付</text></g>
+  <g class="node" data-role="tx" data-note="发送层只接收成品，不关心中间步骤；失败可以在交付前拦下。"><rect x="700" y="140" width="150" height="76" rx="10"/><text class="nm" x="714" y="164">CAN 发送</text><text class="ty" x="714" y="183">下游</text><text class="mt" x="714" y="201">send(frame)</text></g>
+  <line x1="174" y1="178" x2="230" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="202.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">步骤</text>
+  <line x1="430" y1="178" x2="480" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="455.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">build</text>
+  <line x1="650" y1="178" x2="700" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="675.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">交付</text>
+</svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：每个状态接受哪些事件、拒绝哪些事件。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：builder 负责累积，frame 只负责被交付。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
     <h2><span class="n">03</span>两份实现</h2>
-    <p class="subh">C 版把 30 个格子摊成一张常量二维数组，<code>-1</code> 表示“这个状态下不接受这个事件”；C++ 版把每一行搬进一个状态类，返回 <code>nullptr</code> 表示拒绝。分派形式不同，拒绝点完全一致。</p>
-
-    <div class="codes">
+    
+    <p class='subh'>C 版是一组 <code>b_*</code> 函数 + 结构体；C++ 版把每个步骤做成返回 <code>Builder&amp;</code> 的链式方法。</p>
       <div class="codecard">
-        <div class="ch"><span class="lang">C</span><span class="fn">state.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 状态模式 · C 实现：ECU 电源/运行状态机，转移写成表
- * 编译：gcc -std=c11 -Wall -Wextra state.c -o state
- * 5 个状态 × 6 个事件 = 30 个格子，非法格子统一返回 -1。
- */
+        <div class="ch"><span class="lang">C</span><span class="fn">builder.c</span><button class="copy">复制</button></div>
+        <pre><code>/* 建造者：把“拼一帧”拆成可检查的步骤，最后一次性交付 */
 #include &lt;stdio.h&gt;
+#include &lt;stddef.h&gt;
 
-enum { ST_OFF, ST_ACC, ST_ON, ST_RUN, ST_FAULT, ST_N };
-enum { EV_ACC, EV_ON, EV_CRANK, EV_OFF, EV_OVER, EV_CLEAR, EV_N };
+typedef struct {
+    unsigned id;
+    int dlc;
+    unsigned char data[8];
+    unsigned crc;
+} frame_t;
 
-static const char *const ST_NAME[] = { "OFF", "ACC", "ON", "RUN", "FAULT" };
-static const char *const EV_NAME[] = { "ACC", "ON", "CRANK", "OFF", "OVERTEMP", "CLEAR" };
+typedef struct { frame_t f; } builder_t;
 
-/* 行 = 当前状态，列 = 事件；-1 表示该状态下这个事件非法 */
-static const int TRANS[ST_N][EV_N] = {
-    /* OFF   */ { ST_ACC, -1,     -1,      -1,     -1,       -1     },
-    /* ACC   */ { -1,     ST_ON,  -1,      ST_OFF, ST_FAULT, -1     },
-    /* ON    */ { ST_ACC, -1,     ST_RUN,  ST_OFF, ST_FAULT, -1     },
-    /* RUN   */ { -1,     -1,     -1,      ST_OFF, ST_FAULT, -1     },
-    /* FAULT */ { -1,     -1,     -1,      ST_OFF, -1,       ST_OFF }
-};
-
-typedef struct { int state; } ecu_t;
-
-static int ecu_inject(ecu_t *e, int ev)
+static void b_start(builder_t *b)          { b-&gt;f.id = 0; b-&gt;f.dlc = 0; b-&gt;f.crc = 0; }
+static void b_id(builder_t *b, unsigned v) { b-&gt;f.id = v; }
+static void b_data(builder_t *b, const unsigned char *d, int n)
 {
-    int next = TRANS[e->state][ev];
-    if (next &lt; 0) {
-        printf("[ECU] %-5s + %-8s -&gt; 拒绝（该状态下事件非法）\n",
-               ST_NAME[e-&gt;state], EV_NAME[ev]);
-        return -1;
-    }
-    printf("[ECU] %-5s + %-8s -&gt; %s\n", ST_NAME[e-&gt;state], EV_NAME[ev], ST_NAME[next]);
-    e-&gt;state = next;
-    return 0;
+    if (n &gt; 8) n = 8;
+    b-&gt;f.dlc = n;
+    for (int i = 0; i &lt; n; i++) b-&gt;f.data[i] = d[i];
+}
+static void b_crc(builder_t *b)
+{
+    unsigned sum = b-&gt;f.id;
+    for (int i = 0; i &lt; b-&gt;f.dlc; i++) sum += b-&gt;f.data[i];
+    b-&gt;f.crc = sum &amp; 0xFFu;
+}
+static frame_t b_build(const builder_t *b) { return b-&gt;f; }
+
+static void dump(const frame_t *f)
+{
+    printf("id=0x%X dlc=%d data=[", f-&gt;id, f-&gt;dlc);
+    for (int i = 0; i &lt; f-&gt;dlc; i++) printf("%s%02X", i ? " " : "", f-&gt;data[i]);
+    printf("] crc=0x%02X\n", f-&gt;crc);
 }
 
 int main(void)
 {
-    ecu_t e = { ST_OFF };
-    static const int seq[] = { EV_ACC, EV_ON, EV_CRANK, EV_OVER, EV_CRANK, EV_CLEAR, EV_CRANK };
-    static const char *const why[] = {
-        "钥匙拧到 ACC", "再拧到 ON（点火档）", "起动机拖动，发动机运转", "冷却液超温",
-        "已进故障，再打起动机", "故障清除", "已断电，再打起动机"
-    };
+    builder_t b;
+    unsigned char payload[8] = { 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80 };
 
-    for (unsigned i = 0; i &lt; sizeof seq / sizeof seq[0]; i++) {
-        printf("--- %s ---\n", why[i]);
-        ecu_inject(&amp;e, seq[i]);
-    }
-    printf("最终状态：%s\n", ST_NAME[e.state]);
+    b_start(&amp;b);
+    b_id(&amp;b, 0x18FF50E5u);
+    b_data(&amp;b, payload, 3);
+    b_crc(&amp;b);
+    frame_t f1 = b_build(&amp;b);
+    printf("frame1 ");
+    dump(&amp;f1);
 
-    int legal = 0;
-    for (int s = 0; s &lt; ST_N; s++)
-        for (int k = 0; k &lt; EV_N; k++)
-            if (TRANS[s][k] &gt;= 0) legal++;
-    printf("转移表 %d 个格子，其中合法转移 %d 个\n", ST_N * EV_N, legal);
+    b_start(&amp;b);                 /* 复用同一个 builder，不残留上一帧 */
+    b_id(&amp;b, 0x7DFu);
+    b_data(&amp;b, payload, 8);      /* 超长被截到 8 字节 */
+    b_crc(&amp;b);
+    frame_t f2 = b_build(&amp;b);
+    printf("frame2 ");
+    dump(&amp;f2);
+    printf("两次建造独立：frame1 dlc=%d, frame2 dlc=%d\n", f1.dlc, f2.dlc);
     return 0;
 }</code></pre>
       </div>
-
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>./builder.exe</span></div>
+      <pre>frame1 id=0x18FF50E5 dlc=3 data=[10 20 30] crc=0x45
+frame2 id=0x7DF dlc=8 data=[10 20 30 40 50 60 70 80] crc=0x1F
+两次建造独立：frame1 dlc=3, frame2 dlc=8</pre>
+    </div>
       <div class="codecard">
-        <div class="ch"><span class="lang">C++</span><span class="fn">state.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 状态模式 · C++ 实现：每个状态一个类，由状态自己决定下一步去哪
-// 编译：g++ -std=c++17 -Wall -Wextra state.cpp -o state_cpp
+        <div class="ch"><span class="lang">C++</span><span class="fn">builder.cpp</span><button class="copy">复制</button></div>
+        <pre><code>// 建造者 · C++：链式调用，build() 只交付一次
+// 编译：g++ -std=c++17 -Wall -Wextra builder.cpp -o builder_cpp
 #include &lt;cstdio&gt;
+#include &lt;array&gt;
 
-enum class Event { Acc, On, Crank, Off, OverTemp, Clear };
+struct Frame {
+    unsigned id = 0;
+    int dlc = 0;
+    std::array&lt;unsigned char, 8&gt; data{};
+    unsigned crc = 0;
+};
 
-const char* evName(Event e) {
-    switch (e) {
-        case Event::Acc: return "ACC";
-        case Event::On: return "ON";
-        case Event::Crank: return "CRANK";
-        case Event::Off: return "OFF";
-        case Event::OverTemp: return "OVERTEMP";
-        case Event::Clear: return "CLEAR";
+class Builder {
+public:
+    Builder &amp;start() { f_ = Frame{}; return *this; }
+    Builder &amp;id(unsigned v) { f_.id = v; return *this; }
+    Builder &amp;data(const unsigned char *d, int n)
+    {
+        if (n &gt; 8) n = 8;
+        f_.dlc = n;
+        for (int i = 0; i &lt; n; i++) f_.data[static_cast&lt;size_t&gt;(i)] = d[i];
+        return *this;
     }
-    return "?";
-}
-
-class Ecu;
-class State {
-public:
-    virtual ~State() = default;
-    virtual const char* name() const = 0;
-    virtual State* on(Event e, Ecu&amp; ctx) = 0;   // 返回 nullptr 表示拒绝
-};
-
-class Off : public State {
-public:
-    const char* name() const override { return "OFF"; }
-    State* on(Event e, Ecu&amp; ctx) override;
-};
-class Acc : public State {
-public:
-    const char* name() const override { return "ACC"; }
-    State* on(Event e, Ecu&amp; ctx) override;
-};
-class On : public State {
-public:
-    const char* name() const override { return "ON"; }
-    State* on(Event e, Ecu&amp; ctx) override;
-};
-class Run : public State {
-public:
-    const char* name() const override { return "RUN"; }
-    State* on(Event e, Ecu&amp; ctx) override;
-};
-class Fault : public State {
-public:
-    const char* name() const override { return "FAULT"; }
-    State* on(Event e, Ecu&amp; ctx) override;
-};
-
-// 函数内静态对象：避免静态初始化顺序问题
-static Off&amp;   stOff()   { static Off s;   return s; }
-static Acc&amp;   stAcc()   { static Acc s;   return s; }
-static On&amp;    stOn()    { static On s;    return s; }
-static Run&amp;   stRun()   { static Run s;   return s; }
-static Fault&amp; stFault() { static Fault s; return s; }
-
-class Ecu {
-public:
-    explicit Ecu(State* s) : st_(s) {}
-    void inject(Event e) {
-        State* next = st_-&gt;on(e, *this);
-        if (!next) {
-            std::printf("[ECU] %-5s + %-8s -&gt; 拒绝（该状态下事件非法）\n",
-                        st_-&gt;name(), evName(e));
-            return;
-        }
-        std::printf("[ECU] %-5s + %-8s -&gt; %s\n", st_-&gt;name(), evName(e), next-&gt;name());
-        st_ = next;
+    Builder &amp;crc()
+    {
+        unsigned sum = f_.id;
+        for (int i = 0; i &lt; f_.dlc; i++) sum += f_.data[static_cast&lt;size_t&gt;(i)];
+        f_.crc = sum &amp; 0xFFu;
+        return *this;
     }
-    const char* name() const { return st_-&gt;name(); }
+    Frame build() const { return f_; }
 private:
-    State* st_;
+    Frame f_;
 };
 
-State* Off::on(Event e, Ecu&amp;) {
-    if (e == Event::Acc) return &amp;stAcc();
-    return nullptr;
-}
-State* Acc::on(Event e, Ecu&amp;) {
-    switch (e) {
-        case Event::On: return &amp;stOn();
-        case Event::Off: return &amp;stOff();
-        case Event::OverTemp: return &amp;stFault();
-        default: return nullptr;
-    }
-}
-State* On::on(Event e, Ecu&amp;) {
-    switch (e) {
-        case Event::Crank: return &amp;stRun();
-        case Event::Off: return &amp;stOff();
-        case Event::Acc: return &amp;stAcc();
-        case Event::OverTemp: return &amp;stFault();
-        default: return nullptr;
-    }
-}
-State* Run::on(Event e, Ecu&amp;) {
-    switch (e) {
-        case Event::Off: return &amp;stOff();
-        case Event::OverTemp: return &amp;stFault();
-        default: return nullptr;
-    }
-}
-State* Fault::on(Event e, Ecu&amp;) {
-    switch (e) {
-        case Event::Off: return &amp;stOff();
-        case Event::Clear: return &amp;stOff();
-        default: return nullptr;
-    }
+static void dump(const Frame &amp;f)
+{
+    std::printf("id=0x%X dlc=%d data=[", f.id, f.dlc);
+    for (int i = 0; i &lt; f.dlc; i++) std::printf("%s%02X", i ? " " : "", f.data[static_cast&lt;size_t&gt;(i)]);
+    std::printf("] crc=0x%02X\n", f.crc);
 }
 
-int main() {
-    Ecu e(&amp;stOff());
-    const Event seq[] = { Event::Acc, Event::On, Event::Crank, Event::OverTemp,
-                          Event::Crank, Event::Clear, Event::Crank };
-    const char* why[] = {
-        "钥匙拧到 ACC", "再拧到 ON（点火档）", "起动机拖动，发动机运转", "冷却液超温",
-        "已进故障，再打起动机", "故障清除", "已断电，再打起动机"
-    };
-    for (int i = 0; i &lt; 7; ++i) {
-        std::printf("--- %s ---\n", why[i]);
-        e.inject(seq[i]);
-    }
-    std::printf("最终状态：%s\n", e.name());
+int main()
+{
+    unsigned char payload[8] = { 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80 };
+    Builder b;
+    Frame f1 = b.start().id(0x18FF50E5u).data(payload, 3).crc().build();
+    std::printf("frame1 ");
+    dump(f1);
+
+    Frame f2 = b.start().id(0x7DFu).data(payload, 8).crc().build();
+    std::printf("frame2 ");
+    dump(f2);
+    std::printf("两次建造独立：frame1 dlc=%d, frame2 dlc=%d\n", f1.dlc, f2.dlc);
     return 0;
 }</code></pre>
       </div>
-    </div>
-
     <div class="run">
-      <div class="ch"><b>RUN</b><span>./state.exe</span></div>
-      <pre>--- 钥匙拧到 ACC ---
-[ECU] OFF   + ACC      -&gt; ACC
---- 再拧到 ON（点火档） ---
-[ECU] ACC   + ON       -&gt; ON
---- 起动机拖动，发动机运转 ---
-[ECU] ON    + CRANK    -&gt; RUN
---- 冷却液超温 ---
-[ECU] RUN   + OVERTEMP -&gt; FAULT
---- 已进故障，再打起动机 ---
-[ECU] FAULT + CRANK    -&gt; 拒绝（该状态下事件非法）
---- 故障清除 ---
-[ECU] FAULT + CLEAR    -&gt; OFF
---- 已断电，再打起动机 ---
-[ECU] OFF   + CRANK    -&gt; 拒绝（该状态下事件非法）
-最终状态：OFF
-转移表 30 个格子，其中合法转移 12 个</pre>
+      <div class="ch"><b>RUN</b><span>./builder_cpp.exe</span></div>
+      <pre>frame1 id=0x18FF50E5 dlc=3 data=[10 20 30] crc=0x45
+frame2 id=0x7DF dlc=8 data=[10 20 30 40 50 60 70 80] crc=0x1F
+两次建造独立：frame1 dlc=3, frame2 dlc=8</pre>
     </div>
-    <div class="run">
-      <div class="ch"><b>RUN</b><span>./state_cpp.exe</span></div>
-      <pre>--- 钥匙拧到 ACC ---
-[ECU] OFF   + ACC      -&gt; ACC
---- 再拧到 ON（点火档） ---
-[ECU] ACC   + ON       -&gt; ON
---- 起动机拖动，发动机运转 ---
-[ECU] ON    + CRANK    -&gt; RUN
---- 冷却液超温 ---
-[ECU] RUN   + OVERTEMP -&gt; FAULT
---- 已进故障，再打起动机 ---
-[ECU] FAULT + CRANK    -&gt; 拒绝（该状态下事件非法）
---- 故障清除 ---
-[ECU] FAULT + CLEAR    -&gt; OFF
---- 已断电，再打起动机 ---
-[ECU] OFF   + CRANK    -&gt; 拒绝（该状态下事件非法）
-最终状态：OFF</pre>
-    </div>
-    <p class="hintline">逐行一致：C++ 版没有多印一行，也没有在拒绝之后偷偷改状态。差别只在“谁持有这张表”。</p>
   </section>
-  <section class="sec" id="s4">
-    <h2><span class="n">04</span>点事件，看状态怎么走、怎么被拒</h2>
-    <p class="subh">六个事件按钮对应真实操作。点一下：合法就转移并在矩阵里跳行；非法则原状态不动，只记一笔拒绝。矩阵里高亮的是<b>当前状态那一行</b>，绿格是能去的地方。</p>
 
-    <div class="demo">
-      <div class="demo-h"><b>ecu state machine</b><span>非法事件不改变状态</span></div>
-      <div class="stage">
-        <div class="cur"><span>STATE</span><b id="cur">OFF</b><i id="last">等事件</i></div>
-        <div class="evrow" id="evrow"></div>
-        <table class="mtx" id="mtx"></table>
-        <div class="ctl" style="margin-top:10px">
-          <button class="btn" id="stReset">复位到 OFF</button>
-          <button class="btn" id="stClear">清日志</button>
-        </div>
-        <div class="log" id="stLog"></div>
-      </div>
+  <section class="sec" id="s4">
+    <h2><span class="n">04</span>一步一步拼一帧</h2>
+    
+    
+<div class="demo" id="demo">
+  <div class="demo-h"><b>一步一步拼一帧</b><span>点“单步”：看每个字段何时写入、CRC 何时才能算。</span></div>
+  <div class="stage">
+    <div class="dflow" id="dflow"></div>
+    <div class="dbar" id="dbar">未开始</div>
+    <div class="dctl">
+      <button class="btn" id="dPrev">复位</button>
+      <button class="btn" id="dNext">单步</button>
+      <button class="btn" id="dPlay">自动</button>
+      <button class="btn" id="dReset">清日志</button>
     </div>
+    <div class="dnote" id="dnote">点上面的方框，看它在这次流程里负责什么。</div>
+    <div class="log" id="dlog"></div>
+  </div>
+</div>
+<script>dpDemo({nodes:[{id:'id',label:'ID',sub:'0x18FF50E5',note:''}, {id:'data',label:'DATA',sub:'3 字节',note:''}, {id:'crc',label:'CRC',sub:'最后算',note:''}, {id:'build',label:'BUILD',sub:'交付成品',note:''}, {id:'send',label:'SEND',sub:'发送层',note:''}],steps:[{hi:['id'],t:'start() 清底：id=0、dlc=0、crc=0，上一帧不残留'}, {hi:['id'],t:'填 id = 0x18FF50E5'}, {hi:['data'],t:'填数据 10 20 30，dlc 跟着变成 3'}, {hi:['crc'],t:'数据到齐后才算 CRC：sum(id + data) & 0xFF = 0x45'}, {hi:['build'],t:'build() 交付 frame1；builder 之后可以重新 start'}, {hi:['data', 'build'],t:'第二帧复用同一个 builder：dlc 从 3 变 8，没有串上一帧的残留'}, {hi:['send'],t:'两帧分别交给发送层，成品互不影响'}]});</script>
+
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>C 与 C++：同一张表，两种摆放</h2>
+    <h2><span class="n">05</span>C 与 C++：两种链式</h2>
+    
+    
     <div class="tbl">
       <table>
         <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
-        <tbody>
-          <tr><td>状态集合</td><td><code>enum ST_*</code> 整数</td><td><code>class Off/Acc/On/Run/Fault</code></td><td>整数便宜但可被任意强转；类型安全要多一层检查</td></tr>
-          <tr><td>转移定义</td><td><code>TRANS[状态][事件]</code> 常量表</td><td>各状态类的 <code>on()</code></td><td>表能一眼看全、能穷举；类把复杂度摊到文件各处</td></tr>
-          <tr><td>非法判定</td><td><code>-1</code></td><td><code>nullptr</code></td><td>两者都是“显式拒绝”，不靠 default 兜底</td></tr>
-          <tr><td>当前状态</td><td><code>int state</code></td><td><code>State* st_</code></td><td>C++ 多一次间接寻址；C 多一次二维下标</td></tr>
-          <tr><td>生命周期</td><td>无</td><td>函数内静态单例</td><td>没有 <code>new</code>，就不存在“忘了 delete 状态对象”</td></tr>
-          <tr><td>加一个状态</td><td>加一行、改 enum、改所有行</td><td>加一个类 + 挂进相关 <code>on()</code></td><td>表改一处但容易漏列；类改动分散但编译器会提醒未覆盖</td></tr>
-          <tr><td>动作副作用</td><td>转移成功后统一分发</td><td>可在 <code>onEnter</code> 钩子里做</td><td>别塞进转移表，表要保持“纯数据”</td></tr>
-        </tbody>
+        <tbody><tr><td>半成品放哪</td><td><code>builder_t.f</code> 内嵌</td><td><code>Builder::f_</code> 私有成员</td><td>都在 builder 里，调用方拿不到半成品</td></tr><tr><td>步骤接口</td><td><code>b_id()</code> / <code>b_data()</code> / <code>b_crc()</code></td><td>链式 <code>id().data().crc()</code></td><td>C 靠命名约束顺序，C++ 靠返回值把顺序写进表达式</td></tr><tr><td>重置</td><td><code>b_start()</code> 显式清</td><td><code>start()</code> 重新赋值 <code>Frame{}</code></td><td>C 要记得清每个字段；C++ 赋值一次全清</td></tr><tr><td>交付</td><td>按值返回 <code>frame_t</code></td><td>按值返回 <code>Frame</code></td><td>都是副本，交付后改 builder 不影响成品</td></tr><tr><td>超长数据</td><td><code>b_data()</code> 里截到 8 字节</td><td>同样截到 8 字节</td><td>规则一致，但都要在文档里写明，别让调用方猜</td></tr></tbody>
       </table>
     </div>
   </section>
 
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
-    <div class="prose">
-      <ul>
-        <li><b>表越界比逻辑错更难查。</b><code>TRANS[state][ev]</code> 里 <code>state</code> 或 <code>ev</code> 若来自外部（CAN 信号、配置），越界就是未定义行为。入口处先做范围校验，别指望 <code>-1</code> 兜住。</li>
-        <li><b>拒绝要能被上层看见。</b><code>return -1</code> 但调用方不看返回值，等于没做保护。至少让拒绝有日志和计数，诊断时才知道“用户按了但车没反应”。</li>
-        <li><b>一次事件只走一步。</b>在 <code>on()</code> 里递归 <code>inject</code> 会连跳多格，日志和外部观察者都对不上。需要连跳就显式发两次事件。</li>
-        <li><b>CLEAR 不是复位。</b>故障清除只回 OFF，不代表清故障码、不代表重启。这类语义要在文档里写死，否则后期一定有人拿 CLEAR 当 reboot 用。</li>
-        <li><b>状态类别持有可变数据。</b>把状态做成静态单例时，它只能是“规则”，不能存当前车速、当前档位；那些属于上下文 <code>Ecu</code>。</li>
-        <li><b>30 格维护成本。</b>状态和事件一多，矩阵会变成 8×12、10×15；这时就该用脚本从 YAML/CSV 生成表，而不是手写。</li>
-      </ul>
-    </div>
+    
+    <div class="prose"><ul><li><b>CRC 必须在数据之后。</b>链式调用看起来自由，但 <code>crc()</code> 依赖 <code>dlc</code> 与数据；把它写在最前，算出来一定是错的。</li><li><b>build() 之后别再改成品。</b>按值返回意味着成品是副本；如果后续要改，重新 start 再建一帧，不要绕过 builder 直接改字段。</li><li><b>数据截断要报错。</b>超过 8 字节静默截断，调用方以为全发出去了；至少要返回状态或日志，不能只截不说。</li><li><b>builder 不是线程安全的。</b>一个 builder 只给一个任务用；多线程共用要加锁，或者每个线程各建一个。</li><li><b>步骤别无限膨胀。</b>字段超过十几个、还带条件分支时，考虑把“帧描述”做成表驱动，而不是继续加方法。</li></ul></div>
   </section>
-
-  <div class="ch-nav">
-      <a href="../p2/c02.html"><span>上一章</span><b>← 2.2 观察者模式</b></a>
-      <a class="nx" href="../p2/c04.html"><span>下一章</span><b>2.4 命令模式 →</b></a>
-    </div>
-
-  
-</div>
-
+  <div class="ch-nav" id="chNav"></div>
+  </div>
 </div>
 
 <script src="../assets/pd.js"></script>
 <script src="../assets/dp-data.js"></script>
 <script src="../assets/dp-nav.js"></script>
 <script>dpNav('p2');</script>
-<script>
-(function () {
-  var STATES = ['OFF', 'ACC', 'ON', 'RUN', 'FAULT'];
-  var EVENTS = ['ACC', 'ON', 'CRANK', 'OFF', 'OVERTEMP', 'CLEAR'];
-  var T = {
-    OFF:   { ACC: 'ACC' },
-    ACC:   { ON: 'ON', OFF: 'OFF', OVERTEMP: 'FAULT' },
-    ON:    { CRANK: 'RUN', OFF: 'OFF', ACC: 'ACC', OVERTEMP: 'FAULT' },
-    RUN:   { OFF: 'OFF', OVERTEMP: 'FAULT' },
-    FAULT: { OFF: 'OFF', CLEAR: 'OFF' }
-  };
-
-  var cur = 'OFF';
-  var curEl = document.getElementById('cur');
-  var lastEl = document.getElementById('last');
-  var evRow = document.getElementById('evrow');
-  var mtx = document.getElementById('mtx');
-  var logEl = document.getElementById('stLog');
-
-  /* 事件按钮 */
-  EVENTS.forEach(function (ev) {
-    var b = document.createElement('button');
-    b.className = 'btn';
-    b.textContent = ev;
-    b.onclick = function () { inject(ev); };
-    evRow.appendChild(b);
-  });
-
-  /* 矩阵 */
-  var head = '<thead><tr><th>状态 \\ 事件</th>';
-  EVENTS.forEach(function (ev) { head += '<th>' + ev + '</th>'; });
-  head += '</tr></thead><tbody>';
-  mtx.innerHTML = head + '</tbody>';
-
-  function drawMatrix() {
-    var tb = mtx.tBodies[0];
-    tb.innerHTML = '';
-    STATES.forEach(function (st) {
-      var tr = document.createElement('tr');
-      if (st === cur) tr.className = 'on';
-      var th = document.createElement('th');
-      th.textContent = st;
-      tr.appendChild(th);
-      EVENTS.forEach(function (ev) {
-        var td = document.createElement('td');
-        var to = T[st] && T[st][ev];
-        if (to) { td.textContent = to; td.className = 'legal'; }
-        else { td.textContent = '·'; }
-        td.style.cursor = 'pointer';
-        td.onclick = function () { inject(ev); };
-        tr.appendChild(td);
-      });
-      tb.appendChild(tr);
-    });
-  }
-
-  function inject(ev) {
-    var to = T[cur] && T[cur][ev];
-    if (!to) {
-      lastEl.textContent = '拒绝 ' + ev;
-      PD.log(logEl, '[' + cur + '] + ' + ev + ' → 拒绝：该状态下事件非法', 'bad');
-      return;
-    }
-    var from = cur;
-    cur = to;
-    curEl.textContent = cur;
-    lastEl.textContent = from + ' --' + ev + '→';
-    PD.log(logEl, '[' + from + '] + ' + ev + ' → ' + cur);
-    drawMatrix();
-  }
-
-  document.getElementById('stReset').onclick = function () {
-    cur = 'OFF';
-    curEl.textContent = cur;
-    lastEl.textContent = '等事件';
-    PD.log(logEl, '复位 → OFF');
-    drawMatrix();
-  };
-  document.getElementById('stClear').onclick = function () {
-    PD.clear(logEl);
-  };
-
-  drawMatrix();
-  PD.log(logEl, '起始状态 OFF：先按 ACC 上车。', '');
-})();
-</script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,0 +1,4 @@
+original name=fast     timeout=120
+clone-a  name=fast     timeout=120
+clone-b  name=fast-tuned timeout=90
+原型未变：timeout=120

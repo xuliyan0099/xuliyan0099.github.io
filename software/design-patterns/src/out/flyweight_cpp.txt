@@ -1,0 +1,4 @@
+信号 1000 个，描述池 8 份
+sig[0]   unit=C    scale=1.0 use_count=126
+sig[999] unit=deg  scale=1.7
+指针相同：sig[0]==sig[8] -> yes

@@ -1,0 +1,7 @@
++ vehicle
+  + powertrain
+    - engine     PASS
+    - gearbox    FAIL
+  + chassis
+    - abs        PASS
+整车自检：FAIL

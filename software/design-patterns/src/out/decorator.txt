@@ -1,0 +1,5 @@
+raw       = 42
++offset5  = 47
++clamp40  = 40
+负值路径  = 0
+三层顺序：raw -> offset -> clamp，换顺序结果会变

@@ -1,0 +1,4 @@
+fault #1 code=17 O2 heater
+fault #2 code=42 misfire
+fault #3 code=91 CAN bus off
+有效故障 3 条，全部遍历完

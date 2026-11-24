@@ -1,0 +1,9 @@
+-- UDS over CAN --
+[CAN ] UDS 0x22F190 -> CAN
+-- UDS over LIN --
+[LIN ] UDS 0x22F190 -> LIN
+-- OBD over CAN --
+[CAN ] OBD 0x22F190 -> CAN
+-- OBD over LIN --
+[LIN ] OBD 0x22F190 -> LIN
+协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧

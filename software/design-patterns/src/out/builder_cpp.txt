@@ -1,0 +1,3 @@
+frame1 id=0x18FF50E5 dlc=3 data=[10 20 30] crc=0x45
+frame2 id=0x7DF dlc=8 data=[10 20 30 40 50 60 70 80] crc=0x1F
+两次建造独立：frame1 dlc=3, frame2 dlc=8

@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>4.4 迭代器模式 ITERATOR · C 与 C++ 双实现</title>
+<meta name="description" content="迭代器：故障表只暴露 next()，调用方不再直接摸数组。">
+<meta name="theme-color" content="#08090c">
+<link rel="stylesheet" href="../assets/pd.css">
+<script src="../assets/dp-demo.js"></script>
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <label for="navChk" class="nav-toggle">☰ 目录</label>
+    <a class="brand" href="../index.html"><i></i>设计模式<small>C / C++ 双实现</small></a>
+    <span class="tb-sp"></span>
+    <a class="tb" href="../p1/c01.html">导读</a>
+    <a class="tb" href="../../../index.html">知识库</a>
+    <a class="tb" href="../index.html">目录</a>
+  </div>
+</header>
+
+<input type="checkbox" id="navChk" class="nav-chk" hidden>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h" id="sideHead">设计模式全书 · 25 章<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
+    <ol id="sideList"></ol>
+    <div class="vol-nav" id="volNav"></div>
+  </aside>
+
+  <div class="wrap">
+  <div class="ch-meta"><span class="lv">篇四 · 行为型</span><span class="sep">/</span>第 4 章<span class="sep">/</span>约 28 分钟</div>
+  <h1>迭代器模式<span class="en">ITERATOR</span></h1>
+  <p class="lede">故障表今天是数组，明天可能换成环形缓冲或链表。调用方若直接 <code>for (i=0; i&lt;n; i++)</code>，存储一换就全改。<b>迭代器只暴露“还有没有、下一个是谁”</b>，内部结构随便换。</p>
+  <div class="chips"><span class="chip ok">只暴露 next()</span><span class="chip">跳过无效项</span><span class="chip">换存储不改调用方</span></div>
+
+  <section class="sec" id="s1">
+    <h2><span class="n">01</span>问题：调用方直接摸数组，换存储就崩</h2>
+    
+    
+      <div class="prose">
+        <p>直接遍历数组的写法很自然，但把存储细节写进了调用方：</p>
+        <pre><code>for (int i = 0; i &lt; n; i++)
+    if (faults[i].code != 0) handle(&amp;faults[i]);</code></pre>
+        <ul>
+          <li><b>换存储就崩。</b>改成链表后，<code>faults[i]</code> 不存在了，所有调用方都要重写。</li>
+          <li><b>过滤规则散落。</b>“跳过 code=0”的逻辑在每个调用点复制，迟早有一处忘了跳。</li>
+          <li><b>越界靠人守。</b><code>n</code> 算错、表被并发写，循环就读到边界外。</li>
+        </ul>
+        <p>迭代器把“当前位置 + 跳过规则 + 结束条件”收进一个对象；调用方只问 <code>next()</code>，拿不到就不再看。</p>
+      </div>
+  </section>
+
+  <section class="sec" id="s2">
+    <h2><span class="n">02</span>结构：只暴露 next()</h2>
+    <p class="subh">故障表、迭代器、调用方三段；点方框看 next() 如何在内部跳过多余项。</p>
+    
+  
+    <div class="fig">
+      <div class="fig-h"><b>故障表上的迭代器</b><span>iterator</span></div>
+      <div class="diagram">
+<svg viewBox="0 0 880 360" role="img" aria-label="故障表上的迭代器">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
+  <g class="node" data-role="list" data-note="存储里可以有无效项（code=0）；调用方不需要知道它们存在。"><rect x="24" y="130" width="200" height="100" rx="10"/><text class="nm" x="38" y="154">fault_t[]</text><text class="ty" x="38" y="173">存储</text><text class="mt" x="38" y="191">5 项，含 2 个空</text></g>
+  <g class="node" data-role="it" data-note="迭代器持有下标与结束条件，next() 内部跳过无效项并返回指针。"><rect x="300" y="130" width="200" height="100" rx="10"/><text class="nm" x="314" y="154">fault_iter_t</text><text class="ty" x="314" y="173">迭代器</text><text class="mt" x="314" y="191">i / n / next()</text></g>
+  <g class="node" data-role="client" data-note="调用方只关心“还有没有有效故障”，不关心底层是数组还是链表。"><rect x="580" y="130" width="200" height="100" rx="10"/><text class="nm" x="594" y="154">调用方</text><text class="ty" x="594" y="173">诊断任务</text><text class="mt" x="594" y="191">while(next())</text></g>
+  <line x1="224" y1="180" x2="300" y2="180" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="262.0" y="172.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">持有</text>
+  <line x1="500" y1="180" x2="580" y2="180" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="540.0" y="172.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">next()</text>
+</svg>
+      </div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：迭代器是存储与调用方之间的一层。</span></div>
+    </div>
+  </section>
+
+  <section class="sec" id="s3">
+    <h2><span class="n">03</span>两份实现</h2>
+    
+    <p class='subh'>C 版是显式 <code>next()</code>；C++ 版实现 <code>begin()/end()</code>，直接支持 range-for。</p>
+      <div class="codecard">
+        <div class="ch"><span class="lang">C</span><span class="fn">iterator.c</span><button class="copy">复制</button></div>
+        <pre><code>/* 迭代器：调用方只拿 next()，看不到故障表是数组还是链表 */
+#include &lt;stdio.h&gt;
+#include &lt;stddef.h&gt;
+
+typedef struct {
+    int code;
+    const char *name;
+} fault_t;
+
+static const fault_t FAULTS[] = {
+    { 0,  "none" },
+    { 17, "O2 heater" },
+    { 0,  "none" },
+    { 42, "misfire" },
+    { 91, "CAN bus off" },
+};
+
+typedef struct {
+    const fault_t *arr;
+    int n;
+    int i;
+} fault_iter_t;
+
+static void iter_init(fault_iter_t *it, const fault_t *arr, int n)
+{
+    it-&gt;arr = arr; it-&gt;n = n; it-&gt;i = 0;
+}
+
+/* 只返回有效故障；返回 NULL 表示遍历结束 */
+static const fault_t *iter_next(fault_iter_t *it)
+{
+    while (it-&gt;i &lt; it-&gt;n) {
+        const fault_t *f = &amp;it-&gt;arr[it-&gt;i++];
+        if (f-&gt;code != 0) return f;
+    }
+    return NULL;
+}
+
+int main(void)
+{
+    fault_iter_t it;
+    iter_init(&amp;it, FAULTS, (int)(sizeof FAULTS / sizeof FAULTS[0]));
+
+    const fault_t *f;
+    int count = 0;
+    while ((f = iter_next(&amp;it)) != NULL) {
+        printf("fault #%d code=%d %s\n", ++count, f-&gt;code, f-&gt;name);
+    }
+    printf("有效故障 %d 条，全部遍历完\n", count);
+    return 0;
+}</code></pre>
+      </div>
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>./iterator.exe</span></div>
+      <pre>fault #1 code=17 O2 heater
+fault #2 code=42 misfire
+fault #3 code=91 CAN bus off
+有效故障 3 条，全部遍历完</pre>
+    </div>
+      <div class="codecard">
+        <div class="ch"><span class="lang">C++</span><span class="fn">iterator.cpp</span><button class="copy">复制</button></div>
+        <pre><code>// 迭代器 · C++：自定义 begin/end，range-for 直接遍历有效故障
+// 编译：g++ -std=c++17 -Wall -Wextra iterator.cpp -o iterator_cpp
+#include &lt;cstdio&gt;
+#include &lt;vector&gt;
+
+struct Fault {
+    int code;
+    const char *name;
+};
+
+class FaultList {
+public:
+    void add(int code, const char *name) { items_.push_back(Fault{code, name}); }
+
+    class Iter {
+    public:
+        Iter(const FaultList *list, std::size_t pos) : list_(list), pos_(pos) { skip(); }
+        const Fault &amp;operator*() const { return list_-&gt;items_[pos_]; }
+        Iter &amp;operator++() { ++pos_; skip(); return *this; }
+        bool operator!=(const Iter &amp;o) const { return pos_ != o.pos_; }
+    private:
+        void skip() { while (pos_ &lt; list_-&gt;items_.size() &amp;&amp; list_-&gt;items_[pos_].code == 0) ++pos_; }
+        const FaultList *list_;
+        std::size_t pos_;
+    };
+
+    Iter begin() const { return Iter(this, 0); }
+    Iter end() const { return Iter(this, items_.size()); }
+private:
+    std::vector&lt;Fault&gt; items_;
+};
+
+int main()
+{
+    FaultList list;
+    list.add(0, "none");
+    list.add(17, "O2 heater");
+    list.add(0, "none");
+    list.add(42, "misfire");
+    list.add(91, "CAN bus off");
+
+    int count = 0;
+    for (const Fault &amp;f : list)
+        std::printf("fault #%d code=%d %s\n", ++count, f.code, f.name);
+    std::printf("有效故障 %d 条，全部遍历完\n", count);
+    return 0;
+}</code></pre>
+      </div>
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>./iterator_cpp.exe</span></div>
+      <pre>fault #1 code=17 O2 heater
+fault #2 code=42 misfire
+fault #3 code=91 CAN bus off
+有效故障 3 条，全部遍历完</pre>
+    </div>
+  </section>
+
+  <section class="sec" id="s4">
+    <h2><span class="n">04</span>遍历时跳过无效项</h2>
+    
+    
+<div class="demo" id="demo">
+  <div class="demo-h"><b>遍历时跳过无效项</b><span>5 项里 2 项 code=0，调用方只看到 3 条有效故障。</span></div>
+  <div class="stage">
+    <div class="dflow" id="dflow"></div>
+    <div class="dbar" id="dbar">未开始</div>
+    <div class="dctl">
+      <button class="btn" id="dPrev">复位</button>
+      <button class="btn" id="dNext">单步</button>
+      <button class="btn" id="dPlay">自动</button>
+      <button class="btn" id="dReset">清日志</button>
+    </div>
+    <div class="dnote" id="dnote">点上面的方框，看它在这次流程里负责什么。</div>
+    <div class="log" id="dlog"></div>
+  </div>
+</div>
+<script>dpDemo({nodes:[{id:'i0',label:'[0]',sub:'code=0',note:''}, {id:'i1',label:'[1]',sub:'17',note:''}, {id:'i2',label:'[2]',sub:'code=0',note:''}, {id:'i3',label:'[3]',sub:'42',note:''}, {id:'i4',label:'[4]',sub:'91',note:''}],steps:[{hi:['i0'],t:'next() 从 [0] 开始：code=0，跳过'}, {hi:['i1'],t:'[1] code=17：返回 O2 heater'}, {hi:['i2'],t:'继续： [2] code=0，再跳过'}, {hi:['i3'],t:'[3] code=42：返回 misfire'}, {hi:['i4'],t:'[4] code=91：返回 CAN bus off'}, {hi:['i0', 'i1', 'i2', 'i3', 'i4'],t:'越界：返回 NULL，循环自然结束；共 3 条有效故障'}]});</script>
+
+  </section>
+
+  <section class="sec" id="s5">
+    <h2><span class="n">05</span>C 与 C++：迭代器的边界</h2>
+    
+    
+    <div class="tbl">
+      <table>
+        <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
+        <tbody><tr><td>迭代状态</td><td><code>fault_iter_t</code> 结构</td><td>嵌套 <code>Iter</code> 类</td><td>C 手动 init；C++ begin/end 生成</td></tr><tr><td>取下一个</td><td><code>next()</code> 返回指针</td><td><code>operator++</code> + <code>operator*</code></td><td>C 要判 NULL；C++ 用范围 for</td></tr><tr><td>过滤</td><td><code>next()</code> 内部 while</td><td><code>skip()</code> 内部 while</td><td>规则只有一处</td></tr><tr><td>失效</td><td>调用方改表导致下标错位</td><td>容器改动使迭代器失效</td><td>两边都要求遍历期间别改表</td></tr><tr><td>结束</td><td><code>NULL</code></td><td><code>end()</code> 比较</td><td>语义一致：到末尾就停</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sec" id="s6">
+    <h2><span class="n">06</span>代价与坑</h2>
+    
+    <div class="prose"><ul><li><b>遍历时别改表。</b>边遍历边删故障会让下标错位或跳过元素；要删就先收集，遍历完再处理。</li><li><b>迭代器别返回内部指针。</b>返回 <code>&amp;arr[i]</code> 后，表被重排就悬空；必要时返回值拷贝。</li><li><b>C++ 迭代器要满足 range-for 的最小接口。</b><code>begin/end</code>、<code>!=</code>、<code>++</code>、<code>*</code> 一个都不能少。</li><li><b>过滤规则要写清。</b>code=0 是“无故障”还是“未初始化”，语义不同；别让迭代器替业务猜。</li><li><b>并发读要加保护。</b>诊断任务和故障写入可能并发；至少用双缓冲或读写锁，别让迭代器读到半更新状态。</li></ul></div>
+  </section>
+  <div class="ch-nav" id="chNav"></div>
+  </div>
+</div>
+
+<script src="../assets/pd.js"></script>
+<script src="../assets/dp-data.js"></script>
+<script src="../assets/dp-nav.js"></script>
+<script>dpNav('p4');</script>
+</body>
+</html>

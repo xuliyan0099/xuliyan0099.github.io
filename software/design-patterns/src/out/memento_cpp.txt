@@ -1,0 +1,4 @@
+before    gain=12 offset=0 mode=1
+tuned     gain=30 offset=-8 mode=3
+restored  gain=12 offset=0 mode=1
+快照是值拷贝：之后改 ecu 不会污染 memento

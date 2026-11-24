@@ -1,0 +1,6 @@
+original name=fast     timeout=120 retry=1
+clone-a  name=fast     timeout=120 retry=1
+clone-b  name=fast-tuned timeout=90 retry=1
+original name=fast     timeout=120 retry=1
+lookup slow: miss
+克隆 2 份，原型仍 timeout=120

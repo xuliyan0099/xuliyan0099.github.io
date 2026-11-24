@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3.4 装饰器模式 DECORATOR · C 与 C++ 双实现</title>
+<meta name="description" content="装饰器：读数流水线逐层加 offset、clamp，顺序可换，底层只读一次。">
+<meta name="theme-color" content="#08090c">
+<link rel="stylesheet" href="../assets/pd.css">
+<script src="../assets/dp-demo.js"></script>
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <label for="navChk" class="nav-toggle">☰ 目录</label>
+    <a class="brand" href="../index.html"><i></i>设计模式<small>C / C++ 双实现</small></a>
+    <span class="tb-sp"></span>
+    <a class="tb" href="../p1/c01.html">导读</a>
+    <a class="tb" href="../../../index.html">知识库</a>
+    <a class="tb" href="../index.html">目录</a>
+  </div>
+</header>
+
+<input type="checkbox" id="navChk" class="nav-chk" hidden>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h" id="sideHead">设计模式全书 · 25 章<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
+    <ol id="sideList"></ol>
+    <div class="vol-nav" id="volNav"></div>
+  </aside>
+
+  <div class="wrap">
+  <div class="ch-meta"><span class="lv">篇三 · 结构型</span><span class="sep">/</span>第 4 章<span class="sep">/</span>约 28 分钟</div>
+  <h1>装饰器模式<span class="en">DECORATOR</span></h1>
+  <p class="lede">传感器读数进来后要做三件事：加偏移、限幅、必要时再滤波。若每加一个处理就复制一份 <code>read_sensor()</code>，很快就有十几个版本。<b>装饰器把每件事做成一层</b>，层与层串起来，顺序由调用方决定，底层读数只写一次。</p>
+  <div class="chips"><span class="chip ok">一层只做一件事</span><span class="chip">顺序可换、可拆</span><span class="chip">底层只读一次</span></div>
+
+  <section class="sec" id="s1">
+    <h2><span class="n">01</span>问题：每加一个处理就复制一遍读数函数</h2>
+    
+    
+      <div class="prose">
+        <p>坏写法是把处理塞进同一个函数：</p>
+        <pre><code>int read_sensor(void) {
+    int v = adc_read();
+    v += OFFSET;
+    if (v &lt; 0) v = 0;
+    if (v &gt; 40) v = 40;
+    return v;
+}</code></pre>
+        <p>三个处理看着简单，问题在扩展时爆发：</p>
+        <ul>
+          <li><b>顺序写死。</b>先限幅再偏移，和先偏移再限幅，结果不同；业务想换顺序只能改函数。</li>
+          <li><b>无法只取原始值。</b>标定时需要 raw=42，函数却总是返回处理后的 40。</li>
+          <li><b>每加一层就复制。</b>再加中值滤波，又出现 <code>read_sensor_filtered()</code>，调用方开始猜该用哪个。</li>
+        </ul>
+        <p>装饰器把“取原始值”和“处理”分开：最底层只返回 raw，每一层包住下一层，在它的结果上做一件事。要几层、什么顺序，拼链时决定。</p>
+      </div>
+  </section>
+
+  <section class="sec" id="s2">
+    <h2><span class="n">02</span>结构：一层只加一件事</h2>
+    <p class="subh">一条四段流水线：raw → offset → clamp → 业务；每层只依赖它的内层。</p>
+    
+  
+    <div class="fig">
+      <div class="fig-h"><b>读数装饰链</b><span>decorator</span></div>
+      <div class="diagram">
+<svg viewBox="0 0 880 360" role="img" aria-label="读数装饰链">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
+  <g class="node" data-role="raw" data-note="最底层只做一次真实采样，不做任何加工；标定和诊断可以直接拿它。"><rect x="24" y="140" width="160" height="76" rx="10"/><text class="nm" x="38" y="164">raw</text><text class="ty" x="38" y="183">最底层</text><text class="mt" x="38" y="201">read() = 42</text></g>
+  <g class="node" data-role="off" data-note="offset 只关心“在内层结果上加多少”；它不知道内层是 raw 还是另一层装饰。"><rect x="210" y="140" width="170" height="76" rx="10"/><text class="nm" x="224" y="164">offset</text><text class="ty" x="224" y="183">装饰层</text><text class="mt" x="224" y="201">+5</text></g>
+  <g class="node" data-role="clamp" data-note="clamp 只做限幅；顺序换到 offset 之前，42 会先被限成 40，再加 5 得 45。"><rect x="405" y="140" width="170" height="76" rx="10"/><text class="nm" x="419" y="164">clamp</text><text class="ty" x="419" y="183">装饰层</text><text class="mt" x="419" y="201">0..40</text></g>
+  <g class="node" data-role="sink" data-note="业务只看到最终值；它不关心中间有几层、每层做了什么。"><rect x="600" y="140" width="160" height="76" rx="10"/><text class="nm" x="614" y="164">业务</text><text class="ty" x="614" y="183">调用方</text><text class="mt" x="614" y="201">拿到 40</text></g>
+  <line x1="184" y1="178" x2="210" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="380" y1="178" x2="405" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="575" y1="178" x2="600" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+</svg>
+      </div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：每层只读内层，不知道更外面还有谁。</span></div>
+    </div>
+  </section>
+
+  <section class="sec" id="s3">
+    <h2><span class="n">03</span>两份实现</h2>
+    
+    <p class='subh'>C 版用 <code>stage_t</code> 链 + 函数指针；C++ 版用 <code>unique_ptr</code> 串链，析构自动拆。</p>
+      <div class="codecard">
+        <div class="ch"><span class="lang">C</span><span class="fn">decorator.c</span><button class="copy">复制</button></div>
+        <pre><code>/* 装饰：一条读数流水线，每层只加一件事，顺序可换 */
+#include &lt;stdio.h&gt;
+
+typedef struct stage stage_t;
+struct stage {
+    int (*apply)(stage_t *self, int raw);
+    stage_t *inner;   /* 下一层；最底层为 NULL */
+    int arg;
+};
+
+static int raw_apply(stage_t *self, int raw) { (void)self; return raw; }
+
+static int offset_apply(stage_t *self, int raw)
+{
+    int v = self-&gt;inner-&gt;apply(self-&gt;inner, raw);
+    return v + self-&gt;arg;
+}
+static int clamp_apply(stage_t *self, int raw)
+{
+    int v = self-&gt;inner-&gt;apply(self-&gt;inner, raw);
+    if (v &lt; 0) v = 0;
+    if (v &gt; self-&gt;arg) v = self-&gt;arg;
+    return v;
+}
+
+int main(void)
+{
+    stage_t raw   = { raw_apply,   NULL, 0 };
+    stage_t off   = { offset_apply, &amp;raw, 5 };
+    stage_t clamp = { clamp_apply,  &amp;off, 40 };
+
+    printf("raw       = %d\n", raw.apply(&amp;raw, 42));
+    printf("+offset5  = %d\n", off.apply(&amp;off, 42));
+    printf("+clamp40  = %d\n", clamp.apply(&amp;clamp, 42));
+
+    stage_t off2   = { offset_apply, &amp;raw, -60 };
+    stage_t clamp2 = { clamp_apply,  &amp;off2, 40 };
+    printf("负值路径  = %d\n", clamp2.apply(&amp;clamp2, 42));
+    printf("三层顺序：raw -&gt; offset -&gt; clamp，换顺序结果会变\n");
+    return 0;
+}</code></pre>
+      </div>
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>./decorator.exe</span></div>
+      <pre>raw       = 42
++offset5  = 47
++clamp40  = 40
+负值路径  = 0
+三层顺序：raw -&gt; offset -&gt; clamp，换顺序结果会变</pre>
+    </div>
+      <div class="codecard">
+        <div class="ch"><span class="lang">C++</span><span class="fn">decorator.cpp</span><button class="copy">复制</button></div>
+        <pre><code>// 装饰 · C++：unique_ptr 串起流水线，析构自动拆链
+// 编译：g++ -std=c++17 -Wall -Wextra decorator.cpp -o decorator_cpp
+#include &lt;cstdio&gt;
+#include &lt;memory&gt;
+
+class Sensor {
+public:
+    virtual ~Sensor() = default;
+    virtual int read(int raw) const = 0;
+};
+
+class Raw : public Sensor {
+public:
+    int read(int raw) const override { return raw; }
+};
+
+class Offset : public Sensor {
+public:
+    Offset(std::unique_ptr&lt;Sensor&gt; in, int off) : in_(std::move(in)), off_(off) {}
+    int read(int raw) const override { return in_-&gt;read(raw) + off_; }
+private:
+    std::unique_ptr&lt;Sensor&gt; in_;
+    int off_;
+};
+
+class Clamp : public Sensor {
+public:
+    Clamp(std::unique_ptr&lt;Sensor&gt; in, int hi) : in_(std::move(in)), hi_(hi) {}
+    int read(int raw) const override
+    {
+        int v = in_-&gt;read(raw);
+        if (v &lt; 0) v = 0;
+        if (v &gt; hi_) v = hi_;
+        return v;
+    }
+private:
+    std::unique_ptr&lt;Sensor&gt; in_;
+    int hi_;
+};
+
+int main()
+{
+    auto raw = std::make_unique&lt;Raw&gt;();
+    auto off = std::make_unique&lt;Offset&gt;(std::make_unique&lt;Raw&gt;(), 5);
+    auto clamp = std::make_unique&lt;Clamp&gt;(
+        std::make_unique&lt;Offset&gt;(std::make_unique&lt;Raw&gt;(), 5), 40);
+
+    std::printf("raw       = %d\n", raw-&gt;read(42));
+    std::printf("+offset5  = %d\n", off-&gt;read(42));
+    std::printf("+clamp40  = %d\n", clamp-&gt;read(42));
+
+    auto neg = std::make_unique&lt;Clamp&gt;(
+        std::make_unique&lt;Offset&gt;(std::make_unique&lt;Raw&gt;(), -60), 40);
+    std::printf("负值路径  = %d\n", neg-&gt;read(42));
+    std::printf("三层顺序：raw -&gt; offset -&gt; clamp，换顺序结果会变\n");
+    return 0;
+}</code></pre>
+      </div>
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>./decorator_cpp.exe</span></div>
+      <pre>raw       = 42
++offset5  = 47
++clamp40  = 40
+负值路径  = 0
+三层顺序：raw -&gt; offset -&gt; clamp，换顺序结果会变</pre>
+    </div>
+  </section>
+
+  <section class="sec" id="s4">
+    <h2><span class="n">04</span>换顺序，看结果怎么变</h2>
+    
+    
+<div class="demo" id="demo">
+  <div class="demo-h"><b>换顺序，看结果怎么变</b><span>同一组参数，先 offset 后 clamp 与先 clamp 后 offset 结果不同。</span></div>
+  <div class="stage">
+    <div class="dflow" id="dflow"></div>
+    <div class="dbar" id="dbar">未开始</div>
+    <div class="dctl">
+      <button class="btn" id="dPrev">复位</button>
+      <button class="btn" id="dNext">单步</button>
+      <button class="btn" id="dPlay">自动</button>
+      <button class="btn" id="dReset">清日志</button>
+    </div>
+    <div class="dnote" id="dnote">点上面的方框，看它在这次流程里负责什么。</div>
+    <div class="log" id="dlog"></div>
+  </div>
+</div>
+<script>dpDemo({nodes:[{id:'raw',label:'raw',sub:'42',note:''}, {id:'off',label:'offset',sub:'+5',note:''}, {id:'clamp',label:'clamp',sub:'0..40',note:''}, {id:'out',label:'输出',sub:'业务值',note:''}],steps:[{hi:['raw'],t:'raw 采样：42'}, {hi:['off'],t:'offset 层：42 + 5 = 47'}, {hi:['clamp'],t:'clamp 层：47 超过 40，限成 40'}, {hi:['out'],t:'业务拿到 40'}, {hi:['off'],t:'换顺序：先把 42 限到 40'}, {hi:['clamp'],t:'再加 5 → 45，最终值变了：顺序就是语义'}, {hi:['out'],t:'所以链的顺序必须显式定义，不能靠“看起来差不多”'}]});</script>
+
+  </section>
+
+  <section class="sec" id="s5">
+    <h2><span class="n">05</span>C 与 C++：链的所有权</h2>
+    
+    
+    <div class="tbl">
+      <table>
+        <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
+        <tbody><tr><td>链节点</td><td><code>stage_t</code> + <code>apply()</code></td><td><code>Sensor</code> 派生类</td><td>C 的层是数据，C++ 的层是对象</td></tr><tr><td>内层引用</td><td><code>stage_t *inner</code></td><td><code>unique_ptr&lt;Sensor&gt; in_</code></td><td>C 要保证内层活得久；C++ 所有权向上传递</td></tr><tr><td>调用</td><td><code>clamp.apply(&amp;clamp, raw)</code></td><td><code>clamp-&gt;read(raw)</code></td><td>都从最外层进，逐层向内</td></tr><tr><td>顺序</td><td>拼链时决定</td><td>构造时决定</td><td>都一样：顺序是业务语义的一部分</td></tr><tr><td>拆链</td><td>手改 <code>inner</code></td><td><code>reset()</code> 或重建</td><td>C 要小心悬空；C++ 释放即拆</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sec" id="s6">
+    <h2><span class="n">06</span>代价与坑</h2>
+    
+    <div class="prose"><ul><li><b>装饰层不能有状态假设。</b>offset 层若缓存了“上一次内层值”，换顺序或换内层就会读到过期数据。</li><li><b>别在层里做重活。</b>每层只做一件事；滤波、标定、限幅混在一层，等于把原来的大函数拆成名字不同的大函数。</li><li><b>C 版注意 <code>inner</code> 生命周期。</b>内层是栈对象时，外层不能比它活得久；要么全静态，要么显式管理。</li><li><b>C++ 版注意虚析构。</b>基类析构非虚，<code>unique_ptr</code> 删除时会漏掉派生层的资源。</li><li><b>顺序写进文档和测试。</b>同一组参数换顺序结果不同，测试要覆盖业务实际使用的顺序，而不是随手拼一条。</li></ul></div>
+  </section>
+  <div class="ch-nav" id="chNav"></div>
+  </div>
+</div>
+
+<script src="../assets/pd.js"></script>
+<script src="../assets/dp-data.js"></script>
+<script src="../assets/dp-nav.js"></script>
+<script>dpNav('p3');</script>
+</body>
+</html>

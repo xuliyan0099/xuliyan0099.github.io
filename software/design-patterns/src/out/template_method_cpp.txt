@@ -1,0 +1,10 @@
+== bench ==
+step1 power  ... OK
+step2 comm   ... OK
+step3 sensor ... OK
+result PASS
+== field ==
+step1 power  ... OK
+step2 comm   ... OK
+step3 sensor ... FAIL
+两个变体共用同一套顺序与日志

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>1.1 设计模式 · C 与 C++ 双实现</title>
-<meta name="description" content="9 个设计模式：结构图、可点的运行演示，以及能编译运行的 C 与 C++ 两份实现。C 版用函数指针表，C++ 版用虚函数。">
+<title>1.1 导读：为什么用模式 HOW TO READ · C 与 C++ 双实现</title>
+<meta name="description" content="导读：为什么用模式：C 与 C++ 双实现，含结构图、运行输出与可点演示。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
 <style>
@@ -37,7 +37,7 @@
 
 <div class="shell">
   <aside id="sidebar">
-    <div class="vol-h">篇一 · 基础<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
+    <div class="vol-h" id="sideHead">设计模式全书 · 25 章<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
     <ol id="sideList"></ol>
     <div class="vol-nav" id="volNav"></div>
   </aside>
@@ -99,10 +99,7 @@
     <p>全部示例：<code>gcc -std=c11 -Wall -Wextra</code> / <code>g++ -std=c++17 -Wall -Wextra</code>，GCC 16.2.0（MinGW-W64 x86_64），本机编译并运行。 · 静态页面 · 无统计脚本 · 无第三方请求<br>
     <a href="../../../index.html">← 返回个人知识库</a></p>
   </div>
-  <div class="ch-nav">
-      <a href="../index.html"><span>返回</span><b>← 全书目录</b></a>
-      <a class="nx" href="../p1/c02.html"><span>下一章</span><b>1.2 C 也能面向对象 →</b></a>
-    </div>
+  <div class="ch-nav" id="chNav"></div>
 </div>
 
 </div>
@@ -110,6 +107,7 @@
 <script src="../assets/pd.js"></script>
 <script src="../assets/dp-data.js"></script>
 <script src="../assets/dp-nav.js"></script>
+<script src="../assets/dp-demo.js"></script>
 <script>dpNav('p1');</script>
 <script>
 (function () {

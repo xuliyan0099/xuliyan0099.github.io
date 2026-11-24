@@ -3,16 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>3.3 单例模式 Singleton · C 与 C++ 双实现</title>
-<meta name="description" content="全局配置只初始化一次：C 用静态结构 + ready 标志，C++ 用局部静态 Meyers singleton；含初始化次数与测试污染演示。">
+<title>3.3 组合模式 COMPOSITE · C 与 C++ 双实现</title>
+<meta name="description" content="组合：整车、总成、零件组成一棵树，同一套 run() 从根遍历到叶。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
-<style>
-.stat{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
-.stat div{flex:1;min-width:110px;border:1px solid var(--line);border-radius:8px;background:#0d1220;padding:8px 10px}
-.stat span{display:block;font:600 10px/1.5 var(--mono);letter-spacing:.08em;color:#8494ad}
-.stat b{font:700 20px/1.3 var(--mono);color:#8ff5d6}
-</style>
+<script src="../assets/dp-demo.js"></script>
 </head>
 <body>
 <div class="bg" aria-hidden="true"></div>
@@ -33,343 +28,245 @@
 
 <div class="shell">
   <aside id="sidebar">
-    <div class="vol-h">篇三 · 结构型与创建型<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
+    <div class="vol-h" id="sideHead">设计模式全书 · 25 章<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
     <ol id="sideList"></ol>
     <div class="vol-nav" id="volNav"></div>
   </aside>
 
   <div class="wrap">
-  <div class="ch-meta"><span class="lv">篇三 · 结构型与创建型</span><span class="sep">/</span>第 3 章<span class="sep">/</span>约 28 分钟</div>
-  <h1>单例模式<span class="en">SINGLETON</span></h1>
-  <p class="lede">配置、日志、诊断会话这类东西，一个进程里只能有一份。单例解决的是“唯一”和“第一次访问才构造”，不是“全局变量很方便”。它同时也是最难测的模式——因为所有测试共享同一份状态。</p>
-  <div class="chips">
-    <span class="chip ok">三次访问 · 一次初始化</span>
-    <span class="chip">C++ 局部静态天然线程安全</span>
-    <span class="chip warn">测试之间会互相污染</span>
-  </div>
-<section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：要么到处传，要么到处复制</h2>
-    <div class="prose">
-      <p>假设有一份运行配置：超时 500 ms、日志级别 2。不做单例，通常只有两种下场：</p>
-      <ul>
-        <li><b>一路往下传。</b>从 <code>main</code> 传到业务、再传到驱动，每个函数多一个 <code>config_t*</code> 参数；中间某个模块为了省事，自己抄了一份副本，从此两份配置各自演化。</li>
-        <li><b>到处放全局变量。</b><code>extern config_t g_cfg;</code> 写进头文件，任何文件都能改；初始化顺序没人管，某处读到的是全零。</li>
-      </ul>
-      <p>单例把这两件事合起来解决：入口只有一个 <code>instance()</code>，第一次调用时完成初始化，之后都返回同一个地址。它没有消灭全局状态，只是把全局状态<b>收进一个可被追踪的入口</b>——这一点很重要，因为单例的代价几乎都来自“它是全局的”。</p>
-    </div>
+  <div class="ch-meta"><span class="lv">篇三 · 结构型</span><span class="sep">/</span>第 3 章<span class="sep">/</span>约 28 分钟</div>
+  <h1>组合模式<span class="en">COMPOSITE</span></h1>
+  <p class="lede">整车自检要遍历“整车 → 总成 → 零件”。如果枝和叶用两套接口，遍历代码就要在每一层判断“这是组还是零件”。<b>组合模式让枝和叶实现同一个接口</b>：组自己递归孩子，叶只报结果，调用方从根调一次就够。</p>
+  <div class="chips"><span class="chip ok">枝与叶同一接口</span><span class="chip">遍历只写一遍</span><span class="chip">增删子树不改调用方</span></div>
+
+  <section class="sec" id="s1">
+    <h2><span class="n">01</span>问题：树形结构，遍历代码越写越像</h2>
+    
+    
+      <div class="prose">
+        <p>坏写法通常是两套结构 + 手写递归：</p>
+        <pre><code>if (node-&gt;is_group) {
+    for (child in node-&gt;children) run_group(child);
+} else {
+    run_leaf(node);
+}</code></pre>
+        <p>这行代码会在每个层级复制一遍，问题随之而来：</p>
+        <ul>
+          <li><b>层级一深就漏。</b>“总成里还有子总成”时，<code>run_group</code> 忘了递归，孙子节点永远不跑。</li>
+          <li><b>统计口径不一。</b>有的分支只算叶子，有的把组也算一项，最后总数对不上。</li>
+          <li><b>新增节点类型要改遍历。</b>加一个“虚拟节点”或“占位节点”，所有遍历函数都要动。</li>
+        </ul>
+        <p>组合把“遍历孩子”收进组自己：组的 <code>run()</code> 负责递归，叶的 <code>run()</code> 只报自己的结果。调用方只看到 <code>run(root)</code>。</p>
+      </div>
   </section>
 
   <section class="sec" id="s2">
-    <h2><span class="n">02</span>结构：一个入口，一个对象</h2>
-    <p class="subh">三个调用点（a / b / c）走同一扇门，门后只有一个对象；拷贝构造被删掉，所以“再造一个”在编译期就不成立。点方框看各自边界。</p>
-
+    <h2><span class="n">02</span>结构：枝和叶同一接口</h2>
+    <p class="subh">三层树：整车是根，动力/底盘是枝，发动机、变速箱、ABS 是叶；点方框看每层职责。</p>
+    
+  
     <div class="fig">
-      <div class="fig-h"><b>Meyers singleton</b><span>instance() + 局部静态</span></div>
+      <div class="fig-h"><b>整车自检树：枝和叶同一接口</b><span>composite</span></div>
       <div class="diagram">
-        <svg viewBox="0 0 880 320" role="img" aria-label="单例结构图">
-          <defs>
-            <marker id="ar9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-              <path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/>
-            </marker>
-            <marker id="ar9r" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="8" markerHeight="8" orient="auto">
-              <path d="M0 0 L10 5 L0 10 z" fill="#c97a7a"/>
-            </marker>
-          </defs>
-
-          <g class="node" data-role="c1" data-note="调用点 a / b / c：可以是配置读取、日志、诊断会话。它们都只调 instance()，拿到的都是同一个引用——所以 a 改了 timeout，b 立刻看到。">
-            <rect x="24" y="54" width="160" height="56" rx="9"/>
-            <text class="nm" x="38" y="78">a / b / c</text>
-            <text class="ty" x="38" y="97">调用点</text>
-          </g>
-
-          <g class="node" data-role="inst" data-note="instance()：静态成员函数，唯一入口。C 版用 ready 标志判断是否已初始化；C++ 版把对象放在函数内 static，首次调用构造，之后直接返回引用。">
-            <rect x="24" y="160" width="160" height="86" rx="9"/>
-            <text class="nm" x="38" y="184">instance()</text>
-            <text class="ty" x="38" y="203">唯一入口</text>
-            <text class="mt" x="38" y="222">首次：构造</text>
-            <text class="mt" x="38" y="239">之后：返回同一对象</text>
-          </g>
-
-          <g class="node" data-role="obj" data-note="唯一对象（g_cfg / static Config c）：存在静态存储区。构造时机由第一次 instance() 决定，析构在 main 之后——此时日志、堆可能已经不可用。">
-            <rect x="270" y="140" width="220" height="118" rx="10"/>
-            <text class="nm" x="284" y="164">唯一实例</text>
-            <text class="ty" x="284" y="183">静态存储</text>
-            <text class="mt" x="284" y="204">timeout_ms = 500</text>
-            <text class="mt" x="284" y="223">log_level = 2</text>
-            <text class="mt" x="284" y="242">地址全程不变</text>
-          </g>
-
-          <g class="node" data-role="del" data-note="拷贝构造 / 赋值被 delete：`Config copy = a;` 在编译期就报错。这是 C++ 版比 C 版强的地方——C 结构体随时可以被 memcpy 出第二份。">
-            <rect x="566" y="140" width="276" height="118" rx="10"/>
-            <text class="nm" x="580" y="164">禁止复制</text>
-            <text class="ty" x="580" y="183">delete copy ctor</text>
-            <text class="mt" x="580" y="204">Config(const Config&amp;) = delete</text>
-            <text class="mt" x="580" y="223">operator= = delete</text>
-            <text class="mt" x="580" y="242">编译器直接拒绝</text>
-          </g>
-
-          <path class="flow" marker-end="url(#ar9)" d="M104 112 L104 156"/>
-          <path class="flow" marker-end="url(#ar9)" d="M184 200 L266 200"/>
-          <text class="lbl" x="190" y="192">返回引用 / 指针</text>
-          <path class="flow" marker-end="url(#ar9r)" d="M492 200 L562 200"/>
-          <text class="lbl" x="492" y="192">copy ✗</text>
-
-          <text class="lbl" x="24" y="290">C 版：static + ready 标志，只保证“唯一”，不保证线程安全；C++ 版：局部静态，C++11 起初始化线程安全</text>
-          <text class="lbl" x="24" y="310">两者共同的代价：状态在整个进程生命周期内存在，测试之间不会自动清零</text>
-        </svg>
+<svg viewBox="0 0 880 360" role="img" aria-label="整车自检树：枝和叶同一接口">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
+  <g class="node" data-role="root" data-note="根只做一件事：把 depth 传给孩子，收集每个孩子的结果；它自己不判断零件好坏。"><rect x="350" y="34" width="180" height="72" rx="10"/><text class="nm" x="364" y="58">vehicle</text><text class="ty" x="364" y="77">组（根）</text><text class="mt" x="364" y="95">run(depth=0)</text></g>
+  <g class="node" data-role="power" data-note="总成是“组”：它递归两个孩子，任一失败就把失败往上抛。"><rect x="180" y="150" width="180" height="72" rx="10"/><text class="nm" x="194" y="174">powertrain</text><text class="ty" x="194" y="193">组</text><text class="mt" x="194" y="211">engine + gearbox</text></g>
+  <g class="node" data-role="chassis" data-note="同样是组，但只有一个孩子；组合不要求孩子数量一致。"><rect x="520" y="150" width="180" height="72" rx="10"/><text class="nm" x="534" y="174">chassis</text><text class="ty" x="534" y="193">组</text><text class="mt" x="534" y="211">abs</text></g>
+  <g class="node" data-role="eng" data-note="叶不递归，只返回自己的通过/失败；它不知道自己在树的第几层。"><rect x="60" y="268" width="150" height="64" rx="10"/><text class="nm" x="74" y="292">engine</text><text class="ty" x="74" y="311">叶</text><text class="mt" x="74" y="329">PASS</text></g>
+  <g class="node" data-role="gear" data-note="一个叶失败，整棵树的最终结果就是 FAIL；失败原因由调用方按路径定位。"><rect x="230" y="268" width="150" height="64" rx="10"/><text class="nm" x="244" y="292">gearbox</text><text class="ty" x="244" y="311">叶</text><text class="mt" x="244" y="329">FAIL</text></g>
+  <g class="node" data-role="abs" data-note="叶的接口与组完全一致，所以遍历代码不需要类型判断。"><rect x="520" y="268" width="150" height="64" rx="10"/><text class="nm" x="534" y="292">abs</text><text class="ty" x="534" y="311">叶</text><text class="mt" x="534" y="329">PASS</text></g>
+  <line x1="420" y1="106" x2="300" y2="150" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="470" y1="106" x2="580" y2="150" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="250" y1="222" x2="170" y2="268" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="310" y1="222" x2="310" y2="268" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="610" y1="222" x2="595" y2="268" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+</svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：唯一性由谁保证，析构为什么容易出问题。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：组负责递归，叶负责报结果。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
     <h2><span class="n">03</span>两份实现</h2>
-    <p class="subh">C 版是“静态结构 + ready 标志”，写法最省但完全没有并发保护；C++ 版是函数内局部静态，构造与访问同一处完成，且拷贝构造被显式删除。</p>
-
-    <div class="codes">
+    
+    <p class='subh'>C 版用孩子数组 + 统一 <code>run_node()</code>；C++ 版用 <code>unique_ptr</code> 容器，析构自动递归。</p>
       <div class="codecard">
-        <div class="ch"><span class="lang">C</span><span class="fn">singleton.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 单例模式 · C 实现：进程内唯一的配置对象
- * 编译：gcc -std=c11 -Wall -Wextra singleton.c -o singleton
- * 注意：这段只保证「唯一」，不保证「多线程安全」，线程版见页面说明。
- */
+        <div class="ch"><span class="lang">C</span><span class="fn">composite.c</span><button class="copy">复制</button></div>
+        <pre><code>/* 组合：一棵诊断树，叶子是零件，枝是分组，遍历代码只写一遍 */
 #include &lt;stdio.h&gt;
+#include &lt;stddef.h&gt;
 
-typedef struct { int timeout_ms; int log_level; } config_t;
+typedef struct node node_t;
+struct node {
+    const char *name;
+    int is_leaf;
+    int pass;
+    node_t *kids[4];
+    int nkids;
+};
 
-static config_t g_cfg;
-static int      g_ready = 0;
-static unsigned g_calls = 0;
-static unsigned g_inits = 0;
-
-config_t *config_instance(void)
+static int run_node(const node_t *nd, int depth)
 {
-    g_calls++;
-    if (!g_ready) {
-        g_cfg.timeout_ms = 500;
-        g_cfg.log_level  = 2;
-        g_ready = 1;
-        g_inits++;
+    for (int i = 0; i &lt; depth; i++) printf("  ");
+    if (nd-&gt;is_leaf) {
+        printf("- %-10s %s\n", nd-&gt;name, nd-&gt;pass ? "PASS" : "FAIL");
+        return nd-&gt;pass;
     }
-    return &amp;g_cfg;
+    printf("+ %s\n", nd-&gt;name);
+    int ok = 1;
+    for (int i = 0; i &lt; nd-&gt;nkids; i++)
+        if (!run_node(nd-&gt;kids[i], depth + 1)) ok = 0;
+    return ok;
 }
-
-void config_reset_for_test(void)
-{
-    g_ready = 0;
-    printf("  reset：下次访问会重新初始化\n");
-}
-
-unsigned config_calls(void) { return g_calls; }
-unsigned config_inits(void) { return g_inits; }
 
 int main(void)
 {
-    config_t *a = config_instance();
-    config_t *b = config_instance();
-    config_t *c = config_instance();
+    node_t eng  = { .name = "engine",  .is_leaf = 1, .pass = 1, .kids = {0}, .nkids = 0 };
+    node_t gear = { .name = "gearbox", .is_leaf = 1, .pass = 0, .kids = {0}, .nkids = 0 };
+    node_t abs  = { .name = "abs",     .is_leaf = 1, .pass = 1, .kids = {0}, .nkids = 0 };
+    node_t power = { .name = "powertrain", .is_leaf = 0, .pass = 0, .kids = { &amp;eng, &amp;gear }, .nkids = 2 };
+    node_t chassis = { .name = "chassis", .is_leaf = 0, .pass = 0, .kids = { &amp;abs }, .nkids = 1 };
+    node_t root = { .name = "vehicle", .is_leaf = 0, .pass = 0, .kids = { &amp;power, &amp;chassis }, .nkids = 2 };
 
-    printf("三次取实例是同一个对象：%s\n", (a == b &amp;&amp; b == c) ? "是" : "否");
-    printf("访问 %u 次，只初始化 %u 次\n", config_calls(), config_inits());
-
-    a-&gt;timeout_ms = 800;
-    printf("通过 a 改，通过 b 读：timeout=%d\n", b-&gt;timeout_ms);
-
-    config_reset_for_test();
-    printf("reset 后 timeout=%d（测试用例之间互相污染）\n", config_instance()-&gt;timeout_ms);
-    printf("reset 后初始化次数=%u\n", config_inits());
+    int ok = run_node(&amp;root, 0);
+    printf("整车自检：%s\n", ok ? "PASS" : "FAIL");
     return 0;
 }</code></pre>
       </div>
-
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>./composite.exe</span></div>
+      <pre>+ vehicle
+  + powertrain
+    - engine     PASS
+    - gearbox    FAIL
+  + chassis
+    - abs        PASS
+整车自检：FAIL</pre>
+    </div>
       <div class="codecard">
-        <div class="ch"><span class="lang">C++</span><span class="fn">singleton.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 单例模式 · C++ 实现：Meyers singleton（C++11 起初始化线程安全）
-// 编译：g++ -std=c++17 -Wall -Wextra singleton.cpp -o singleton_cpp
+        <div class="ch"><span class="lang">C++</span><span class="fn">composite.cpp</span><button class="copy">复制</button></div>
+        <pre><code>// 组合 · C++：Group 持有 unique_ptr，析构自动递归
+// 编译：g++ -std=c++17 -Wall -Wextra composite.cpp -o composite_cpp
 #include &lt;cstdio&gt;
+#include &lt;memory&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 
-class Config {
+class Component {
 public:
-    static Config&amp; instance() {
-        static Config c;          // 局部静态：首次调用时构造，C++11 保证线程安全
-        return c;
-    }
-
-    int timeout_ms = 500;
-    int log_level  = 2;
-
-private:
-    Config() = default;
-    Config(const Config&amp;) = delete;
-    Config&amp; operator=(const Config&amp;) = delete;
+    explicit Component(std::string name) : name_(std::move(name)) {}
+    virtual ~Component() = default;
+    virtual bool run(int depth) const = 0;
+protected:
+    std::string name_;
 };
 
-int main() {
-    Config&amp; a = Config::instance();
-    Config&amp; b = Config::instance();
-    Config&amp; c = Config::instance();
+class Leaf : public Component {
+public:
+    Leaf(std::string n, bool pass) : Component(std::move(n)), pass_(pass) {}
+    bool run(int depth) const override
+    {
+        for (int i = 0; i &lt; depth; i++) std::printf("  ");
+        std::printf("- %-10s %s\n", name_.c_str(), pass_ ? "PASS" : "FAIL");
+        return pass_;
+    }
+private:
+    bool pass_;
+};
 
-    std::printf("三次取实例是同一个对象：%s\n", (&amp;a == &amp;b &amp;&amp; &amp;b == &amp;c) ? "是" : "否");
+class Group : public Component {
+public:
+    explicit Group(std::string n) : Component(std::move(n)) {}
+    Group &amp;add(std::unique_ptr&lt;Component&gt; c) { kids_.push_back(std::move(c)); return *this; }
+    bool run(int depth) const override
+    {
+        for (int i = 0; i &lt; depth; i++) std::printf("  ");
+        std::printf("+ %s\n", name_.c_str());
+        bool ok = true;
+        for (const auto &amp;c : kids_)
+            if (!c-&gt;run(depth + 1)) ok = false;
+        return ok;
+    }
+private:
+    std::vector&lt;std::unique_ptr&lt;Component&gt;&gt; kids_;
+};
 
-    a.timeout_ms = 800;
-    std::printf("通过 a 改，通过 b 读：timeout=%d\n", b.timeout_ms);
-    std::printf("a 与 b 是同一块内存：%s\n", (&amp;a == &amp;b) ? "是" : "否");
-    // 拷贝构造已 delete：写 `Config copy = a;` 会在编译期失败，而不是运行时多一个实例
+int main()
+{
+    auto root = std::make_unique&lt;Group&gt;("vehicle");
+    auto power = std::make_unique&lt;Group&gt;("powertrain");
+    power-&gt;add(std::make_unique&lt;Leaf&gt;("engine", true));
+    power-&gt;add(std::make_unique&lt;Leaf&gt;("gearbox", false));
+    root-&gt;add(std::move(power));
+    auto chassis = std::make_unique&lt;Group&gt;("chassis");
+    chassis-&gt;add(std::make_unique&lt;Leaf&gt;("abs", true));
+    root-&gt;add(std::move(chassis));
+
+    bool ok = root-&gt;run(0);
+    std::printf("整车自检：%s\n", ok ? "PASS" : "FAIL");
     return 0;
 }</code></pre>
       </div>
-    </div>
-
     <div class="run">
-      <div class="ch"><b>RUN</b><span>./singleton.exe</span></div>
-      <pre>三次取实例是同一个对象：是
-访问 3 次，只初始化 1 次
-通过 a 改，通过 b 读：timeout=800
-  reset：下次访问会重新初始化
-reset 后 timeout=500（测试用例之间互相污染）
-reset 后初始化次数=2</pre>
+      <div class="ch"><b>RUN</b><span>./composite_cpp.exe</span></div>
+      <pre>+ vehicle
+  + powertrain
+    - engine     PASS
+    - gearbox    FAIL
+  + chassis
+    - abs        PASS
+整车自检：FAIL</pre>
     </div>
-    <div class="run">
-      <div class="ch"><b>RUN</b><span>./singleton_cpp.exe</span></div>
-      <pre>三次取实例是同一个对象：是
-通过 a 改，通过 b 读：timeout=800
-a 与 b 是同一块内存：是</pre>
-    </div>
-    <p class="hintline">C 版多了“访问次数 / 初始化次数”两个计数器，是因为它需要证明“只初始化一次”；C++ 版由局部静态的语义直接保证，静态构造函数只跑一次，不需要额外标志位。</p>
   </section>
-  <section class="sec" id="s4">
-    <h2><span class="n">04</span>点三次“取实例”，看初始化次数</h2>
-    <p class="subh">取实例、改超时、再取——观察“初始化次数”是不是只在第一次增加。最后那个“reset”模拟测试框架在用例之间重置，它留下的污染在日志里。</p>
 
-    <div class="demo">
-      <div class="demo-h"><b>config singleton</b><span>唯一 + 懒初始化</span></div>
-      <div class="stage">
-        <div class="stat">
-          <div><span>访问次数</span><b id="sCalls">0</b></div>
-          <div><span>初始化次数</span><b id="sInits">0</b></div>
-          <div><span>timeout</span><b id="sTimeout">—</b></div>
-        </div>
-        <div class="ctl" style="margin-bottom:10px">
-          <button class="btn on" id="btnTake">取实例</button>
-          <button class="btn" id="btnSet">timeout = 800</button>
-          <button class="btn" id="btnReset">reset（模拟测试）</button>
-          <button class="btn" id="btnClear">清日志</button>
-        </div>
-        <div class="log" id="sgLog"></div>
-      </div>
+  <section class="sec" id="s4">
+    <h2><span class="n">04</span>自检树从根跑到叶</h2>
+    
+    
+<div class="demo" id="demo">
+  <div class="demo-h"><b>自检树从根跑到叶</b><span>单步看递归顺序：先整车，再动力，最后到底盘。</span></div>
+  <div class="stage">
+    <div class="dflow" id="dflow"></div>
+    <div class="dbar" id="dbar">未开始</div>
+    <div class="dctl">
+      <button class="btn" id="dPrev">复位</button>
+      <button class="btn" id="dNext">单步</button>
+      <button class="btn" id="dPlay">自动</button>
+      <button class="btn" id="dReset">清日志</button>
     </div>
+    <div class="dnote" id="dnote">点上面的方框，看它在这次流程里负责什么。</div>
+    <div class="log" id="dlog"></div>
+  </div>
+</div>
+<script>dpDemo({nodes:[{id:'root',label:'vehicle',sub:'组',note:''}, {id:'power',label:'powertrain',sub:'组',note:''}, {id:'eng',label:'engine',sub:'叶 PASS',note:''}, {id:'gear',label:'gearbox',sub:'叶 FAIL',note:''}, {id:'chassis',label:'chassis',sub:'组',note:''}, {id:'abs',label:'abs',sub:'叶 PASS',note:''}],steps:[{hi:['root'],t:'vehicle.run(0)：打印根，开始遍历孩子'}, {hi:['power'],t:'进入 powertrain：它是组，继续递归'}, {hi:['eng'],t:'engine 是叶：报 PASS，返回到 powertrain'}, {hi:['gear'],t:'gearbox 是叶：报 FAIL，powertrain 记为失败'}, {hi:['chassis'],t:'powertrain 返回后，进入 chassis'}, {hi:['abs'],t:'abs 是叶：报 PASS'}, {hi:['root', 'power'],t:'整车汇总：任一孩子失败 → FAIL，路径可定位到 gearbox'}]});</script>
+
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>C 与 C++：同一份唯一，两种保证</h2>
+    <h2><span class="n">05</span>C 与 C++：谁管孩子</h2>
+    
+    
     <div class="tbl">
       <table>
         <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
-        <tbody>
-          <tr><td>唯一存储</td><td>文件级 <code>static config_t g_cfg</code></td><td>函数内 <code>static Config c</code></td><td>都在静态存储区，地址全程不变</td></tr>
-          <tr><td>初始化时机</td><td>首次调用 + <code>ready</code> 标志</td><td>首次调用时构造</td><td>C 版必须自己维护“是否已初始化”</td></tr>
-          <tr><td>并发</td><td>无保护，可能双初始化</td><td>C++11 起局部静态初始化线程安全</td><td>C 版要补 <code>pthread_once</code> / 原子 CAS</td></tr>
-          <tr><td>禁止复制</td><td>做不到，<code>memcpy</code> 随时能造第二份</td><td><code>delete</code> 拷贝构造与赋值</td><td>这是 C++ 版真正的结构优势</td></tr>
-          <tr><td>析构</td><td>进程结束时随静态区回收</td><td><code>main</code> 返回后析构，顺序不确定</td><td>析构里若打日志，日志系统可能已经没了</td></tr>
-          <tr><td>测试重置</td><td><code>ready = 0</code> 即可</td><td>没有官方办法，得自己写 <code>resetForTest()</code></td><td>两者都在“为测试开后门”</td></tr>
-        </tbody>
+        <tbody><tr><td>孩子容器</td><td><code>node_t *kids[4]</code></td><td><code>vector&lt;unique_ptr&lt;Component&gt;&gt;</code></td><td>C 固定上限；C++ 动态扩容且自动释放</td></tr><tr><td>统一接口</td><td>函数指针 <code>run_node</code></td><td>纯虚 <code>run()</code></td><td>都让枝和叶长得一样</td></tr><tr><td>遍历</td><td>组内部递归</td><td>组内部递归</td><td>调用方只调一次根</td></tr><tr><td>失败传播</td><td>返回 int，逐层与</td><td>返回 bool，逐层与</td><td>口径要统一，别有的层吞掉失败</td></tr><tr><td>增删子树</td><td>改数组 + nkids</td><td>push_back / erase</td><td>C 要手维护计数，C++ 容器代劳</td></tr></tbody>
       </table>
     </div>
   </section>
 
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
-    <div class="prose">
-      <ul>
-        <li><b>单例是带门脸的全局变量。</b>它没消除耦合，只把耦合藏进 <code>instance()</code> 调用里。结果是：依赖关系在签名上看不出来，测试只能靠 reset 硬掰。</li>
-        <li><b>C 版并不线程安全。</b>两个线程同时看到 <code>!ready</code>，会各自初始化一次，后写的覆盖先写的。要真线程安全，用 <code>pthread_once</code>、原子 CAS，或干脆把初始化挪到启动单线程阶段。</li>
-        <li><b>双检锁不是随手能写的。</b>先判空、再加锁、再判空，如果没有原子变量与内存序，编译器/CPU 重排会让你拿到“指针已赋值但对象还没构造完”的实例。别手写，用局部静态或 <code>std::call_once</code>。</li>
-        <li><b>析构顺序是隐雷。</b>静态对象在 <code>main</code> 返回之后才析构，此时其他静态对象（日志、内存池）可能已经销毁。工程上常见的做法是“故意不析构”（指针 new 出来永不 delete），换确定性。</li>
-        <li><b>跨模块就不是单例了。</b>每个 <code>.so</code> / <code>.dll</code> 若各自编译进一份静态实例，进程里就有多份。要跨模块唯一，得把实例放到主程序并通过接口传出去。</li>
-        <li><b>头文件里别定义变量。</b><code>config_t g_cfg;</code> 写在头文件、被两个 .c include，就是重复定义（C 里链接期报错，C++ 里 ODR 违规）。头文件只放 <code>extern</code> 声明与函数原型。</li>
-        <li><b>reset 要清干净。</b>演示里 reset 只把 <code>ready</code> 归零，下次访问重新赋初值，看起来“干净”；真实项目里若 reset 漏清某个字段，测试就会带着上个用例的残留跑，而且只在特定顺序下失败。</li>
-        <li><b>能注入就别单例。</b>把配置作为构造参数传进模块，测试时可以随手造两份不同的配置并发跑。单例留给真正进程级唯一的东西：日志、诊断会话、硬件管理器。</li>
-      </ul>
-    </div>
+    
+    <div class="prose"><ul><li><b>别在叶里访问父节点。</b>叶一旦反向依赖父节点，树就变成图，递归容易成环；需要上下文就通过参数往下传。</li><li><b>递归深度要设上限。</b>诊断树通常不深，但配置错误可能造出自引用；入口处限制 depth 或检测环。</li><li><b>组也可以是空组。</b>空组应明确返回“通过”还是“未配置”，别让 0 个孩子默默算 PASS 掩盖配置缺失。</li><li><b>C 版孩子数组要初始化。</b><code>kids</code> 未清零、<code>nkids</code> 又写大了，会读到野指针；统一用指定初始化器。</li><li><b>统计不要混层。</b>“通过率”按叶算还是按组算要写死；否则同一棵树两个报表两个数。</li></ul></div>
   </section>
-
-  <div class="ch-nav">
-      <a href="../p3/c02.html"><span>上一章</span><b>← 3.2 工厂模式</b></a>
-      <a class="nx" href="../index.html"><span>END</span><b>读完 · 回到全书目录</b></a>
-    </div>
-
-  
-</div>
-
+  <div class="ch-nav" id="chNav"></div>
+  </div>
 </div>
 
 <script src="../assets/pd.js"></script>
 <script src="../assets/dp-data.js"></script>
 <script src="../assets/dp-nav.js"></script>
 <script>dpNav('p3');</script>
-<script>
-(function () {
-  var calls = 0, inits = 0, timeout = null, ready = false;
-  var sCalls = document.getElementById('sCalls');
-  var sInits = document.getElementById('sInits');
-  var sTimeout = document.getElementById('sTimeout');
-  var logEl = document.getElementById('sgLog');
-
-  function sync() {
-    sCalls.textContent = calls;
-    sInits.textContent = inits;
-    sTimeout.textContent = (timeout === null ? '—' : timeout);
-  }
-
-  function take() {
-    calls++;
-    if (!ready) {
-      timeout = 500;
-      ready = true;
-      inits++;
-      PD.log(logEl, '首次访问：构造实例，timeout=500 log_level=2');
-    } else {
-      PD.log(logEl, '再次访问：同一实例，timeout=' + timeout);
-    }
-    sync();
-  }
-
-  document.getElementById('btnTake').onclick = take;
-
-  document.getElementById('btnSet').onclick = function () {
-    if (!ready) take();
-    timeout = 800;
-    PD.log(logEl, '通过 a 改 timeout=800；任何持有实例的地方读到的都是 800');
-    sync();
-  };
-
-  document.getElementById('btnReset').onclick = function () {
-    if (!ready && timeout === null) { PD.log(logEl, '还没有实例，无需 reset', 'warn'); return; }
-    ready = false;
-    PD.log(logEl, 'reset：ready=0，下次访问会重新初始化', 'warn');
-    PD.log(logEl, '注意：reset 之前写进去的 timeout=800 会被下一次初始化覆盖回 500');
-  };
-
-  document.getElementById('btnClear').onclick = function () { PD.clear(logEl); };
-
-  sync();
-  PD.log(logEl, '点“取实例”开始。初始化只应发生一次。');
-})();
-</script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

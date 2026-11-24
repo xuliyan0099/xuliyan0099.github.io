@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>4.6 备忘录模式 MEMENTO · C 与 C++ 双实现</title>
+<meta name="description" content="备忘录：改标定前存一份快照，调坏了能原样退回。">
+<meta name="theme-color" content="#08090c">
+<link rel="stylesheet" href="../assets/pd.css">
+<script src="../assets/dp-demo.js"></script>
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <label for="navChk" class="nav-toggle">☰ 目录</label>
+    <a class="brand" href="../index.html"><i></i>设计模式<small>C / C++ 双实现</small></a>
+    <span class="tb-sp"></span>
+    <a class="tb" href="../p1/c01.html">导读</a>
+    <a class="tb" href="../../../index.html">知识库</a>
+    <a class="tb" href="../index.html">目录</a>
+  </div>
+</header>
+
+<input type="checkbox" id="navChk" class="nav-chk" hidden>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h" id="sideHead">设计模式全书 · 25 章<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
+    <ol id="sideList"></ol>
+    <div class="vol-nav" id="volNav"></div>
+  </aside>
+
+  <div class="wrap">
+  <div class="ch-meta"><span class="lv">篇四 · 行为型</span><span class="sep">/</span>第 6 章<span class="sep">/</span>约 26 分钟</div>
+  <h1>备忘录模式<span class="en">MEMENTO</span></h1>
+  <p class="lede">现场调参最怕“越调越远”：增益、偏移、模式改了十几轮，想回到最初那版却没有记录。<b>备忘录把“当前状态”存成一份不可变快照</b>，需要时整体恢复；原对象不用暴露内部字段给外部。</p>
+  <div class="chips"><span class="chip ok">改前先存</span><span class="chip">快照不可变</span><span class="chip">恢复是整体替换</span></div>
+
+  <section class="sec" id="s1">
+    <h2><span class="n">01</span>问题：调参调坏了，没有退路</h2>
+    
+    
+      <div class="prose">
+        <p>没有快照时，回退靠“记得原来的值”：</p>
+        <pre><code>ecu.gain = 30;   /* 原来是多少？ */
+ecu.offset = -8; /* 谁记了？ */</code></pre>
+        <ul>
+          <li><b>回退不完整。</b>只记住 gain，忘了 mode，恢复后状态是混合的。</li>
+          <li><b>快照被污染。</b>把 <code>calib_t*</code> 直接存起来，后续改原对象，快照跟着变。</li>
+          <li><b>外部乱改。</b>为了让调用方能恢复，把内部字段全暴露，封装名存实亡。</li>
+        </ul>
+        <p>备忘录把快照做成独立值：保存时拷贝，恢复时整体替换；快照只给原对象读写，外部只能“拿着”，不能“改里面的字段”。</p>
+      </div>
+  </section>
+
+  <section class="sec" id="s2">
+    <h2><span class="n">02</span>结构：快照与恢复分开</h2>
+    <p class="subh">原对象、快照、保管者三方：点方框看谁有权读写快照。</p>
+    
+  
+    <div class="fig">
+      <div class="fig-h"><b>标定快照：保存与恢复分开</b><span>memento</span></div>
+      <div class="diagram">
+<svg viewBox="0 0 880 360" role="img" aria-label="标定快照：保存与恢复分开">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
+  <g class="node" data-role="orig" data-note="原对象负责产生快照与从快照恢复；它是唯一能读写快照内部的人。"><rect x="40" y="130" width="210" height="100" rx="10"/><text class="nm" x="54" y="154">Ecu / calib_t</text><text class="ty" x="54" y="173">原对象</text><text class="mt" x="54" y="191">gain/offset/mode</text></g>
+  <g class="node" data-role="mem" data-note="快照保存的是当时的完整状态；之后改原对象不会影响它。"><rect x="330" y="130" width="210" height="100" rx="10"/><text class="nm" x="344" y="154">memento</text><text class="ty" x="344" y="173">快照</text><text class="mt" x="344" y="191">值拷贝，不可变</text></g>
+  <g class="node" data-role="care" data-note="保管者只负责把快照放好、按需交回；它不解析、不修改快照内容。"><rect x="620" y="130" width="180" height="100" rx="10"/><text class="nm" x="634" y="154">Caretaker</text><text class="ty" x="634" y="173">保管者</text><text class="mt" x="634" y="191">只存不用</text></g>
+  <line x1="250" y1="165" x2="330" y2="165" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="290.0" y="157.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">save()</text>
+  <line x1="330" y1="200" x2="250" y2="200" stroke="#5876a4" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+  <text x="290.0" y="192.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">restore()</text>
+  <line x1="540" y1="180" x2="620" y2="180" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="580.0" y="172.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">保管</text>
+</svg>
+      </div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：原对象写快照，保管者只搬运。</span></div>
+    </div>
+  </section>
+
+  <section class="sec" id="s3">
+    <h2><span class="n">03</span>两份实现</h2>
+    
+    <p class='subh'>C 版快照是结构体值；C++ 版把 <code>Memento</code> 的字段设为私有，只对 <code>Ecu</code> 开放。</p>
+      <div class="codecard">
+        <div class="ch"><span class="lang">C</span><span class="fn">memento.c</span><button class="copy">复制</button></div>
+        <pre><code>/* 备忘录：改标定之前先存一份，出事能原样退回 */
+#include &lt;stdio.h&gt;
+
+typedef struct {
+    int gain;
+    int offset;
+    int mode;
+} calib_t;
+
+typedef struct { calib_t snap; } memento_t;
+
+static memento_t save(const calib_t *c)
+{
+    memento_t m = { *c };
+    return m;
+}
+static void restore(calib_t *c, const memento_t *m)
+{
+    *c = m-&gt;snap;
+}
+
+static void dump(const char *tag, const calib_t *c)
+{
+    printf("%-9s gain=%d offset=%d mode=%d\n", tag, c-&gt;gain, c-&gt;offset, c-&gt;mode);
+}
+
+int main(void)
+{
+    calib_t ecu = { 12, 0, 1 };
+    dump("before", &amp;ecu);
+
+    memento_t m = save(&amp;ecu);
+
+    ecu.gain = 30;          /* 现场调参，调坏了 */
+    ecu.offset = -8;
+    ecu.mode = 3;
+    dump("tuned", &amp;ecu);
+
+    restore(&amp;ecu, &amp;m);
+    dump("restored", &amp;ecu);
+    printf("快照是值拷贝：之后改 ecu 不会污染 memento\n");
+    return 0;
+}</code></pre>
+      </div>
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>./memento.exe</span></div>
+      <pre>before    gain=12 offset=0 mode=1
+tuned     gain=30 offset=-8 mode=3
+restored  gain=12 offset=0 mode=1
+快照是值拷贝：之后改 ecu 不会污染 memento</pre>
+    </div>
+      <div class="codecard">
+        <div class="ch"><span class="lang">C++</span><span class="fn">memento.cpp</span><button class="copy">复制</button></div>
+        <pre><code>// 备忘录 · C++：Memento 只暴露给 Originator，外部拿不到内部字段
+// 编译：g++ -std=c++17 -Wall -Wextra memento.cpp -o memento_cpp
+#include &lt;cstdio&gt;
+
+struct Calib { int gain; int offset; int mode; };
+
+class Memento {
+public:
+    explicit Memento(const Calib &amp;c) : c_(c) {}
+private:
+    friend class Ecu;
+    Calib c_;
+};
+
+class Ecu {
+public:
+    void set(int g, int o, int m) { c_ = Calib{g, o, m}; }
+    Memento save() const { return Memento(c_); }
+    void restore(const Memento &amp;m) { c_ = m.c_; }
+    void dump(const char *tag) const
+    {
+        std::printf("%-9s gain=%d offset=%d mode=%d\n", tag, c_.gain, c_.offset, c_.mode);
+    }
+private:
+    Calib c_{};
+};
+
+int main()
+{
+    Ecu ecu;
+    ecu.set(12, 0, 1);
+    ecu.dump("before");
+    Memento m = ecu.save();
+
+    ecu.set(30, -8, 3);
+    ecu.dump("tuned");
+
+    ecu.restore(m);
+    ecu.dump("restored");
+    std::printf("快照是值拷贝：之后改 ecu 不会污染 memento\n");
+    return 0;
+}</code></pre>
+      </div>
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>./memento_cpp.exe</span></div>
+      <pre>before    gain=12 offset=0 mode=1
+tuned     gain=30 offset=-8 mode=3
+restored  gain=12 offset=0 mode=1
+快照是值拷贝：之后改 ecu 不会污染 memento</pre>
+    </div>
+  </section>
+
+  <section class="sec" id="s4">
+    <h2><span class="n">04</span>改三次，退回第一次</h2>
+    
+    
+<div class="demo" id="demo">
+  <div class="demo-h"><b>改三次，退回第一次</b><span>看快照是否随原对象变化。</span></div>
+  <div class="stage">
+    <div class="dflow" id="dflow"></div>
+    <div class="dbar" id="dbar">未开始</div>
+    <div class="dctl">
+      <button class="btn" id="dPrev">复位</button>
+      <button class="btn" id="dNext">单步</button>
+      <button class="btn" id="dPlay">自动</button>
+      <button class="btn" id="dReset">清日志</button>
+    </div>
+    <div class="dnote" id="dnote">点上面的方框，看它在这次流程里负责什么。</div>
+    <div class="log" id="dlog"></div>
+  </div>
+</div>
+<script>dpDemo({nodes:[{id:'s0',label:'初始',sub:'12/0/1',note:''}, {id:'snap',label:'快照',sub:'12/0/1',note:''}, {id:'s1',label:'调参后',sub:'30/-8/3',note:''}, {id:'back',label:'恢复',sub:'12/0/1',note:''}],steps:[{hi:['s0'],t:'初始标定：gain=12 offset=0 mode=1'}, {hi:['snap'],t:'save()：拷贝一份完整快照'}, {hi:['s1'],t:'现场调参：gain=30 offset=-8 mode=3'}, {hi:['snap'],t:'快照仍是 12/0/1：值拷贝，不受影响'}, {hi:['back'],t:'restore()：三个字段整体换回'}, {hi:['s1'],t:'恢复后原对象 12/0/1；之后再改也不会污染旧快照'}]});</script>
+
+  </section>
+
+  <section class="sec" id="s5">
+    <h2><span class="n">05</span>C 与 C++：快照的可见性</h2>
+    
+    
+    <div class="tbl">
+      <table>
+        <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
+        <tbody><tr><td>快照</td><td><code>memento_t</code> 内嵌 <code>calib_t</code></td><td><code>Memento</code> 私有字段</td><td>C 靠约定不碰；C++ 用访问控制</td></tr><tr><td>保存</td><td><code>save(&amp;ecu)</code> 值拷贝</td><td><code>ecu.save()</code></td><td>都要求深拷贝</td></tr><tr><td>恢复</td><td><code>restore(&amp;ecu, &amp;m)</code></td><td><code>ecu.restore(m)</code></td><td>整体替换，不逐字段挑</td></tr><tr><td>可见性</td><td>结构体公开，谁都能改</td><td>仅 <code>friend Ecu</code> 可读写</td><td>C++ 能把“不可变”落到编译期</td></tr><tr><td>多份历史</td><td>自己开数组存</td><td><code>vector&lt;Memento&gt;</code></td><td>要撤销栈就多存几份</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sec" id="s6">
+    <h2><span class="n">06</span>代价与坑</h2>
+    
+    <div class="prose"><ul><li><b>快照必须是深拷贝。</b>配置里有字符串或指针时，浅拷贝只复制地址，原对象一改快照就变。</li><li><b>别把快照当历史日志。</b>备忘录通常只保一份；需要多级撤销要显式做栈，并限制深度。</li><li><b>频繁保存有成本。</b>每改一个字段存一次，内存和拷贝开销都上来；按“一次调参会话”存一次更合理。</li><li><b>恢复不等于回滚外部副作用。</b>标定恢复了，已经写进 NVRAM 的值、已经发出的报文不会自动撤回。</li><li><b>快照别跨线程共享。</b>一个快照被两个线程同时恢复，读到的可能是半更新状态；要么加锁，要么每线程各存一份。</li></ul></div>
+  </section>
+  <div class="ch-nav" id="chNav"></div>
+  </div>
+</div>
+
+<script src="../assets/pd.js"></script>
+<script src="../assets/dp-data.js"></script>
+<script src="../assets/dp-nav.js"></script>
+<script>dpNav('p4');</script>
+</body>
+</html>

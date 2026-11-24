@@ -411,3 +411,59 @@ section[id]{scroll-margin-top:76px}
   .part-head2 h2{font-size:19px}
 }
 
+
+/* ---------- v2：整书左栏目录 + 通用演示 + 平板/手机 ---------- */
+.shell{grid-template-columns:300px minmax(0,1fr);max-width:1420px}
+#sidebar{padding:24px 8px 40px 14px}
+#sidebar>ol>li>a{font-size:14px;line-height:1.5;padding:8px 10px 9px;gap:10px}
+#sidebar .no{width:44px;font:600 11.5px/1.65 var(--mono);color:#7f92b4}
+#sidebar .sub{font-size:11px;line-height:1.55;color:#71809b;margin-top:3px}
+.part-h{margin-top:18px!important;border-top:1px solid var(--line);padding-top:10px}
+.part-h:first-child{margin-top:0!important;border-top:0;padding-top:0}
+.part-h>a{display:flex;align-items:baseline;gap:5px;padding:4px 10px 6px;text-decoration:none;color:#7f90ad;
+  font:600 11px/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase}
+.part-h>a b{font:700 12.5px/1.4 var(--sans);letter-spacing:.02em;color:#c7d5ee;text-transform:none}
+.part-h>a i{flex:none;margin-left:auto;font:600 9.5px/1 var(--mono);color:#5f7291}
+.part-h>a:hover b{color:#8ff5d6}
+#sidebar .side-sub{padding-left:4px;margin:2px 0 6px}
+#sidebar .side-sub a{font-size:11.5px;padding:3px 8px}
+
+.dflow{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 10px}
+.dchip{
+  display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:104px;
+  padding:8px 11px;border:1px solid var(--line);border-radius:10px;background:#0d1220;
+  color:#c9d5e8;cursor:pointer;text-align:left;transition:border-color .18s,background .18s;
+}
+.dchip b{font:600 12.5px/1.35 var(--sans)}
+.dchip i{font:400 10.5px/1.35 var(--mono);font-style:normal;color:#7f90ad}
+.dchip:hover{border-color:#38466a;background:#101728}
+.dchip.on{border-color:rgba(67,214,168,.6);background:rgba(67,214,168,.09);color:#d9fff3}
+.dchip.on i{color:#8ff5d6}
+.dbar{font:600 11.5px/1.5 var(--mono);color:#8fa3c4;margin:2px 0 8px}
+.dbar.bad{color:#ffb0b0}
+.dctl{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.dnote{font-size:12px;line-height:1.7;color:#8fa3c4;padding:8px 10px;margin:0 0 10px;
+  border:1px dashed var(--line);border-radius:9px;background:rgba(255,255,255,.015)}
+.log em{font-style:normal;color:#5f7291;margin-right:8px}
+.log .bad{color:#ffb0b0}
+.demo .log{max-height:240px;min-height:78px;overflow:auto}
+
+@media (max-width:1080px) and (min-width:901px){
+  .shell{grid-template-columns:252px minmax(0,1fr)}
+  #sidebar>ol>li>a{font-size:13px;gap:8px}
+  #sidebar .no{width:38px}
+  .side-sub a{font-size:11px}
+  .wrap{padding-left:24px;padding-right:24px}
+}
+@media (max-width:900px){
+  #sidebar{width:min(88vw,360px);padding:18px 10px 70px 12px}
+  #sidebar>ol>li>a{font-size:14.5px;padding:9px 10px}
+  #sidebar .no{width:42px;font-size:12px}
+  .side-sub a{font-size:12px}
+  .dchip{min-width:96px;padding:8px 10px}
+}
+@media (max-width:640px){
+  .dctl .btn{flex:1 1 42%}
+  .chips{font-size:10px}
+}
+

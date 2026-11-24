@@ -1,0 +1,6 @@
+visit ECU      engine_ecu
+visit SENSOR   o2_sensor
+visit ACTUATOR injector
+visit ECU      abs_ecu
+合计 ECU=2 SENSOR=1 ACTUATOR=1
+新增一种统计，只写新的 visitor，不改节点
