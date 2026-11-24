@@ -71,14 +71,14 @@ window.PARTS = [
     sub: '从网表到一块能上电的板',
     intro: '库与封装、叠层与阻抗、布局、布线、DDR 专题、电源平面、DFM、出图下单、贴片、首板点亮。',
     chapters: [
-      { n: '5.1', t: '库与封装', s: '封装画错的六种后果', f: 'c01.html', ready: false },
-      { n: '5.2', t: '叠层与阻抗', s: '4/6 层怎么定、怎么和板厂谈', f: 'c02.html', ready: false },
-      { n: '5.3', t: '布局', s: '电源、SoC、DDR、接口、晶振的摆放顺序', f: 'c03.html', ready: false },
-      { n: '5.4', t: '布线', s: '阻抗、回流、过孔、跨分割', f: 'c04.html', ready: false },
-      { n: '5.5', t: 'DDR 布线专题', s: '拓扑、等长、VREF、地过孔', f: 'c05.html', ready: false },
-      { n: '5.6', t: '电源平面与散热', s: '铜皮、散热焊盘、过孔阵列', f: 'c06.html', ready: false },
-      { n: '5.7', t: 'DRC 与 DFM', s: '丝印、拼板、工艺边、测试点', f: 'c07.html', ready: false },
-      { n: '5.8', t: '出图、贴片、首板点亮', s: 'Gerber、BOM/CPL、回流、十步法', f: 'c08.html', ready: false }
+      { n: '5.1', t: '库与封装', s: '封装画错要废一批板：IPC 焊盘、1:1 验证', f: 'c01.html', ready: true },
+      { n: '5.2', t: '叠层与阻抗', s: '4 层叠层与 50Ω/100Ω 实算、跨分割', f: 'c02.html', ready: true },
+      { n: '5.3', t: '布局', s: '七步顺序与五条硬间距、干扰源分区', f: 'c03.html', ready: true },
+      { n: '5.4', t: '布线', s: '阻抗连续、过孔载流、3W 串扰、等长', f: 'c04.html', ready: true },
+      { n: '5.5', t: 'DDR3L 布线专题', s: '点对点拓扑、等长预算、VREF/ZQ/ODT', f: 'c05.html', ready: true },
+      { n: '5.6', t: '电源平面与散热', s: '平板电容、分割原则、铜箔与过孔热阻', f: 'c06.html', ready: true },
+      { n: '5.7', t: 'DRC 与 DFM', s: '丝印规则、拼板工艺边、DFM 十二项', f: 'c07.html', ready: true },
+      { n: '5.8', t: '出图、贴片、首板点亮', s: 'Gerber、BOM/CPL、钢网面积比、十步法', f: 'c08.html', ready: true }
     ]
   },
   {
@@ -101,6 +101,8 @@ window.PART_OF = function (n) {
   var map = { '1': 'p1', '2': 'p2', '3': 'p3', '4': 'p4', '5': 'p5', '6': 'p6' };
   return map[major] || 'p1';
 };
+
+
 
 
 

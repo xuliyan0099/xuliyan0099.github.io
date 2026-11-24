@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5.8 出图、贴片、首板点亮：从文件到一块能跑的板 | 第五篇 · PCB 与制造 | i.MX6ULL 学习手册</title>
+<meta name="description" content="Gerber 与钻孔文件清单、BOM/CPL 的五个坑、钢网面积比、回流曲线四区、首板点亮十步法，附成本与周期估算。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第五篇 · PCB 与制造</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第五篇 · PCB</span><span class="sep">/</span>第 8 章<span class="sep">/</span>约 60 分钟</div>
+    <h1>出图、贴片、首板点亮：从文件到一块能跑的板</h1>
+    <p class="lede">设计完成到板子跑起来，中间还有五道关卡：<b>出图、审核、打样、贴片、点亮</b>。每一道都有「一次做错、整批重来」的坑。这一章把它们排成一条可执行的时间线。</p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>列出 Gerber 与钻孔文件的完整清单，知道漏哪一层会怎样</li>
+        <li>检查 BOM/CPL 的五个常见错误（极性、旋转、封装、位号、DNP）</li>
+        <li>用面积比判断钢网能不能下锡，选对钢网厚度</li>
+        <li>说出回流曲线的四个区间与峰值温度</li>
+        <li>按十步法点亮首板，并知道每一步的判据</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">5.8.1</span>Gerber 清单：少一层就废</h2>
+    <table>
+      <thead><tr><th>文件</th><th>内容</th><th>漏了会怎样</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">GTL / GBL</td><td>顶层/底层铜</td><td>没线路，板子是白板</td></tr>
+        <tr><td class="nm">GTS / GBS</td><td>顶层/底层阻焊</td><td>焊盘被绿油盖住，焊不上</td></tr>
+        <tr><td class="nm">GTO / GBO</td><td>顶层/底层丝印</td><td>无位号，维修困难</td></tr>
+        <tr><td class="nm">GKO / 板框</td><td>外形铣切</td><td>板厂不知道切多大</td></tr>
+        <tr><td class="nm">DRL（Excellon）</td><td>钻孔 + 槽孔</td><td>没有孔，插件装不进</td></tr>
+        <tr><td class="nm">GTP / GBP</td><td>钢网（SMT 用）</td><td>贴片厂无法开钢网</td></tr>
+      </tbody>
+    </table>
+    <p>内层还要 G1/G2（内层铜）与对应阻焊（一般无）。检查方法：把 Gerber 用 KiCad/Gerbv 打开，逐层与设计图叠合看，重点看「钻孔是否落在焊盘中心」。偏移 0.1mm 就会破环。</p>
+
+    <h2><span class="n">5.8.2</span>BOM / CPL：五个必查项</h2>
+    <ol>
+      <li><b>位号与封装对应</b>：BOM 写 SOT-23，CPL 写 SOT-23-5，贴片厂直接贴错；</li>
+      <li><b>极性/方向</b>：二极管、LED、钽电容、IC 的 1 脚；CPL 里必须有 rotation 字段；</li>
+      <li><b>DNP 标记</b>：不贴的元件要在 BOM 里单独列或删除，否则贴片厂照贴（本板 R26、R85 等标 DNP）；</li>
+      <li><b>替代料</b>：缺货时的 pin-to-pin 替代必须同封装同极性，否则要改板；</li>
+      <li><b>坐标原点</b>：CPL 原点必须与 Gerber 一致（通常板左下角），否则整体偏移。</li>
+    </ol>
+    <p>经验：BOM/CPL 出错导致的返工，比设计错误更常见。发出去前一定用「贴片厂提供的模板」核对一遍格式。</p>
+
+    <h2><span class="n">5.8.3</span>钢网：面积比决定能不能下锡</h2>
+    <p>钢网开窗的「面积比」：</p>
+    <p style="text-align:center">AR = 开窗面积 / 孔壁面积 = (W×L)/(2×(W+L)×t)</p>
+    <p>AR ≥0.66 才能可靠脱模。以 0.5mm 间距 IC、开窗 0.25×0.6mm、钢网 0.12mm：</p>
+    <p style="text-align:center">AR = (0.25×0.6)/(2×0.85×0.12) = 0.15/0.204 = <b>0.735</b> ✓</p>
+    <p>若钢网 0.15mm：AR=0.15/0.255=0.588 ✗，下锡不足，虚焊。所以细间距器件要 <b>0.1–0.12mm 薄钢网</b>，或做「阶梯钢网」（局部减薄）。</p>
+    <p>BGA 还要按「焊盘 1:1 开窗 + 0.05mm 外扩」处理；本板 BGA-289 的 0.45mm 焊盘对应开窗 0.5mm。</p>
+
+    <h2><span class="n">5.8.4</span>回流曲线：四个区间</h2>
+    <p>无铅（SAC305）典型曲线：</p>
+    <table>
+      <thead><tr><th>区间</th><th>温度</th><th>时间</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">预热</td><td>室温→150°C</td><td>60–90s</td><td>溶剂挥发，防爆锡</td></tr>
+        <tr><td class="nm">恒温</td><td>150–190°C</td><td>60–120s</td><td>助焊剂活化，均匀受热</td></tr>
+        <tr><td class="nm">回流</td><td>217°C 以上</td><td>45–90s</td><td>焊膏熔化、润湿</td></tr>
+        <tr><td class="nm">冷却</td><td>峰值→室温</td><td>≤4°C/s</td><td>形成细晶粒焊点</td></tr>
+      </tbody>
+    </table>
+    <p>峰值温度 <b>235–245°C</b>（SAC305 熔点 217°C）。峰值过高会损伤塑料件（Type-C 座、按键），过低会虚焊。本板有 Type-C 与轻触开关，峰值取 240°C 上限内。</p>
+
+    <h2><span class="n">5.8.5</span>首板点亮十步法</h2>
+    <ol>
+      <li>目检：有无漏贴、错贴、立碑、连锡（放大镜 + 显微镜）；</li>
+      <li>测短路：各电源域对地电阻（同 4.8 五步法第一步）；</li>
+      <li>限流 0.1A 上电，量 DC_IN、VM、5V；</li>
+      <li>量 3.3V、1.35V、2.8V、NVCC_SD；</li>
+      <li>测 POR_B 时序（低→高，≥100ms）；</li>
+      <li>测 24MHz 起振（≥1V<sub>pp</sub>）；</li>
+      <li>接串口，看是否有 U-Boot 输出；</li>
+      <li>U-Boot 下测 DDR：<code>mtest</code> 或 <code>memtester</code>；</li>
+      <li>测 eMMC/SD 识别、网口链路、USB 枚举；</li>
+      <li>烧系统，跑 24h 压力测试，记录温度。</li>
+    </ol>
+    <p>每一步都要有「通过判据」，否则「看起来能跑」会在两周后变成随机死机。</p>
+
+    <h2><span class="n">5.8.6</span>成本与周期（参考）</h2>
+    <table>
+      <thead><tr><th>项目</th><th>5 片 4 层 10×10cm</th><th>周期</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">PCB 打样</td><td>¥100–300</td><td>3–5 天</td></tr>
+        <tr><td class="nm">钢网</td><td>¥50–100</td><td>2 天</td></tr>
+        <tr><td class="nm">贴片（含料）</td><td>¥300–800</td><td>3–7 天</td></tr>
+        <tr><td class="nm">首板调试</td><td>你的时间</td><td>1–3 天</td></tr>
+      </tbody>
+    </table>
+    <p>所以「一次做对」的价值极高：一次返工 = 两周 + 双倍费用。这也是为什么 5.1–5.7 的检查清单值得逐条走。</p>
+
+    <div class="demo">
+      <div class="dh"><b>钢网面积比计算器</b><span>输入开窗尺寸与钢网厚度，判断能否可靠下锡</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div><div class="lbl">开窗宽 <b id="wv">0.25</b> mm</div><input id="w" class="r" type="range" min="0.1" max="1" step="0.01" value="0.25"></div>
+          <div><div class="lbl">开窗长 <b id="lv">0.60</b> mm</div><input id="l" class="r" type="range" min="0.1" max="2" step="0.01" value="0.6"></div>
+          <div><div class="lbl">钢网厚 <b id="tv">0.12</b> mm</div><input id="t" class="r" type="range" min="0.08" max="0.2" step="0.01" value="0.12"></div>
+        </div>
+        <div id="stOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h3>练习</h3>
+    <details class="quiz"><summary>1. 漏了阻焊层会怎样？</summary><div class="ans">焊盘被绿油覆盖，无法焊接。</div></details>
+<details class="quiz"><summary>2. BOM 与 CPL 封装不一致会怎样？</summary><div class="ans">贴片厂按 CPL 贴，元件与焊盘不匹配，整批报废。</div></details>
+    <details class="quiz"><summary>3. 面积比公式与判据？</summary><div class="ans">AR=(W×L)/(2(W+L)t)，要求 ≥0.66。</div></details>
+    <details class="quiz"><summary>4. SAC305 熔点与峰值温度？</summary><div class="ans">217°C；峰值 235–245°C。</div></details>
+    <details class="quiz"><summary>5. 为什么细间距要用 0.1–0.12mm 钢网？</summary><div class="ans">厚钢网面积比不足，脱模不良导致下锡量不够、虚焊。</div></details>
+    <details class="quiz"><summary>6. 首板点亮第一步为什么是目检？</summary><div class="ans">漏贴/错贴/连锡能在上电前发现，避免烧板。</div></details>
+
+    <div class="ch-nav">
+      <a href="c07.html"><span>上一篇</span><b>← 5.7 DRC 与 DFM</b></a>
+      <a class="nx" id="chNavNext" href="../p6/c01.html"><span>下一篇</span><b>第六篇 · 进阶 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p5','c08.html');
+(function(){
+  function calc(){
+    var w=+document.getElementById('w').value,l=+document.getElementById('l').value,t=+document.getElementById('t').value;
+    var ar=(w*l)/(2*(w+l)*t);
+    document.getElementById('wv').textContent=w.toFixed(2);
+    document.getElementById('lv').textContent=l.toFixed(2);
+    document.getElementById('tv').textContent=t.toFixed(2);
+    document.getElementById('stOut').innerHTML=
+      '面积比 AR = (W×L)/(2×(W+L)×t) = <b style="color:#5ff1ef">'+ar.toFixed(3)+'</b><br>'+
+      (ar>=0.66?'<span style="color:#9ff5c0">≥0.66，可可靠脱模</span>':'<span style="color:#ff8f80">&lt;0.66，下锡不足，需减薄钢网或缩小开窗</span>')+'<br>'+
+      '建议钢网厚 ≤ <b style="color:#5ff1ef">'+((w*l)/(2*(w+l)*0.66)).toFixed(3)+' mm</b>';
+  }
+  ['w','l','t'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .r{width:100%;accent-color:#5ff1ef}
+</style>
+</body>
+</html>
+

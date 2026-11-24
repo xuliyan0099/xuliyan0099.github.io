@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5.7 DRC 与 DFM：丝印、拼板、工艺边、测试点 | 第五篇 · PCB 与制造 | i.MX6ULL 学习手册</title>
+<meta name="description" content="把 DRC 的三类报错、丝印规则、拼板与工艺边、Mark 点、测试点、DFM 十二项检查清单讲成可执行的出厂前流程。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第五篇 · PCB 与制造</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第五篇 · PCB</span><span class="sep">/</span>第 7 章<span class="sep">/</span>约 50 分钟</div>
+    <h1>DRC 与 DFM：丝印、拼板、工艺边、测试点</h1>
+    <p class="lede">DRC 通过不等于能生产。<b>板厂退单的 90% 原因都在 DFM</b>：丝印压焊盘、工艺边不够、Mark 点缺失、阻焊桥太窄。这一章给一份 12 项出厂前检查清单。</p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>分清 DRC（设计规则）与 DFM（可制造性）的区别</li>
+        <li>按尺寸规则设计丝印、Mark 点、测试点</li>
+        <li>选对拼板方式（V-cut / 邮票孔）并留够工艺边</li>
+        <li>跑完 12 项 DFM 检查，避免被板厂退单</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">5.7.1</span>DRC 与 DFM 不是一回事</h2>
+    <table>
+      <thead><tr><th>类别</th><th>检查什么</th><th>谁定义</th><th>漏了会怎样</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">DRC</td><td>线宽、间距、孔径、环宽、短路</td><td>你的软件规则</td><td>无法生产或电气失效</td></tr>
+        <tr><td class="nm">DFM</td><td>丝印、阻焊桥、拼板、工艺边、Mark</td><td>板厂工艺能力</td><td>能画出来但做不出来/良率低</td></tr>
+      </tbody>
+    </table>
+    <p>典型误判：DRC 全绿，但丝印字号 0.5mm、压住焊盘——板厂照做，回来字符糊成一团，极性看不清，贴片贴反。</p>
+
+    <h2><span class="n">5.7.2</span>丝印四条硬规则</h2>
+    <ul>
+      <li><b>字高 ≥0.8mm、线宽 ≥0.15mm</b>：再小印不出来（丝网印刷极限约 0.15mm 线宽）；</li>
+      <li><b>丝印不得压焊盘/过孔</b>：绿油上的丝印在焊盘上会被焊膏冲掉，且造成焊接不良；</li>
+      <li><b>极性标记必须可见</b>：二极管阴极、钽电容正极、IC 的 1 脚、连接器 1 脚；</li>
+      <li><b>位号不要被元件盖住</b>：贴片后仍要能看到 R12、C34，便于维修。</li>
+    </ul>
+    <p>本板的做法：二极管用「阴极端一条粗线」，IC 用「1 脚圆点 + 缺口」，Type-C 用「开口方向 + 1 脚标记」。这些小标记在调试时能省几小时。</p>
+
+    <h2><span class="n">5.7.3</span>Mark 点与测试点</h2>
+    <p><b>Mark 点（光学定位）</b>：贴片机用它校正。要求：</p>
+    <ul>
+      <li>直径 1.0–1.5mm 的实心圆，周围 2mm 内无铜、无丝印（留出对比度）；</li>
+      <li>至少 3 个，呈不对称分布（防呆，避免旋转 180° 也能对上）；</li>
+      <li>拼板上每个小板至少 1 个，整板 3 个。</li>
+    </ul>
+    <p><b>测试点</b>：</p>
+    <ul>
+      <li>直径 ≥1.0mm，间距 ≥2.54mm（探针床间距）；</li>
+      <li>每个电源域、复位、关键时钟各留一个；</li>
+      <li>测试点不要盖绿油（要开窗），且不要放在元件正下方。</li>
+    </ul>
+
+    <h2><span class="n">5.7.4</span>拼板：V-cut 还是邮票孔</h2>
+    <table>
+      <thead><tr><th>方式</th><th>适用</th><th>优点</th><th>缺点</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">V-cut（V 形槽）</td><td>矩形板、边缘直线</td><td>成本低、掰板整齐</td><td>不能做异形、槽深占板厚 1/3</td></tr>
+        <tr><td class="nm">邮票孔（Mouse bites）</td><td>异形板、圆角、拼板间隙小</td><td>适应性好</td><td>掰后有毛刺，需打磨</td></tr>
+        <tr><td class="nm">双面 V-cut</td><td>较厚板</td><td>应力小</td><td>成本略高</td></tr>
+      </tbody>
+    </table>
+    <p>工艺边：拼板四周留 <b>≥5mm</b>（贴片机轨道夹持需要），并在工艺边上放 Mark 点与定位孔（孔径 3–4mm）。拼板间隙：V-cut 为 0（共边），邮票孔为 2–3mm。</p>
+    <p>算一下利用率：一块 100×80mm 的板，在 300×200mm 拼板内做 2×2，加 5mm 工艺边：</p>
+    <p style="text-align:center">拼板尺寸 = (100×2+10) × (80×2+10) = 210×170mm<br>
+      利用率 = 4×100×80/(210×170) = 32000/35700 ≈ <b>89.6%</b></p>
+    <p>若改成 1×2（210×90），利用率 = 16000/18900 ≈ 84.7%——拼得多不一定更省，要看边料占比。</p>
+
+    <h2><span class="n">5.7.5</span>DFM 十二项检查清单</h2>
+    <ol>
+      <li>最小线宽/间距 ≥ 板厂能力（常规 5/5mil，本板 BGA 出线用 4/4mil 需选进阶工艺）</li>
+      <li>最小孔径 ≥0.2mm，孔环 ≥0.15mm（否则破环）</li>
+      <li>阻焊桥 ≥0.1mm（IC 引脚间），否则连锡</li>
+      <li>丝印字高 ≥0.8mm、不压焊盘</li>
+      <li>板边 ≥0.3mm 无铜，≥0.5mm 无孔</li>
+      <li>工艺边 ≥5mm，Mark 点 3 个</li>
+      <li>拼板 V-cut 深度 = 板厚 1/3，邮票孔孔径 0.5–0.8mm</li>
+      <li>槽孔/异形孔用「槽孔」层标注，不要用焊盘叠</li>
+      <li>金手指/Type-C 做倒角，避免插拔刮伤</li>
+      <li>大面积铜箔做「网格」或「十字连接」，防翘曲</li>
+      <li>BGA 区域阻焊开窗按焊盘 +0.05mm，不要整体开大窗</li>
+      <li>每层都做「对比度检查」：Gerber 与设计图叠合，确认无缺失层</li>
+    </ol>
+
+    <h2><span class="n">5.7.6</span>本板三处容易踩的 DFM 坑</h2>
+    <ul>
+      <li><b>RJ45 变压器</b>：ATK9111A 的引脚间距 2.0mm，焊盘间阻焊桥只有 0.12mm，需要板厂做「阻焊桥加宽」或接受少量连锡风险；</li>
+      <li><b>Type-C 16pin</b>：0.5mm 间距，钢网开窗要做「纳米涂层 + 阶梯」，否则连锡；</li>
+      <li><b>BGA-289 0.8mm</b>：焊盘 0.45mm、阻焊开窗 0.5mm，需激光钢网 + 0.1mm 阶梯，普通钢网下锡量不足。</li>
+    </ul>
+
+    <div class="demo">
+      <div class="dh"><b>拼板利用率计算器</b><span>输入单板尺寸、阵列、工艺边，算拼板尺寸与利用率</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div><div class="lbl">单板长 <b id="lv">100</b> mm</div><input id="l" class="r" type="range" min="20" max="300" step="5" value="100"></div>
+          <div><div class="lbl">单板宽 <b id="wv">80</b> mm</div><input id="w" class="r" type="range" min="20" max="300" step="5" value="80"></div>
+          <div><div class="lbl">列数 <b id="cv">2</b></div><input id="c" class="r" type="range" min="1" max="6" step="1" value="2"></div>
+          <div><div class="lbl">行数 <b id="rv">2</b></div><input id="r" class="r" type="range" min="1" max="6" step="1" value="2"></div>
+          <div><div class="lbl">工艺边 <b id="ev">5</b> mm</div><input id="e" class="r" type="range" min="0" max="15" step="1" value="5"></div>
+          <div><div class="lbl">板间隙 <b id="gv">0</b> mm</div><input id="g" class="r" type="range" min="0" max="5" step="0.5" value="0"></div>
+        </div>
+        <div id="panelOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h3>练习</h3>
+    <details class="quiz"><summary>1. DRC 全绿为什么还可能做不出来？</summary><div class="ans">DFM 问题（丝印、阻焊桥、工艺边、Mark）不在 DRC 规则里。</div></details>
+    <details class="quiz"><summary>2. 丝印最小字高与线宽？</summary><div class="ans">字高 ≥0.8mm、线宽 ≥0.15mm。</div></details>
+    <details class="quiz"><summary>3. Mark 点尺寸与周围净空？</summary><div class="ans">直径 1–1.5mm，周围 2mm 无铜无丝印。</div></details>
+    <details class="quiz"><summary>4. 工艺边为什么 ≥5mm？</summary><div class="ans">贴片机轨道夹持需要，太窄会夹不住或压到元件。</div></details>
+    <details class="quiz"><summary>5. V-cut 与邮票孔怎么选？</summary><div class="ans">直线边缘用 V-cut（成本低）；异形/圆角用邮票孔。</div></details>
+    <details class="quiz"><summary>6. 阻焊桥太窄会怎样？</summary><div class="ans">引脚间连锡，尤其在 0.5mm 间距器件上。</div></details>
+
+    <div class="ch-nav">
+      <a href="c06.html"><span>上一篇</span><b>← 5.6 电源平面与散热</b></a>
+      <a class="nx" id="chNavNext" href="c08.html"><span>下一章</span><b>5.8 出图、贴片、首板点亮 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p5','c07.html');
+(function(){
+  function calc(){
+    var L=+document.getElementById('l').value, W=+document.getElementById('w').value;
+    var c=+document.getElementById('c').value, r=+document.getElementById('r').value;
+    var e=+document.getElementById('e').value, g=+document.getElementById('g').value;
+    var pl=c*L+(c-1)*g+2*e, pw=r*W+(r-1)*g+2*e;
+    var util=(c*r*L*W)/(pl*pw)*100;
+    document.getElementById('lv').textContent=L;document.getElementById('wv').textContent=W;
+    document.getElementById('cv').textContent=c;document.getElementById('rv').textContent=r;
+    document.getElementById('ev').textContent=e;document.getElementById('gv').textContent=g;
+    document.getElementById('panelOut').innerHTML=
+      '拼板尺寸 = <b style="color:#5ff1ef">'+pl+' × '+pw+' mm</b>（含 '+e+'mm 工艺边）<br>'+
+      '单板数 = '+c+'×'+r+' = '+(c*r)+' 片<br>'+
+      '面积利用率 = <b style="color:#5ff1ef">'+util.toFixed(1)+'%</b> '+(util<85?'<span style="color:#ffd79a">偏低，考虑调整阵列/工艺边</span>':'<span style="color:#9ff5c0">良好</span>')+'<br>'+
+      '建议：工艺边 ≥5mm，Mark 点 3 个（不对称），定位孔 3–4mm';
+  }
+  ['l','w','c','r','e','g'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .r{width:100%;accent-color:#5ff1ef}
+</style>
+</body>
+</html>
+

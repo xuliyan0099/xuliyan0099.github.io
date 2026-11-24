@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5.3 布局：先摆什么、后摆什么、间距怎么定 | 第五篇 · PCB 与制造 | i.MX6ULL 学习手册</title>
+<meta name="description" content="给出可执行的布局顺序（结构→接口→电源→SoC→DDR→时钟→去耦），并列出本板关键间距约束：DDR 10mm、晶振 5mm、去耦 1mm、热源隔离。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第五篇 · PCB 与制造</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第五篇 · PCB</span><span class="sep">/</span>第 3 章<span class="sep">/</span>约 55 分钟</div>
+    <h1>布局：先摆什么、后摆什么、间距怎么定</h1>
+    <p class="lede">布线再漂亮也救不了糟糕的布局。<b>布局决定 80% 的信号质量与全部的结构可行性</b>。这一章给一套固定顺序、一张间距约束表，并用本板实物图对照说明。</p>
+
+    <figure class="photo">
+      <div><img src="../../assets/img/parts/board_mini.jpg" alt="正点原子 MINI 底板实物"><figcaption>MINI 底板实物：DC 座与电源区在左、SoC 与 DDR 居中、网口/双 USB 靠板边、40pin LCD 与排针分居两翼。</figcaption></div>
+      <div><img src="../../assets/img/sch/mini_p4_fb.png" alt="MINI 第 4 页电源区布局分区"><figcaption>对应的电源区原理图：DC_IN→F1→VD2→两颗 DCJW5060 依次排布，物理位置与图序一致。</figcaption></div>
+    </figure>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>按七步顺序完成一次布局，而不是「想到哪摆哪」</li>
+        <li>记住五条硬间距：DDR 10mm、晶振 5mm、去耦 1mm、热源隔离、接口靠边</li>
+        <li>把「干扰源」与「敏感件」分区，知道哪些元件不能挨着</li>
+        <li>用回流路径判断布局好坏，而不是只看「整齐」</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">5.3.1</span>七步顺序</h2>
+    <ol>
+      <li><b>结构</b>：先放定位孔、板框、连接器（DC 座、Type-C、RJ45、排针、LCD 座）。它们的位置由外壳/结构决定，不可移动。</li>
+      <li><b>接口电路</b>：ESD/TVS、共模电感、限流开关紧贴接口内侧（本板 D1/D2 SMBJ、L3/L4 磁珠）。</li>
+      <li><b>电源</b>：DC 输入 → 保险丝 → 防反接 → DCDC。输入电容贴 DCDC 的 VIN。</li>
+      <li><b>主芯片</b>：SoC 放在板中心，靠近 DDR 与主要接口，散热焊盘朝板内。</li>
+      <li><b>存储</b>：DDR 紧贴 SoC（≤10mm），eMMC/NAND 放在远离 DCDC 的一侧。</li>
+      <li><b>时钟</b>：24MHz 晶振紧贴 SoC（≤5mm），底下铺地，远离 DCDC 电感与 SW 节点。</li>
+      <li><b>去耦</b>：最后按 BGA 电源球位置摆放，每颗电容到球 ≤1mm。</li>
+    </ol>
+    <p>顺序的意义：<b>先固定「不能动的」，再优化「能动的」</b>。反过来先摆去耦电容，最后发现连接器位置不对，全部重来。</p>
+
+    <h2><span class="n">5.3.2</span>五条硬间距</h2>
+    <table>
+      <thead><tr><th>约束</th><th>数值</th><th>为什么</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">SoC ↔ DDR</td><td>≤10mm</td><td>DDR 走线越短，等长与阻抗越容易控；超过 20mm 反射明显</td></tr>
+        <tr><td class="nm">SoC ↔ 24MHz 晶振</td><td>≤5mm</td><td>走线长会增加负载电容与干扰拾取，起振裕度下降</td></tr>
+        <tr><td class="nm">去耦电容 ↔ 电源球</td><td>≤1mm</td><td>回路电感 &gt;1nH 时电容在 100MHz 已失效（见 4.4）</td></tr>
+        <tr><td class="nm">DCDC 电感 ↔ 晶振/模拟</td><td>≥10mm</td><td>SW 节点 dv/dt 大，是主要辐射源</td></tr>
+        <tr><td class="nm">热源 ↔ 电解电容/晶振</td><td>≥5mm</td><td>电解液寿命随温度指数下降；晶振频率随温度漂移</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="n">5.3.3</span>干扰源与敏感件：必须分区</h2>
+    <p>板上元件按「电磁性格」分三类：</p>
+    <table>
+      <thead><tr><th>类别</th><th>本板例子</th><th>处理</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">强干扰源</td><td>两颗 DCJW5060、L1/L2 电感、RJ45 变压器、USB 5V</td><td>集中在电源区，远离敏感件，下方不走信号</td></tr>
+        <tr><td class="nm">敏感件</td><td>24MHz 晶振、RTC 晶振、以太网 PHY 的 RBIAS、ADC 参考</td><td>靠 SoC、铺地包围、远离电感</td></tr>
+        <tr><td class="nm">中性</td><td>eMMC、排针、LED、按键</td><td>可放边缘，优先让位</td></tr>
+      </tbody>
+    </table>
+    <p>典型翻车：把 24MHz 晶振放在 DCDC 电感旁边 3mm，结果「常温正常、满载偶发死机」——因为电感漏磁耦合进晶振，频率被拉偏。</p>
+
+    <h2><span class="n">5.3.4</span>用回流路径检验布局</h3>
+    <p>摆完之后，对每条关键信号问一句：<b>它的回流从哪走？</b></p>
+    <ul>
+      <li>DDR 数据线在 L1，回流在 L2 地平面正下方 → 只要 L2 完整，就 OK；</li>
+      <li>USB D+/D- 在 L4，参考 L3 电源平面 → L3 若有分割，回流被切断；</li>
+      <li>SD 卡信号跨到板边连接器 → 回流路径要从连接器地脚回到 L2，必须保证地过孔充足。</li>
+    </ul>
+    <p>布局阶段就能发现「必须跨分割」的情况，此时调整位置比后期加缝合电容更彻底。</p>
+
+    <h2><span class="n">5.3.5</span>本板布局复盘</h2>
+    <p>照着实物图看，能读出设计者的取舍：</p>
+    <ul>
+      <li><b>DC 座在左下</b>，紧接 F1、VD2、两颗 DCDC——输入路径最短，减少 12V 大电流走线；</li>
+      <li><b>两颗 DCDC 电感朝板内</b>，SW 节点远离板边，减少对外辐射；</li>
+      <li><b>SoC 居中偏上</b>，DDR 在其右侧紧贴，DDR 走线短且有空间等长；</li>
+      <li><b>RJ45 在右侧板边</b>，PHY 紧邻，25MHz 晶振贴 PHY；</li>
+      <li><b>双 USB 在右下</b>，Type-C 与 Host 座并排，MT9700 紧随其后；</li>
+      <li><b>40pin LCD 与 2×24 排针分居上下</b>，把「用户接口」全部推到板边。</li>
+    </ul>
+    <p>这不是「摆得好看」，而是「每条关键路径都最短」。你改板时如果移动了 DCDC 位置，就要重新审视 5.3.2 的五条间距。</p>
+
+    <div class="demo">
+      <div class="dh"><b>布局间距核算器</b><span>填入实际摆放距离，逐条判断是否满足约束</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div><div class="lbl">SoC↔DDR <b id="d1v">8</b> mm</div><input id="d1" class="r" type="range" min="2" max="40" step="1" value="8"></div>
+          <div><div class="lbl">SoC↔晶振 <b id="d2v">4</b> mm</div><input id="d2" class="r" type="range" min="1" max="30" step="1" value="4"></div>
+          <div><div class="lbl">去耦↔电源球 <b id="d3v">1.0</b> mm</div><input id="d3" class="r" type="range" min="0.2" max="5" step="0.1" value="1"></div>
+          <div><div class="lbl">电感↔晶振 <b id="d4v">12</b> mm</div><input id="d4" class="r" type="range" min="2" max="40" step="1" value="12"></div>
+          <div><div class="lbl">热源↔电解 <b id="d5v">6</b> mm</div><input id="d5" class="r" type="range" min="1" max="30" step="1" value="6"></div>
+        </div>
+        <div id="layOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h3>练习</h3>
+    <details class="quiz"><summary>1. 布局第一步为什么是结构件？</summary><div class="ans">连接器与定位孔位置由外壳决定，不可移动，先固定它们才能优化其余。</div></details>
+    <details class="quiz"><summary>2. DDR 距 SoC 超过 20mm 会有什么问题？</summary><div class="ans">走线长、反射与串扰增大，等长难做，DDR 训练不稳。</div></details>
+    <details class="quiz"><summary>3. 去耦电容为什么必须 ≤1mm？</summary><div class="ans">回路电感超过 1nH 后，100MHz 阻抗过高，电容失效。</div></details>
+    <details class="quiz"><summary>4. DCDC 电感为什么不能挨着晶振？</summary><div class="ans">漏磁耦合会拉偏晶振频率，导致偶发死机。</div></details>
+    <details class="quiz"><summary>5. 怎么用回流判断布局好坏？</summary><div class="ans">看每条关键信号的正下方参考平面是否完整、是否被迫跨分割。</div></details>
+    <details class="quiz"><summary>6. 本板为什么把两颗 DCDC 电感朝板内？</summary><div class="ans">SW 节点远离板边，减少对外辐射与耦合。</div></details>
+
+    <div class="ch-nav">
+      <a href="c02.html"><span>上一篇</span><b>← 5.2 叠层与阻抗</b></a>
+      <a class="nx" id="chNavNext" href="c04.html"><span>下一章</span><b>5.4 布线 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p5','c03.html');
+(function(){
+  function calc(){
+    var a=+document.getElementById('d1').value,b=+document.getElementById('d2').value,c=+document.getElementById('d3').value;
+    var d=+document.getElementById('d4').value,e=+document.getElementById('d5').value;
+    document.getElementById('d1v').textContent=a;document.getElementById('d2v').textContent=b;
+    document.getElementById('d3v').textContent=c.toFixed(1);document.getElementById('d4v').textContent=d;
+    document.getElementById('d5v').textContent=e;
+    function row(name,val,lim,unit){
+      var ok=val<=lim;
+      return name+'：'+val+unit+'（限 ≤'+lim+unit+'）'+(ok?'<span style="color:#9ff5c0"> ✓</span>':'<span style="color:#ff8f80"> ✗ 超限</span>')+'<br>';
+    }
+    var out='';
+    out+=row('SoC↔DDR',a,10,'mm');
+    out+=row('SoC↔晶振',b,5,'mm');
+    out+=row('去耦↔电源球',c,1,'mm');
+    out+='电感↔晶振：'+d+'mm（限 ≥10mm）'+(d>=10?'<span style="color:#9ff5c0"> ✓</span>':'<span style="color:#ff8f80"> ✗ 太近</span>')+'<br>';
+    out+='热源↔电解：'+e+'mm（限 ≥5mm）'+(e>=5?'<span style="color:#9ff5c0"> ✓</span>':'<span style="color:#ff8f80"> ✗ 太近</span>')+'<br>';
+    document.getElementById('layOut').innerHTML=out;
+  }
+  ['d1','d2','d3','d4','d5'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .r{width:100%;accent-color:#5ff1ef}
+</style>
+</body>
+</html>
+
+

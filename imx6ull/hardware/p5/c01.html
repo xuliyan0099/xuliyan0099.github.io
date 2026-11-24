@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5.1 库与封装：一个封装画错，整批板报废 | 第五篇 · PCB 与制造 | i.MX6ULL 学习手册</title>
+<meta name="description" content="封装画错的六种真实后果、命名规范、IPC-7351 焊盘计算、1:1 打印验证法，以及本板六类关键封装（SOT-23-5、SMA、Type-C、BGA、排针）的检查清单。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第五篇 · PCB 与制造</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第五篇 · PCB</span><span class="sep">/</span>第 1 章<span class="sep">/</span>约 50 分钟</div>
+    <h1>库与封装：一个封装画错，整批板报废</h1>
+    <p class="lede">原理图错了改一根线，封装错了要废一批板。<b>封装是唯一「不能靠改代码补救」的错误</b>。这一章讲六种真实翻车方式、命名的强制规范、IPC-7351 焊盘算法，以及一个 5 分钟就能做的 1:1 打印验证。</p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>说出六种封装错误的后果，并知道每种在什么阶段能发现</li>
+        <li>按「引脚数_体宽_间距」规范命名，避免同名不同物</li>
+        <li>用 IPC-7351 的思路算焊盘长宽，而不是「差不多」</li>
+        <li>用 1:1 打印 + 实物比对，在打样前拦住 80% 的封装错</li>
+        <li>检查本板六类关键封装（SOT-23-5、SMA、Type-C、BGA、排针、晶振）</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">5.1.1</span>六种翻车方式</h2>
+    <table>
+      <thead><tr><th>#</th><th>错误</th><th>后果</th><th>在哪一步能发现</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">1</td><td>引脚数错（SOT-23 画成 SOT-23-5）</td><td>焊不上，或飞线救</td><td>1:1 打印比对</td></tr>
+        <tr><td class="nm">2</td><td>焊盘过长/内距太宽</td><td>回流时立碑（tombstone）</td><td>打样首板</td></tr>
+        <tr><td class="nm">3</td><td>极性反（二极管/钽电容/LED）</td><td>上电即炸或完全不亮</td><td>原理图符号 + 丝印</td></tr>
+        <tr><td class="nm">4</td><td>0.5mm 间距 QFN 焊盘过宽</td><td>连锡、桥接</td><td>钢网/首板 X 光</td></tr>
+        <tr><td class="nm">5</td><td>丝印压在焊盘上</td><td>焊接不良、字符残缺</td><td>DRC 丝印检查</td></tr>
+        <tr><td class="nm">6</td><td>封装外形与结构件干涉</td><td>装不进外壳/顶到电池</td><td>3D 装配检查</td></tr>
+      </tbody>
+    </table>
+    <p>第 2 种最隐蔽：焊盘稍微长一点，手工焊完全正常，一上回流焊就立碑——因为两端焊膏表面张力不平衡。这类问题<b>只有首板能暴露</b>，所以第一次打样不要一次打 50 片。</p>
+
+    <h2><span class="n">5.1.2</span>命名：让封装名自带信息</h2>
+    <p>推荐格式：<b>类型-引脚数_体宽x体长mm_P间距mm</b>，例如：</p>
+    <ul>
+      <li><code>SOT-23-5_1.6x2.9mm_P0.95mm</code></li>
+      <li><code>SOP-8_3.9x4.9mm_P1.27mm</code></li>
+      <li><code>QFN-32_5x5mm_P0.5mm_EP3.1mm</code></li>
+      <li><code>BGA-289_17x17mm_P0.8mm</code></li>
+    </ul>
+    <p>为什么必须带尺寸：不同厂家的「SOT-23」体宽可能 1.2–1.4mm，焊盘按 1.2 画、实物 1.4，就会出现「引脚够不着焊盘」。名字里带尺寸，就不会拿错。</p>
+    <p>本板的 i.MX6ULL 是 <b>MAPBGA-289、0.8mm 间距、17×17mm</b>；核心板 60pin 连接器是 <b>3710M060046G3FT01</b>（0.5mm 间距双排），这类连接器的封装必须用厂家提供的 STEP/DXF，不能自己画。</p>
+
+    <h2><span class="n">5.1.3</span>焊盘尺寸：IPC-7351 的三条边</h2>
+    <p>焊盘不是「和引脚一样大」，而是由三段组成：</p>
+    <ul>
+      <li><b>Toe（脚尖外伸）</b>：提供焊点外形，典型 0.1–0.3mm；</li>
+      <li><b>Heel（脚跟内伸）</b>：保证根部润湿，典型 0.1–0.2mm；</li>
+      <li><b>Side（侧向外伸）</b>：防止偏移，典型 0.05–0.15mm。</li>
+    </ul>
+    <p>简化算法（翼形引脚，如 SOP/QFP）：</p>
+    <p style="text-align:center">焊盘长 = 引脚长 + Toe + Heel ≈ L + 0.4mm<br>
+      焊盘宽 = 引脚宽 + 2×Side ≈ W + 0.2mm<br>
+      内距 = 引脚跨距 − 引脚长（保证脚跟落在焊盘上）</p>
+    <p>以 0402（体 1.0×0.5mm，端头各 0.25mm）为例，IPC 中密度（Level B）推荐：焊盘 0.55×0.60mm，两焊盘中心距 0.90mm。若你把焊盘做到 0.8mm 长、中心距 1.1mm，两端焊膏量差一点就会立碑。</p>
+    <p>密度等级：A（最大，手工/返修友好）、B（标准）、C（最密，高密度板）。<b>手工焊选 A，回流+钢网选 B</b>，不要一律用 C。</p>
+
+    <h2><span class="n">5.1.4</span>5 分钟拦住 80% 的错：1:1 打印</h2>
+    <ol>
+      <li>PCB 软件导出顶层/底层 PDF，<b>关闭「适应页面」</b>，按 1:1 打印；</li>
+      <li>打印后量一条已知线（如 2.54mm 排针间距），确认真的是 2.54mm（打印机常有 1–3% 缩放）；</li>
+      <li>把实物（芯片、连接器、晶振）放上去，看引脚是否正好压在焊盘上；</li>
+      <li>重点看：极性标记方向、1 脚位置、连接器开口朝向、晶振四脚是否对称。</li>
+    </ol>
+    <p>这一步成本 5 分钟，能拦住引脚数错、间距错、极性反、连接器朝向错——四类最常见的报废原因。</p>
+
+    <h2><span class="n">5.1.5</span>本板六类关键封装检查清单</h2>
+    <table>
+      <thead><tr><th>器件</th><th>封装</th><th>必须核对</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">U7/U12 LDO</td><td>SOT-23-5，P0.95</td><td>5 个脚（不是 3 个）；1 脚是 VIN 还是 VOUT 按手册</td></tr>
+        <tr><td class="nm">VD2 肖特基</td><td>SMA（DO-214AC）</td><td>阴极带方向；焊盘长 ≥4.3mm 才放得下</td></tr>
+        <tr><td class="nm">Type-C 座</td><td>16pin 沉板/贴板</td><td>CC1/CC2、A/B 面、外壳固定脚</td></tr>
+        <tr><td class="nm">U1 SoC</td><td>BGA-289 P0.8</td><td>球径 0.4mm、焊盘 0.45mm、A1 角位置</td></tr>
+        <tr><td class="nm">P4 排针</td><td>2.54mm 2×24</td><td>针脚 0.64mm 方针 → 焊盘孔径 1.0mm</td></tr>
+        <tr><td class="nm">Y2 晶振</td><td>3225 四脚</td><td>四脚中 2、4 为 GND，1/3 为晶体，别画成两脚</td></tr>
+      </tbody>
+    </table>
+    <p>晶振这条最容易错：3225 四脚晶振的 2、4 脚是外壳地，必须接地；如果按「两脚晶振」画，1、3 脚会短到地，直接不起振。</p>
+
+    <div class="demo">
+      <div class="dh"><b>翼形引脚焊盘计算器</b><span>输入引脚长/宽/间距，按密度等级算焊盘长宽与内距</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div><div class="lbl">引脚长 <b id="lv">1.0</b> mm</div><input id="l" class="r" type="range" min="0.2" max="3" step="0.05" value="1.0"></div>
+          <div><div class="lbl">引脚宽 <b id="wv">0.4</b> mm</div><input id="w" class="r" type="range" min="0.1" max="1.2" step="0.05" value="0.4"></div>
+          <div><div class="lbl">引脚间距 <b id="pv">1.27</b> mm</div><input id="p" class="r" type="range" min="0.3" max="2.54" step="0.01" value="1.27"></div>
+          <div><div class="lbl">密度等级</div><select id="d" class="inp"><option value="0.4">A 最大</option><option value="0.3" selected>B 标准</option><option value="0.2">C 最密</option></select></div>
+        </div>
+        <div id="fpOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h3>练习</h3>
+    <details class="quiz"><summary>1. SOT-23 与 SOT-23-5 的差别在哪？画错会怎样？</summary><div class="ans">引脚数 3 vs 5；画错焊不上，只能飞线或报废。</div></details>
+    <details class="quiz"><summary>2. 为什么焊盘过长会导致立碑？</summary><div class="ans">两端焊膏量/润湿力不平衡，回流表面张力把元件拉起。</div></details>
+    <details class="quiz"><summary>3. IPC 密度等级 A/B/C 分别适合什么场景？</summary><div class="ans">A 手工返修、B 标准回流、C 高密度细间距。</div></details>
+    <details class="quiz"><summary>4. 0402 的推荐焊盘尺寸（Level B）？</summary><div class="ans">约 0.55×0.60mm，中心距 0.90mm。</div></details>
+    <details class="quiz"><summary>5. 1:1 打印第一步要确认什么？</summary><div class="ans">打印是否真 1:1（量 2.54mm 排针间距），排除打印机缩放。</div></details>
+    <details class="quiz"><summary>6. 3225 四脚晶振按两脚画会怎样？</summary><div class="ans">1/3 脚被短接到外壳地，晶振不起振。</div></details>
+
+    <div class="ch-nav">
+      <a href="../p4/c08.html"><span>上一篇</span><b>← 4.8 测量与故障注入</b></a>
+      <a class="nx" id="chNavNext" href="c02.html"><span>下一章</span><b>5.2 叠层与阻抗 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p5','c01.html');
+(function(){
+  function calc(){
+    var L=+document.getElementById('l').value, W=+document.getElementById('w').value, P=+document.getElementById('p').value, d=+document.getElementById('d').value;
+    var padL=L+d, padW=W+0.15;
+    document.getElementById('lv').textContent=L.toFixed(2);
+    document.getElementById('wv').textContent=W.toFixed(2);
+    document.getElementById('pv').textContent=P.toFixed(2);
+    document.getElementById('fpOut').innerHTML=
+      '推荐焊盘长 = 引脚长 + '+(d*0.6).toFixed(2)+'（Toe）+ '+(d*0.4).toFixed(2)+'（Heel）≈ <b style="color:#5ff1ef">'+padL.toFixed(2)+' mm</b><br>'+
+      '推荐焊盘宽 = 引脚宽 + 2×0.075 ≈ <b style="color:#5ff1ef">'+padW.toFixed(2)+' mm</b><br>'+
+      '焊盘中心距 ≈ 引脚间距 <b style="color:#5ff1ef">'+P.toFixed(2)+' mm</b><br>'+
+      '焊盘间隙 = P − padW = <b style="color:#5ff1ef">'+(P-padW).toFixed(2)+' mm</b> '+(P-padW<0.15?'<span style="color:#ffb4a8">过小，易连锡（细间距需按钢网开窗处理）</span>':'<span style="color:#9ff5c0">可制造</span>');
+  }
+  ['l','w','p','d'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  document.getElementById('d').addEventListener('change',calc);
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .r{width:100%;accent-color:#5ff1ef}
+.demo .inp{width:100%;background:#0a1020;color:#5ff1ef;border:1px solid #2a3a55;border-radius:8px;padding:6px}
+</style>
+</body>
+</html>
+

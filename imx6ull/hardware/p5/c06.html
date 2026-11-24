@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5.6 电源平面与散热：平板电容、铜箔热阻、过孔阵列 | 第五篇 · PCB 与制造 | i.MX6ULL 学习手册</title>
+<meta name="description" content="算平面电容、分割平面的原则、铜箔与过孔的热阻，给出 SoC/LDO/DCDC 的散热设计方法与本板可对照的实例。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第五篇 · PCB 与制造</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第五篇 · PCB</span><span class="sep">/</span>第 6 章<span class="sep">/</span>约 55 分钟</div>
+    <h1>电源平面与散热：平板电容、铜箔热阻、过孔阵列</h1>
+    <p class="lede">电源平面有两个身份：<b>供电网络</b>和<b>高频电容</b>；同时它还是<b>散热器</b>。这一章把三个身份都算成数字：0.4nF 的平板电容、74K/W 的铜箔、176K/W 的单孔。</p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>算两层铜构成的平板电容，解释它为什么能管 100MHz 以上</li>
+        <li>决定哪些平面要分割、哪些绝对不能分割</li>
+        <li>用 R=L/(kA) 算铜箔与过孔的热阻</li>
+        <li>为 SoC、LDO、DCDC 分别设计散热路径</li>
+        <li>用热像仪验证散热设计是否达标</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">5.6.1</span>平板电容：免费的高频电容</h2>
+    <p>两层平行铜就是电容：</p>
+    <p style="text-align:center">C = ε<sub>0</sub>·ε<sub>r</sub>·A/d</p>
+    <p>取 10cm² 面积（0.001m²）、介质厚 0.1mm、ε<sub>r</sub>=4.3：</p>
+    <p style="text-align:center">C = 8.854e-12×4.3×0.001/1e-4 ≈ <b>0.38 nF</b></p>
+    <p>0.38nF 在 100MHz 时阻抗 = 1/(2π×100M×0.38n) = <b>4.2Ω</b>——不算低，但关键在于它的 <b>ESL 极低</b>（<0.1nH），而 0402 电容在 100MHz 已经呈感性（0.5nH→31Ω）。所以高频段平面比电容更有效。</p>
+    <p>推论：<b>L2 地与 L3 电源要尽量贴近</b>（介质越薄，C 越大），且不要在两平面之间走信号（会挖洞减少面积）。</p>
+
+    <h2><span class="n">5.6.2</span>分割原则：地不分割，电源按域分割</h2>
+    <ul>
+      <li><b>地平面整片不分割</b>：所有回流共用，分割会切断回流。唯一例外是「模拟地/数字地」，且要单点连接（本板 ADC 参考与主地之间用 0Ω 或磁珠）。</li>
+      <li><b>电源平面按电压域分割</b>：3.3V、1.35V、5V 各自一块，缝宽 ≥0.3mm。</li>
+      <li><b>分割缝不要走线</b>：缝下方的信号没有参考平面，阻抗失控。</li>
+      <li><b>跨域信号要缝合</b>：如 3.3V 域的 IO 与 1.35V 域的 DDR 之间有信号，需在跨点放缝合电容。</li>
+    </ul>
+    <p>本板 CORE 的 L3 上有 DRAM_1V35、DCDC_3V3、NVCC_SD 等多块分割——这是必要的，因为电压不同；但 DDR 信号走 L1/L4，参考 L2 地，避开了分割缝。</p>
+
+    <h2><span class="n">5.6.3</span>铜箔热阻：横向散热</p>
+    <p>热量在铜箔里横向扩散，热阻：</p>
+    <p style="text-align:center">R<sub>θ</sub> = L/(k·w·t)</p>
+    <p>铜的 k=385 W/(m·K)。取 1oz（t=35µm）、10mm 长、10mm 宽：</p>
+    <p style="text-align:center">R = 0.01/(385×0.01×3.5e-5) = 0.01/1.35e-4 ≈ <b>74 K/W</b></p>
+    <p>也就是说，1W 热量经 1cm 铜箔散出，温升 74°C——铜箔不是「超导体」，短距离还行，长距离散热迅速失效。</p>
+    <p>这就是为什么散热要「就近大面积铺铜 + 打过孔到内层」，而不是「拉一条长铜线到板边」。</p>
+
+    <h2><span class="n">5.6.4</span>过孔热阻：垂直通路</p>
+    <p>单个 0.3mm 孔、25µm 镀铜、板厚 1.6mm：</p>
+    <p style="text-align:center">A = π×0.3×0.025 = 0.0236 mm²<br>
+      R = 0.0016/(385×2.36e-8) ≈ <b>176 K/W</b></p>
+    <p>10 个并联 → 17.6K/W；20 个 → 8.8K/W。所以 SoC 底部散热焊盘通常打 <b>16–25 个过孔</b>，不是为了载流，是为了导热。</p>
+    <p>注意：过孔要「填铜/树脂塞孔」才有好的导热，普通过孔内部是空腔 + 薄镀层，热阻比理论值高。</p>
+
+    <h2><span class="n">5.6.5</span>三类器件的散热路径</h2>
+    <table>
+      <thead><tr><th>器件</th><th>主要热路径</th><th>本板做法</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">SoC（BGA）</td><td>芯片 → 焊球 → PCB 内层地 → 空气</td><td>底部散热焊盘 + 多过孔到 L2 地；BGA 下方铺铜</td></tr>
+        <tr><td class="nm">DCDC（SOT-23-6）</td><td>结 → 引脚 → 焊盘 → 铜箔</td><td>GND 脚铜箔 ≥25mm²；SW 脚不要大面积铜（噪声）</td></tr>
+        <tr><td class="nm">LDO（SOT-23）</td><td>结 → GND 脚 → 铜箔</td><td>GND 脚周围 25–100mm² 铜（4.3 节算过）</td></tr>
+      </tbody>
+    </table>
+    <p>一个常被忽略的点：<b>散热铜箔要连到内层地，而不是孤立在顶层</b>。孤立铜箔只能靠空气对流，热阻高一个量级。</p>
+
+    <h2><span class="n">5.6.6</span>实测：热像仪怎么用</h2>
+    <ol>
+      <li>设置发射率：PCB 绿油约 0.9，金属焊盘约 0.1（不设对会读低 30°C 以上）；</li>
+      <li>满载运行 15 分钟到热平衡；</li>
+      <li>读 SoC、DCDC、LDO、PHY 四处温度；</li>
+      <li>判据：SoC 壳温 &lt;85°C、DCDC &lt;100°C、LDO &lt;90°C（环境 40°C）。</li>
+    </ol>
+    <p>若 LDO 超过 90°C，先按 4.3 节算结温，再决定「加铜箔 / 降电流 / 换封装」三选一。</p>
+
+    <div class="demo">
+      <div class="dh"><b>铜箔 / 过孔热阻计算器</b><span>算铜箔横向热阻、N 个过孔的并联热阻、1W 下的温升</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div><div class="lbl">铜箔长 <b id="lv">10</b> mm</div><input id="l" class="r" type="range" min="2" max="50" step="1" value="10"></div>
+          <div><div class="lbl">铜箔宽 <b id="wv">10</b> mm</div><input id="w" class="r" type="range" min="2" max="50" step="1" value="10"></div>
+          <div><div class="lbl">铜厚 <b id="tv">1</b> oz</div><input id="t" class="r" type="range" min="0.5" max="3" step="0.5" value="1"></div>
+          <div><div class="lbl">过孔数 <b id="nv">16</b></div><input id="n" class="r" type="range" min="1" max="40" step="1" value="16"></div>
+          <div><div class="lbl">功耗 <b id="pv">1.0</b> W</div><input id="p" class="r" type="range" min="0.1" max="5" step="0.1" value="1"></div>
+        </div>
+        <div id="thOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h3>练习</h3>
+    <details class="quiz"><summary>1. 10cm²、0.1mm、ε<sub>r</sub>=4.3 的平板电容多少？</summary><div class="ans">约 0.38nF。</div></details>
+    <details class="quiz"><summary>2. 为什么地平面不能分割？</summary><div class="ans">回流共用，分割会切断回流路径，阻抗与辐射恶化。</div></details>
+    <details class="quiz"><summary>3. 1oz 铜、10×10mm 的横向热阻？</summary><div class="ans">约 74K/W。</div></details>
+    <details class="quiz"><summary>4. 单个 0.3mm 过孔的热阻？16 个并联？</summary><div class="ans">约 176K/W；16 个并联约 11K/W。</div></details>
+    <details class="quiz"><summary>5. SoC 底部为什么打 16–25 个过孔？</summary><div class="ans">导热到内层地，单靠顶层铜箔无法散出。</div></details>
+    <details class="quiz"><summary>6. 热像仪为什么必须先设发射率？</summary><div class="ans">发射率错会把金属或绿油温度读低 30°C 以上。</div></details>
+
+    <div class="ch-nav">
+      <a href="c05.html"><span>上一篇</span><b>← 5.5 DDR 布线专题</b></a>
+      <a class="nx" id="chNavNext" href="c07.html"><span>下一章</span><b>5.7 DRC 与 DFM →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p5','c06.html');
+(function(){
+  function calc(){
+    var L=+document.getElementById('l').value/1000, W=+document.getElementById('w').value/1000;
+    var oz=+document.getElementById('t').value, t=oz*35e-6;
+    var n=+document.getElementById('n').value, P=+document.getElementById('p').value;
+    var Rcu=L/(385*W*t);
+    var Rvia=0.0016/(385*(Math.PI*0.3e-3*25e-6));
+    document.getElementById('lv').textContent=(L*1000).toFixed(0);
+    document.getElementById('wv').textContent=(W*1000).toFixed(0);
+    document.getElementById('tv').textContent=oz.toFixed(1);
+    document.getElementById('nv').textContent=n;
+    document.getElementById('pv').textContent=P.toFixed(1);
+    document.getElementById('thOut').innerHTML=
+      '铜箔横向热阻 = L/(k·w·t) = <b style="color:#5ff1ef">'+Rcu.toFixed(0)+' K/W</b>，'+P+'W 时 ΔT≈'+(P*Rcu).toFixed(0)+'°C<br>'+
+      '单孔热阻 ≈ <b style="color:#5ff1ef">'+Rvia.toFixed(0)+' K/W</b>，'+n+' 孔并联 ≈ '+(Rvia/n).toFixed(1)+' K/W，'+P+'W 时 ΔT≈'+(P*Rvia/n).toFixed(1)+'°C<br>'+
+      '合计（并联）≈ <b style="color:#5ff1ef">'+(1/(1/Rcu+1/(Rvia/n))).toFixed(1)+' K/W</b> ⇒ 估算温升 '+(P/(1/Rcu+1/(Rvia/n))).toFixed(0)+'°C';
+  }
+  ['l','w','t','n','p'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .r{width:100%;accent-color:#5ff1ef}
+</style>
+</body>
+</html>
+

@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5.2 叠层与阻抗：4 层怎么定、50Ω 多宽、怎么和板厂谈 | 第五篇 · PCB 与制造 | i.MX6ULL 学习手册</title>
+<meta name="description" content="讲 2/4/6 层叠层的取舍、微带与带状线阻抗公式、50Ω/100Ω 的实际线宽、参考平面与跨分割，以及下单时怎么写阻抗要求。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第五篇 · PCB 与制造</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第五篇 · PCB</span><span class="sep">/</span>第 2 章<span class="sep">/</span>约 55 分钟</div>
+    <h1>叠层与阻抗：4 层怎么定、50Ω 多宽、怎么和板厂谈</h1>
+    <p class="lede">叠层决定了「有没有完整参考平面」，而参考平面决定了阻抗与回流。选错叠层，后面所有布线技巧都失效。这一章讲三种叠层的取舍、两条阻抗公式，并把 50Ω 算成具体的毫米数。</p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>说清 2 层与 4 层的本质差别（不是「多两层」，而是「有完整地平面」）</li>
+        <li>用微带线公式算 50Ω 需要的线宽，并解释 h 与 εr 的影响</li>
+        <li>算 100Ω 差分对的线宽/间距</li>
+        <li>判断「跨分割」为什么会让信号变差，怎么避免</li>
+        <li>在下单备注里写出板厂能执行的阻抗要求</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">5.2.1</span>为什么 2 层板做不了高速信号</h2>
+    <p>2 层板：顶层走信号、底层大多是地，但中间是 1.6mm 厚的 FR4。信号线的参考平面在 1.6mm 之外，线宽要 3mm 才能做到 50Ω——根本布不下。更糟的是，2 层板没有完整地平面，回流路径被走线切断，DDR 这种 400MHz 信号会振铃、串扰。</p>
+    <p>4 层板的标准叠层（自上而下）：</p>
+    <table>
+      <thead><tr><th>层</th><th>用途</th><th>铜厚/介质</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">L1 顶层</td><td>元件 + 关键信号</td><td>1oz / 介质 0.2mm</td></tr>
+        <tr><td class="nm">L2 地</td><td>完整地平面（参考面）</td><td>1oz</td></tr>
+        <tr><td class="nm">L3 电源</td><td>3.3V/1.35V 分割</td><td>1oz</td></tr>
+        <tr><td class="nm">L4 底层</td><td>次关键信号 + 接口</td><td>1oz / 介质 0.2mm</td></tr>
+      </tbody>
+    </table>
+    <p>L2 完整地平面是核心：L1 的微带线以 L2 为参考，L4 的微带线以 L3 为参考（所以 L3 电源平面必须整片、少分割）。L2 与 L3 间距小（约 0.4–0.6mm），构成天然平板电容，这就是第四篇说的「高频低阻通路」。</p>
+
+    <h2><span class="n">5.2.2</span>微带线阻抗：一条公式</h2>
+    <p>表层走线（一边是空气、一边是介质）叫微带线，IPC-2141 近似：</p>
+    <p style="text-align:center">Z<sub>0</sub> = (87/√(ε<sub>r</sub>+1.41)) · ln(5.98h/(0.8w+t))</p>
+    <p>h 是到参考平面距离，w 线宽，t 铜厚。代入本板 4 层参数（ε<sub>r</sub>=4.3、h=0.2mm、t=0.035mm）：</p>
+    <p style="text-align:center">w=0.35mm → 5.98h=1.196，0.8w+t=0.315，比值 3.80，ln=1.335<br>
+      Z<sub>0</sub>=87/2.39×1.335 ≈ <b>48.6 Ω</b></p>
+    <p>所以 <b>0.35mm 线宽 ≈ 50Ω</b>。若板厂用的是 0.18mm 介质（更薄的半固化片），同样 50Ω 只需 0.30mm 宽。这就是为什么「50Ω 线宽」不能抄别人的板——必须按自己的叠层算。</p>
+    <p>敏感性：h 增加 10%，Z<sub>0</sub> 增加约 6%；ε<sub>r</sub> 从 4.3 变 4.0，Z<sub>0</sub> 增加约 5%。所以板厂的介质厚度公差 ±10% 会带来约 ±6% 阻抗偏差——这就是「阻抗控制 ±10%」的来源，想要 ±5% 就要加钱选高精度叠层。</p>
+
+    <h2><span class="n">5.2.3</span>差分 100Ω：间距是关键</h3>
+    <p>USB、以太网、DDR 时钟都是差分。差分阻抗近似：</p>
+    <p style="text-align:center">Z<sub>diff</sub> ≈ 2Z<sub>0</sub>(1 − 0.48·e<sup>−0.96s/h</sup>)</p>
+    <p>s 是两线间距。若单端 50Ω、s=0.2mm、h=0.2mm：e<sup>−0.96</sup>=0.383 ⇒ Z<sub>diff</sub>=2×50×(1−0.184)=<b>81.6Ω</b>，偏低。要 100Ω 就得加大 s 或减小 w：</p>
+    <table>
+      <thead><tr><th>w (mm)</th><th>s (mm)</th><th>Z<sub>diff</sub></th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">0.35</td><td>0.20</td><td>82Ω</td><td>偏紧，USB 勉强</td></tr>
+        <tr><td class="nm">0.30</td><td>0.25</td><td>91Ω</td><td>接近</td></tr>
+        <tr><td class="nm">0.25</td><td>0.30</td><td>99Ω</td><td>本板网口/USB 取法</td></tr>
+      </tbody>
+    </table>
+    <p>本板 ENET 的 RMII 是单端 50Ω（不是差分），只有 TX±/RX± 走差分；USB D+/D- 是 90Ω 差分。注意：差分对的两根线必须<b>等长、等间距、同层</b>，中间不能插别的线。</p>
+
+    <h2><span class="n">5.2.4</span>参考平面与跨分割：最容易犯的错</h2>
+    <p>信号电流回流总是走「阻抗最低路径」，在高频下就是<b>参考平面上正下方的镜像电流</b>。如果参考平面被分割（比如地平面被一条电源槽切开），回流被迫绕路，产生：</p>
+    <ul>
+      <li>回流路径变长 → 电感增加 → 边沿变慢、振铃；</li>
+      <li>回流绕行处形成天线 → 辐射超标；</li>
+      <li>跨分割的线与相邻线串扰剧增。</li>
+    </ul>
+    <p>三条对策：</p>
+    <ol>
+      <li>关键信号（DDR、USB、ENET）只走在「参考平面完整」的层；</li>
+      <li>必须跨分割时，在跨点附近放「缝合电容」（0.1µF）连接两个平面；</li>
+      <li>分割平面之间保证间距 ≥0.3mm，且不要在分割缝上走线。</li>
+    </ol>
+    <p>本板 CORE 的 1.35V 与 3.3V 在 L3 上分割，DDR 信号走在 L1/L4，参考的是 L2 完整地——这是正确做法。若把 DDR 走在 L3，就会遇到分割缝，DDR 训练必然不稳。</p>
+
+    <h2><span class="n">5.2.5</span>和板厂谈：备注怎么写</h2>
+    <p>不要写「阻抗 50Ω」四个字就完事，板厂需要可执行的信息：</p>
+    <ul>
+      <li><b>叠层表</b>：每层铜厚、介质型号/厚度（如 L1-L2：2116×2，0.2mm）；</li>
+      <li><b>阻抗要求</b>：L1 单端 50Ω±10%（线宽 0.35mm）；L1 差分 100Ω±10%（0.25/0.30mm）；</li>
+      <li><b>测试方式</b>：TDR 测试条（coupon），要求提供报告；</li>
+      <li><b>板厚</b>：1.6mm±10%，翘曲 ≤0.5%。</li>
+    </ul>
+    <p>嘉立创等厂有「阻抗计算器」页面，可以直接选叠层、填线宽，生成可下单的参数——比自己算更可靠，因为他们的介质型号是固定的。</p>
+
+    <div class="demo">
+      <div class="dh"><b>微带 / 差分阻抗计算器</b><span>改 h、ε<sub>r</sub>、w、t、s，实时算 Z<sub>0</sub> 与 Z<sub>diff</sub></span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div><div class="lbl">介质厚 h <b id="hv">0.20</b> mm</div><input id="h" class="r" type="range" min="0.05" max="0.6" step="0.01" value="0.2"></div>
+          <div><div class="lbl">ε<sub>r</sub> <b id="erv">4.3</b></div><input id="er" class="r" type="range" min="3" max="6" step="0.1" value="4.3"></div>
+          <div><div class="lbl">线宽 w <b id="wv">0.35</b> mm</div><input id="w" class="r" type="range" min="0.1" max="1" step="0.01" value="0.35"></div>
+          <div><div class="lbl">铜厚 t <b id="tv">0.035</b> mm</div><input id="t" class="r" type="range" min="0.018" max="0.07" step="0.001" value="0.035"></div>
+          <div><div class="lbl">差分间距 s <b id="sv">0.25</b> mm</div><input id="s" class="r" type="range" min="0.05" max="0.6" step="0.01" value="0.25"></div>
+        </div>
+        <div id="impOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h3>练习</h3>
+    <details class="quiz"><summary>1. 4 层板的核心优势是什么？</summary><div class="ans">有完整地平面作参考，阻抗可控、回流路径连续。</div></details>
+    <details class="quiz"><summary>2. h=0.2mm、ε<sub>r</sub>=4.3、w=0.35mm，Z<sub>0</sub> 多少？</summary><div class="ans">约 48.6Ω，接近 50Ω。</div></details>
+    <details class="quiz"><summary>3. 为什么 50Ω 线宽不能照抄别的板？</summary><div class="ans">线宽由 h 与 ε<sub>r</sub> 决定，叠层不同则线宽不同。</div></details>
+    <details class="quiz"><summary>4. 跨分割为什么会让信号变差？</summary><div class="ans">回流被迫绕行，电感增大、振铃、辐射。</div></details>
+    <details class="quiz"><summary>5. 差分 100Ω 主要靠调什么？</summary><div class="ans">间距 s 与线宽 w，两者都增大/减小时 Z<sub>diff</sub> 变化。</div></details>
+    <details class="quiz"><summary>6. 下单备注里最少要写哪四项？</summary><div class="ans">叠层表、阻抗要求与线宽、TDR 测试条、板厚与翘曲。</div></details>
+
+    <div class="ch-nav">
+      <a href="c01.html"><span>上一篇</span><b>← 5.1 库与封装</b></a>
+      <a class="nx" id="chNavNext" href="c03.html"><span>下一章</span><b>5.3 布局 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p5','c02.html');
+(function(){
+  function calc(){
+    var h=+document.getElementById('h').value, er=+document.getElementById('er').value;
+    var w=+document.getElementById('w').value, t=+document.getElementById('t').value, s=+document.getElementById('s').value;
+    var z0=87/Math.sqrt(er+1.41)*Math.log(5.98*h/(0.8*w+t));
+    var zdiff=2*z0*(1-0.48*Math.exp(-0.96*s/h));
+    document.getElementById('hv').textContent=h.toFixed(2);
+    document.getElementById('erv').textContent=er.toFixed(1);
+    document.getElementById('wv').textContent=w.toFixed(2);
+    document.getElementById('tv').textContent=t.toFixed(3);
+    document.getElementById('sv').textContent=s.toFixed(2);
+    var cls=Math.abs(z0-50)<5?'#9ff5c0':'#ffd79a';
+    document.getElementById('impOut').innerHTML=
+      '单端微带 Z<sub>0</sub> = 87/√(ε<sub>r</sub>+1.41)·ln(5.98h/(0.8w+t)) = <b style="color:'+cls+'">'+z0.toFixed(1)+' Ω</b><br>'+
+      '差分 Z<sub>diff</sub> ≈ 2Z<sub>0</sub>(1−0.48e<sup>−0.96s/h</sup>) = <b style="color:#5ff1ef">'+zdiff.toFixed(1)+' Ω</b><br>'+
+      '要达到 50Ω，建议线宽 ≈ <b style="color:#5ff1ef">'+ (w*50/z0).toFixed(2) +' mm</b>（按线性缩放粗估，最终以板厂计算器为准）<br>'+
+      '要达到 100Ω 差分，建议 s ≈ <b style="color:#5ff1ef">'+(h*Math.log(0.48/(1-100/(2*z0)))/(-0.96)).toFixed(2)+' mm</b>（同 w 下反解）';
+  }
+  ['h','er','w','t','s'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .r{width:100%;accent-color:#5ff1ef}
+</style>
+</body>
+</html>
+
+

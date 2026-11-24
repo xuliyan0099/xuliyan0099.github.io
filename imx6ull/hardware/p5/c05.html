@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5.5 DDR3L 布线专题：单颗粒点对点、等长预算、VREF 与 ZQ | 第五篇 · PCB 与制造 | i.MX6ULL 学习手册</title>
+<meta name="description" content="以本板 U5 NT5CC256M16EP 单颗粒点对点拓扑为例，给 DDR3L 的分组、等长预算、3W 串扰、VREF/ZQ 走线与 ODT 设置，附实测与故障判据。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第五篇 · PCB 与制造</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第五篇 · PCB</span><span class="sep">/</span>第 5 章<span class="sep">/</span>约 65 分钟</div>
+    <h1>DDR3L 布线专题：单颗粒点对点、等长预算、VREF 与 ZQ</h1>
+    <p class="lede">DDR 是整块板最难的布线。<b>但它也是最「规则化」的</b>：分组、等长、阻抗、参考平面、串扰，五件事都有明确数字。本板是单颗粒 x16 点对点，比 fly-by 简单一个量级——正好用来把规则学扎实。</p>
+
+    <figure class="fig sch">
+      <div class="scroller"><img src="../../assets/img/sch/core_p3_ddr.png" alt="CORE 第 3 页 DDR3L 全部信号与 VREF/ZQ 电路" class="tall"></div>
+      <figcaption>CORE 第 3 页（300dpi）：U5 NT5CC256M16EP-EK 的 96 个球。左侧地址/命令组（ADDR0–14、BA0–2、CS/RAS/CAS/WE、ODT、CLK±、CKE、RESET），右侧数据组（DQ0–15、DQS±、DM），右下 VREF 分压与 ZQ 240Ω。</figcaption>
+    </figure>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>把 DDR 信号正确分为「地址命令组」与「数据组」，并说出各组参考谁</li>
+        <li>算 400MHz 下的等长预算（mm 与 ps 互换）</li>
+        <li>解释点对点为什么不需要 fly-by 的蛇形补偿</li>
+        <li>处理 VREF、ZQ、ODT 三个「非信号」但致命的网络</li>
+        <li>用 memtester + 降频 + 示波器三步定位 DDR 故障</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">5.5.1</span>先算清楚速率</h2>
+    <p>本板 DDR3L-1600 颗粒（NT5CC256M16EP-EK 标称 1600Mbps），但 i.MX6ULL 的 MMDC 最高 400MHz 时钟（DDR-800，800Mbps）。取 400MHz：</p>
+    <p style="text-align:center">t<sub>CK</sub> = 1/400MHz = <b>2.5 ns</b>（一个时钟周期）</p>
+    <p>数据在双边沿采样，所以 DQ 的「单位间隔」UI = 1.25ns。等长容差通常取 UI 的 10–20%，即 <b>125–250ps</b>，换算长度 19–37mm——看起来宽松，但这是「组内相对偏差」，不是绝对值。</p>
+
+    <h2><span class="n">5.5.2</span>分组：三组信号，三种规则</h2>
+    <table>
+      <thead><tr><th>组</th><th>成员</th><th>参考</th><th>关键规则</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">地址/命令组</td><td>ADDR0–14、BA0–2、CS/RAS/CAS/WE、CKE、ODT、RESET</td><td>相对 SDCLK</td><td>组内等长 ±0.1ns；相对时钟 ±0.3ns</td></tr>
+        <tr><td class="nm">数据组</td><td>DQ0–15、DQS0/1±、DM0/1</td><td>相对各自 DQS</td><td>DQ 与 DQS 等长 ±0.1ns；DQS 差分对内 ±20ps</td></tr>
+        <tr><td class="nm">时钟</td><td>SDCLK0_P/N</td><td>自身差分</td><td>100Ω 差分、对内 ±20ps、远离 DQ</td></tr>
+      </tbody>
+    </table>
+    <p>本板只有一个颗粒（x16），所以 <b>DQS0 对应 DQ0–7、DQS1 对应 DQ8–15</b>，两组分别等长，不要跨组比。</p>
+
+    <h2><span class="n">5.5.3</span>点对点 vs fly-by</h2>
+    <p>多颗粒 DDR3 常用 fly-by：地址/命令/时钟沿一条「飞线」依次经过每个颗粒，再用「读/写均衡」补偿各颗粒的到达时间差。这种拓扑的地址线要绕蛇形，且每个颗粒的 ODT 时序不同。</p>
+    <p>本板单颗粒：<b>点对点</b>，SoC 的每个 DDR 球到颗粒的对应球只有一条路径，没有分支、没有负载差。好处：</p>
+    <ul>
+      <li>地址组不需要 fly-by 的蛇形补偿，只要组内等长；</li>
+      <li>ODT 只有一个颗粒，静态设置即可；</li>
+      <li>串扰源少，3W 就够。</li>
+    </ul>
+    <p>代价是：换板加颗粒就要重做拓扑——这也是为什么「一块板只能一种 DDR 配置」。</p>
+
+    <h2><span class="n">5.5.4</span>等长预算：从 ps 到 mm</h2>
+    <p>表层微带传播延迟约 <b>160mm/ns</b>（6.25ps/mm），内层带状线约 170mm/ns（5.9ps/mm）。取 6ps/mm 估算：</p>
+    <table>
+      <thead><tr><th>约束</th><th>ps</th><th>mm</th><th>实现</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">DQ ↔ DQS</td><td>±100ps</td><td>±16mm</td><td>蛇形绕线，误差 ≤10mm 更稳</td></tr>
+        <tr><td class="nm">DQS 差分对内</td><td>±20ps</td><td>±3mm</td><td>两根线同层、平行、等宽</td></tr>
+        <tr><td class="nm">地址组相对时钟</td><td>±300ps</td><td>±50mm</td><td>组内先等长，再整体对齐</td></tr>
+        <tr><td class="nm">SDCLK 对内</td><td>±20ps</td><td>±3mm</td><td>差分对严格等长</td></tr>
+      </tbody>
+    </table>
+    <p>工程做法：先用「最长的 DQS」定基准，所有 DQ 绕到与它等长；地址组用「时钟线」定基准。绕线用「小振幅蛇形」（段长 ≥3 倍线宽、间距 ≥3W），不要用大波浪（会引入阻抗不连续）。</p>
+
+    <h2><span class="n">5.5.5</span>VREF、ZQ、ODT：三条容易毁掉一切的线</h2>
+    <ul>
+      <li><b>VREF（0.675V）</b>：由 R54/R55 1.5K 分压 + C65 22µF + C66 104。走线要求：<b>细、短、包地</b>，且远离 DQ/DQS 与时钟。VREF 上的 10mV 噪声会直接变成采样判决错误。VREFCA（M8）与 VREFDQ（H1）各并 224（C53/C54）。</li>
+      <li><b>ZQ（240Ω ±1%）</b>：R48/R49 接 ZQ0/ZQ1，R52 240Ω 接 ZQPAD。这是输出阻抗校准基准，<b>不能用 5% 电阻，不能走长线</b>，必须紧贴球。</li>
+      <li><b>ODT</b>：R50/R51 10K 下拉保证复位期间确定电平；正常由控制器驱动。ODT 阻值（Rtt）由 MMDC 寄存器配置，与颗粒的 ODT 球相连。</li>
+    </ul>
+    <p>这三条线的共同点：<b>它们不传数据，但决定数据能不能被正确采样</b>。新手往往花 90% 精力在 DQ 等长，却把 VREF 走在 DQS 旁边——结果就是「跑 memtest 随机错一位」。</p>
+
+    <h2><span class="n">5.5.6</span>实测：三步定位 DDR 故障</h2>
+    <ol>
+      <li><b>memtester 压力测试</b>：<code>memtester 400M 10</code>，跑 10 轮。判据：0 错误。有错就是硬件或时序问题。</li>
+      <li><b>降频对比</b>：把 DDR 从 400MHz 降到 200MHz 再测。若错误消失，是时序/等长问题；若仍错，是电源/VREF/焊接问题。</li>
+      <li><b>示波器看眼图</b>：用差分探头测 DQS 与 DQ，看建立/保持窗口。400MHz 下眼宽应 &gt;0.6UI（0.75ns）。</li>
+    </ol>
+    <p>故障判据表：</p>
+    <table>
+      <thead><tr><th>现象</th><th>最可能原因</th><th>验证</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">训练阶段就失败（不启动）</td><td>时钟/CS/地址错、焊接虚</td><td>量 SDCLK 有无、检查 BGA 焊接</td></tr>
+        <tr><td class="nm">启动正常、压力测试错位</td><td>DQ/DQS 等长超差、串扰</td><td>降频测试；查蛇形长度</td></tr>
+        <tr><td class="nm">随机整字节错</td><td>某根 DQ 虚焊/开路</td><td>逐位测试定位</td></tr>
+        <tr><td class="nm">高温才出错</td><td>VREF 漂移、ODT 阻抗变化</td><td>热风加热对比</td></tr>
+        <tr><td class="nm">换板就好</td><td>PCB 阻抗/叠层偏差</td><td>要求板厂提供 TDR 报告</td></tr>
+      </tbody>
+    </table>
+
+    <div class="demo">
+      <div class="dh"><b>DDR 等长预算计算器</b><span>给时钟频率与容差比例，算 ps/mm 预算；给长度差算时序偏差</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+          <div><div class="lbl">时钟 <b id="fv">400</b> MHz</div><input id="f" class="r" type="range" min="100" max="800" step="10" value="400"></div>
+          <div><div class="lbl">容差 <b id="pv">15</b> % UI</div><input id="p" class="r" type="range" min="5" max="30" step="1" value="15"></div>
+          <div><div class="lbl">层类型</div><select id="ly" class="inp"><option value="6.25">表层微带 6.25ps/mm</option><option value="5.9" selected>内层带状 5.9ps/mm</option></select></div>
+          <div><div class="lbl">实测长度差 <b id="dlv">12</b> mm</div><input id="dl" class="r" type="range" min="0" max="60" step="1" value="12"></div>
+        </div>
+        <div id="ddrOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h3>练习</h3>
+    <details class="quiz"><summary>1. 400MHz 的 t<sub>CK</sub> 与 UI 各是多少？</summary><div class="ans">t<sub>CK</sub>=2.5ns；DDR 双边沿，UI=1.25ns。</div></details>
+    <details class="quiz"><summary>2. DQ ↔ DQS 的容差 ±100ps 对应多少 mm？</summary><div class="ans">按 6ps/mm，约 ±16mm。</div></details>
+    <details class="quiz"><summary>3. 本板为什么不需要 fly-by 蛇形补偿？</summary><div class="ans">单颗粒点对点，无分支、无负载差。</div></details>
+    <details class="quiz"><summary>4. VREF 为什么不能走在 DQS 旁边？</summary><div class="ans">高速线耦合噪声进 VREF，直接改变采样判决门限。</div></details>
+    <details class="quiz"><summary>5. ZQ 电阻为什么必须 1%？</summary><div class="ans">它是输出阻抗校准基准，误差直接变成 ODT/驱动阻抗误差。</div></details>
+    <details class="quiz"><summary>6. memtest 错一位，怎么一步步定位？</summary><div class="ans">先降频（分离时序/电源），再逐位测试定位 DQ，最后示波器看眼图。</div></details>
+    <details class="quiz"><summary>7. 绕线蛇形段长为什么要 ≥3 倍线宽？</summary><div class="ans">避免小段产生阻抗不连续与额外串扰。</div></details>
+
+    <div class="ch-nav">
+      <a href="c04.html"><span>上一篇</span><b>← 5.4 布线</b></a>
+      <a class="nx" id="chNavNext" href="c06.html"><span>下一章</span><b>5.6 电源平面与散热 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p5','c05.html');
+(function(){
+  function calc(){
+    var f=+document.getElementById('f').value, pct=+document.getElementById('p').value;
+    var psmm=+document.getElementById('ly').value, dl=+document.getElementById('dl').value;
+    var tck=1000/f, ui=tck/2, budget=ui*pct/100;
+    var mm=budget/psmm;
+    document.getElementById('fv').textContent=f;
+    document.getElementById('pv').textContent=pct;
+    document.getElementById('dlv').textContent=dl;
+    var drift=dl*psmm;
+    document.getElementById('ddrOut').innerHTML=
+      't<sub>CK</sub> = 1/f = '+(tck).toFixed(3)+' ns，UI = '+(ui*1000).toFixed(0)+' ps<br>'+
+      '等长预算 = UI×'+pct+'% = <b style="color:#5ff1ef">'+budget.toFixed(0)+' ps</b> ≈ <b style="color:#5ff1ef">'+mm.toFixed(1)+' mm</b><br>'+
+      '实测长度差 '+dl+'mm ⇒ 时序偏差 <b style="color:'+(drift>budget?'#ff8f80':'#9ff5c0')+'">'+drift.toFixed(0)+' ps</b> '+(drift>budget?'超预算，需绕线补偿':'在预算内');
+  }
+  ['f','p','ly','dl'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  document.getElementById('ly').addEventListener('change',calc);
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .r{width:100%;accent-color:#5ff1ef}
+.demo .inp{width:100%;background:#0a1020;color:#5ff1ef;border:1px solid #2a3a55;border-radius:8px;padding:6px}
+</style>
+</body>
+</html>
+

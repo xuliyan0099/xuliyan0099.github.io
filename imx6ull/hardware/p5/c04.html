@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5.4 布线：阻抗连续、回流、过孔、串扰的七条规则 | 第五篇 · PCB 与制造 | i.MX6ULL 学习手册</title>
+<meta name="description" content="讲阻抗连续性、回流路径、过孔载流与残桩、3W 串扰规则、差分等长与时序换算，每条都给可算的数字与本板实例。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第五篇 · PCB 与制造</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第五篇 · PCB</span><span class="sep">/</span>第 4 章<span class="sep">/</span>约 60 分钟</div>
+    <h1>布线：阻抗连续、回流、过孔、串扰的七条规则</h1>
+    <p class="lede">布线不是「把网表连通」，而是<b>让每条线的电磁环境保持一致</b>。这一章给七条可判定的规则，每条都配得上一个数字：3W 的 −20dB、1.8A 的过孔、6.7ps/mm 的时序。</p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>说清「阻抗不连续」的三种来源，并知道怎么避免</li>
+        <li>算过孔载流与过孔电感，决定大电流要打几个孔</li>
+        <li>用 3W 规则把串扰压到 −20dB 以下，并算出间距</li>
+        <li>把「等长」换算成时间偏差，判断 DDR/USB 的容差</li>
+        <li>处理层间切换与参考平面切换时的回流问题</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">5.4.1</span>规则一：阻抗连续</h2>
+    <p>阻抗突变会引起反射，反射系数：</p>
+    <p style="text-align:center">Γ = (Z<sub>2</sub>−Z<sub>1</sub>)/(Z<sub>2</sub>+Z<sub>1</sub>)</p>
+    <p>50Ω 线上遇到 30Ω（线宽突然变宽）：Γ=(30−50)/80=−0.25，即 25% 反射。三种常见突变：</p>
+    <ol>
+      <li><b>线宽变化</b>：从 BGA 焊盘出的细线（0.15mm）到常规线（0.35mm），中间没有渐变；</li>
+      <li><b>参考平面缺失</b>：走线下方地平面被挖空（比如为了避让过孔）；</li>
+      <li><b>连接器/排针</b>：排针的寄生电容电感与 50Ω 不匹配。</li>
+    </ol>
+    <p>对策：线宽变化处用「阶梯过渡」（每段 ≤1/10 波长）；平面挖空处补「桥」；高速信号避免走排针（本板的 2×24 排针只走低速 IO）。</p>
+
+    <h2><span class="n">5.4.2</span>规则二：过孔——载流、电感、残桩</h2>
+    <p><b>载流</b>：0.3mm 孔径、25µm 镀铜，环形截面积 ≈ π×0.3×0.025 = 0.0236mm²（约 37mil²）。按 IPC-2221、ΔT=10°C：</p>
+    <p style="text-align:center">I = 0.048×10<sup>0.44</sup>×37<sup>0.725</sup> ≈ <b>1.8 A/孔</b></p>
+    <p>所以 3A 的电源要打 2–3 个孔（并留余量）。本板 DCDC 输出 1.5A 峰值，用 2–3 个过孔并联是合理的。</p>
+    <p><b>电感</b>：一个通孔约 0.5–0.8nH。高速信号每换一层就多 0.6nH，若换 3 次层，累积 2nH，在 500MHz 时阻抗 6Ω，足以造成可见反射。</p>
+    <p><b>残桩</b>：通孔在离开信号层后仍有未用的铜筒（stub）。stub 长度 L 会在 f=vc/(4L) 处产生谐振（vc 为介质中光速，FR4 约 170mm/ns）。1.6mm 板厚的通孔，若信号走 L1→L2，stub 约 1.4mm，谐振在 30GHz，影响不大；但 3mm 厚背板就要用盲埋孔。</p>
+
+    <h2><span class="n">5.4.3</span>规则三：3W 与串扰</h2>
+    <p>相邻线的容性/感性耦合随间距迅速衰减，近似：</p>
+    <p style="text-align:center">V<sub>xtalk</sub> ∝ 1/(1+(s/h)<sup>2</sup>)</p>
+    <p>s 是线间距，h 是到参考平面距离。当 s=3h（即 3W 规则，h≈w）：</p>
+    <p style="text-align:center">1/(1+9) = 0.1 ⇒ 约 <b>−20dB</b>（10% 耦合）</p>
+    <p>要更低就取 5W（−28dB）或加地线隔离（guard trace，需密集地过孔）。本板 DDR 数据线间距按 3W 以上布，DQS 与时钟旁边留空。</p>
+    <p>注意：3W 是「线边到线边」还是「线中心到线中心」常有争议——按<b>边到边 ≥2 倍线宽</b>（即中心距 3W）执行最稳妥。</p>
+
+    <h2><span class="n">5.4.4</span>规则四：等长与时间偏差</h3>
+    <p>FR4 中信号传播速度约 170mm/ns，即 <b>6.7 ps/mm</b>（表层微带稍快，约 160mm/ns）。</p>
+    <table>
+      <thead><tr><th>接口</th><th>允许偏差</th><th>换算长度</th><th>来源</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">DDR3L 数据组内</td><td>±0.2ns</td><td>±30mm（很宽松）</td><td>400MHz 周期 2.5ns 的 1/10</td></tr>
+        <tr><td class="nm">DDR 时钟差分对</td><td>±20ps</td><td>±3mm</td><td>差分对内偏斜</td></tr>
+        <tr><td class="nm">USB 2.0 D+/D−</td><td>±50ps</td><td>±7mm</td><td>差分对内</td></tr>
+        <tr><td class="nm">RMII TX/RX 组</td><td>±1ns</td><td>±150mm</td><td>50MHz 参考</td></tr>
+      </tbody>
+    </table>
+    <p>「等长」不是绝对值相等，而是<b>组内相对偏差</b>在容差内。所以布线时先布最长的那根（通常是时钟或最外侧数据），其余按它绕线。</p>
+
+    <h2><span class="n">5.4.5</span>规则五：层间切换要「伴随地过孔」</h3>
+    <p>信号从 L1 换到 L4，参考平面从 L2 变成 L3。若 L2 与 L3 不是同一网络（一个是地、一个是电源），回流必须跨过这两个平面之间的电容——而平面间电容只有 nF 级，高频回流几乎断掉。</p>
+    <p>对策：在信号过孔旁 <b>0.5mm 内</b>放一个「地过孔」，连接 L2 与 L3 的地（若 L3 是电源，则放缝合电容）。这叫「回流过孔」。</p>
+
+    <h2><span class="n">5.4.6</span>规则六：电源与地</p>
+    <ul>
+      <li>电源走线用<b>铺铜</b>而不是细线，宽度按 4.1 的 IPC 公式；</li>
+      <li>每个电源引脚旁的去耦电容过孔成对（电源孔 + 地孔）；</li>
+      <li>地平面不要开长槽；必须开槽时，槽的走向垂直于信号流向。</li>
+    </ul>
+
+    <h2><span class="n">5.4.7</span>规则七：可制造性布线</h3>
+    <ul>
+      <li>线到板边 ≥0.3mm，孔到板边 ≥0.5mm；</li>
+      <li>最小线宽/间距按板厂能力（嘉立创常规 5/5mil，进阶 3.5/3.5mil）；</li>
+      <li>过孔不要打在焊盘上（除非树脂塞孔+电镀，成本高）；</li>
+      <li>测试点：每个电源域留一个，直径 ≥1mm，间距 ≥2.54mm 便于探针。</li>
+    </ul>
+
+    <div class="demo">
+      <div class="dh"><b>串扰 / 过孔 / 时序换算器</b><span>算 3W 下的串扰 dB、过孔载流、长度差对应的时间偏差</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+          <div><div class="lbl">间距/高度比 s/h <b id="shv">3.0</b></div><input id="sh" class="r" type="range" min="1" max="10" step="0.1" value="3"></div>
+          <div><div class="lbl">长度差 ΔL <b id="dlv">10</b> mm</div><input id="dl" class="r" type="range" min="0" max="100" step="1" value="10"></div>
+          <div><div class="lbl">过孔孔径 <b id="dv">0.3</b> mm</div><input id="d" class="r" type="range" min="0.15" max="0.6" step="0.05" value="0.3"></div>
+          <div><div class="lbl">镀铜厚 <b id="tv">25</b> µm</div><input id="t" class="r" type="range" min="15" max="50" step="5" value="25"></div>
+        </div>
+        <div id="rtOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h3>练习</h3>
+    <details class="quiz"><summary>1. 50Ω 线遇到 30Ω，反射系数多少？</summary><div class="ans">(30−50)/80=−0.25，即 25%。</div></details>
+    <details class="quiz"><summary>2. 0.3mm 孔、25µm 铜，单孔能过多大电流（10°C）？</summary><div class="ans">约 1.8A。</div></details>
+    <details class="quiz"><summary>3. 3W 规则对应多少串扰？</summary><div class="ans">s/h=3 时 1/(1+9)=0.1，约 −20dB。</div></details>
+    <details class="quiz"><summary>4. 10mm 长度差对应多少 ps？</summary><div class="ans">10×6.7=67ps。</div></details>
+    <details class="quiz"><summary>5. 为什么换层要加地过孔？</summary><div class="ans">参考平面变了，回流需要就近通路，否则高频回流断开。</div></details>
+    <details class="quiz"><summary>6. 电源为什么用铺铜而不是细线？</summary><div class="ans">载流与散热，细线在大电流下温升过高。</div></details>
+
+    <div class="ch-nav">
+      <a href="c03.html"><span>上一篇</span><b>← 5.3 布局</b></a>
+      <a class="nx" id="chNavNext" href="c05.html"><span>下一章</span><b>5.5 DDR 布线专题 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p5','c04.html');
+(function(){
+  function calc(){
+    var sh=+document.getElementById('sh').value, dl=+document.getElementById('dl').value;
+    var d=+document.getElementById('d').value, t=+document.getElementById('t').value/1000;
+    var xt=1/(1+sh*sh), db=20*Math.log10(xt);
+    var area=Math.PI*d*t; // mm2
+    var mil2=area*(1/0.0254)*(1/0.0254);
+    var I=0.048*Math.pow(10,0.44)*Math.pow(mil2,0.725);
+    document.getElementById('shv').textContent=sh.toFixed(1);
+    document.getElementById('dlv').textContent=dl;
+    document.getElementById('dv').textContent=d.toFixed(2);
+    document.getElementById('tv').textContent=(t*1000).toFixed(0);
+    document.getElementById('rtOut').innerHTML=
+      '串扰 ≈ 1/(1+(s/h)<sup>2</sup>) = '+(xt*100).toFixed(1)+'% ⇒ <b style="color:#5ff1ef">'+db.toFixed(1)+' dB</b><br>'+
+      '长度差 '+dl+'mm ⇒ 时序偏差 <b style="color:#5ff1ef">'+(dl*6.7).toFixed(0)+' ps</b><br>'+
+      '过孔截面积 '+(area).toFixed(4)+' mm²（'+mil2.toFixed(1)+' mil²）⇒ 单孔载流 ≈ <b style="color:#5ff1ef">'+I.toFixed(2)+' A</b>(ΔT=10°C)<br>'+
+      '按 ΔT=20°C 约 '+(0.048*Math.pow(20,0.44)*Math.pow(mil2,0.725)).toFixed(2)+' A';
+  }
+  ['sh','dl','d','t'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .r{width:100%;accent-color:#5ff1ef}
+</style>
+</body>
+</html>
+
