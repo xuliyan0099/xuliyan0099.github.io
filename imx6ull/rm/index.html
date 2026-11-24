@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RM 逐章解读 · 计划目录（60 章） | i.MX6ULL 学习手册</title>
+<meta name="description" content="i.MX6ULL 参考手册 Rev.1（4127 页 / 60 章）的逐章解读计划：七篇分组、每章要点与页码、六批写作顺序、每章固定骨架、互动工具与按问题查的热路径表。">
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<style>
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 0 6px}
+.stat{padding:13px 15px;border:1px solid rgba(110,168,254,.22);border-radius:12px;background:rgba(255,255,255,.03)}
+.stat b{display:block;font:700 19px/1.35 ui-monospace,Consolas,monospace;color:#7ee7ff}
+.stat span{display:block;margin-top:4px;font-size:11.5px;color:#8fa3c4}
+
+.rm-part{margin:34px 0 8px;padding-top:22px;border-top:1px solid rgba(120,150,200,.16)}
+.rm-part:first-child{border-top:0;padding-top:0}
+.rm-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 8px}
+.rm-head h2{margin:0;padding:0;border:0;font-size:22px}
+.rm-head h2 small{display:block;margin-top:5px;font:500 11px/1 ui-monospace,Consolas,monospace;letter-spacing:.1em;color:#7f90ad;text-transform:uppercase}
+.rm-head .pk{font:600 11px/1 ui-monospace,Consolas,monospace;letter-spacing:.12em;color:#5ff1ef;border:1px solid rgba(95,241,239,.35);padding:5px 8px;border-radius:6px;white-space:nowrap}
+.rm-head .pc{font:500 11.5px/1 ui-monospace,Consolas,monospace;color:#8fa3c4;margin-left:auto}
+.rm-part .pl{margin:2px 0 0;color:#9fb0c7;font-size:13.5px;line-height:1.85;max-width:74ch}
+.rm-part .psub{margin:7px 0 0;font:500 12px/1.6 ui-monospace,Consolas,monospace;letter-spacing:.04em;color:#6f86a8}
+
+ol.rm-list{list-style:none;margin:16px 0 0;padding:0}
+li.rmrow{margin:0 0 10px}
+li.rmrow>div,li.rmrow>a{
+  display:grid;grid-template-columns:66px 1fr 52px;gap:14px;align-items:start;
+  padding:13px 16px;border:1px solid rgba(110,168,254,.2);border-radius:12px;text-decoration:none;
+  background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012));
+}
+li.rmrow>a:hover{border-color:rgba(95,241,239,.45);transform:translateY(-1px)}
+li.rmrow.pending>div{opacity:.88}
+.rn{font:700 12px/1.6 ui-monospace,Consolas,monospace;letter-spacing:.04em;color:#7ee7ff}
+.rt2 b{display:block;font-size:15.5px;color:#eaf3ff;line-height:1.5}
+.ren{display:block;margin-top:3px;font:500 11.5px/1.65 ui-monospace,Consolas,monospace;color:#7f90ad}
+.rline{display:block;margin-top:6px;font-size:13px;line-height:1.78;color:#b9c6dc}
+.rpts{display:block;margin-top:5px;font-size:12px;line-height:1.75;color:#8fa3c4}
+.rmark{font:600 10.5px/1 ui-monospace,Consolas,monospace;letter-spacing:.06em;padding:5px 6px;border-radius:5px;text-align:center;white-space:nowrap;display:inline-block}
+.table-lv3 td:first-child{width:92px}
+.rmark.read{color:#7ff0c9;border:1px solid rgba(95,241,239,.35);background:rgba(95,241,239,.08)}
+.rmark.table{color:#ffd79a;border:1px solid rgba(255,184,77,.35);background:rgba(255,184,77,.08)}
+.rmark.opt{color:#c8c0ff;border:1px solid rgba(139,123,255,.4);background:rgba(139,123,255,.1)}
+.rst{grid-column:3;justify-self:center;margin-top:7px;font:600 10.5px/1 ui-monospace,Consolas,monospace;color:#5f6c84}
+
+.bt{table-layout:fixed;width:100%}
+.bt td:first-child{white-space:nowrap}
+.bt code{color:#cfe0ff;font-size:12.5px}
+.tools-t td:last-child{width:158px}
+.tblw{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:16px 0 22px;padding-bottom:2px}
+.tblw table{margin:0}
+@media (max-width:720px){
+  .stats{grid-template-columns:1fr 1fr}
+  li.rmrow>div,li.rmrow>a{grid-template-columns:54px 1fr;gap:12px}
+  .rmark{grid-column:2;justify-self:start}
+  .rst{grid-column:2;justify-self:start;margin-top:2px}
+  .rm-head .pc{margin-left:0}
+}
+</style>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">RM 逐章解读 · 60 章</div>
+    <ol>
+      <li><a href="#rule"><span class="no">00</span><span>计划总则<span class="sub">怎么拆、拆到什么粒度</span></span></a></li>
+      <li><a href="#m1"><span class="no">一</span><span>地图与启动<span class="sub">RM01–RM08 · 8 章</span></span></a></li>
+      <li><a href="#m2"><span class="no">二</span><span>时钟、电源与复位<span class="sub">7 章</span></span></a></li>
+      <li><a href="#m3"><span class="no">三</span><span>CPU 平台、内存与存储<span class="sub">12 章</span></span></a></li>
+      <li><a href="#m4"><span class="no">四</span><span>引脚、GPIO 与基础外设<span class="sub">9 章</span></span></a></li>
+      <li><a href="#m5"><span class="no">五</span><span>通信接口<span class="sub">8 章</span></span></a></li>
+      <li><a href="#m6"><span class="no">六</span><span>音视频与显示<span class="sub">10 章</span></span></a></li>
+      <li><a href="#m7"><span class="no">七</span><span>安全、调试与杂项<span class="sub">6 章</span></span></a></li>
+      <li><a href="#batch"><span class="no">▦</span><span>写作批次<span class="sub">六批上线的顺序</span></span></a></li>
+      <li><a href="#template"><span class="no">✎</span><span>每章骨架<span class="sub">八段固定结构</span></span></a></li>
+      <li><a href="#tools"><span class="no">⚙</span><span>互动工具<span class="sub">复用 6 台，新增 12 台</span></span></a></li>
+      <li><a href="#hot"><span class="no">⌕</span><span>按问题查<span class="sub">现象 → 章号</span></span></a></li>
+      <li><a href="#accept"><span class="no">✓</span><span>验收与边界<span class="sub">什么算写完</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="../manual/index.html">← 手册研读 8 篇</a><a href="../hardware/index.html">硬件全书 →</a></div>
+  </aside>
+
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">芯片手册逐章解读</span><span class="sep">/</span>IMX6ULLRM Rev.1 (11/2017)<span class="sep">/</span>60 章 + 附录 A</div>
+    <h1>i.MX6ULL 参考手册：逐章解读</h1>
+    <p class="lede">这本手册 4127 页、60 章，正文 3969 页。它从来不是读物，是字典：写驱动时被一个问题叫出来，查三页就走。所以这套解读也不逐页翻译，而是<b>把每章压成「这一章解决什么问题、关键寄存器是哪几个、代码里长什么样」</b>，厚的章配查表工具，薄的章一页写完。</p>
+
+    <div class="stats">
+      <div class="stat"><b>60 + A</b><span>章条目（正文 60 章）</span></div>
+      <div class="stat"><b><span data-rm-stat="pages">3969 页</span></b><span>正文页数（p159–4127）</span></div>
+      <div class="stat"><b>7 篇</b><span>按「解决哪类问题」分组</span></div>
+      <div class="stat"><b><span data-rm-stat="ready">0 / 60</span></b><span>已上线（本页只交计划）</span></div>
+    </div>
+
+    <h2 id="rule"><span class="n">00</span>计划总则：三条规矩</h2>
+    <div class="goals">
+      <h4>这套解读的三条硬规矩</h4>
+      <ol>
+        <li><b>每章开头只回答一个问题</b>——「这一章在整颗芯片里管哪一段」。回答不出来，这章就不写。</li>
+        <li><b>篇幅跟手册页数脱钩</b>——642 页的 IOMUXC 不逐页抄，只讲 5 类寄存器 + 配一台搜索器；4 页的 MQS 就写一页。手册厚不等于这一章厚。</li>
+        <li><b>每个结论都要有落点</b>——落在一条寄存器读写序列、一段代码、一行 dts，或一次实测（示波器/万用表/串口输出）。没有落点的句子删掉。</li>
+      </ol>
+    </div>
+    <p><b>页码口径：</b>本页所有页码都是 <code>IMX6ULLRM Rev.1</code> 这份 PDF 的物理页，与页脚印刷页码一致（正文自 p159 起）。你在 PDF 阅读器里直接跳这个数就能到；不要用目录里那些「1-1、2-3」的章内编号。</p>
+    <p><b>厚度分布：</b>10 章超过 100 页（RM32 的 642 页、RM41 的 476 页、RM56 的 260 页、RM46 的 234 页、RM35 的 174 页、RM22 的 150 页、RM23 与 RM58 各 132 页、RM18 的 126 页、RM42 的 110 页），合计 2436 页，占正文的六成；另有 9 章不足 10 页（RM02、RM03、RM06、RM11、RM12、RM36、RM38、RM52、RM54），合计 50 页。前一类是本套解读的重点，后一类不硬撑篇幅。</p>
+
+    <h2><span class="n">01</span>三档标记：通读、查表、选读</h2>
+    <div class="tblw">
+    <table class="table-lv3">
+      <thead><tr><th>标记</th><th>含义</th><th>怎么用</th></tr></thead>
+      <tbody>
+        <tr><td><span class="rmark read">通读</span></td><td>核心机制，值得从头读到尾，读不懂后面会反复卡</td><td>按批次顺序读完；读完能独立写出初始化序列</td></tr>
+        <tr><td><span class="rmark table">查表</span></td><td>结构性大表（地址、引脚、中断、事件、熔丝、DMA 通道）</td><td>不读，用：配了搜索/解码工具，按名字查到位</td></tr>
+        <tr><td><span class="rmark opt">选读</span></td><td>只跟特定产品相关（电子纸、多路音频、调试、TrustZone 等）</td><td>做这块产品时再读；不做就跳过，不占学习路径</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h2><span class="n">02</span>七篇目录 · 60 章逐条</h2>
+    <p>每一条给：手册章号与页码、页数、主线一句话、两到四个解读点、档位。分组不按手册章号硬切，而按「解决哪类问题」：查地址和启动看第一篇，外设不动先看第二篇，存储与 DMA 在第三篇，点灯与定时在第四篇，通信在第五篇，屏幕摄像头在第六篇，安全调试在第七篇。手册章号仍标在每一条上，随时能回到原文。</p>
+    <div id="toc"></div>
+
+    <h2 id="batch"><span class="n">03</span>写作批次：六批上线</h2>
+    <p>不按手册顺序写，按「先能跑、再能通、最后能看」写。每批是一个完整可用的闭环，写完就能拿去上板验证。</p>
+    <div class="tblw">
+    <table class="bt">
+      <colgroup><col style="width:66px"><col style="width:31%"><col><col style="width:70px"></colgroup>
+      <thead><tr><th>批次</th><th>章号</th><th>这一批解决的闭环</th><th>状态</th></tr></thead>
+      <tbody>
+        <tr><td>第 0 批</td><td>本页</td><td>计划目录：分组、页码、档位、批次、骨架、验收</td><td>已交付</td></tr>
+        <tr><td>第 1 批<br><code>11 章</code></td><td><code>01–06、08、10、18、28、32</code></td><td>从手册走到点灯与串口：地址表 → 启动链 → 时钟 → 引脚复用 → GPIO。配「引脚搜索器」「配频计算器」</td><td>待写</td></tr>
+        <tr><td>第 2 批<br><code>14 章</code></td><td><code>13、20、24、26、30、31、33、40、51、52、53、55、59、60</code></td><td>基础外设与通信入门：定时、PWM、ADC、按键、触摸、看门狗、复位与晶振、UART/I2C/SPI/CAN</td><td>待写</td></tr>
+        <tr><td>第 3 批<br><code>10 章</code></td><td><code>15、17、21、29、35、38、42、43、46、58</code></td><td>存储与 DMA：DDR 校准、NAND+ECC、SD/eMMC、QSPI、EIM、SDMA、APBH。系统能起来的分水岭</td><td>待写</td></tr>
+        <tr><td>第 4 批<br><code>10 章</code></td><td><code>09、16、19、23、25、34、36、41、45、50</code></td><td>音视频与显示：摄像头 → PXP → LCD 一条链，加电子纸、SAI/ESAI/ASRC/SPDIF/MQS</td><td>待写</td></tr>
+        <tr><td>第 5 批<br><code>3 章</code></td><td><code>22、56、57</code></td><td>网络与 USB：BD 描述符环、MDIO、EHCI/设备端点、PHY 握手</td><td>待写</td></tr>
+        <tr><td>第 6 批<br><code>12 章 + 附录</code></td><td><code>07、11、12、14、27、37、39、44、47、48、49、54、A</code></td><td>安全、电源细节、调试与杂项：信任链、eFUSE 烧写、RTC/防拆、JTAG、AIPSTZ/SPBA、GPC/PMU、修订历史</td><td>待写</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="box tip">
+      <h5>为什么第 1 批不是从 RM01 顺着写</h5>
+      <p>因为「顺着读」对手册没用。第 1 批宁可跳过 ADC、跳过显示，也要先把 <b>地址表(RM02) → 中断表(RM03) → 引脚总表(RM04) → 启动链(RM08) → 时钟(RM18) → 引脚复用(RM32) → GPIO(RM28)</b> 这条链打通：它是「板子上的一个 LED 为什么不亮」的完整回答路径。这条链不通，读再多外设章也用不上。</p>
+    </div>
+
+    <h2 id="template"><span class="n">04</span>每章骨架：八段固定结构</h2>
+    <p>60 章用同一套骨架，读者翻任何一章都知道下一段在哪。只有薄章允许省掉第 4、5 段。</p>
+    <ol class="steps">
+      <li><b>这一章管什么</b>：一段话说清它在芯片里的位置、上下游是谁、什么时候必须翻它。配一张「在本篇中的位置」小图。</li>
+      <li><b>结构与时序</b>：自绘框图或时序图（不截手册截图，按原文重画并标注手册页码），标出数据从哪来到哪去。</li>
+      <li><b>关键寄存器 5–8 个</b>：只挑「不配就不工作」的和「配错就出怪现象」的，每个给偏移、位域、复位值、一句话含义。全量寄存器表不进正文，收进折叠表或查表工具。</li>
+      <li><b>一次完整配置序列</b>：编号步骤 + 实际写值，从开门控时钟到第一个中断/第一帧数据，保证顺序正确、可复制。</li>
+      <li><b>代码与 dts 对应</b>：一段裸机寄存器版 + 一段 Linux 驱动/dts 版，说明两者字段怎么对应（谁替你做了哪一步）。</li>
+      <li><b>三个坑</b>：来自实测或勘误手册，写「现象 → 原因 → 怎么确认 → 怎么改」，不写泛泛的注意事项。</li>
+      <li><b>自测三题</b>：折叠答案，题目要求「改一个位，预测现象」，不是名词解释。</li>
+      <li><b>上下游</b>：本章依赖哪章、被哪章依赖、勘误手册里有没有相关条目。</li>
+    </ol>
+
+    <h2 id="tools"><span class="n">05</span>互动工具：复用 6 台，新增 12 台</h2>
+    <p>大表不靠眼睛翻。凡是「输入一个名字/一个目标值，直接给寄存器值」的环节，都做成页面里的可点工具，并标明它算的是手册哪一页的公式。</p>
+    <div class="tblw">
+    <table class="tools-t">
+      <thead><tr><th>工具</th><th>对应章</th><th>做什么</th><th>状态</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">时钟树配频</td><td>RM10 / RM18</td><td>目标频率 → PLL 与分频链 → CCGR 门控位</td><td>复用 <code>viz/clock-tree</code></td></tr>
+        <tr><td class="nm">引脚复用</td><td>RM04 / RM32</td><td>pad 名 → ALT 功能 → PAD_CTL 解码</td><td>复用 <code>viz/gpio</code>，扩成搜索器</td></tr>
+        <tr><td class="nm">中断与抢占</td><td>RM03 / RM12</td><td>中断号 → 优先级 → 抢占过程</td><td>复用 <code>viz/nvic</code></td></tr>
+        <tr><td class="nm">启动链路</td><td>RM08</td><td>BOOT_MODE → eFUSE → IVT → 各介质</td><td>复用 <code>viz/boot</code></td></tr>
+        <tr><td class="nm">MMU 页表</td><td>RM02</td><td>虚拟地址 → 页表遍历 → 物理地址</td><td>复用 <code>viz/mmu</code></td></tr>
+        <tr><td class="nm">Cache 层次</td><td>RM02 / RM38</td><td>读写命中路径与一致性</td><td>复用 <code>viz/cache</code></td></tr>
+        <tr><td class="nm">引脚搜索器</td><td>RM32</td><td>按 pad 名或 GPIOx_IOy 查 MUX_MODE、PAD_CTL、SELECT_INPUT</td><td>新增</td></tr>
+        <tr><td class="nm">CCGR 门控表</td><td>RM18</td><td>外设名 → 门控位 → 对应根时钟</td><td>新增</td></tr>
+        <tr><td class="nm">UART 波特率</td><td>RM55</td><td>目标波特率 → UBIR/UBMR 取值与误差百分比</td><td>新增</td></tr>
+        <tr><td class="nm">I2C 速率</td><td>RM31</td><td>总线速率 → IFDR 分频、地址与读写位拼装</td><td>新增</td></tr>
+        <tr><td class="nm">SPI 波形</td><td>RM20</td><td>CPOL/CPHA/位宽 → 画出四种模式的采样点</td><td>新增</td></tr>
+        <tr><td class="nm">CAN 位时序</td><td>RM26</td><td>波特率与采样点 → PROP/PHASE 段与 CBT 值</td><td>新增</td></tr>
+        <tr><td class="nm">LCD 时序</td><td>RM34</td><td>分辨率 + 刷新率 → HS/VS/DOTCLK 与前后廊寄存器</td><td>新增</td></tr>
+        <tr><td class="nm">PXP 变换</td><td>RM41</td><td>缩放/旋转/CSC 一条链的可视化</td><td>新增</td></tr>
+        <tr><td class="nm">DDR 初始化脚本</td><td>RM35</td><td>参数表 → 寄存器写序列（可复制）</td><td>新增</td></tr>
+        <tr><td class="nm">SD 命令流</td><td>RM58</td><td>CMD0 → CMD8 → ACMD41 → 读块 的状态机动画</td><td>新增</td></tr>
+        <tr><td class="nm">ENET 描述符环</td><td>RM22</td><td>BD 环收发 + 中断的逐帧演示</td><td>新增</td></tr>
+        <tr><td class="nm">看门狗窗口</td><td>RM59</td><td>喂狗时间窗与复位的因果关系</td><td>新增</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h2 id="hot"><span class="n">06</span>按问题查：现象 → 先翻哪章</h2>
+    <p>这张表是本套解读的「急诊分诊台」。遇到现象先在这里定位章号，再去正文，不要从 RM01 开始翻。</p>
+    <div class="tblw">
+    <table>
+      <thead><tr><th>现象 / 问题</th><th>先翻</th><th>再看</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">板子不亮、上电无任何输出</td><td>RM08 启动、RM51 复位</td><td>RM60 晶振、RM39 PMU、RM02 地址表</td></tr>
+        <tr><td class="nm">点亮一个 LED 没反应</td><td>RM32 引脚复用、RM28 GPIO</td><td>RM18 CCGR 门控、RM02 基地址</td></tr>
+        <tr><td class="nm">串口一个字符都不打印</td><td>RM55 UART</td><td>RM32（TX 的 ALT）、RM18（UART 门控）、RM60（时钟源）</td></tr>
+        <tr><td class="nm">想从 396MHz 提到 528MHz</td><td>RM18 CCM</td><td>RM10 电源策略、RM39 PMU 调压</td></tr>
+        <tr><td class="nm">定时中断周期不准</td><td>RM24 EPIT / RM30 GPT</td><td>RM18 根时钟、RM03 中断号</td></tr>
+        <tr><td class="nm">I2C 从设备不 ACK</td><td>RM31 I2C</td><td>RM32 引脚与上拉、RM02 基地址</td></tr>
+        <tr><td class="nm">SPI 读回全 0xFF</td><td>RM20 ECSPI</td><td>RM32（CS/MISO 复用）、RM46 DMA</td></tr>
+        <tr><td class="nm">RGB 屏花屏 / 偏移</td><td>RM34 eLCDIF</td><td>RM41 PXP、RM18 LCD 时钟、RM02 framebuffer 地址</td></tr>
+        <tr><td class="nm">摄像头有数据但图像错位</td><td>RM19 CSI</td><td>RM41 PXP 打包与 CSC、RM32 引脚</td></tr>
+        <tr><td class="nm">网口不通 / 丢包</td><td>RM22 ENET</td><td>RM32 RMII 引脚、RM18 ENET 时钟、RM02 描述符内存</td></tr>
+        <tr><td class="nm">U 盘 / OTG 不识别</td><td>RM56 USB</td><td>RM57 PHY、RM18 USB 时钟</td></tr>
+        <tr><td class="nm">CAN 发不出去 / Bus-Off</td><td>RM26 FLEXCAN</td><td>RM32 引脚、RM18 时钟、终端电阻</td></tr>
+        <tr><td class="nm">TF 卡 / eMMC 起不来</td><td>RM58 uSDHC</td><td>RM08 启动介质、RM05 熔丝、RM32 引脚</td></tr>
+        <tr><td class="nm">NAND 坏块 / ECC 报错</td><td>RM29 GPMI、RM17 BCH</td><td>RM15 APBH-DMA、RM08 BCB</td></tr>
+        <tr><td class="nm">DDR 跑高频率不稳定</td><td>RM35 MMDC</td><td>RM02 地址、原理图端接与 VREF</td></tr>
+        <tr><td class="nm">DMA 搬完数据不对</td><td>RM46 SDMA、RM15 APBH</td><td>RM03 事件号、RM38 OCRAM、cache 一致性</td></tr>
+        <tr><td class="nm">低功耗唤醒不回来</td><td>RM10 总览、RM27 GPC</td><td>RM39 PMU、RM51 复位、RM48 SNVS</td></tr>
+        <tr><td class="nm">用户态读寄存器直接挂掉</td><td>RM14 AIPSTZ</td><td>RM02 地址映射、Linux 权限模型</td></tr>
+        <tr><td class="nm">安全启动验签失败</td><td>RM11 安全、RM05 熔丝</td><td>RM37 OCOTP、RM48 SNVS、RM08 HAB</td></tr>
+        <tr><td class="nm">JTAG 连不上芯片</td><td>RM07 调试、RM47 SJC</td><td>RM51 复位、RM05 熔丝（JTAG 禁用位）</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h2 id="accept"><span class="n">07</span>验收与边界</h2>
+    <div class="box tip">
+      <h5>一章算写完的标准</h5>
+      <p>① 能不看手册，按本章第 4 段把外设配出一次可观测结果（一个中断、一帧数据、一个波形）；② 正文出现的每个寄存器名都能在标注的那一页找到，误差不超过 1 页；③ 有一个自绘图或一个可点工具支撑最关键的那个机制；④ 三个坑都写过「怎么确认」，不是泛泛而谈。</p>
+    </div>
+    <div class="box pit">
+      <h5>明确不做的四件事</h5>
+      <p><b>不抄原文</b>：不做整段翻译，不贴手册截图，只重画与本篇相关的部分并标页码。<br>
+      <b>不做全量寄存器表</b>：60 章全抄一遍就是第二本手册，没有意义；只挑关键寄存器，其余给查表工具。<br>
+      <b>不编造时序数字</b>：所有数值来自 Rev.1 或勘误手册，实测数据标明板子与条件下。<br>
+      <b>不回避差异</b>：手册是 2017 年的 Rev.1，SDK 2.2 与正点原子实际初始化序列与手册有出入的地方，正文会单独标出「手册说 / 代码是 / 实测是」。</p>
+    </div>
+
+    <div class="ch-nav">
+      <a href="../manual/index.html"><span>前置</span><b>← 手册研读 8 篇（怎么读一本手册）</b></a>
+      <a class="nx" href="../hardware/index.html"><span>并行</span><b>硬件全书 · 六篇 52 章 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="rm-data.js"></script>
+<script src="rm.js"></script>
+<script>renderRMToc('toc');</script>
+</body>
+</html>
