@@ -1,9 +1,11 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>3.3 核心板第 2 页：SoC 电源脚 | 第三篇 · 逐页读真实原理图 | i.MX6ULL 学习手册</title>
-<meta name="description" content="VDD_ARM_CAP/VDD_SOC_CAP 的内置 LDO 与旁路、NVCC 电压域分组、去耦电容怎么配、SNVS 常电脚。">
-<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+<title>3.3 核心板第 2 页：SoC 电源球与「只装电容」的脚 | 第三篇 | i.MX6ULL 学习手册</title>
+<meta name="description" content="CORE p2：VDD_SOC_IN、VDD_ARM_CAP、VDD_SOC_CAP、VDD_HIGH_CAP、VDD_SNVS_CAP 的球位与电容配置；为什么 CAP 脚不能外接电源；224 为什么是 0.22µF。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -14,99 +16,140 @@
   <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
 <div class="shell">
   <aside id="sidebar"><div class="vol-h">第三篇 · 逐页读真实原理图</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 3 章<span class="sep">/</span>约 24 分钟</div>
-    <h1>核心板第 2 页：SoC 的电源脚怎么接</h1>
-    <p class="lede">i.MX6ULL 有上百个电源/地脚，但归类只有几种：<b>内核（ARM/SOC）</b>、<b>IO 电压域（NVCC_*）</b>、<b>模拟（USB/ADC/PLL）</b>、<b>常电（SNVS）</b>。这一页的关键不是「接上电源」，而是<b>每个域接哪一路、旁路电容放几颗</b>。</p>
+    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 3 章<span class="sep">/</span>约 50 分钟</div>
+    <h1>核心板第 2 页：SoC 电源球与「只装电容」的脚</h1>
+    <p class="lede">CORE p2 是 U1A（IMX6ULL-POWER）这一块芯片符号的电源侧。它把 400 多个球里与「电」有关的全部集中在一页：哪些球要外部送电（IN），哪些球<b>只能接电容、绝不能接电源</b>（CAP）。这一组规则是读懂 i.MX6ULL 电源设计的第一道门槛，也是新手最常炸芯片的地方。</p>
+
+    <figure class="fig sch"><div class="scroller"><img loading="lazy" src="../../assets/img/sch/core_p2_pwr.png" class="tall" alt="CORE p2：VDD_ARM_CAP 四球与 VDD_SOC_CAP 十球及对应电容"><a class="zoom" href="../../assets/img/sch/core_p2_pwr.png" class="tall" target="_blank" rel="noopener">新窗口打开</a></div><figcaption>CORE p2 局部（300dpi 裁切）：<b>VDD_ARM_CAP1–4</b>（G9/G10/G11/H11）→ C15/C16 <b>224</b> + C17 22µF；<b>VDD_SOC_CAP1–10</b>（G8,H8,J8,J11,K8,K11,L8,L9,L10,L11）→ C21/C22/C23 <b>224</b> + C24 22µF。注意这些球<b>没有</b>接任何电源网络，只接电容到地。</figcaption></figure>
+
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>说出 VDD_ARM_CAP / VDD_SOC_CAP 的用途，以及内外部 LDO 两种模式的区别</li>
-        <li>解释 NVCC_* 为什么分这么多组，接错会有什么后果</li>
-        <li>按「大容值 + 小容值 + 靠近引脚」三原则布置去耦</li>
+        <li>区分 IN 球与 CAP 球：一个要外部供电，一个只接电容</li>
+        <li>说出 VDD_ARM_CAP / VDD_SOC_CAP 为什么各要 4 球与 10 球（内部 LDO 分段）</li>
+        <li>解释 224 的含义（0.22µF）与为什么用 224 而不是 104</li>
+        <li>算出 CAP 脚去耦的容值下限与 ESL 目标，理解「就近 5mm」的意义</li>
+        <li>看懂 VDD_COIN_3V 支路的 D1/D2 + R34 1.5K + C31，知道后备电池怎么接</li>
       </ol>
     </div>
 
-    <h2><span class="n">3.3.1</span>内核电源：CAP 脚是「内置 LDO 的输出」</h2>
-    <p>i.MX6ULL 内部集成了给 ARM 核与 SOC 逻辑供电的 LDO。规格书里的 <b>VDD_ARM_CAP</b>、<b>VDD_SOC_CAP</b> 就是这些内部 LDO 的输出脚，需要外接电容稳定环路；如果外部另有 DCDC 供电（本板就是），则要走「LDO 旁路（bypass）」配置，把内部 LDO 关掉或短接，避免内外打架。</p>
+    <h2><span class="n">3.3.1</span>IN 与 CAP：两种完全不同的球</h2>
     <table>
-      <thead><tr><th>脚</th><th>作用</th><th>外接</th><th>读图要点</th></tr></thead>
+      <thead><tr><th>组</th><th>球位</th><th>接到哪</th><th>性质</th></tr></thead>
       <tbody>
-        <tr><td class="nm">VDD_ARM_IN / VDD_ARM_CAP</td><td>ARM 核供电与其内部 LDO 输出</td><td>外部 1.35V + 去耦；CAP 脚挂 10µF+0.1µF</td><td>若用外部 DCDC，需按手册设置旁路，CAP 仍要电容</td></tr>
-        <tr><td class="nm">VDD_SOC_IN / VDD_SOC_CAP</td><td>SOC 逻辑供电与内部 LDO 输出</td><td>同上</td><td>两路常同源，但要分别去耦</td></tr>
-        <tr><td class="nm">VDD_SNVS_IN</td><td>常电域输入（2.4–3.6V，典型 3.0V）</td><td>电池或 SNVS LDO</td><td>主电源断开时仍要有电</td></tr>
-        <tr><td class="nm">VDD_HIGH_CAP</td><td>USB PHY / 模拟高压内部稳压输出</td><td>外接电容</td><td>只挂电容，不要外部灌电</td></tr>
+        <tr><td class="nm">VDD_SOC_IN1–5 + VDD_SOC_I</td><td>H9,H10,J9,J10,K9,K10</td><td>网络 VDD_ARM_SOC_IN（1.35V）</td><td>外部供电输入</td></tr>
+        <tr><td class="nm">VDD_ARM_CAP1–4</td><td>G9,G10,G11,H11</td><td>只接 C15/C16 224 + C17 22µF</td><td>内部 LDO 输出，仅去耦</td></tr>
+        <tr><td class="nm">VDD_SOC_CAP1–10</td><td>G8,H8,J8,J11,K8,K11,L8,L9,L10,L11</td><td>只接 C21/C22/C23 224 + C24 22µF</td><td>内部 LDO 输出，仅去耦</td></tr>
+        <tr><td class="nm">VDD_HIGH_IN / VDD_HIGH_CAP1–2</td><td>N13 / R14,R15</td><td>VDD_HIGH_IN 外部 / C27 224+C28 22µF</td><td>输入 + 内部输出</td></tr>
+        <tr><td class="nm">VDD_SNVS_IN / VDD_SNVS_CAP</td><td>P12 / N12</td><td>SNVS_3V3 / C29 224+C30 22µF</td><td>输入 + 内部输出</td></tr>
+        <tr><td class="nm">NVCC_PLL</td><td>P12/P13</td><td>C32 224</td><td>内部 PLL 电源，仅去耦</td></tr>
+        <tr><td class="nm">VSS1–23 + VSS47</td><td>23 个球 + U17</td><td>GND</td><td>地</td></tr>
       </tbody>
     </table>
-    <div class="box deep">
-      <h5>「CAP 脚只挂电容」是一条硬规则</h5>
-      <p>CAP 是内部稳压器的输出，外部再给它加电源等于两个电源并联，轻则环流失稳，重则损坏。读图时看到 CAP 脚只连电容、不连任何电源网络，说明设计正确。</p>
+    <p><b>最关键的判据</b>：CAP 球在图上<b>没有电源符号</b>，只有一根线连到电容。如果你看到有人把 3.3V 直接焊到 VDD_ARM_CAP，那不是「增强供电」，是<b>拿外部电源去顶内部 LDO 的输出</b>——轻则 LDO 保护、重则永久损坏。</p>
+
+    <h2><span class="n">3.3.2</span>为什么 CAP 球有 4 个、10 个这么多</h2>
+    <p>i.MX6ULL 内部有多组 LDO，给 CPU 内核、SOC 逻辑、PLL 等分别供电。每个 LDO 的输出在封装内走到不同的球，球数多是因为：</p>
+<ul>
+      <li><b>电流分散</b>：内核在 528MHz 全速时峰值电流可达安培级，单个球的电流能力有限（约 0.3–0.5A），必须并联多个；</li>
+      <li><b>降低寄生电感</b>：多球并联把封装电感从 ~1nH 降到 ~0.3nH，高频去耦才有效；</li>
+      <li><b>芯片内部布线</b>：不同模块的 LDO 输出本来就在不同区域，物理上就是多个焊盘。</b></li>
+    </ul>
+    <p>VDD_SOC_CAP 有 10 个球，是因为 SOC 逻辑域面积最大、负载最重；VDD_ARM_CAP 4 个球，对应 CPU 内核那一块。</p>
+
+    <h2><span class="n">3.3.3</span>224 是什么：0.22µF 的「中间容量」</h2>
+    <p>三位数标注法：<b>224 = 22×10<sup>4</sup> pF = 220000pF = 0.22µF</b>。为什么不直接上 104（0.1µF）或 22µF？</p>
+    <ul>
+      <li><b>104（0.1µF）</b>：谐振频率高（约 10–20MHz），负责高频；但容量小，对 ms 级的负载跳变储能不足。</li>
+      <li><b>22µF</b>：储能足，但 ESL 大，高频阻抗反而高，且谐振点低（约 1–2MHz）。</li>
+      <li><b>224（0.22µF）</b>：介于两者之间，谐振约 5–8MHz，正好覆盖 CPU 负载跳变的主要频段（开关电源环路带宽 ~100kHz–1MHz 与内核时钟谐波之间）。</li>
+    </ul>
+    <p>所以本板用「<b>224 多个 + 22µF 一个</b>」的组合：224 贴近球放（负责中高频），22µF 稍远（负责低频储能）。这是典型的三段式去耦（大电解/钽 + 中容陶瓷 + 小容高频）。</p>
+
+    <h2><span class="n">3.3.4</span>去耦的硬指标：距离、过孔、回路</h2>
+    <ol>
+      <li><b>距离 ≤ 5mm</b>：电容到球焊盘的走线越短越好。走线每 1mm 约 0.2nH，5mm 就是 1nH，与电容自身 ESL（0.5–1nH）同量级——再远，电容就"失效"了。</li>
+      <li><b>过孔打在焊盘旁</b>：电容的地端必须有自己的过孔到地平面，不能借用球的过孔。一个过孔约 0.3–0.5nH。</li>
+      <li><b>回路面积最小</b>：电容—球—地平面构成环路，环路越小，辐射与感应越小。BGA 下方铺地平面，电容放在背面正对球位是最佳布局。</li>
+      <li><b>不要串磁珠</b>：CAP 脚前面串磁珠会与内部 LDO 形成谐振，可能自激。</li>
+    </ol>
+    <p>算一个直观的数字：若某 CAP 球需要 1A 的 10ns 电流阶跃，允许电压跌落 30mV，则所需电容 C=I·Δt/ΔV=1×10n/0.03≈<b>333nF</b>。224（220nF）×3 颗并联 = 660nF，留 2 倍余量——这就是「为什么是 3 颗 224 而不是 1 颗」。</p>
+
+    <h2><span class="n">3.3.5</span>VDD_COIN_3V 支路：后备电池怎么接</h2>
+    <p>本页右下角还有一条小支路：<b>D1/D2（RB521S-30 肖特基）+ R34 1.5K + C31 224</b>，网络名 VDD_COIN_3V。它的作用是把纽扣电池（3V）与 SNVS 3.3V 做「或」：</p>
+    <ul>
+      <li>主电源在时，SNVS_3V3 通过 D2 给 VDD_SNVS 供电，电池被 D1 反偏隔离，不放电；</li>
+      <li>主电源断时，电池通过 D1 供电，D2 反偏，防止电池倒灌给整板；</li>
+      <li>R34 1.5K 是限流（也是电池检测分压的一环），C31 224 去耦。</li>
+    </ul>
+    <p>图上注释写明「Confirm the coin cell discharge curr &gt; 40uA if used」——意思是如果真装纽扣电池，要确认放电电流大于 40µA（否则某些电池的钝化层会导致接触不良）。这句注释是设计者留给你的验算题。</p>
+
+    <h2><span class="n">3.3.6</span>这一页的诊断价值</h2>
+    <p>当板子「1.35V 有、但就是不起」时，量 CAP 脚：</p>
+    <table>
+      <thead><tr><th>现象</th><th>判据</th><th>可能原因</th></tr></thead>
+      <tbody>
+        <tr><td>VDD_ARM_CAP 无电压</td><td>0V</td><td>内部 LDO 未使能（VDD_SOC_IN 未到 / 复位未释放）</td></tr>
+        <tr><td>CAP 电压 ≈ IN 电压</td><td>两者几乎相等</td><td>内部 LDO 旁路模式（正常，某些配置下 LDO 直通）</td></tr>
+        <tr><td>CAP 电压抖动</td><td>纹波 &gt; 50mV</td><td>去耦不足 / 电容虚焊 / 地平面断裂</td></tr>
+        <tr><td>CAP 短路到地</td><td>对地电阻 &lt; 10Ω</td><td>芯片损坏（最常见于静电/过压后）</td></tr>
+      </tbody>
+    </table>
+    <p>注意 CAP 脚<b>不能</b>用外部电源"补电"来验证——正确做法是查内部 LDO 的使能条件（VDD_SOC_IN、POR_B、PMIC_ON_REQ）。</p>
+
+    <div class="demo">
+      <div class="dh"><b>CAP 脚去耦计算器</b><span>输入电流阶跃/允许跌落，算最小容量与并联颗数</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div><div style="font-size:12px;color:#9fb0c7">电流阶跃 I（A）<b id="in1" style="color:#5ff1ef">1.0</b></div><input id="cur" type="range" min="0.1" max="3" step="0.05" value="1" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">持续时间 Δt（ns）<b id="in2" style="color:#5ff1ef">10</b></div><input id="dt" type="range" min="1" max="100" step="1" value="10" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">允许跌落 ΔV（mV）<b id="in3" style="color:#5ff1ef">30</b></div><input id="dv" type="range" min="5" max="100" step="1" value="30" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="cOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
     </div>
 
-    <h2><span class="n">3.3.2</span>NVCC 电压域：为什么分这么多组</h2>
-    <p><code>NVCC_GPIO</code>、<code>NVCC_UART</code>、<code>NVCC_SD</code>、<code>NVCC_CSI</code>、<code>NVCC_ENET</code> 等是 SoC 的 IO 供电域，分组的目的有两个：</p>
-    <ul>
-      <li><b>电平可配</b>：不同外设可能需要 1.8V 或 3.3V，分组后可以独立设定；</li>
-      <li><b>噪声隔离</b>：SD 卡、以太网这类高速/大电流接口的噪声不污染其他域。</li>
-    </ul>
-    <p>接错的后果很具体：把 1.8V 器件接到 3.3V 域 → 灌电、发热、通信异常；把 3.3V 器件接到 1.8V 域 → 电平不够、读不到高。</p>
-    <p>本板：<b>NVCC_SD</b> 由 U9 可控（1.8/3.3V 切换，TP6）；<b>NVCC_CSI</b> 由 U12（XC6206P282）固定 2.8V（TP8）；<b>NVCC_GPIO</b> 接 <code>DCDC_3V3</code>。</p>
+    <h3>练习（答案在折叠里）</h3>
+    <details class="quiz"><summary>1. VDD_ARM_CAP 能不能接 1.35V 电源？</summary><div class="ans">不能。它是内部 LDO 的输出脚，只能接电容到地；外接电源会顶坏 LDO。</div></details>
+    <details class="quiz"><summary>2. 224 等于多少 µF？</summary><div class="ans">0.22µF（220nF）。</div></details>
+    <details class="quiz"><summary>3. 为什么 CAP 球要并联多个？</summary><div class="ans">分散电流、降低封装寄生电感、匹配内部多组 LDO 的物理布局。</div></details>
+    <details class="quiz"><summary>4. 1A/10ns/30mV 需要多大电容？</summary><div class="ans">333nF；本板 3 颗 224=660nF，余量 2 倍。</div></details>
+    <details class="quiz"><summary>5. VDD_COIN_3V 的两颗肖特基各起什么作用？</summary><div class="ans">D2 让主电源供电、隔离电池；D1 让电池在主电源断时供电、防止倒灌。</div></details>
+    <details class="quiz"><summary>6. CAP 脚对地短路说明什么？</summary><div class="ans">芯片内部损坏，通常需换 SoC（先确认不是电容本身短路）。</div></details>
 
-    <figure class="fig">
-      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <rect x="20" y="18" width="410" height="220" rx="10" fill="#141c2e" stroke="#3a4560"/>
-        <text x="36" y="42" fill="#eaf3ff" font-size="11">四类电源脚</text>
-        <text x="36" y="70" fill="#9df5f4" font-size="10">内核：VDD_ARM / VDD_SOC（1.35V）</text>
-        <text x="36" y="92" fill="#9fb0c7" font-size="9.5">大电流、对纹波敏感、需要 CAP 电容</text>
-        <text x="36" y="118" fill="#9df3c2" font-size="10">IO 域：NVCC_GPIO / SD / CSI / ENET</text>
-        <text x="36" y="140" fill="#9fb0c7" font-size="9.5">电平可配，接错就通信异常</text>
-        <text x="36" y="166" fill="#c8c0ff" font-size="10">模拟：USB PHY、ADC、PLL</text>
-        <text x="36" y="188" fill="#9fb0c7" font-size="9.5">要低噪声，常加 LC/磁珠隔离</text>
-        <text x="36" y="214" fill="#ffd79a" font-size="10">常电：VDD_SNVS_IN</text>
-        <text x="36" y="232" fill="#9fb0c7" font-size="9.5">断电仍活，靠电池或独立 LDO</text>
-
-        <rect x="450" y="18" width="400" height="220" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
-        <text x="466" y="42" fill="#eaf3ff" font-size="11">去耦三原则</text>
-        <text x="466" y="72" fill="#9df5f4" font-size="10">① 大容值管低频</text>
-        <text x="466" y="94" fill="#9fb0c7" font-size="9.5">22µF/10µF 放在域入口，稳负载跳变</text>
-        <text x="466" y="120" fill="#9df5f4" font-size="10">② 小容值管高频</text>
-        <text x="466" y="142" fill="#9fb0c7" font-size="9.5">0.1µF 放在每个电源脚旁，越近越好</text>
-        <text x="466" y="168" fill="#9df5f4" font-size="10">③ 过孔与回流</text>
-        <text x="466" y="190" fill="#9fb0c7" font-size="9.5">电容地过孔靠 GND 平面，别共用长走线</text>
-        <text x="466" y="216" fill="#ff9c9c" font-size="9.5">只有大容值没有小容值：高频尖峰照过</text>
-
-        <text x="20" y="264" fill="#9fb0c7" font-size="10.5">判定方法：示波器交流耦合、20MHz 带宽限制，量内核轨的纹波峰峰值；超过手册限值先查去耦与布局。</text>
-        <text x="20" y="288" fill="#6f7f9c" font-size="10">「电源脚都接了」不等于「电源设计对了」——去耦的位置比数量更重要。</text>
-        <text x="20" y="312" fill="#ff9c9c" font-size="10">坑：CAP 脚接了外部电源，内部 LDO 与外部 DCDC 对打，电压震荡。</text>
-      </svg>
-      <figcaption><b>图 3-3</b>　四类电源脚与去耦三原则。</figcaption>
-    </figure>
-
-    <h2><span class="n">3.3.3</span>读这一页的顺序</h2>
-    <ol class="steps">
-      <li>找 SoC 符号（U1A–U1E），先看它是哪一部分（电源脚通常单独一页）。</li>
-      <li>把每个电源脚旁的电容数一遍：<b>没有 0.1µF 的脚就是隐患</b>。</li>
-      <li>核对每个 NVCC 域接的是哪一路电压，与本板电源树（3.2 章）对上。</li>
-      <li>找 SNVS 相关脚，确认它接的是常电而不是主 3.3V。</li>
-      <li>找 CAP 脚，确认只挂电容、无外部电源。</li>
-    </ol>
-
-    <h3>自测</h3>
-    <details class="quiz"><summary>VDD_ARM_CAP 上量到 1.35V，但外部 DCDC 也输出 1.35V，这正常吗？</summary><div class="ans">要区分模式：如果设计为外部供电 + 内部 LDO 旁路，CAP 脚应与 1.35V 同电位（通过内部旁路开关），属正常；如果手册要求内部 LDO 工作，CAP 是内部输出，外部再灌电就是错误。</div></details>
-    <details class="quiz"><summary>NVCC_SD 固定接 3.3V 会有什么问题？</summary><div class="ans">SD 卡切到 1.8V 高速模式后，IO 上拉到 3.3V 会经 ESD 二极管持续灌电，卡或 SoC 都可能损坏，通信也不稳。必须跟随切换。</div></details>
-    <details class="quiz"><summary>为什么每个电源脚都要一颗 0.1µF，而不是一个域共用一颗？</summary><div class="ans">因为引脚到共用电容之间有走线电感，高频电流来不及从远处补，只有「就近」的电容才有效。共用一颗等于放弃高频去耦。</div></details>
-
-        <h2>原页对照</h2>
-    <figure class="fig sch">
-      <div class="scroller"><a href="../../assets/img/sch/core_p2.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/core_p2.png" alt="CORE V2.0 原理图第 2 页" loading="lazy"></a></div>
-      <figcaption><b>原页 · CORE p2</b>　第 2 页：SoC 的全部电源脚。左侧 VDD_ARM_SOC_IN 与 VDD_HIGH_IN，右侧四组 VDD_ARM_CAP / VDD_SOC_CAP 的「3 颗 224（0.22µF）+ 1 颗 22µF」就近去耦，下方 24 个 VSS 球。数一遍去耦电容，就明白「电源脚不是一只脚，是一组脚」。<a class="zoom" href="../../assets/img/sch/core_p2.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
-    </figure>
-    <div class="ch-nav"><a href="c02.html"><span>上一章</span><b>← 3.2 核心板第 1 页</b></a>
-      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.4 核心板第 3 页 →</b></a></div>
+    <div class="ch-nav">
+      <a href="c02.html"><span>上一章</span><b>← 3.2 核心板第 1 页：六路电源</b></a>
+      <a class="nx" id="chNavNext" href="c04.html"><span>下一章</span><b>3.4 核心板第 3 页：DDR3L 与 VREF →</b></a>
+    </div>
   </main>
 </div>
-<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
-<script>renderPart('p3','c03.html');</script>
-</body></html>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p3','c03.html');
+(function(){
+  function calc(){
+    var I=+document.getElementById('cur').value, dt=+document.getElementById('dt').value, dv=+document.getElementById('dv').value;
+    document.getElementById('in1').textContent=I.toFixed(2);
+    document.getElementById('in2').textContent=dt;
+    document.getElementById('in3').textContent=dv;
+    var C=I*dt*1e-9/(dv*1e-3); // F
+    var nF=C*1e9;
+    document.getElementById('cOut').innerHTML=
+      '所需容量 C = I·Δt/ΔV = '+I.toFixed(2)+'×'+dt+'ns / '+(dv/1000).toFixed(3)+'V = <b style="color:#5ff1ef">'+nF.toFixed(0)+' nF</b><br>'+
+      '按 224（220nF/颗）需要 <b style="color:#5ff1ef">'+Math.ceil(nF/220)+' 颗</b> 并联；本板每 CAP 组 3 颗 224 + 1 颗 22µF<br>'+
+      '等效串联电感目标：ESL ≤ ΔV·Δt/(I·n) ≈ '+((dv*1e-3*dt*1e-9)/(I*Math.max(1,Math.ceil(nF/220)))*1e12).toFixed(0)+' pH/颗（实际用 0402 + 紧贴球位做到 0.5–1nH）';
+  }
+  ['cur','dt','dv'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)}); calc();
+})();
+</script>
+</body>
+</html>
+
+
+

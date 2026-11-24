@@ -1,9 +1,11 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>3.8 MINI 第 1 页：连接器与调试 | 第三篇 · 逐页读真实原理图 | i.MX6ULL 学习手册</title>
-<meta name="description" content="两个 60pin 板对板连接器、I2C 4.7k 上拉、JTAG 10k 下拉、8 位拨码；从连接器看两板之间到底传了哪些信号。">
-<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+<title>3.8 核心板第 7 页：BOOT 配置的 47K 阵列 | 第三篇 | i.MX6ULL 学习手册</title>
+<meta name="description" content="CORE p7：BT_CFG1/2/4 共 24 位与 LCD_DATA 复用，R1-R24 47K 上下拉编码启动参数，BMODE[1:0] 真值表，底板 4.7K 如何覆盖 47K 的分压判据。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -14,93 +16,141 @@
   <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
 <div class="shell">
   <aside id="sidebar"><div class="vol-h">第三篇 · 逐页读真实原理图</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 8 章<span class="sep">/</span>约 22 分钟</div>
-    <h1>MINI 第 1 页：两个 60pin 连接器</h1>
-    <p class="lede">核心板与底板之间没有排线，只有两个 <b>60pin 板对板连接器（IMX1、IMX2，型号 3710M060046G3FT01）</b>。这一页是「两板合同」：所有跨板的电源、地、总线、控制信号都在这里。<b>数清 120 个脚怎么分配，就看懂了整机架构。</b></p>
+    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 8 章<span class="sep">/</span>约 50 分钟</div>
+    <h1>核心板第 7 页：BOOT 配置的 47K 阵列</h1>
+    <p class="lede">这一页（IMX6ULL_CORE_BOOT.SchDoc）只有电阻和一个真值表，却是整块板「从哪启动」的开关。24 颗 47K 电阻对应 24 位启动配置，全部挂在 LCD_DATA0–23 这些球上。它回答一个很实际的问题：<b>为什么核心板用 47K、底板用 4.7K，两个电阻并联时谁说了算？</b></p>
+
+    <figure class="fig sch"><div class="scroller"><img loading="lazy" src="../../assets/img/sch/core_p7_boot.png" class="tall" alt="CORE p7 BOOT MAP：R1-R24 47K 上下拉、BT_CFG1/2/4 与 LCD_DATA、BMODE 真值表"><a class="zoom" href="../../assets/img/sch/core_p7_boot.png" class="tall" target="_blank" rel="noopener">新窗口打开</a></div><figcaption>BOOT 区（300dpi 裁切）：右上 <b>R85 47K/DNP</b> 与 <b>R1/R3/R2 47K</b> 上拉到 DCDC_3V3；中间三列 <b>R4–R24 47K</b> 分别对 <b>BT_CFG1[0..7]↔LCD_DATA0..7</b>、<b>BT_CFG2[0..7]↔LCD_DATA8..15</b>、<b>BT_CFG4[0..7]↔LCD_DATA16..23</b>；右下 <b>BMODE[1:0]</b> 真值表。</figcaption></div></figure>
+
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>说清两个连接器的分工（电源/地 vs 高速信号）</li>
-        <li>解释 I2C 的 4.7k 上拉（R40/R42/R57）与 JTAG 的 10k 下拉（R59–R62）</li>
-        <li>理解 8 位拨码为什么要放在底板而不是核心板</li>
+        <li>说出 BT_CFG1/2/4 三组各 8 位、为什么没有 BT_CFG3</li>
+        <li>解释 47K 上下拉如何编码 0/1，为什么不用 0Ω 直接短接</li>
+        <li>算出「47K 上拉 + 4.7K 下拉」的分压结果，并判断 SoC 读到 0 还是 1</li>
+        <li>用 BMODE[1:0] 表选出「USB 下载」模式</li>
+        <li>列出「启动失败」时该量哪几个电阻</li>
       </ol>
     </div>
 
-    <h2><span class="n">3.8.1</span>连接器的分配逻辑</h2>
+    <h2><span class="n">3.8.1</span>24 位配置从哪来</h2>
+    <p>i.MX6ULL 复位时会把一批球当作「启动配置输入」采样，称为 BOOT_CFG。它们被分成三组（本板命名 BT_CFG1/2/4，跳过 3，因为 3 在别的封装/别的页用到）：</p>
     <table>
-      <thead><tr><th>组</th><th>典型内容</th><th>设计考虑</th></tr></thead>
+      <thead><tr><th>组</th><th>位</th><th>复用球</th><th>典型内容</th></tr></thead>
       <tbody>
-        <tr><td class="nm">电源与地</td><td>DCDC_5V、DCDC_3V3、GND（多个脚并联）</td><td>大电流回路要用多个脚并联降阻抗；地脚分散布置保证回流</td></tr>
-        <tr><td class="nm">高速差分</td><td>USB_OTG_DP/DM、ENET 差分、LCD 差分时钟（若有）</td><td>成对相邻、阻抗连续、尽量少过孔</td></tr>
-        <tr><td class="nm">低速总线</td><td>I2C、UART、SPI、CAN、RS485 侧信号</td><td>可容忍较长走线，但要上拉/串阻</td></tr>
-        <tr><td class="nm">控制/配置</td><td>BOOT_CFG、RESET、ON_OFF、中断</td><td>上电默认电平必须确定</td></tr>
+        <tr><td class="nm">BT_CFG1[0..7]</td><td>8</td><td>LCD_DATA0–7</td><td>启动设备类型、SD 位宽、快速启动等</td></tr>
+        <tr><td class="nm">BT_CFG2[0..7]</td><td>8</td><td>LCD_DATA8–15</td><td>NAND 几何、页大小、EEC 强度</td></tr>
+        <tr><td class="nm">BT_CFG4[0..7]</td><td>8</td><td>LCD_DATA16–23</td><td>SPI NOR 参数、USB 选项、看门狗等</td></tr>
       </tbody>
     </table>
+    <p>三组共 24 位，全部与 LCD 数据线复用。原因：<b>LCD_DATA 是「复位后才有意义」的输出</b>，复位期间把它们当输入采样，正好不冲突。代价是：LCD 屏必须在 SoC 释放复位后才能初始化，否则这些球上的电阻会影响屏的总线。</p>
 
-    <h2><span class="n">3.8.2</span>三处上拉/下拉，各管一件事</h2>
+    <h2><span class="n">3.8.2</span>为什么用 47K 而不是 0Ω 短接</h2>
+    <p>如果直接用 0Ω 短接到 3.3V 或 GND，编码当然最干净。但有两个问题：</p>
     <ul>
-      <li><b>I2C 上拉 R40 / R42 / R57（4.7k）</b>：开漏总线必须有上拉，4.7k 是 100–400kHz 下的常用值（1.9 章）。</li>
-      <li><b>JTAG 下拉 R59–R62（10k）</b>：JTAG 的 TCK/TMS/TDI/TRST 必须有确定默认电平，否则上电时可能误入测试模式、甚至让 CPU 停在调试状态。</li>
-      <li><b>拨码 SW（D1–D8）</b>：放底板是为了让用户可改；核心板只留 4.7k 上拉，拨码接地即把该位拉低（3.7 章）。</li>
+      <li><b>不可改</b>：贴片电阻焊死，改一次启动配置就要动烙铁；</li>
+      <li><b>底板无法覆盖</b>：0Ω 是硬连接，底板想用拨码改这一位，会与 0Ω 形成短路（3.3V 对地）。</li>
     </ul>
+    <p>用 47K 上拉/下拉，就变成「弱默认」：<b>核心板给一个默认值，底板用更小的电阻可以把它拉过去</b>。这正是本板的设计：核心板 47K 定默认，底板 4.7K 或拨码改值。</p>
+    <p>算一下「谁赢」：核心板 47K 上拉到 3.3V，底板 4.7K 下拉到地，两者并联成分压：</p>
+    <p style="text-align:center">V = 3.3 × 4.7/(47+4.7) = 3.3 × 0.091 = <b>0.30V</b> → 稳稳读成 0</p>
+    <p>反过来若底板也用 47K 下拉：V=3.3×0.5=<b>1.65V</b>，正好卡在阈值附近——<b>这就是「电阻比必须 ≥10:1」的由来</b>。所以底板选 4.7K 不是随便选的，而是「47K 的十分之一」。</p>
 
-    <figure class="fig">
-      <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <rect x="20" y="18" width="250" height="200" rx="10" fill="#141c2e" stroke="#5ff1ef"/>
-        <text x="145" y="42" fill="#9df5f4" font-size="11" text-anchor="middle">核心板</text>
-        <rect x="60" y="60" width="170" height="40" rx="4" fill="rgba(95,241,239,.08)" stroke="#3a4560"/>
-        <text x="145" y="84" fill="#9fb0c7" font-size="9" text-anchor="middle">IMX1（60pin）</text>
-        <rect x="60" y="110" width="170" height="40" rx="4" fill="rgba(95,241,239,.08)" stroke="#3a4560"/>
-        <text x="145" y="134" fill="#9fb0c7" font-size="9" text-anchor="middle">IMX2（60pin）</text>
-        <text x="40" y="180" fill="#6f7f9c" font-size="9">电源/地/总线/控制全部跨板</text>
+    <h2><span class="n">3.8.3</span>BMODE[1:0]：四种启动大类</h2>
+    <p>除了 24 位 BOOT_CFG，还有两根独立的 BOOT_MODE0/1（T10/U10），它们决定「大类」：</p>
+    <table>
+      <thead><tr><th>BMODE[1:0]</th><th>方式</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">00</td><td>Boot From Fuses</td><td>量产：启动参数烧进熔丝，不可改</td></tr>
+        <tr><td class="nm">01</td><td>Serial Downloader</td><td>USB/串口下载，救砖与首次烧写</td></tr>
+        <tr><td class="nm">10</td><td>Internal Boot</td><td>按 BOOT_CFG 从 eMMC/NAND/SD 启动</td></tr>
+        <tr><td class="nm">11</td><td>Reserved</td><td>保留，不要用</td></tr>
+      </tbody>
+    </table>
+    <p>注意 BMODE 与 BOOT_CFG 是「两级选择」：BMODE 决定「走哪条大路」，BOOT_CFG 决定「大路里的哪条小巷」。这也是为什么救砖只要拨 BMODE=01，不用管 24 位配置。</p>
 
-        <line x1="230" y1="80" x2="330" y2="80" stroke="#3a4560" stroke-dasharray="4 3"/>
-        <line x1="230" y1="130" x2="330" y2="130" stroke="#3a4560" stroke-dasharray="4 3"/>
+    <h2><span class="n">3.8.4</span>上拉与下拉的视觉识别</h2>
+    <p>本页电阻排列有一个规律，读图时能一眼看出来：</p>
+<ul>
+      <li><b>电阻上端接 DCDC_3V3、下端接 BT_CFGx</b> → 上拉 → 默认 <b>1</b>；</li>
+      <li><b>电阻上端接 BT_CFGx、下端接 GND</b> → 下拉 → 默认 <b>0</b>。</li>
+    </ul>
+    <p>所以看哪一位是 1、哪一位是 0，不用查表，直接看电阻的「朝向」。这也是本页画成两列（上拉列/下拉列）而不是一长排的原因：<b>图形本身就是编码表</b>。</p>
+    <p>其中 <b>R85、R87、R88、R89</b> 标了 <b>DNP</b>，说明这四位在当前 BOM 下不参与编码（悬空 → SoC 内部有弱上下拉，取默认值）。DNP 位是「留给不同 SKU 的旋钮」：贴 eMMC 版与 NAND 版，这几颗的贴装不同。</p>
 
-        <rect x="330" y="18" width="250" height="200" rx="10" fill="#141c2e" stroke="#5ce1a0"/>
-        <text x="455" y="42" fill="#9df3c2" font-size="11" text-anchor="middle">MINI 底板</text>
-        <rect x="370" y="60" width="170" height="40" rx="4" fill="rgba(92,225,160,.08)" stroke="#3a4560"/>
-        <text x="455" y="84" fill="#9fb0c7" font-size="9" text-anchor="middle">插座 + 上拉/下拉</text>
-        <rect x="370" y="110" width="170" height="40" rx="4" fill="rgba(92,225,160,.08)" stroke="#3a4560"/>
-        <text x="455" y="134" fill="#9fb0c7" font-size="9" text-anchor="middle">拨码 / 外设</text>
-        <text x="350" y="180" fill="#6f7f9c" font-size="9">TF 卡、CAN、RS485、以太网、USB</text>
+    <h2><span class="n">3.8.5</span>启动失败怎么查</h2>
+    <table>
+      <thead><tr><th>现象</th><th>测什么</th><th>判据</th><th>结论</th></tr></thead>
+      <tbody>
+        <tr><td>串口无任何输出</td><td>BMODE0/1 电压</td><td>00/01/10/11 之一，稳定</td><td>悬空或中间电平 → 拨码/电阻错</td></tr>
+        <tr><td>USB 下载也认不到</td><td>BMODE 是否 01</td><td>两脚都低=00，一低一高=01</td><td>拨码装反或 10K 虚焊</td></tr>
+        <tr><td>Internal Boot 失败</td><td>BT_CFG 各位</td><td>与目标介质表一致</td><td>某位被底板 4.7K 拉反</td></tr>
+        <tr><td>偶尔能起偶尔不能</td><td>BT_CFG 电平</td><td>不应在 1.2–2.0V</td><td>电阻比不足（两边都 47K），判决随机</td></tr>
+        <tr><td>贴了 eMMC 却按 NAND 起</td><td>BOM 与 BOOT_CFG</td><td>必须一致</td><td>换 BOM 或改配置电阻</td></tr>
+      </tbody>
+    </table>
+    <p>实用技巧：<b>把万用表调到 200k 档，直接量 BT_CFGx 对 3.3V 与对地的电阻</b>，就能反推这一位的默认值，不用拆板。</p>
 
-        <text x="620" y="70" fill="#9fb0c7" font-size="9.5">读图技巧：</text>
-        <text x="620" y="92" fill="#9fb0c7" font-size="9.5">① 先数地脚与电源脚</text>
-        <text x="620" y="112" fill="#9fb0c7" font-size="9.5">② 再找差分对</text>
-        <text x="620" y="132" fill="#9fb0c7" font-size="9.5">③ 最后查配置脚</text>
-
-        <text x="20" y="248" fill="#9fb0c7" font-size="10.5">板对板连接器的额定电流通常每脚 0.5–1A，电源必须多脚并联；接触电阻也会随插拔次数上升。</text>
-        <text x="20" y="272" fill="#ff9c9c" font-size="10">现场故障：连接器没插紧 → 某路电源时有时无，表现为「碰一下就好」。</text>
-      </svg>
-      <figcaption><b>图 3-8</b>　两板之间的信号分配。</figcaption>
-    </figure>
-
-    <div class="box pit">
-      <h5>连接器相关的四个坑</h5>
-      <p><b>1. 只插一侧：</b>电源与地不成回路，现象千奇百怪。</p>
-      <p><b>2. 地脚分配不均：</b>回流路径长，高速信号误码。</p>
-      <p><b>3. 差分对不在同一连接器：</b>跨连接器走线，阻抗突变。</p>
-      <p><b>4. 插反/错位：</b>防呆设计不足，直接烧核心板。</p>
+    <div class="demo">
+      <div class="dh"><b>上下拉分压判决器</b><span>改核心板/底板电阻，看 SoC 读到的电平是否落在安全区</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+          <div><div class="lbl">核心板上拉 R<sub>pu</sub> <b id="pun">47</b> kΩ</div><input id="pu" type="range" min="1" max="100" step="1" value="47" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">底板下拉 R<sub>pd</sub> <b id="pdn">4.7</b> kΩ</div><input id="pd" type="range" min="1" max="100" step="0.1" value="4.7" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">电源 <b id="vn">3.3</b> V</div><input id="v" type="range" min="2.5" max="3.6" step="0.05" value="3.3" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">判决阈值比例 <b id="tn">0.3</b></div><input id="t" type="range" min="0.2" max="0.5" step="0.01" value="0.3" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="bOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
     </div>
 
-    <h3>自测</h3>
-    <details class="quiz"><summary>为什么 JTAG 的 TMS/TCK 要下拉而不是上拉？</summary><div class="ans">为了让上电时默认处于「非调试」状态：TCK 被拉低不产生时钟、TMS 为低不进入测试序列。若浮空，噪声可能让 CPU 进入调试停滞。</div></details>
-    <details class="quiz"><summary>两个连接器的电源脚为什么要多个并联？</summary><div class="ans">单脚额定电流有限（约 0.5–1A），且接触电阻会产生压降与发热。多脚并联降低总阻抗与温升，也提高可靠性。</div></details>
-    <details class="quiz"><summary>拨码为什么放在底板？</summary><div class="ans">用户需要随时改动启动介质；核心板是模块化产品，把拨码/按键/接口放在底板上更符合「核心板 + 底板」的产品形态。</div></details>
+    <h3>练习（答案在折叠里）</h3>
+    <details class="quiz"><summary>1. 47K 上拉 + 4.7K 下拉，节点电压多少？</summary><div class="ans">3.3×4.7/(47+4.7)=0.30V，读 0。</div></details>
+    <details class="quiz"><summary>2. 两边都用 47K 会怎样？</summary><div class="ans">1.65V 落在阈值附近，判决不确定，出现「偶尔能起」。</div></details>
+    <details class="quiz"><summary>3. BMODE=01 是什么？</summary><div class="ans">Serial Downloader，USB 下载模式，救砖用。</div></details>
+    <details class="quiz"><summary>4. 为什么 BOOT_CFG 复用 LCD_DATA？</summary><div class="ans">复位期间 LCD 未工作，这些球可当输入采样；释放复位后作 LCD 数据。</div></details>
+    <details class="quiz"><summary>5. DNP 的 47K 位意味着什么？</summary><div class="ans">该位不参与编码，取 SoC 内部默认，是不同 SKU 的预留旋钮。</div></details>
+    <details class="quiz"><summary>6. 串口全无输出先查哪两处？</summary><div class="ans">BMODE 电平、POR_B 是否释放；再查 24MHz 与 SNVS 3.3V。</div></details>
 
-        <h2>原页对照</h2>
-    <figure class="fig sch">
-      <div class="scroller"><a href="../../assets/img/sch/mini_p4.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/mini_p4.png" alt="MINI V2.2 原理图第 4 页" loading="lazy"></a></div>
-      <figcaption><b>原页 · MINI p4</b>　第 4 页 USB USART 区：U7 CH340C 与 U12/U13 SGM3157 二选一，把 UART1 或 UART3 接到调试口。JTAG 在 p1 左下角（R59–R62 10k、R58 10k/NC）。<a class="zoom" href="../../assets/img/sch/mini_p4.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
-    </figure>
-    <div class="ch-nav"><a href="c07.html"><span>上一章</span><b>← 3.7 启动配置</b></a>
-      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.9 MINI 第 2 页 →</b></a></div>
+    <div class="ch-nav">
+      <a href="c07.html"><span>上一章</span><b>← 3.7 ONOFF、POR、晶振</b></a>
+      <a class="nx" id="chNavNext" href="c09.html"><span>下一章</span><b>3.9 核心板第 8 页：60pin 连接器 →</b></a>
+    </div>
   </main>
 </div>
-<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
-<script>renderPart('p3','c08.html');</script>
-</body></html>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p3','c08.html');
+(function(){
+  function calc(){
+    var pu=+document.getElementById('pu').value, pd=+document.getElementById('pd').value, v=+document.getElementById('v').value, t=+document.getElementById('t').value;
+    document.getElementById('pun').textContent=pu; document.getElementById('pdn').textContent=pd.toFixed(1);
+    document.getElementById('vn').textContent=v.toFixed(2); document.getElementById('tn').textContent=t.toFixed(2);
+    var vn=v*pd/(pu+pd), ratio=pd/(pu+pd);
+
+    var state;
+    if(vn < v*t) state='<b style="color:#9ff5c0">读到 0（安全）</b>';
+    else if(vn > v*(1-t)) state='<b style="color:#9ff5c0">读到 1（安全）</b>';
+    else state='<b style="color:#ffb4a8">中间电平（危险，判决随机）</b>';
+    document.getElementById('bOut').innerHTML=
+      '节点电压 = '+v.toFixed(2)+'×'+pd.toFixed(1)+'/('+pu+'+'+pd.toFixed(1)+') = <b style="color:#5ff1ef">'+vn.toFixed(2)+' V</b>（分压比 '+(ratio*100).toFixed(1)+'%）<br>'+
+      '电阻比 R<sub>pu</sub>/R<sub>pd</sub> = '+(pu/pd).toFixed(1)+' 倍；建议 ≥10 倍才能稳定判决<br>'+
+      '结论：'+state;
+  }
+  ['pu','pd','v','t'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+</style>
+</body>
+</html>
+
+

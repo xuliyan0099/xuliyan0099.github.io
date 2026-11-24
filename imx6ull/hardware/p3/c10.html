@@ -1,9 +1,11 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>3.10 MINI 第 3 页：以太网与排针 | 第三篇 · 逐页读真实原理图 | i.MX6ULL 学习手册</title>
-<meta name="description" content="SR8201F PHY、磁珠 220R 与 10µF、25MHz 12pF 晶振、ATK9111A 变压器、44pin 排针信号分配。">
-<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+<title>3.10 MINI 第 1 页：连接器、启动拨码、I2C 与 JTAG | 第三篇 | i.MX6ULL 学习手册</title>
+<meta name="description" content="MINI 底板 p1：IMX1/IMX2 两个 60pin 与核心板 J1/J2 的对应，R70-R75 47Ω SD 串阻，I2C 4.7K 上拉与上升时间，JTAG 10K 网络，8 位 BOOT 拨码与 BOOT DEVICE 表。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -14,91 +16,135 @@
   <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
 <div class="shell">
   <aside id="sidebar"><div class="vol-h">第三篇 · 逐页读真实原理图</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 10 章<span class="sep">/</span>约 24 分钟</div>
-    <h1>MINI 第 3 页：以太网与排针</h1>
-    <p class="lede">以太网是这块板上「最模拟」的接口：<b>PHY + 变压器 + 阻抗 + 时钟</b>，每一环都不能省。这一页还藏着 44pin 排针，把 UART、CAN、ENET、JTAG 引到外部——它是「接逻辑分析仪和示波器」的地方。</p>
+    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 10 章<span class="sep">/</span>约 55 分钟</div>
+    <h1>MINI 第 1 页：连接器、启动拨码、I2C 与 JTAG</h1>
+    <p class="lede">从这一章开始到底板（MINI V2.2）。第 1 页（IMX6ULL_MINI_CORE.SchDoc）是全板的「总入口」：两个 60 pin 连接器把核心板的 120 个触点接进来，然后立刻分出四件事——<b>SD 总线加 47Ω 串阻、I2C 加 4.7K 上拉、JTAG 加 10K 网络、BOOT 用 8 位拨码</b>。这一页读懂，后面三页就都是「按功能往外接」。</p>
+
+    <figure class="fig sch"><div class="scroller"><img loading="lazy" src="../../assets/img/sch/mini_p1.png" alt="MINI p1 全页：IMX1/IMX2 两个 60pin、SD 串阻、I2C 上拉、JTAG、BOOT 拨码"><a class="zoom" href="../../assets/img/sch/mini_p1.png" target="_blank" rel="noopener">新窗口打开</a></div><figcaption>MINI p1 全页（200dpi）。左半是 <b>IMX1（A1–A60）</b>，右半是 <b>IMX2（B1–B60）</b>；中上 <b>R70–R75 47Ω</b> 串在 SD 总线上；右中 <b>R40/R41/R42/R57 4.7K</b> 是 I2C1/I2C2 上拉；左下 <b>JTAG</b> 区；右下 <b>BOOT</b> 区（R43–R50 + D1–D8 拨码 + BOOT DEVICE 表）。</figcaption></figure>
+
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>说出 PHY、变压器、RJ45 三者各自解决什么问题</li>
-        <li>解释 25MHz 晶振 12pF 与磁珠 220R@100MHz 的取值理由</li>
-        <li>知道排针上哪些信号能直接测量、哪些不能乱接</li>
+        <li>说出 IMX1/IMX2 与核心板 J1/J2 的对应关系，并解释为何要再画一次符号</li>
+        <li>解释 SD 总线为什么用 47Ω 串阻、而 I2C 用 4.7K 上拉——两种「阻抗」不是一回事</li>
+        <li>用上升时间公式验证 4.7K 上拉能支持多快的 I2C</li>
+        <li>说出 JTAG 那 5 颗 10K 电阻各自防什么</li>
+        <li>按 BOOT DEVICE 表拨出「从 SD 卡启动」</li>
       </ol>
     </div>
 
-    <h2><span class="n">3.10.1</span>以太网链路的三段</h2>
+    <h2><span class="n">3.10.1</span>为什么底板还要再画一遍连接器</h2>
+    <p>核心板 p8 的连接器叫 J1/J2，底板 p1 的连接器叫 IMX1/IMX2，型号相同、脚号相同。这不是重复劳动，而是<b>两块板各自的「接口视图」</b>：</p>
+    <ul>
+      <li>核心板视图：以「SoC 的球」为中心，告诉你每个球引到连接器哪一脚；</li>
+      <li>底板视图：以「底板功能」为中心，告诉你 TF 卡、LCD、CAN 分别接连接器哪一脚。</li>
+    </ul>
+    <p>所以追一根线要「两边对看」：先在底板看到 <b>CSI_MCLK 接 IMX1-A??</b>，再到核心板 p8 找同名网络，得到 SoC 球号。熟练之后可以直接按网络名跳，不必记脚号。</p>
+
+    <h2><span class="n">3.10.2</span>SD 总线：47Ω 串阻 + 47K 上拉</h2>
+    <p>中上部的 <b>R70–R75 = 47Ω</b> 分别串在 <b>USDCLK / USDCMD / DATA0 / DATA1 / DATA2 / DATA3</b> 上。为什么是 47Ω？</p>
+    <ul>
+      <li><b>源端匹配</b>：SoC 的 SD 驱动输出阻抗约 30–40Ω，加 47Ω 接近 50Ω 走线的特征阻抗，抑制反射；</li>
+      <li><b>速率适配</b>：SD 默认模式 25MHz、高速 50MHz，边沿不需要极快，47Ω 让上升沿变缓，EMI 下降；</li>
+      <li><b>与 47K 上拉分工</b>：串阻管「边沿」，上拉管「默认电平」，两者互不替代。TF 卡座的 R1–R5（47K，且标 NC）就是上拉组，见 3.11 节。</li>
+    </ul>
+    <p>注意 R70–R75 是 <b>47Ω</b> 而不是常见的 22Ω/33Ω：值越大边沿越慢，50MHz 下 47Ω 仍有余量，但对 100MHz 以上的 UHS 模式就不够了——这也是 MINI 只做到 SD 高速模式的原因之一。</p>
+
+    <h2><span class="n">3.10.3</span>I2C：4.7K 上拉与上升时间</h2>
+    <p>右侧 <b>R40/R41 = 4.7K</b>（I2C2_SCL/SDA）、<b>R42/R57 = 4.7K</b>（I2C1_SCL/SDA），都上拉到 DCDC_3V3。I2C 是开漏总线，上拉电阻与总线电容决定上升沿：</p>
+    <p style="text-align:center">t<sub>r</sub> ≈ 0.847 × R × C<sub>b</sub></p>
+    <p>Fast Mode（400kHz）要求 t<sub>r</sub> ≤ 300ns。若 C<sub>b</sub>=100pF：t<sub>r</sub>=0.847×4.7k×100p=40ns，余量充足；若挂 5 个器件、C<sub>b</sub> 涨到 400pF：t<sub>r</sub>=160ns，仍合格；但若 C<sub>b</sub> 到 800pF，t<sub>r</sub>=318ns，<b>超标</b>，表现为「示波器看波形圆角、偶发 NACK」。</p>
+    <p>为什么不用 10K？10K 更省电（3.3V/10K=0.33mA vs 0.7mA），但 t<sub>r</sub> 翻倍。本板选 4.7K 是「400kHz + 多器件」的折中；做 100kHz 标准模式时 10K 也够。</p>
+    <p><b>陷阱</b>：I2C 上拉必须接到「与该总线 IO 同电压」的电源。若 IO 是 1.8V 域却上拉到 3.3V，会经 ESD 二极管倒灌。</p>
+
+    <h2><span class="n">3.10.4</span>JTAG：五颗 10K 的分工</h2>
+    <p>左下 JTAG 区有 <b>R58 10K/NC、R59/R60/R61/R62 10K、R67 0R/NC</b>，接一个 <b>10 pin 排针（JTAG1，标 DNP）</b>。它们的作用是「让 JTAG 脚在不接调试器时有确定电平」：</p>
     <table>
-      <thead><tr><th>段</th><th>器件</th><th>做什么</th><th>关键外围</th></tr></thead>
+      <thead><tr><th>信号</th><th>电阻</th><th>默认</th><th>原因</th></tr></thead>
       <tbody>
-        <tr><td class="nm">数字侧</td><td>SoC ENET（RMII）</td><td>MAC 层，TXD/RXD/REF_CLK/MDC/MDIO</td><td>REF_CLK 由 PHY 或外部晶振提供</td></tr>
-        <tr><td class="nm">PHY</td><td><b>U11 SR8201F</b></td><td>编解码、自协商、LED、地址配置</td><td><b>25MHz 晶振 E1 + C19/C20 12pF</b>；<b>L3 磁珠 220R@100MHz + C13 10µF</b></td></tr>
-        <tr><td class="nm">隔离</td><td><b>ATK9111A</b> 网络变压器</td><td>电气隔离（耐压）、共模抑制、阻抗匹配</td><td>中心抽头接法、终端电阻</td></tr>
-        <tr><td class="nm">接口</td><td>RJ45</td><td>物理连接、LED 指示</td><td>ESD 保护、变压器侧终端</td></tr>
+        <tr><td class="nm">JTAG_TDI</td><td>R59 10K 上拉</td><td>1</td><td>TDI 内部有上拉，外部加固</td></tr>
+        <tr><td class="nm">JTAG_TMS</td><td>R60 10K 上拉</td><td>1</td><td>TMS=1 时状态机不进复位</td></tr>
+        <tr><td class="nm">JTAG_TCK</td><td>R61 10K 下拉</td><td>0</td><td>时钟悬空会拾取噪声，产生误移位</td></tr>
+        <tr><td class="nm">JTAG_nTRST</td><td>R62 10K 上拉</td><td>1</td><td>低有效复位，默认不复位</td></tr>
+        <tr><td class="nm">JTAG_MOD</td><td>R58 10K/NC</td><td>—</td><td>模式选择，按需贴</td></tr>
       </tbody>
     </table>
+    <p><b>R67 0R/NC</b> 是 JTAG_TDO 与排针之间的可选串联，用于隔离（不接调试器时断开，避免 TDO 变成天线）。<b>JTAG1 标 DNP</b> 说明量产板不焊排针，只在调试版贴。</p>
 
-    <h2><span class="n">3.10.2</span>磁珠与晶振：两个「看起来随便」的取值</h2>
-    <p><b>L3（220Ω@100MHz）+ C13（10µF）</b>是 PHY 模拟电源的 LC 滤波：磁珠在高频呈阻性，把开关噪声挡在 PHY 之外；10µF 提供本地储能。选 220Ω 而不是更大的值，是为了兼顾「抑制」与「直流压降/电流能力」。</p>
-    <p><b>25MHz 晶振配 12pF</b>：按 3.6 章的算法，两只电容串联等效 6pF + 约 6pF 寄生 ≈ 12pF，正好匹配 CL=12pF 的晶振。以太网对时钟精度要求 ±50ppm，晶振负载电容错 2pF 就可能出界。</p>
+    <h2><span class="n">3.10.5</span>BOOT 拨码：8 位开关 + 4.7K</h2>
+    <p>右下 BOOT 区是本板最有「动手感」的部分：<b>R43/R44 = 10K</b> 在 BOOT_MODE0/1 上，<b>R45–R50 = 4.7K</b> 在 BOOT_CFG1 的若干位上，<b>D1–D8 八位拨码</b>决定每一位接地还是悬空。旁边的 BOOT DEVICE 表直接给出结论：</p>
+    <table>
+      <thead><tr><th>启动介质</th><th>拨码组合（示意）</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">Micro SD</td><td>D1–D8 全 OFF（BOOT_CFG 取默认，SD 优先）</td></tr>
+        <tr><td class="nm">USB（下载）</td><td>BOOT_MODE=01，D 组按表</td></tr>
+        <tr><td class="nm">eMMC</td><td>按 eMMC 表拨，配合核心板 BOM</td></tr>
+        <tr><td class="nm">NAND</td><td>按 NAND 表拨，配合核心板 BOM</td></tr>
+      </tbody>
+    </table>
+    <p>拨码的电气本质：<b>ON = 把该位通过 0Ω 接到 GND（读 0），OFF = 靠 4.7K 上拉（读 1）</b>。这与核心板 47K 的「弱默认」正好配成 10:1，所以拨码能可靠覆盖核心板默认值（详见 3.8 节的分压计算）。</p>
+    <p>图上 <b>BOOT_DATA7 ↔ LCD_DATA6</b> 这类标注说明：拨码影响的位与 LCD 数据线是同一批球，屏初始化后这些开关就「失效」——所以<b>拨码必须在复位前设好，运行中改无效</b>。</p>
 
-    <figure class="fig">
-      <svg viewBox="0 0 860 300" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <rect x="16" y="18" width="430" height="180" rx="10" fill="#141c2e" stroke="#3a4560"/>
-        <text x="32" y="42" fill="#eaf3ff" font-size="11">以太网信号链</text>
-        <rect x="40" y="62" width="80" height="36" rx="4" fill="rgba(95,241,239,.1)" stroke="#5ff1ef"/>
-        <text x="80" y="84" fill="#9df5f4" font-size="9" text-anchor="middle">SoC MAC</text>
-        <line x1="120" y1="80" x2="170" y2="80" stroke="#3a4560"/>
-        <rect x="170" y="62" width="86" height="36" rx="4" fill="rgba(255,184,77,.12)" stroke="#ffb84d"/>
-        <text x="213" y="84" fill="#ffd79a" font-size="9" text-anchor="middle">SR8201F</text>
-        <line x1="256" y1="80" x2="300" y2="80" stroke="#3a4560"/>
-        <rect x="300" y="62" width="86" height="36" rx="4" fill="rgba(139,123,255,.12)" stroke="#8b7bff"/>
-        <text x="343" y="84" fill="#c8c0ff" font-size="9" text-anchor="middle">变压器</text>
-        <line x1="386" y1="80" x2="420" y2="80" stroke="#3a4560"/>
-        <text x="424" y="84" fill="#9fb0c7" font-size="9">RJ45</text>
-        <text x="32" y="130" fill="#9fb0c7" font-size="9">RMII：TXD/RXD/REF_CLK，50MHz 参考时钟</text>
-        <text x="32" y="150" fill="#9fb0c7" font-size="9">MDC/MDIO：配置与读状态</text>
-        <text x="32" y="176" fill="#6f7f9c" font-size="9">PHY 地址脚在复位时采样，决定 MDIO 地址</text>
+    <h2><span class="n">3.10.6</span>P2：6×2 SDIO WIFI 排针</h2>
+    <p>右上 <b>P2（Header 6X2）</b> 是 12 pin 排针，接 SDIO WIFI 模块：USDHC1 的 CLK/CMD/DATA0–3、WIFI_INT、WIFI_REG_ON、SD1_VSELECT 等。旁边 <b>C26 104</b> 去耦、<b>R22/R39 0R</b> 是可选跳线。</p>
+    <p>为什么用排针而不是板载模块？<b>认证与成本</b>：WIFI 模块需要射频认证，做成可插拔模块，整机认证时只需换模块，不必改主板。</p>
 
-        <rect x="456" y="18" width="380" height="180" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
-        <text x="472" y="42" fill="#eaf3ff" font-size="11">44pin 排针 P4 的用途</text>
-        <text x="472" y="72" fill="#9fb0c7" font-size="10">UART1–3：串口日志与登录</text>
-        <text x="472" y="96" fill="#9fb0c7" font-size="10">CAN：接 CAN 分析仪</text>
-        <text x="472" y="120" fill="#9fb0c7" font-size="10">ENET：部分信号引出</text>
-        <text x="472" y="144" fill="#9fb0c7" font-size="10">JTAG：接仿真器（需注意电平）</text>
-        <text x="472" y="172" fill="#ff9c9c" font-size="9.5">不要把 5V 直接接到排针的 IO 上</text>
-
-        <text x="16" y="242" fill="#9fb0c7" font-size="10.5">链路不通的排查顺序：PHY 供电/复位 → 25MHz 是否有波形 → MDIO 能否读到 PHY ID → 变压器与网口 → 最后才怀疑 MAC 配置。</text>
-        <text x="16" y="266" fill="#6f7f9c" font-size="10">网口 LED 不亮但能通信，通常是 LED 脚配置错误（复用为其他功能），不是链路问题。</text>
-        <text x="16" y="290" fill="#ff9c9c" font-size="10">坑：变压器中心抽头上拉电压接错（3.3V vs 1.8V），链路协商直接失败。</text>
-      </svg>
-      <figcaption><b>图 3-10</b>　以太网三段链路与排针用途。</figcaption>
-    </figure>
-
-    <div class="box pit">
-      <h5>以太网四个高频故障</h5>
-      <p><b>1. PHY 复位没释放：</b>MDIO 读不到 ID，链路灯不亮。</p>
-      <p><b>2. 晶振不起振/频偏：</b>能识别 PHY 但链路不稳、丢包。</p>
-      <p><b>3. 差分对走线不对称：</b>眼图差、长距离掉线。</p>
-      <p><b>4. 变压器中心抽头去耦缺失：</b>共模噪声大，辐射超标。</p>
+    <div class="demo">
+      <div class="dh"><b>I2C 上拉与上升时间</b><span>改上拉电阻、总线电容、速率，判断是否满足 t<sub>r</sub> 上限</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+          <div><div class="lbl">上拉 R <b id="rn">4.7</b> kΩ</div><input id="r" type="range" min="1" max="20" step="0.1" value="4.7" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">总线电容 C<sub>b</sub> <b id="cn">100</b> pF</div><input id="c" type="range" min="20" max="800" step="10" value="100" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">速率 <b id="fn">400</b> kHz</div><input id="f" type="range" min="100" max="400" step="100" value="400" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">电源 <b id="vn">3.3</b> V</div><input id="v" type="range" min="1.8" max="5" step="0.1" value="3.3" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="iOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
     </div>
 
-    <h3>自测</h3>
-    <details class="quiz"><summary>MDIO 读不到 PHY，最先量什么？</summary><div class="ans">先量 PHY 的供电与复位脚，再量 25MHz 晶振是否起振。供电/复位不正常时，PHY 根本不响应 MDIO。</div></details>
-    <details class="quiz"><summary>为什么 PHY 的模拟电源要加磁珠而不是直接连 3.3V？</summary><div class="ans">因为 PHY 内部的模拟电路（PLL、驱动）对电源噪声敏感；磁珠在高频呈高阻，配合电容把开关噪声隔离，提升链路裕量。</div></details>
-    <details class="quiz"><summary>排针上的 UART 能直接接 5V 的 USB 转串口吗？</summary><div class="ans">不能直接接。SoC 的 IO 是 3.3V 域，5V 电平会灌入。要用 3.3V 电平的转串口，或加电平转换。</div></details>
+    <h3>练习（答案在折叠里）</h3>
+    <details class="quiz"><summary>1. SD 总线上的 47Ω 与 TF 卡的 47K 各管什么？</summary><div class="ans">47Ω 串阻管边沿/反射；47K 上拉管默认电平（且标 NC 可不贴）。</div></details>
+    <details class="quiz"><summary>2. 4.7K、100pF 的 I2C 上升时间？</summary><div class="ans">0.847×4.7k×100p≈40ns，远小于 300ns。</div></details>
+    <details class="quiz"><summary>3. 为什么 JTAG_TCK 要下拉？</summary><div class="ans">时钟脚悬空易拾取噪声，产生误移位；下拉保证默认静止。</div></details>
+    <details class="quiz"><summary>4. 拨码 ON 是读 0 还是 1？</summary><div class="ans">ON 通常把该位接 GND，读 0；OFF 靠上拉读 1。</div></details>
+    <details class="quiz"><summary>5. 运行中改拨码为什么无效？</summary><div class="ans">BOOT_CFG 只在复位瞬间采样，之后这些球复用为 LCD 数据。</div></details>
+    <details class="quiz"><summary>6. P2 为什么用排针接 WIFI？</summary><div class="ans">模块可替换、便于整机射频认证、降低成本。</div></details>
 
-        <h2>原页对照</h2>
-    <figure class="fig sch">
-      <div class="scroller"><a href="../../assets/img/sch/mini_p3.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/mini_p3.png" alt="MINI V2.2 原理图第 3 页" loading="lazy"></a></div>
-      <figcaption><b>原页 · MINI p3</b>　第 3 页：以太网 U11 SR8201F + 25MHz 晶振 + 网络变压器，右侧 44pin 排针把 UART1–3、CAN、ENET、JTAG 引出。差分对与阻抗要求写在这一页的走线注释里。<a class="zoom" href="../../assets/img/sch/mini_p3.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
-    </figure>
-    <div class="ch-nav"><a href="c09.html"><span>上一章</span><b>← 3.9 MINI 第 2 页</b></a>
-      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.11 MINI 第 4 页 →</b></a></div>
+    <div class="ch-nav">
+      <a href="c09.html"><span>上一章</span><b>← 3.9 核心板 60pin 连接器</b></a>
+      <a class="nx" id="chNavNext" href="c11.html"><span>下一章</span><b>3.11 MINI 第 2 页：TF、CAN、RS485 与人机外设 →</b></a>
+    </div>
   </main>
 </div>
-<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
-<script>renderPart('p3','c10.html');</script>
-</body></html>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p3','c10.html');
+(function(){
+  function calc(){
+    var r=+document.getElementById('r').value, c=+document.getElementById('c').value, f=+document.getElementById('f').value, v=+document.getElementById('v').value;
+    document.getElementById('rn').textContent=r.toFixed(1); document.getElementById('cn').textContent=c;
+    document.getElementById('fn').textContent=f; document.getElementById('vn').textContent=v.toFixed(1);
+    var tr=0.847*r*1000*c*1e-12; // s
+    var limit=(f>=400)?300:(f>=100?1000:1000);
+    var ir=v/(r*1000)*1000;
+    document.getElementById('iOut').innerHTML=
+      't<sub>r</sub> = 0.847×R×C<sub>b</sub> = <b style="color:#5ff1ef">'+(tr*1e9).toFixed(0)+' ns</b>（规范上限 '+limit+' ns @'+f+'kHz）<br>'+
+      '上拉电流（SDA 拉低时）= '+v.toFixed(1)+'V/'+r.toFixed(1)+'kΩ = <b style="color:#5ff1ef">'+ir.toFixed(2)+' mA</b><br>'+
+      (tr*1e9<=limit?'<span style="color:#9ff5c0">满足上升时间要求</span>':'<span style="color:#ffb4a8">超出上限，需减小上拉或降低总线电容</span>')+
+      '<br><span style="color:#6f7f9c;font-size:11.5px">注：0.847 是 RC 上升时间常数近似（10%→90%）；实际还要叠加器件驱动能力。</span>';
+  }
+  ['r','c','f','v'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+</style>
+</body>
+</html>

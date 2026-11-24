@@ -38,17 +38,17 @@ window.PARTS = [
     intro: '以这两份 PDF 原理图为教材，一页一章：列出这一页所有网络、逐个器件说出取值理由、点出最容易画错的地方。MINI 底板 4 页、核心板 8 页，全部拆开读。',
     chapters: [
       { n: '3.1', t: '图纸怎么读', s: '页序、网络命名、位号、跨页连接', f: 'c01.html', ready: true },
-      { n: '3.2', t: '核心板第 1 页：五路电源', s: 'SNVS / CSI / ARM-SOC / LVDDR3 / SD', f: 'c02.html', ready: true },
+      { n: '3.2', t: '核心板第 1 页：六路电源逐个算', s: 'SNVS / CSI / ARM-SOC / VDD_HIGH / LVDDR3 / SD 可切', f: 'c02.html', ready: true },
       { n: '3.3', t: '核心板第 2 页：SoC 电源脚', s: 'VDD_ARM_CAP、VDD_SOC_CAP、SNVS 常电', f: 'c03.html', ready: true },
       { n: '3.4', t: '核心板第 3 页：DDR3L', s: '拓扑、VREF 1.5k 分压、端接、等长', f: 'c04.html', ready: true },
       { n: '3.5', t: '核心板第 4 页：eMMC 与 NAND', s: '10k 上拉、双存储位号、NVCC_SD 切换', f: 'c05.html', ready: true },
-      { n: '3.6', t: '核心板第 6 页：复位与晶振', s: 'MAX809R、24MHz 18pF、RTC 32.768kHz', f: 'c06.html', ready: true },
-      { n: '3.7', t: '核心板第 7 页：启动配置', s: 'BOOT_CFG 4.7k 阵列与 BOOT 表', f: 'c07.html', ready: true },
-      { n: '3.8', t: 'MINI 第 1 页：连接器与调试', s: '两个 60pin、I2C 4.7k、JTAG、8 位拨码', f: 'c08.html', ready: true },
-      { n: '3.9', t: 'MINI 第 2 页：TF 卡与低速外设', s: '47k 上拉、LED/按键/蜂鸣器、RS485/CAN', f: 'c09.html', ready: true },
-      { n: '3.10', t: 'MINI 第 3 页：以太网与排针', s: 'SR8201F、25MHz、变压器、网口 LED', f: 'c10.html', ready: true },
-      { n: '3.11', t: 'MINI 第 4 页：输入电源与 USB', s: '两片 DCJ5060、4.7µH、USB 切换、CH340', f: 'c11.html', ready: true },
-      { n: '3.12', t: '一页看全板', s: '把 12 页压成一张信号地图', f: 'c12.html', ready: true }
+      { n: '3.6', t: '核心板第 5 页：LCD、以太网、GPIO、USB', s: '24 位 RGB、RMII 七根线、时钟串阻、VBUS 电容', f: 'c06.html', ready: true },
+      { n: '3.7', t: '核心板第 6 页：ONOFF、复位与两颗晶振', s: 'POR_B、MAX809R、24MHz 18pF、RTC 32.768kHz', f: 'c07.html', ready: true },
+      { n: '3.8', t: '核心板第 7 页：BOOT 配置的 47K 阵列', s: 'BT_CFG1/2/4 共 24 位、BMODE 表、4.7k 覆盖 47k', f: 'c08.html', ready: true },
+      { n: '3.9', t: '核心板第 8 页：60pin 连接器与整板信号', s: 'J1/J2 定义、电源脚分布、连接器寄生的代价', f: 'c09.html', ready: true },
+      { n: '3.10', t: 'MINI 第 1 页：连接器、启动拨码、I2C 与 JTAG', s: 'IMX1/IMX2、47k 上拉、8 位拨码、调试口', f: 'c10.html', ready: true },
+      { n: '3.11', t: 'MINI 第 2 页：TF、CAN、RS485 与人机外设', s: 'TJA1050、SP3485 自动方向、屏与摄像头', f: 'c11.html', ready: true },
+      { n: '3.12', t: 'MINI 第 3–4 页：以太网与电源树，一页看全板', s: 'SR8201F+变压器、DCJW5060 ×2、USB/CH340', f: 'c12.html', ready: true }
     ]
   },
   {
@@ -101,3 +101,5 @@ window.PART_OF = function (n) {
   var map = { '1': 'p1', '2': 'p2', '3': 'p3', '4': 'p4', '5': 'p5', '6': 'p6' };
   return map[major] || 'p1';
 };
+
+

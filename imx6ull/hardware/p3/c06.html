@@ -1,9 +1,11 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>3.6 核心板第 6 页：复位与晶振 | 第三篇 · 逐页读真实原理图 | i.MX6ULL 学习手册</title>
-<meta name="description" content="MAX809R 复位链、R33 0Ω 与 C14、24MHz 晶振 18pF 的负载电容推导、RTC 32.768kHz；复位与时钟故障的判据。">
-<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+<title>3.6 核心板第 5 页：LCD、两路以太网、GPIO、USB、SD1 | 第三篇 | i.MX6ULL 学习手册</title>
+<meta name="description" content="CORE p5 逐块解读：24 位 RGB LCD 与 PCLK 串阻、ENET1/2 的 RMII 引脚、GPIO1_IO00-09 与 SNVS_TAMPER 的分工、USB VBUS 电容脚、SD1 时钟串阻与上拉、ADC 参考。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -14,125 +16,156 @@
   <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
 <div class="shell">
   <aside id="sidebar"><div class="vol-h">第三篇 · 逐页读真实原理图</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 6 章<span class="sep">/</span>约 26 分钟</div>
-    <h1>核心板第 6 页：复位与晶振</h1>
-    <p class="lede">板子「不启动」时，工程师最先量的两样东西就是<b>复位电平</b>和<b>时钟波形</b>。这一页把两件事都画全了：U3（MAX809R）负责上电复位，Y2（24MHz）负责主时钟，另有一路 32.768kHz 给 RTC。</p>
+    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 6 章<span class="sep">/</span>约 55 分钟</div>
+    <h1>核心板第 5 页：LCD、两路以太网、GPIO、USB、SD1</h1>
+    <p class="lede">这一页（IMX6ULL_CORE_LCDNET.SchDoc）是「接口密集页」：左边 24 位 LCD，中间两路以太网，右边 GPIO 与 USB/SD，底部 ADC。四个区块的共同问题是同一个：<b>哪些线要串阻、串多大、为什么</b>。看懂这一页，你就掌握了「时钟线串阻、数据线直连」这条通用规则。</p>
+
+    <figure class="fig sch"><div class="scroller"><img loading="lazy" src="../../assets/img/sch/core_p5_lcd.png" alt="CORE p5 LCD 区：LCD_CLK/DE/HSYNC/VSYNC/RESET 与 LCD_DATA0-23"><a class="zoom" href="../../assets/img/sch/core_p5_lcd.png" target="_blank" rel="noopener">新窗口打开</a></div><figcaption>LCD 区（300dpi 裁切）：<b>LCD_CLK(A8)、LCD_ENABLE(B8)、LCD_HSYNC(D9)、LCD_VSYNC(C9)、LCD_RESET(E9)</b>，其中 <b>R43 10R</b> 串在 LCD_PCLK 上、<b>R45 0R</b> 是可选跳线；<b>LCD_DATA00–23</b> 直接从 SoC 连出（Ball B9/A9/E10/D10…）。NVCC_LCDIF 由 E13 供电，旁挂 C48/C49 224。</figcaption></figure>
+
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>顺着 POR_B 走一遍复位链，说出每一颗元件的作用</li>
-        <li>用 CL = C/2 + C<sub>stray</sub> 解释「24MHz 晶振为什么配 18pF」</li>
-        <li>区分「起振慢」「不起振」「频偏大」三种时钟故障与对应原因</li>
+        <li>说清 RGB LCD 的 PCLK/DE/HSYNC/VSYNC 四根控制线各自作用，以及像素时钟怎么算</li>
+        <li>解释「只有 PCLK 串 10Ω、数据线不串」的原因</li>
+        <li>列出 RMII 接口的 7 根关键信号与 25MHz 参考时钟的走向</li>
+        <li>区分 GPIO1_IOxx 与 SNVS_TAMPERxx 的电源域差异</li>
+        <li>说明 USB 的 VDD_USB_CAP 与 CHD 脚为什么这样接</li>
       </ol>
     </div>
 
-    <h2><span class="n">3.6.1</span>复位链：四颗元件，一条逻辑</h2>
-    <ol class="steps">
-      <li><b>U3（MAX809R）</b>监视 <code>DCDC_3V3</code>：低于阈值 → RST 输出低（复位有效）；回升并延时后释放。</li>
-      <li><b>R33（0Ω）</b>把 RST 连到 <code>POR_B</code>：0Ω 是「可拆」的连接，方便调试时断开、也方便版本改动。</li>
-      <li><b>C14（104）</b>挂在 POR_B 上：吸收复位线上的毛刺，并与 R33/内部上拉形成小的 RC 延时，保证复位脉冲足够宽。</li>
-      <li><b>POR_B 内部上拉</b>：SoC 侧有上拉，外部只需「拉低即复位」，不需要额外驱动能力。</li>
+    <h2><span class="n">3.6.1</span>LCD：24 位并行的「老式但可靠」</h2>
+    <p>i.MX6ULL 的 LCDIF 输出 <b>RGB888 24 位</b>，一次并行送出 3 个字节。除了数据，还有 4 根时序线：</p>
+    <table>
+      <thead><tr><th>信号</th><th>球</th><th>作用</th><th>极性</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">LCD_CLK（PCLK）</td><td>A8</td><td>像素时钟，每个沿送一个像素</td><td>由 LCDIF 分频产生</td></tr>
+        <tr><td class="nm">LCD_ENABLE（DE）</td><td>B8</td><td>数据有效窗口，高电平时数据才被接收</td><td>高有效</td></tr>
+        <tr><td class="nm">LCD_HSYNC</td><td>D9</td><td>行同步，标志一行开始</td><td>极性可配</td></tr>
+        <tr><td class="nm">LCD_VSYNC</td><td>C9</td><td>场同步，标志一帧开始</td><td>极性可配</td></tr>
+        <tr><td class="nm">LCD_RESET</td><td>E9</td><td>屏复位（多数屏低有效）</td><td>低有效</td></tr>
+      </tbody>
+    </table>
+    <p>像素时钟的算法（以 800×480@60Hz 为例）：</p>
+    <p style="text-align:center">PCLK = (HFP+HSW+HBP+800) × (VFP+VSW+VBP+480) × 60</p>
+    <p>代入常见参数（H: 40/48/40，V: 13/3/29）：(928)×(525)×60 ≈ <b>29.2MHz</b>。这就是为什么 LCD 的 PCLK 要串 10Ω：30MHz 的方波在 50Ω 走线上很容易振铃，串 10Ω 后边沿变缓、过冲减小，而 30MHz 周期 33ns，多 0.6ns 完全无碍。</p>
+
+    <h2><span class="n">3.6.2</span>为什么只串 PCLK，不串 24 根数据</h2>
+    <p>三个原因，缺一不可：</p>
+    <ol>
+      <li><b>时钟是「采样基准」</b>：数据线只要在 PCLK 的沿上稳定即可，轻微的边沿差异不影响判决；而 PCLK 自己振铃会让采样沿位置飘，所有数据一起出错。</li>
+      <li><b>数量代价</b>：24 根数据各串一颗电阻，PCB 面积与成本都不可接受；一颗 PCLK 电阻就能改善整组时序。</li>
+      <li><b>数据线是「准静态」</b>：30MHz 下数据在一行内基本不变（大面积同色），真正的翻转集中在少数位置，振铃概率低于时钟。</li>
     </ol>
-    <p>另一颗监控芯片 <b>U10（UM805RE 一类）</b>在部分版本上用于监视 1.35V 或产生第二路复位，用途是「确保内核电压也稳定后才释放复位」。读图时要看清它接的是哪一路、输出连到哪里。</p>
+    <p>这条规则同样适用于 SD1_CLK（R28 10R）与 ENET 的 TX_CLK（R44 10R）——<b>凡是「送出后要被别人采样的时钟」，都考虑串 10–33Ω</b>。</p>
 
-    <div class="box tip">
-      <h5>复位脚的三条实测判据</h5>
-      <p>① 上电后 POR_B 应从低变高（低有效），上升沿要干净；② 松开复位按钮后电压应稳定在高，不能有回沟；③ 若一直为低，先断开 R33 判断是 SoC 侧还是监控芯片侧拉低。</p>
-    </div>
+    <h2><span class="n">3.6.3</span>以太网：RMII 的 7 根线</h2>
+    <figure class="fig sch"><div class="scroller"><img loading="lazy" src="../../assets/img/sch/core_p5_net.png" alt="CORE p5 以太网区：ENET1/ENET2 的 TXD/TXEN/TX_CLK/RXD/CRS_DV 与 NVCC_ENET"><a class="zoom" href="../../assets/img/sch/core_p5_net.png" target="_blank" rel="noopener">新窗口打开</a></div><figcaption>ENET 区（300dpi 裁切）：ENET1 的 <b>TXD0/TXD1/TXEN/TX_CLK/RXD0/RXD1/RXER/CRS_DV</b> 与 ENET2 的同名信号并列；<b>R44 10R</b> 串在 ENET1_TX_CLK、<b>R46 10R</b> 串在 ENET2_TX_CLK；NVCC_ENET（F13）旁挂 C48 224。</figcaption></figure>
+    <p>RMII（Reduced MII）只有 7 根信号 + 1 根 50MHz 参考时钟：</p>
+    <table>
+      <thead><tr><th>信号</th><th>方向</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">TXD0/TXD1</td><td>MAC → PHY</td><td>2 位发送数据（RMII 用 2 位，10/100M 复用）</td></tr>
+        <tr><td class="nm">TXEN</td><td>MAC → PHY</td><td>发送使能</td></tr>
+        <tr><td class="nm">TX_CLK</td><td>PHY → MAC 或外部 50MHz</td><td>发送时钟，核心板用 25MHz 晶振 ×2 或 PHY 内部 PLL</td></tr>
+        <tr><td class="nm">RXD0/RXD1</td><td>PHY → MAC</td><td>2 位接收数据</td></tr>
+        <tr><td class="nm">CRS_DV</td><td>PHY → MAC</td><td>载波检测/数据有效复用</td></tr>
+        <tr><td class="nm">RXER</td><td>PHY → MAC</td><td>接收错误（RMII 可选）</td></tr>
+      </tbody>
+    </table>
+    <p>核心板把两路以太网的引脚都引到 60pin，底板决定用哪路：MINI 底板用 ENET2（配 SR8201F），另一路留给扩展。这也解释了为什么核心板要画 ENET1 和 ENET2 两套——<b>核心板做「全引出」，底板做「选一路」</b>。</p>
 
-    <h2><span class="n">3.6.2</span>24MHz 晶振：18pF 是怎么来的</h2>
-    <p>晶振规格书里最关键的一项不是频率，而是<b>负载电容 C<sub>L</sub></b>（常见 8pF、12pF、18pF）。外部两只电容与寄生电容共同决定实际负载：</p>
-    <p style="text-align:center">C<sub>L</sub> ≈ (C12 × C13)/(C12 + C13) + C<sub>stray</sub></p>
-    <p>当 C12 = C13 = 18pF 时，串联等效 9pF；PCB 与引脚寄生约 3pF，合计 12pF——所以 <b>18pF 配的是 CL = 12pF 的晶振</b>。如果晶振规格是 CL = 18pF，就要把电容加到约 30pF，否则频率会偏高（振荡在「负载偏轻」状态）。</p>
-    <p>频偏的工程判据：负载电容每偏差 1pF，24MHz 晶振的频率偏移约几十 ppm 量级；对 USB、以太网这类要求 ±50ppm 的接口，几 pF 的偏差就可能出界。</p>
+    <h2><span class="n">3.6.4</span>GPIO 与 SNVS_TAMPER：两个电源域</h2>
+    <p>这一页右侧的 GPIO 是 <b>GPIO1_IO00–09</b>（球 K13/L15/L14/L17/M16/M17/K17/L16/N17/M15），供电 <b>NVCC_GPIO（J13）</b>，3.3V 域，可以关断。<span class="nm">SNVS_TAMPER0–9</span> 则属于 <b>SNVS 常电域</b>，主电源断了仍然有效——所以它们被用来做「唤醒源」（按键唤醒、ACC 检测）。</p>
+    <p>看图判断电源域的方法：<b>看这一组球附近有没有独立的 NVCC_xxx 网络</b>。有 NVCC_GPIO 就是可关断域；挂在 VDD_SNVS 上就是常电域。混用会出两种怪现象：常电域信号送进断电域芯片 → 漏电/闩锁；断电域信号送进常电域 → 电平不确定导致误唤醒。</p>
+    <p>图上还把这些 GPIO 的复用功能全部标出，例如 <b>GPIO1_IO00/I2C2_SCL/GPT1_CAPTURE1/ANATOP_OTG1_ID/ENET1_REF_CLK1/MQS_RGHT</b>。读的时候按「当前项目用哪个功能」取一根，不要以为六个功能同时在跑。</p>
 
-    <figure class="fig">
-      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <rect x="20" y="18" width="410" height="200" rx="10" fill="#141c2e" stroke="#3a4560"/>
-        <text x="36" y="42" fill="#eaf3ff" font-size="11">晶振两端的负载电容</text>
-        <rect x="150" y="80" width="34" height="60" rx="4" fill="rgba(255,255,255,.04)" stroke="#5ff1ef"/>
-        <text x="167" y="116" fill="#9df5f4" font-size="9" text-anchor="middle">Y2</text>
-        <line x1="120" y1="96" x2="150" y2="96" stroke="#5ff1ef"/>
-        <line x1="184" y1="96" x2="214" y2="96" stroke="#5ff1ef"/>
-        <text x="96" y="92" fill="#9fb0c7" font-size="9">XTALI</text>
-        <text x="220" y="92" fill="#9fb0c7" font-size="9">XTALO</text>
-        <rect x="104" y="120" width="26" height="14" rx="3" fill="rgba(92,225,160,.15)" stroke="#5ce1a0"/>
-        <text x="96" y="148" fill="#9df3c2" font-size="9">C12 18pF</text>
-        <rect x="176" y="120" width="26" height="14" rx="3" fill="rgba(92,225,160,.15)" stroke="#5ce1a0"/>
-        <text x="176" y="148" fill="#9df3c2" font-size="9">C13 18pF</text>
-        <line x1="117" y1="134" x2="117" y2="156" stroke="#6f7f9c"/>
-        <line x1="189" y1="134" x2="189" y2="156" stroke="#6f7f9c"/>
-        <text x="36" y="184" fill="#6f7f9c" font-size="9">18/2 = 9pF，加约 3pF 寄生 → CL ≈ 12pF</text>
+    <h2><span class="n">3.6.5</span>USB：VBUS 与 CHD 的特殊接法</h2>
+    <p>USB 部分有三个容易看错的脚：</p>
+    <ul>
+      <li><b>USB_OTG1_VBUS（T12）</b>：这是「检测 VBUS 是否存在」的输入，不是给 SoC 供电。外接 5V 经分压/限流后接入，SoC 据此判断「插了主机还是插了设备」。</li>
+      <li><b>VDD_USB_CAP（R12）</b>：内部 USB PHY 的稳压输出，<b>只接电容</b>（C6 22µF + C5/C7/C8 104）。同 CAP 脚规则，绝不能外部供电。</li>
+      <li><b>USB_OTG1_CHD（U16）</b>：Charger Detect，用于识别充电器类型（DCP/CDP/SDP），决定允许抽取多大电流。底板把它引到 Type-C 的 CC/检测电路。</li>
+    </ul>
+    <p>USB_OTG1_DP/DN（U15/T15）、OTG2（U13/T13）是差分对，要求 90Ω 差分、等长；ESD 保护放在连接器侧（底板），核心板只负责走线。</p>
 
-        <rect x="450" y="18" width="400" height="200" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
-        <text x="466" y="42" fill="#eaf3ff" font-size="11">三种时钟故障</text>
-        <text x="466" y="72" fill="#9df3c2" font-size="10">不起振</text>
-        <text x="466" y="92" fill="#9fb0c7" font-size="9.5">电容值错、晶振坏、焊盘虚焊、驱动强度不足</text>
-        <text x="466" y="118" fill="#ffd79a" font-size="10">起振慢/易停</text>
-        <text x="466" y="138" fill="#9fb0c7" font-size="9.5">负载电容偏大、ESR 偏高的晶振、负阻余量不足</text>
-        <text x="466" y="164" fill="#ffd79a" font-size="10">频偏大</text>
-        <text x="466" y="184" fill="#9fb0c7" font-size="9.5">负载电容不匹配、寄生电容估算错、温度特性差</text>
+    <h2><span class="n">3.6.6</span>SD1 与 ADC</h2>
+    <p><b>SD1（USDHC1）</b>：SD1_CLK 经 <b>R28 10R</b> 串阻，SD1_CMD/DATA0–3 直连；NVCC_SD1（C4）由 NVCC_SD 供电（可在 3.3/1.8V 间切换，见 3.2 节 U9）。C9（18pF/DNP）是预留的时钟负载电容，用于调时钟边沿——DNP 表示默认不贴。</p>
+    <p><b>ADC</b>：VDDA_ADC_3P3（L13）与 ADC_VREFH（M13）都接 3.3V，旁挂 C10 104。ADC 的参考就是 VDDA，所以 <b>3.3V 的噪声直接变成 ADC 噪声</b>；做精密采样时这一脚要单独 LC 滤波，本板只放了 104（够 10 位 SAR 用）。</p>
 
-        <text x="20" y="252" fill="#9fb0c7" font-size="10.5">RTC 用 32.768kHz 音叉晶振，负载电容通常 6–12pF，且对布局极敏感：走线要短、下面不要铺地平面、远离发热源。</text>
-        <text x="20" y="276" fill="#6f7f9c" font-size="10">判据：RTC 走时一天偏差超过几秒，先查晶振负载电容与寄生，再怀疑芯片。</text>
-        <text x="20" y="300" fill="#ff9c9c" font-size="10">坑：用示波器探头直接量晶振脚（探头电容几十 pF），会把振荡「量停」。</text>
-      </svg>
-      <figcaption><b>图 3-6</b>　晶振负载电容的算法与三种故障。</figcaption>
-    </figure>
+    <h2><span class="n">3.6.7</span>故障判据</h2>
+    <table>
+      <thead><tr><th>现象</th><th>先测</th><th>判据</th><th>结论</th></tr></thead>
+      <tbody>
+        <tr><td>屏花屏/条纹</td><td>PCLK 波形</td><td>30MHz 方波、过冲 &lt;0.3V</td><td>过冲大 → R43 虚焊或走线过长</td></tr>
+        <tr><td>屏全黑但有背光</td><td>DE/HSYNC/VSYNC</td><td>有脉冲</td><td>无脉冲 → LCDIF 未使能或屏复位未释放</td></tr>
+        <tr><td>网口不通</td><td>TX_CLK</td><td>25/50MHz</td><td>无时钟 → PHY 未起振或 R44 开路</td></tr>
+        <tr><td>网口丢包</td><td>CRS_DV 与 RXD</td><td>有随包脉冲</td><td>无 → RMII 模式配置错（PHY 的 RX_DV 跳线）</td></tr>
+        <tr><td>USB 不识别</td><td>VBUS 检测脚</td><td>插线后 &gt;1V</td><td>0V → 分压电阻开路，SoC 认为「没插」</td></tr>
+        <tr><td>SD 卡不识别</td><td>SD1_CLK</td><td>50MHz 有波形</td><td>无 → 时钟未使能；有 → 查 CMD 上拉</td></tr>
+      </tbody>
+    </table>
 
     <div class="demo">
-      <div class="dh"><b>负载电容计算器</b><span>给晶振 CL 与寄生，算两只电容该取多少</span></div>
+      <div class="dh"><b>LCD 像素时钟计算器</b><span>输入分辨率与前后肩，算出 PCLK，并与 30MHz 档位对照</span></div>
       <div class="db">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div><div style="font-size:12px;color:#9fb0c7">晶振 C<sub>L</sub> <b id="clv" style="color:#5ff1ef">12</b> pF</div><input id="cl" type="range" min="6" max="20" step="0.5" value="12" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12px;color:#9fb0c7">寄生电容 <b id="csv" style="color:#5ff1ef">3</b> pF</div><input id="cs" type="range" min="1" max="8" step="0.5" value="3" style="width:100%;accent-color:#5ff1ef"></div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+          <div><div class="lbl">水平像素 <b id="wn">800</b></div><input id="w" type="range" min="320" max="1280" step="8" value="800" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">垂直像素 <b id="hn">480</b></div><input id="h" type="range" min="240" max="1024" step="8" value="480" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">刷新率 <b id="fn">60</b> Hz</div><input id="f" type="range" min="30" max="75" step="1" value="60" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">水平总消隐 <b id="hb">128</b> 像素</div><input id="hbk" type="range" min="40" max="400" step="8" value="128" style="width:100%;accent-color:#5ff1ef"></div>
         </div>
-        <div id="xtalOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+          <div><div class="lbl">垂直总消隐 <b id="vb">45</b> 行</div><input id="vbk" type="range" min="10" max="120" step="1" value="45" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">数据位宽 <b id="bn">24</b> bit</div><input id="bits" type="range" min="16" max="24" step="8" value="24" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="lOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
       </div>
     </div>
 
-    <h2><span class="n">3.6.3</span>复位与时钟的联合排查顺序</h2>
-    <ol class="steps">
-      <li>量 <code>POR_B</code>：低 → 复位没释放，查监控芯片与 3.3V；高 → 进入下一步。</li>
-      <li>量 24MHz：无波形 → 查晶振与电容；有波形但幅度小 → 查负载与驱动。</li>
-      <li>量 32.768kHz：只影响 RTC，不影响启动，但会影响时间与唤醒。</li>
-      <li>都正常仍不启动 → 查 BOOT_CFG（下一章）与 DDR（3.4 章）。</li>
-    </ol>
+    <h3>练习（答案在折叠里）</h3>
+    <details class="quiz"><summary>1. 800×480@60，水平总 928、垂直总 525，PCLK 多少？</summary><div class="ans">928×525×60≈29.2MHz。</div></details>
+    <details class="quiz"><summary>2. 为什么只给 PCLK 串 10Ω？</summary><div class="ans">PCLK 是采样基准，振铃会让采样沿漂移；数据线数量多且为准静态，串阻成本高收益低。</div></details>
+    <details class="quiz"><summary>3. RMII 有几根数据/控制信号？</summary><div class="ans">TXD0/1、TXEN、RXD0/1、CRS_DV、RXER 共 7 根，另加 50MHz 参考时钟。</div></details>
+    <details class="quiz"><summary>4. SNVS_TAMPER 与 GPIO1_IOxx 的电源域差别？</summary><div class="ans">前者常电域（主电源断仍有效，做唤醒），后者 NVCC_GPIO 可关断域。</div></details>
+    <details class="quiz"><summary>5. VDD_USB_CAP 能外部供电吗？</summary><div class="ans">不能，它是内部 PHY 稳压输出，只接电容。</div></details>
+    <details class="quiz"><summary>6. SD1 的 C9 18pF 为什么标 DNP？</summary><div class="ans">预留时钟负载电容，用于调试边沿；默认不贴，避免拖慢时钟。</div></details>
 
-    <h3>自测</h3>
-    <details class="quiz"><summary>POR_B 一直是低，怎么快速判断是监控芯片还是 SoC 在拉低？</summary><div class="ans">断开 R33（0Ω）后分别量两侧：若芯片侧仍低 → 监控芯片或 3.3V 异常；若 SoC 侧仍低 → SoC 内部复位逻辑或外部复位按钮/调试器在拉低。</div></details>
-    <details class="quiz"><summary>晶振 CL=18pF，却只装了 18pF 两只电容，会怎样？</summary><div class="ans">实际 CL 只有约 12pF，负载偏轻 → 频率偏高（几十 ppm 量级），可能导致 USB/以太网超出容限，或起振裕度变化。应把电容加到约 30pF。</div></details>
-    <details class="quiz"><summary>为什么示波器探头直接量晶振可能让振荡停止？</summary><div class="ans">探头有几十 pF 电容，并在晶振脚上等于额外增加负载电容，破坏谐振条件，振荡器可能停振或频率被拉偏。应使用高阻/低电容探头或间接测量。</div></details>
-
-        <h2>原页对照</h2>
-    <figure class="fig sch">
-      <div class="scroller"><a href="../../assets/img/sch/core_p6.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/core_p6.png" alt="CORE V2.0 原理图第 6 页" loading="lazy"></a></div>
-      <figcaption><b>原页 · CORE p6</b>　第 6 页下半部：RESET（U2 MAX809R，R31 0Ω、C13 104、POR_B 上拉 R33）+ XTAL（Y2 24MHz、C12/C14 18pF、R32 1M 并联反馈）。RTC 32.768kHz 在 B 区，配 C2/C3 18pF。<a class="zoom" href="../../assets/img/sch/core_p6.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
-    </figure>
-    <div class="ch-nav"><a href="c05.html"><span>上一章</span><b>← 3.5 核心板第 4 页</b></a>
-      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.7 核心板第 7 页 →</b></a></div>
+    <div class="ch-nav">
+      <a href="c05.html"><span>上一章</span><b>← 3.5 eMMC 与 NAND</b></a>
+      <a class="nx" id="chNavNext" href="c07.html"><span>下一章</span><b>3.7 核心板第 6 页：控制、时钟、复位 →</b></a>
+    </div>
   </main>
 </div>
-<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
 <script>
 renderPart('p3','c06.html');
 (function(){
   function calc(){
-    var cl=+document.getElementById('cl').value, cs=+document.getElementById('cs').value;
-    document.getElementById('clv').textContent=cl.toFixed(1);
-    document.getElementById('csv').textContent=cs.toFixed(1);
-    var c=2*(cl-cs);
-    document.getElementById('xtalOut').innerHTML=
-      '<b style="color:#eaf3ff;font-size:15px">每只电容应取 ≈ '+c.toFixed(1)+' pF</b><br>'+
-      (c>0?'就近取标准值（如 18pF / 22pF / 27pF / 30pF）':'<span style="color:#ff9c9c">寄生已超过 CL，需减少寄生或换更低 CL 的晶振</span>')+'<br>'+
-      '校验：'+(c/2).toFixed(1)+' pF（串联等效）+ '+cs.toFixed(1)+' pF 寄生 = '+((c/2)+cs).toFixed(1)+' pF<br>'+
-      '<span style="color:#6f7f9c;font-size:11.5px">公式：CL = C/2 + Cstray（两只等值时）。寄生含 PCB 走线、焊盘、芯片引脚，通常 2–4pF。</span>';
+    var w=+document.getElementById('w').value, h=+document.getElementById('h').value, f=+document.getElementById('f').value;
+    var hb=+document.getElementById('hbk').value, vb=+document.getElementById('vbk').value, b=+document.getElementById('bits').value;
+    ['wn','hn','fn','hb','vb','bn'].forEach(function(){});
+    document.getElementById('wn').textContent=w; document.getElementById('hn').textContent=h;
+    document.getElementById('fn').textContent=f; document.getElementById('hb').textContent=hb;
+    document.getElementById('vb').textContent=vb; document.getElementById('bn').textContent=b;
+    var pclk=(w+hb)*(h+vb)*f/1e6;
+    var bw=pclk*1e6*b/8/1e6;
+    document.getElementById('lOut').innerHTML=
+      'PCLK = ('+w+'+'+hb+')×('+h+'+'+vb+')×'+f+' = <b style="color:#5ff1ef">'+pclk.toFixed(2)+' MHz</b><br>'+
+      '像素吞吐 = '+pclk.toFixed(1)+'M×'+b+'bit = <b style="color:#5ff1ef">'+bw.toFixed(0)+' MB/s</b>（LCDIF 从 DDR 取数的下限）<br>'+
+      '周期 = '+(1000/pclk).toFixed(1)+' ns；串 10Ω 后附加边沿 ≈ (10+50)×10pF = 0.6ns，占周期 '+((0.6/(1000/pclk))*100).toFixed(1)+'%';
   }
-  ['cl','cs'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  ['w','h','f','hbk','vbk','bits'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
   calc();
 })();
 </script>
-</body></html>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+</style>
+</body>
+</html>

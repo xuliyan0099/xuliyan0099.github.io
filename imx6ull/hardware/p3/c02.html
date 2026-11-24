@@ -1,9 +1,11 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>3.2 核心板第 1 页：五路电源 | 第三篇 · 逐页读真实原理图 | i.MX6ULL 学习手册</title>
-<meta name="description" content="U1/U6/U8 三颗 DCDC 与 U7/U12/U9 三颗 LDO/开关，生成 1.35V、3.3V、LVDDR3、SNVS、CSI、SD 六路电压；配 TP3–TP8 实测判据。">
-<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+<title>3.2 核心板第 1 页：六路电源逐个算 | 第三篇 · 逐页读真实原理图 | i.MX6ULL 学习手册</title>
+<meta name="description" content="CORE p1 六个电源区块：SNVS 3.3V、CSI 2.8V、ARM/SOC 1.35V、VDD_HIGH 3.3V、LVDDR3 1.35V、NVCC_SD 3.27/1.81V；含 EN 延时与 DISCHG_EN 放电电路。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -14,113 +16,165 @@
   <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
 <div class="shell">
   <aside id="sidebar"><div class="vol-h">第三篇 · 逐页读真实原理图</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 2 章<span class="sep">/</span>约 26 分钟</div>
-    <h1>核心板第 1 页：五路（其实六路）电源</h1>
-    <p class="lede">这一页是整块板的「心脏」。它把 5V 输入变成 1.35V、3.3V、LVDDR3、SNVS 3.3V、CSI 2.8V、SD 1.8/3.3V 六路电压。<b>看懂这一页，你就知道为什么板子上电顺序不能乱。</b></p>
+    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 2 章<span class="sep">/</span>约 55 分钟</div>
+    <h1>核心板第 1 页：六路电源逐个算</h1>
+    <p class="lede">CORE p1 是整块核心板的「心脏页」：六个红字区块把 DC5V / DCDC_3V3 拆成 SNVS 3.3V、CSI 2.8V、ARM/SOC 1.35V、VDD_HIGH 3.3V、LVDDR3 1.35V、NVCC_SD 3.27/1.81V。这一页读完，你就知道每一路为什么是这个电压、反馈电阻怎么取值、使能与放电怎么配合。</p>
+
+    <figure class="fig sch"><div class="scroller"><img loading="lazy" src="../../assets/img/sch/core_p1_rails.png" alt="CORE p1 上部：SNVS、NVCC_CSI、ARM/SOC 三个电源区块"><a class="zoom" href="../../assets/img/sch/core_p1_rails.png" target="_blank" rel="noopener">新窗口打开</a></div><figcaption>CORE p1 上半页原图裁切：左 <b>SNVS</b>（U7 ME6209A33，DC5V→SNVS_3V3，TP4）、中 <b>NVCC_CSI</b>（U12 XC6206P282MR，DCDC_3V3→VCC_CSI，TP8）、右 <b>ARM/SOC</b>（U6 MT3420B + L1 2.2µH + R56 124K/R61 100K，0.6V，EN 由 DCDC_3V3_PG 经 R60 10K/C85 104 延时）。下半页还有 VDD_HIGH（U8）、LVDDR3（U11）、NVCC_SD（U9）。</figcaption></figure>
+
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>画出这六路电压的来源、电压值与主要负载</li>
-        <li>解释为什么 SNVS 3.3V 单独用一颗 LDO 而不与主 3.3V 合并</li>
-        <li>用 TP3–TP8 五个测试点定位「哪一路没起来」</li>
-        <li>说出上电顺序错乱会导致什么现象</li>
+        <li>说出六路电源各自的输入、输出、电流等级与「为什么用它」</li>
+        <li>用 V<sub>out</sub>=V<sub>ref</sub>(1+R<sub>1</sub>/R<sub>2</sub>) 核对每一路，并与图上的 <b>#R1/R2</b> 备注对上</li>
+        <li>算出 EN 脚 RC 的延时常数，解释上电时序为什么要错开</li>
+        <li>看懂 DISCHG_EN + 2SK3018 + 50R 的快速放电电路，知道它解决什么</li>
+        <li>解释 SD 电源为什么能在 3.27V 与 1.81V 之间切换</li>
       </ol>
     </div>
 
-    <h2><span class="n">3.2.1</span>电源树：谁生谁</h2>
+    <h2><span class="n">3.2.1</span>六路一览：谁给谁供电</h2>
     <table>
-      <thead><tr><th>电压轨</th><th>来源器件</th><th>典型值</th><th>主要负载</th><th>测试点</th></tr></thead>
+      <thead><tr><th>区块</th><th>芯片</th><th>输入</th><th>输出</th><th>为什么</th></tr></thead>
       <tbody>
-        <tr><td class="nm">DCDC_5V</td><td>底板输入（MINI 第 4 页）</td><td>5.0V</td><td>核心板 DCDC 输入、USB VBUS</td><td>—</td></tr>
-        <tr><td class="nm">VDD_ARM_SOC_IN</td><td>U1（MT3420B 类 DCDC，L2 2.2µH）</td><td>1.35V</td><td>SoC 内核（ARM + SOC）</td><td>TP3</td></tr>
-        <tr><td class="nm">DRAM_1V35 / LVDDR3</td><td>U6 或 U8（DCDC）</td><td>1.35V</td><td>DDR3L 颗粒与 SoC DDR 接口</td><td>TP7</td></tr>
-        <tr><td class="nm">DCDC_3V3</td><td>U8 或 U6（DCDC）</td><td>3.3V</td><td>SoC 的 NVCC_GPIO、外设、上拉</td><td>—</td></tr>
-        <tr><td class="nm">VDD_SNVS_3V3</td><td>U7（ME6209A33 LDO）</td><td>3.3V</td><td>SNVS 域（RTC、唤醒逻辑，常电）</td><td>TP4</td></tr>
-        <tr><td class="nm">NVCC_CSI</td><td>U12（XC6206P282 LDO）</td><td>2.8V</td><td>摄像头接口 IO</td><td>TP8</td></tr>
-        <tr><td class="nm">NVCC_SD</td><td>U9（TMI6030 电源开关）</td><td>1.8 / 3.3V</td><td>SD 卡 IO（随卡切换）</td><td>TP6</td></tr>
+        <tr><td class="nm">SNVS</td><td>U7 ME6209A33M3G</td><td>DC5V</td><td>SNVS_3V3 → VDD_SNVS_3V3</td><td>常电、低 I<sub>q</sub>，RTC/唤醒不能断</td></tr>
+        <tr><td class="nm">NVCC_CSI</td><td>U12 XC6206P282MR</td><td>DCDC_3V3</td><td>VCC_CSI 2.8V</td><td>摄像头模块要 2.8V（模拟/IO）</td></tr>
+        <tr><td class="nm">ARM/SOC</td><td>U6 MT3420B + L1</td><td>DC5V</td><td>VDD_ARM_SOC_IN 1.35V</td><td>内核大电流，必须 DCDC</td></tr>
+        <tr><td class="nm">VDD_HIGH</td><td>U8 TMI3113 + L2</td><td>DCDC_3V3</td><td>VDD_HIGH 3.3V</td><td>内部高压域，独立 LDO/DCDC 隔离噪声</td></tr>
+        <tr><td class="nm">LVDDR3</td><td>U11 MT3420B + L3</td><td>DC5V</td><td>DRAM_1V35</td><td>DDR3L 1.35V，大电流、低纹波</td></tr>
+        <tr><td class="nm">NVCC_SD</td><td>U9 TMI6050</td><td>DCDC_3V3</td><td>3.27V / 1.81V 可切</td><td>SD 3.0 高速模式要 1.8V 信号</td></tr>
       </tbody>
     </table>
-    <p>注意：三颗 DCDC 的具体分工在不同版本的核心板上可能互换，<b>读图时以网络名为准，不要凭器件位号记忆</b>——这正是上一章强调「网络名才是说明书」的原因。</p>
+    <p>注意两个「看起来重复」的地方：<b>VDD_HIGH 是 3.3V，NVCC_CSI 是 2.8V</b>，都从 DCDC_3V3 再降一次。为什么不用 DCDC_3V3 直供？因为 SoC 内部这些域对噪声敏感（尤其 CSI 模拟前端），单独一级 LDO 能把开关纹波再压 40–60dB。</p>
 
-    <figure class="fig">
-      <svg viewBox="0 0 880 340" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <rect x="330" y="18" width="180" height="34" rx="6" fill="rgba(255,184,77,.14)" stroke="#ffb84d"/>
-        <text x="420" y="40" fill="#ffd79a" font-size="11" text-anchor="middle">DCDC_5V 输入</text>
-
-        <line x1="420" y1="52" x2="420" y2="70" stroke="#3a4560"/>
-        <rect x="60" y="70" width="150" height="32" rx="5" fill="#141c2e" stroke="#5ff1ef"/>
-        <text x="135" y="91" fill="#9df5f4" font-size="9.5" text-anchor="middle">U1 → 1.35V（TP3）</text>
-        <rect x="240" y="70" width="150" height="32" rx="5" fill="#141c2e" stroke="#5ff1ef"/>
-        <text x="315" y="91" fill="#9df5f4" font-size="9.5" text-anchor="middle">U6/U8 → 1.35V（TP7）</text>
-        <rect x="430" y="70" width="150" height="32" rx="5" fill="#141c2e" stroke="#5ff1ef"/>
-        <text x="505" y="91" fill="#9df5f4" font-size="9.5" text-anchor="middle">U8/U6 → 3.3V</text>
-        <line x1="420" y1="70" x2="505" y2="70" stroke="#3a4560"/>
-        <line x1="135" y1="70" x2="315" y2="70" stroke="#3a4560"/>
-
-        <rect x="620" y="70" width="200" height="32" rx="5" fill="#141c2e" stroke="#5ce1a0"/>
-        <text x="720" y="91" fill="#9df3c2" font-size="9.5" text-anchor="middle">U7 → SNVS 3.3V（TP4）</text>
-        <line x1="600" y1="52" x2="720" y2="52" stroke="#3a4560"/>
-        <line x1="720" y1="52" x2="720" y2="70" stroke="#3a4560"/>
-
-        <rect x="120" y="140" width="170" height="32" rx="5" fill="rgba(255,255,255,.03)" stroke="#8b7bff"/>
-        <text x="205" y="161" fill="#c8c0ff" font-size="9.5" text-anchor="middle">U12 → NVCC_CSI 2.8V（TP8）</text>
-        <rect x="320" y="140" width="170" height="32" rx="5" fill="rgba(255,255,255,.03)" stroke="#8b7bff"/>
-        <text x="405" y="161" fill="#c8c0ff" font-size="9.5" text-anchor="middle">U9 → NVCC_SD 1.8/3.3V（TP6）</text>
-        <line x1="315" y1="102" x2="205" y2="140" stroke="#3a4560"/>
-        <line x1="505" y1="102" x2="405" y2="140" stroke="#3a4560"/>
-
-        <text x="60" y="206" fill="#9fb0c7" font-size="10">大电流、高效率 → DCDC：1.35V 内核轨要几百 mA 到安级</text>
-        <text x="60" y="230" fill="#9fb0c7" font-size="10">小电流、常电、低噪声 → LDO：SNVS 要「主电源关了还活着」</text>
-        <text x="60" y="254" fill="#9fb0c7" font-size="10">可控电源 → 开关：SD 要随卡在 1.8/3.3V 之间切</text>
-
-        <text x="60" y="286" fill="#ff9c9c" font-size="10">上电顺序错乱的典型现象：只亮电源灯、串口无输出、反复重启。</text>
-        <text x="60" y="310" fill="#6f7f9c" font-size="10">排查顺序：量 TP4（SNVS 是否常电）→ TP3（内核）→ TP7/TP6/TP8 → 再看复位。</text>
-      </svg>
-      <figcaption><b>图 3-2</b>　核心板电源树：一路输入，六路输出，五个测试点。</figcaption>
-    </figure>
-
-    <h2><span class="n">3.2.2</span>为什么 SNVS 要单独一颗 LDO</h2>
-    <p>SNVS = Secure Non-Volatile Storage 域，包含 RTC、唤醒逻辑、部分常电寄存器。它的设计目标是：<b>主电源全部关掉时，仍靠纽扣电池或待机电源维持</b>。如果直接挂在主 3.3V 上，主电源一断，RTC 时间就丢；而单独 LDO 的输入可以来自 <code>VDD_SNVS_IN</code>（电池或 5V 待机），所以它必须独立。</p>
-    <p>代价是这颗 LDO 的静态电流必须很小（µA 级），否则电池几天就耗尽——这就是 2.6 章讲 I<sub>q</sub> 的实际落点。</p>
-
-    <h2><span class="n">3.2.3</span>三颗 DCDC 的关键外围</h2>
+    <h2><span class="n">3.2.2</span>SNVS：唯一不能断电的一路</h2>
+    <p>U7 是 ME6209A33M3G（SOT-23-3，3.3V 固定输出）。输入 DC5V，输出 SNVS_3V3，经 TP4 与 VDD_SNVS_3V3 相连。这一路的关键词是<b>Always-On</b>：</p>
     <ul>
-      <li><b>L2 = 2.2µH</b>：1.35V 大电流轨的储能电感，感值小是为了在大电流下仍有足够饱和余量（2.3 章）。</li>
-      <li><b>输入/输出电容</b>：22µF 级大容值 + 0.1µF 小容值并联，前者稳低频纹波、后者吸高频尖峰（2.2 章）。</li>
-      <li><b>反馈分压</b>：决定输出电压，必须用 1% 电阻且走线短、靠近 FB 脚（2.6 章）。</li>
-      <li><b>使能/时序</b>：EN 脚常由前一级的 PG 或 RC 延时控制，保证顺序。</li>
+      <li>它给 SoC 的 SNVS 域（RTC、唤醒、掉电检测）供电，主电源断了也要活着；</li>
+      <li>所以选 LDO 而不是 DCDC：LDO 没有开关噪声、不需要电感、静态电流可做到 µA 级；</li>
+      <li>C86 104 + C87 22µF 是输入/输出去耦（22µF 负责负载跳变，104 负责高频）。</li>
     </ul>
+    <p>算一下它的耗散：若 DC5V=5V、负载 30mA：P=(5−3.3)×0.03=51mW，SOT-23 温升约 13°C——完全可接受。这就是「小电流 + 低压差 → 用 LDO」的典型。</p>
 
-    <div class="box pit">
-      <h5>四个「电源没起来」的真实原因</h5>
-      <p><b>1. EN 脚没释放。</b>前级 PG 未到、或 EN 被误拉低，DCDC 根本不启动。</p>
-      <p><b>2. 反馈分压虚焊。</b>FB 悬空 → 输出冲到最高 → 过压保护打嗝。</p>
-      <p><b>3. 电感饱和。</b>负载偏大或感值选小，输出塌陷、芯片过热。</p>
-      <p><b>4. 输出短路。</b>某路负载短路，DCDC 进入 hiccup 模式，表现为「电压一跳一跳」。</p>
+    <h2><span class="n">3.2.3</span>NVCC_CSI：为什么摄像头要 2.8V</h2>
+    <p>U12 是 XC6206P282MR，输出 2.8V 给 VCC_CSI（TP8）。原因：多数 CMOS 图像传感器（OV5640 等）的 <b>AVDD 是 2.8V 模拟电源</b>，IO 可以是 1.8/2.8/3.3V，但模拟域必须 2.8V 左右以保证动态范围。给 3.3V 会超规格、图像噪点变大；给 1.8V 则驱动不足。</p>
+    <p>C108 104 + C88 10µF：输入去耦 + 输出储能。XC6206 的 I<sub>q</sub> 只有约 1µA，适合常开；它的压差约 0.25V@100mA，所以 3.3→2.8V（0.5V 压差）刚好够。</p>
+    <p><b>陷阱</b>：若把 U12 换成 3.3V 版本（XC6206P332），摄像头的模拟域就工作在 3.3V——短期能出图，长期信噪比下降、发热增加。</p>
+
+    <h2><span class="n">3.2.4</span>ARM/SOC 与 LVDDR3：两片 MT3420B</h2>
+    <p>U6（ARM/SOC）与 U11（LVDDR3）是同一型号 MT3420B，都是「DC5V 输入、1.35V 输出、外置 2.2µH」的同步 Buck。区别只在反馈网络与电流能力：</p>
+    <p style="text-align:center">V<sub>out</sub> = 0.6 × (1 + R<sub>top</sub>/R<sub>bottom</sub>)</p>
+    <p>U6：R56 124K / R61 100K → 0.6×(1+1.24)=<b>1.344V</b>；图上备注 <b>#R1/R2=1.25</b>，对应 0.6×2.25=<b>1.35V</b>。两个值差 0.5%，属于「按 E96 取整后与目标值的正常偏差」。</p>
+    <p>U11：R78 124K / R81 100K，同样 1.35V。两路分开是因为 <b>ARM 内核与 DDR 需要独立调节/独立去耦</b>：内核负载跳变剧烈，DDR 对纹波敏感，共用一路会互相干扰。</p>
+    <p><b>EN 与时序</b>：U6 的 EN 不是直接接 3.3V，而是由 <b>DCDC_3V3_PG</b> 经 R60 10K 上拉、C85 104 到地。时间常数 τ=10k×0.1µF=<b>1ms</b>，EN 上升到阈值约 2.2τ≈2.2ms。这段延时保证「3.3V 稳定之后，才允许 1.35V 起来」——顺序错了，SoC 的 IO 会先于内核得电，产生闩锁风险。</p>
+
+    <h2><span class="n">3.2.5</span>VDD_HIGH：TMI3113 与它的 0.6V 基准</h2>
+    <p>U8（TMI3113）输入 DCDC_3V3、输出 VDD_HIGH 3.3V。反馈 R64 100K / R66 22K，图上直接标了 <b>0.6V</b> 与 <b>#R1/R2=4.5</b>：0.6×5.5=<b>3.3V</b>。旁边的 C89 22µF + C90 104 是输出电容组合。</p>
+    <p>为什么 3.3V 进、3.3V 出还要 DC-DC？因为 SoC 的 VDD_HIGH 需要「独立的一路」，不能和板上其他 3.3V 负载共享（否则 USB、以太网的噪声会灌进 SoC）。这一级相当于「再稳压 + 隔离」。</p>
+
+    <h2><span class="n">3.2.6</span>NVCC_SD：唯一会「变电压」的一路</h2>
+    <p>U9 是 TMI6050（注意不是常见的 TMI6030），基准 <b>0.8V</b>，反馈 R68 68K / R73 22K：</p>
+    <p style="text-align:center">0.8×(1+68/22)=0.8×4.09=<b>3.27V</b>　（图上备注 #SD1_VSELECT=0: R1/R2=3.09: 3.27V）</p>
+    <p>当 <b>SD1_VSELECT=1</b> 时，Q5（2SK3018）导通，把 R69 47K 并入下分压，比值降到 1.26：</p>
+    <p style="text-align:center">0.8×(1+1.26)=<b>1.81V</b>　（备注 #SD1_VSELECT=1: R1/R2=1.26: 1.81V）</p>
+    <p>这正是 SD 3.0 的规范要求：初始化用 3.3V，切到高速模式后信号电平降到 1.8V。<b>同一组引脚、两种电平</b>，靠一颗 MOS + 一个 GPIO 完成切换。R75 100K 是 Q5 栅极的下拉，保证 VSELECT 悬空时默认 3.3V（图上注明 Default:3.3V）。</p>
+
+    <h2><span class="n">3.2.7</span>DISCHG_EN 与 50R：为什么要「主动放电」</h2>
+    <p>每一路输出旁都有一组 <b>R59/R65/R80/R74 = 50R + Q2/Q4/Q6/Q7（2SK3018）</b>，栅极由 <b>DISCHG_EN</b> 控制。作用：</p>
+    <ul>
+      <li><b>快速关断</b>：DCDC 关掉后，输出电容上的电荷不会立刻消失（负载很轻时可能维持几十毫秒）。若此时重新上电，电压不确定，SoC 可能进入异常状态。</li>
+      <li><b>保证时序干净</b>：关机时让 1.35V 先于 3.3V 掉到 0，避免 IO 先失电、内核仍在工作的「反向供电」。</li>
+      <li><b>50R 的取值</b>：3.3V/50Ω=66mA，1.35V/50Ω=27mA，既能在几毫秒内把 22µF 放到 0.3V 以下（τ=50Ω×22µF≈1.1ms，3τ≈3.3ms），又不会因电流过大损坏 MOS。</li>
+    </ul>
+    <p>注意放电管接在<b>输出与地之间</b>，不是接在反馈脚上——接错位置会改变环路工作点，输出反而不稳。</p>
+
+    <h2><span class="n">3.2.8</span>0Ω 跳线与测试点：图纸上的「可调项」</h2>
+    <p>本页的 <b>R71 0R、R77 0R、R82 0R、R83 0R、R84 0R、R86 0R</b> 都是可拆的短接：用于隔离某一路做电流测量、或者切换供电路径。<b>TP3（SOC_IN）、TP4（SNVS_3V3）、TP5（DC3V3）、TP6（VCC_SD）、TP7（VCC_DDR）、TP8（VCC_CSI）</b> 则是给万用表/示波器的探点。</p>
+    <p>调试习惯：<b>上电第一件事量 TP4</b>（SNVS 必须有 3.3V，否则整板不启动）；<b>第二件事量 TP3</b>（1.35V 内核）；<b>第三件事量 TP7</b>（1.35V DDR）。三个点都对，再去看时钟与复位。</p>
+
+    <div class="demo">
+      <div class="dh"><b>六路电源反算器</b><span>选一路，改 R1/R2 与 Vref，看输出并与图上标注对照</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div><div style="font-size:12px;color:#9fb0c7">选择电源</div>
+            <select id="rail" style="width:100%;background:#0a1020;color:#5ff1ef;border:1px solid #2a3a55;border-radius:8px;padding:6px">
+              <option value="1.344,124,100,0.6">U6 ARM/SOC（124K/100K）</option>
+              <option value="1.344,124,100,0.6">U11 LVDDR3（124K/100K）</option>
+              <option value="3.33,100,22,0.6">U8 VDD_HIGH（100K/22K）</option>
+              <option value="3.27,68,22,0.8">U9 NVCC_SD 3.3V（68K/22K）</option>
+              <option value="1.81,68,54,0.8">U9 NVCC_SD 1.8V（Q5 并入后）</option>
+              <option value="3.32,49.9,15,0.768">MINI U4 3.3V（49.9K/15K）</option>
+            </select>
+          </div>
+          <div><div style="font-size:12px;color:#9fb0c7">V<sub>ref</sub> <b id="vn" style="color:#5ff1ef">0.6</b> V</div><input id="vr" type="range" min="0.5" max="0.9" step="0.002" value="0.6" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">R<sub>top</sub> <b id="rn" style="color:#5ff1ef">124</b> kΩ</div><input id="r1" type="range" min="10" max="150" step="0.1" value="124" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">
+          <div><div style="font-size:12px;color:#9fb0c7">R<sub>bottom</sub> <b id="bn" style="color:#5ff1ef">100</b> kΩ</div><input id="r2" type="range" min="5" max="150" step="0.1" value="100" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">EN 延时 R/C（10K + 104）<b id="tn" style="color:#5ff1ef">1.0</b> ms</div><input id="rc" type="range" min="0" max="100" step="1" value="100" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="pOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
     </div>
 
-    <div class="box tip">
-      <h5>用万用表做「五点上电体检」</h5>
-      <p>上电 3 秒内依次量：TP4（SNVS 3.3V）→ TP3（1.35V）→ TP7（DRAM 1.35V）→ TP6（SD 电压，随卡变化）→ TP8（2.8V）。任何一点偏离 ±5% 就先查那一路，不要急着怀疑 SoC。</p>
+    <h2><span class="n">3.2.9</span>这一页最容易被画错的三处</h2>
+    <ol>
+      <li><b>EN 直接接 3.3V</b>：上电瞬间 1.35V 与 3.3V 同时起来，SoC 的 IO 先得电、内核后得电，可能闩锁。正确做法是 EN 由上一级的 PG 经 RC 延时。</li>
+      <li><b>反馈电阻接到输出电容之后</b>：反馈必须从「负载端」而不是「电感端」取，否则走线电感会让环路不稳。</li>
+      <li><b>SD 电源切换用 GPIO 直接驱动 Q5 栅极</b>：栅极要串电阻/下拉（本板 R75 100K），否则悬空时输出可能停在中间电压，SD 卡识别失败。</li>
+    </ol>
+
+    <h3>练习（答案在折叠里）</h3>
+    <details class="quiz"><summary>1. U6 的 R56/R61 是 124K/100K、V<sub>ref</sub>=0.6V，输出多少？</summary><div class="ans">0.6×(1+1.24)=1.344V ≈1.35V。</div></details>
+    <details class="quiz"><summary>2. U9 在 VSELECT=1 时为什么变 1.81V？</summary><div class="ans">Q5 导通把 R69 47K 并入下分压，比值从 3.09 降到 1.26，0.8×2.26≈1.81V。</div></details>
+    <details class="quiz"><summary>3. EN 的 R60 10K + C85 104 延时多少？</summary><div class="ans">τ=1ms，到阈值约 2.2ms。</div></details>
+    <details class="quiz"><summary>4. DISCHG_EN 的 50R + 22µF 放电时间常数？</summary><div class="ans">τ=50×22µF≈1.1ms，3τ≈3.3ms 基本放到 0。</div></details>
+    <details class="quiz"><summary>5. 为什么 VDD_HIGH 要单独一级 3.3V？</summary><div class="ans">隔离其他 3.3V 负载的噪声，给 SoC 内部高压域一个干净电源。</div></details>
+    <details class="quiz"><summary>6. 上电先量哪个测试点？</summary><div class="ans">TP4（SNVS 3.3V）；没有它整板不启动。其次 TP3（内核 1.35V）、TP7（DDR 1.35V）。</div></details>
+
+    <div class="ch-nav">
+      <a href="c01.html"><span>上一章</span><b>← 3.1 图纸怎么读</b></a>
+      <a class="nx" id="chNavNext" href="c03.html"><span>下一章</span><b>3.3 核心板第 2 页：SoC 电源脚 →</b></a>
     </div>
-
-    <h3>自测</h3>
-    <details class="quiz"><summary>板子只亮电源灯、串口无输出，先量哪个测试点？</summary><div class="ans">先量 TP4（SNVS 3.3V），因为 SNVS 是常电域、最先需要，也是复位逻辑的供电；再量 TP3 内核 1.35V。若这两路正常，才去查复位与晶振。</div></details>
-    <details class="quiz"><summary>为什么 1.35V 轨用电感 2.2µH，而底板 5V 小轨用 4.7µH？</summary><div class="ans">因为 1.35V 轨电流大、开关频率下需要更大饱和电流，感值小可以在同样体积下获得更高 I<sub>sat</sub>；小电流轨用大感值换取更低纹波。</div></details>
-    <details class="quiz"><summary>NVCC_SD 为什么不用固定 3.3V？</summary><div class="ans">因为 SD 卡支持 1.8V 高速模式，卡协商后会要求切换 IO 电压。用可控电源开关（U9）跟随卡的状态切换，既满足协议也避免 3.3V 灌入 1.8V 器件。</div></details>
-
-        <h2>原页对照</h2>
-    <figure class="fig sch">
-      <div class="scroller"><a href="../../assets/img/sch/core_p1.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/core_p1.png" alt="CORE V2.0 原理图第 1 页" loading="lazy"></a></div>
-      <figcaption><b>原页 · CORE p1</b>　第 1 页：SNVS(U7 3.3V)、NVCC_CSI(U12 2.8V)、ARM/SOC(U6 1.345V)、VDD_HIGH/DCDC_3V3(U8 3.32V)、NVCC_SD(U9)、LVDDR3(U11 1.35V)，右下角还印着官方电源容差表（MIN/TYP/MAX）。五路电源的证据链全在这一页。<a class="zoom" href="../../assets/img/sch/core_p1.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
-    </figure>
-    <div class="ch-nav"><a href="c01.html"><span>上一章</span><b>← 3.1 图纸怎么读</b></a>
-      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.3 核心板第 2 页 →</b></a></div>
   </main>
 </div>
-<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
-<script>renderPart('p3','c02.html');</script>
-</body></html>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p3','c02.html');
+(function(){
+  var map={};
+  function setFromSel(){
+    var v=document.getElementById('rail').value.split(',');
+    document.getElementById('vr').value=v[3];
+    document.getElementById('r1').value=v[1];
+    document.getElementById('r2').value=v[2];
+    calc();
+  }
+  function calc(){
+    var vr=+document.getElementById('vr').value, r1=+document.getElementById('r1').value, r2=+document.getElementById('r2').value;
+    var rc=+document.getElementById('rc').value;
+    document.getElementById('vn').textContent=vr.toFixed(3);
+    document.getElementById('rn').textContent=r1.toFixed(1);
+    document.getElementById('bn').textContent=r2.toFixed(1);
+    var vo=vr*(1+r1/r2), tau=10*rc/1000*1000;
+    document.getElementById('tn').textContent=(10*rc/1000).toFixed(2);
+    document.getElementById('pOut').innerHTML=
+      '<b style="color:#eaf3ff;font-size:15px">V<sub>out</sub> = '+vr.toFixed(3)+'×(1+'+r1.toFixed(1)+'/'+r2.toFixed(1)+') = <b style="color:#5ff1ef">'+vo.toFixed(2)+' V</b></b><br>'+
+      '比值 R1/R2 = '+(r1/r2).toFixed(2)+'　分压电流 ≈ '+(vr/r2*1000).toFixed(1)+' µA（不影响效率，但越大越易受噪声）<br>'+
+      'EN 延时：R=10K、C='+rc+'×1nF → τ='+(10*rc/1000).toFixed(2)+' ms，达阈值约 '+(2.2*10*rc/1000).toFixed(1)+' ms<br>'+
+      '<span style="color:#6f7f9c;font-size:11.5px">与图上 #R1/R2 备注对照：U6/U11=1.25、U8=4.5、U9=3.09（3.3V）/1.26（1.8V）。</span>';
+  }
+  document.getElementById('rail').addEventListener('change',setFromSel);
+  ['vr','r1','r2','rc'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  setFromSel();
+})();
+</script>
+</body>
+</html>
+

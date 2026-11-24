@@ -1,9 +1,11 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>3.7 核心板第 7 页：启动配置 | 第三篇 · 逐页读真实原理图 | i.MX6ULL 学习手册</title>
-<meta name="description" content="BOOT_CFG0–7 的 4.7k 上拉阵列、复位释放时采样、拨码与 10k 下拉；启动失败的排查顺序。">
-<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+<title>3.7 核心板第 6 页：ONOFF、POR、24MHz 与 32.768kHz | 第三篇 | i.MX6ULL 学习手册</title>
+<meta name="description" content="CORE p6 控制页：ONOFF 与 POR_B、MAX809R 复位、Y2 24MHz 与 18pF 负载电容、Y1 32.768kHz RTC、SNVS_TAMPER 与板级信号映射、BOOT_MODE 复用为移位寄存器。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -14,91 +16,146 @@
   <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
 <div class="shell">
   <aside id="sidebar"><div class="vol-h">第三篇 · 逐页读真实原理图</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 7 章<span class="sep">/</span>约 22 分钟</div>
-    <h1>核心板第 7 页：启动配置</h1>
-    <p class="lede">这一页没有芯片，只有一片电阻阵列：<b>R4–R24 各 4.7k</b> 把 BOOT_CFG0–7 上拉到 <code>DCDC_3V3</code>，另有 <b>R2 的 4.7k×4</b> 与底板上的 <b>R43–R50 10k</b> 和 8 位拨码共同决定启动值。<b>这是整块板「第一毫秒」的逻辑。</b></p>
+    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 7 章<span class="sep">/</span>约 55 分钟</div>
+    <h1>核心板第 6 页：ONOFF、POR、24MHz 与 32.768kHz</h1>
+    <p class="lede">这一页（IMX6ULL_CORE_CONTROL.SchDoc）管「板子能不能起来」：开关键、复位监控、两颗晶振、启动模式脚、以及十个常电唤醒脚。它没有大芯片，全是小器件，但每一个都决定启动成败。核心问题有两个：<b>24MHz 的负载电容为什么是 18pF、32.768kHz 为什么也是 18pF</b>，以及 <b>POR_B 到底由谁拉低</b>。</p>
+
+    <figure class="fig sch"><div class="scroller"><img loading="lazy" src="../../assets/img/sch/core_p6_ctrl.png" class="tall" alt="CORE p6 左侧：ONOFF/POR、BOOT_MODE、SNVS_TAMPER0-9、RTC 晶振、USB VBUS 电容"><a class="zoom" href="../../assets/img/sch/core_p6_ctrl.png" class="tall" target="_blank" rel="noopener">新窗口打开</a></div><figcaption>控制区左半（300dpi 裁切）：<b>R26 100K/DNP</b> 从 ONOFF 上拉到 VDD_SNVS_IN；POR_B→POR（P8）；BOOT_MODE0/1（T10/U10）同时复用为 <b>SHIFT_SDI/SHIFT_SHCP</b>；SNVS_TAMPER0–9 一路对应 ACC_INT/BT_DISABLE/PERI_PWREN/GPIO_DVFS/AUD_INT/ENET1_nINT/ENET2_nINT/SHIFT_STCP/SHIFT_nOE/LCD_DISP；底部 USB_OTG1_VBUS 与 VDDUSB 的 104/22µF。</figcaption></figure>
+
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>说清「复位释放时采样」这件事的时序含义</li>
-        <li>判断拨码在 ON 时该给 0 还是 1（两种电路接法）</li>
-        <li>解释为什么 BOOT_CFG 用 4.7k 而不是 10k</li>
-        <li>按「电压→复位→时钟→BOOT_CFG→介质」的顺序排查启动失败</li>
+        <li>指出 ONOFF 与 POR_B 的区别：一个是「用户按键」，一个是「电源复位」</li>
+        <li>说出 MAX809R 在电路里的位置与它为什么用 0Ω 跳线连到 POR_B</li>
+        <li>用负载电容公式验证 24MHz 晶振的 18pF 取值，并解释 1MΩ 反馈电阻的作用</li>
+        <li>解释 32.768kHz 晶振为什么能做得又小又省电</li>
+        <li>说出 SNVS_TAMPER0–9 在本板上各自接到什么板级信号</li>
       </ol>
     </div>
 
-    <h2><span class="n">3.7.1</span>采样的时刻：复位释放的那一瞬间</h2>
-    <p>SoC 内部的 Boot ROM 在 <code>POR_B</code> 释放后极短时间内（微秒级）读取 BOOT_CFG 引脚电平，把它锁进寄存器，然后按表决定：从 eMMC、NAND、SD、USB 还是串口下载启动。<b>采样之后，这些脚就可以被复用成普通 IO</b>——所以它们既是配置脚，也是功能脚，这是 i.MX 系列的典型设计。</p>
-    <p>含义很直接：<b>上电期间这些脚的电平必须稳定</b>。如果上拉太弱、走线太长、引脚电容大，RC 建立时间超过采样窗口，Boot ROM 读到的就是随机值——表现为「有时能启动、有时不能」。</p>
-
-    <h2><span class="n">3.7.2</span>两种拨码接法，结论完全相反</h2>
+    <h2><span class="n">3.7.1</span>ONOFF 与 POR_B：两种「重启」</h2>
+    <p>两个脚名字很像，作用完全不同：</p>
     <table>
-      <thead><tr><th>接法</th><th>拨到 ON 时</th><th>拨到 OFF 时</th><th>本板</th></tr></thead>
+      <thead><tr><th>脚</th><th>球</th><th>触发方式</th><th>结果</th></tr></thead>
       <tbody>
-        <tr><td class="nm">上拉 + 开关到地</td><td>该位 = 0</td><td>该位 = 1（被上拉）</td><td>核心板 R4–R24 上拉 + 底板拨码到地，属此类</td></tr>
-        <tr><td class="nm">下拉 + 开关到电源</td><td>该位 = 1</td><td>该位 = 0</td><td>部分底板采用</td></tr>
+        <tr><td class="nm">ONOFF</td><td>R8</td><td>长按（内部有去抖/计时逻辑）</td><td>进入或退出低功耗/关机流程，由 PMIC 与内核协商</td></tr>
+        <tr><td class="nm">POR_B</td><td>P8</td><td>外部拉低（复位芯片/按键/ watchdog）</td><td>整芯片硬复位，所有寄存器回默认，重新采样 BOOT</td></tr>
       </tbody>
     </table>
-    <p>读图时必须看拨码的另一端接的是 GND 还是 3.3V。<b>搞反了，整张启动表都读错</b>，而且现象非常迷惑：拨码明明「按手册拨了」，就是不启动。</p>
+    <p>本板 ONOFF 上有 <b>R26 100K</b> 上拉到 <b>VDD_SNVS_IN</b>，且标了 <b>DNP</b>（默认不贴）。为什么？因为 ONOFF 内部已有上拉，外部 100K 是「可选加固」：在电磁干扰强的场合贴上，保证不误触发；普通场合不贴以省电。这类标注是读图时最该留意的信息——<b>看到 DNP 就知道「设计者预留了这个位置，但当前配置不用」</b>。</p>
 
-    <figure class="fig">
-      <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <rect x="20" y="18" width="410" height="180" rx="10" fill="#141c2e" stroke="#3a4560"/>
-        <text x="36" y="42" fill="#eaf3ff" font-size="11">一位 BOOT_CFG 的等效电路</text>
-        <line x1="150" y1="64" x2="150" y2="80" stroke="#ffb84d"/>
-        <text x="158" y="72" fill="#ffd79a" font-size="9">DCDC_3V3</text>
-        <rect x="138" y="80" width="24" height="30" rx="3" fill="rgba(255,184,77,.15)" stroke="#ffb84d"/>
-        <text x="168" y="100" fill="#ffd79a" font-size="9">4.7k</text>
-        <line x1="150" y1="110" x2="150" y2="136" stroke="#5ff1ef"/>
-        <text x="160" y="130" fill="#9df5f4" font-size="9">BOOT_CFGx → SoC</text>
-        <line x1="150" y1="136" x2="150" y2="152" stroke="#5ce1a0"/>
-        <text x="106" y="168" fill="#9df3c2" font-size="9">拨码 ON → 接地 = 0</text>
-        <line x1="136" y1="152" x2="164" y2="152" stroke="#6f7f9c"/>
-        <text x="36" y="190" fill="#6f7f9c" font-size="9">ON=0、OFF=1（上拉型）</text>
+    <h2><span class="n">3.7.2</span>POR_B 由谁拉低：MAX809R 与按键</h2>
+    <p>本页底部的 <b>U2 MAX809R</b>（SOT-23-3：GND=1、RST=2、VDD=3）就是复位监控芯片。它的工作方式极简单：</p>
+    <ul>
+      <li>VDD 低于阈值（R 后缀约 2.63V，按后缀表可查）→ RST 保持低；</li>
+      <li>VDD 高于阈值并稳定一段时间（约 200ms 复位延时）→ RST 释放为高。</li>
+    </ul>
+    <p>所以上电顺序是：DC5V 起 → 3.3V 起 → MAX809R 等 3.3V 稳定 → 释放 POR_B → SoC 开始采样 BOOT_MODE/BOOT_CFG → 取第一条指令。这条链上任何一环缺失，表现都是「串口一个字符都没有」。</p>
+    <p>RST 输出通过 <b>0Ω 跳线</b>（图上 R31/R33 两颗 0Ω）接到 POR_B 网络。0Ω 的用处：返工时可以断开复位芯片，改由底板按键或外部调试器控制复位。<b>0Ω 不是「没电阻」，而是「可断开的导线」</b>，读图时把它当导线看，但在故障分析时要记得它可能虚焊。</p>
 
-        <rect x="450" y="18" width="400" height="180" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
-        <text x="466" y="42" fill="#eaf3ff" font-size="11">为什么是 4.7k 而不是 10k</text>
-        <text x="466" y="72" fill="#9fb0c7" font-size="10">RC 建立：t ≈ 0.7×R×C</text>
-        <text x="466" y="96" fill="#9fb0c7" font-size="10">10k + 20pF → 约 140ns</text>
-        <text x="466" y="120" fill="#9fb0c7" font-size="10">4.7k + 20pF → 约 66ns</text>
-        <text x="466" y="144" fill="#9df3c2" font-size="10">采样窗口很窄，越快越稳</text>
-        <text x="466" y="168" fill="#6f7f9c" font-size="9">代价：常态多耗一点电（可忽略）</text>
+    <h2><span class="n">3.7.3</span>24MHz 主晶振：18pF 是怎么算出来的</h2>
+    <figure class="fig sch"><div class="scroller"><img loading="lazy" src="../../assets/img/sch/core_p6_xtal.png" alt="CORE p6 XTAL 区：Y2 24MHz 四脚晶振、C12/C14 18pF、R32 1M"><a class="zoom" href="../../assets/img/sch/core_p6_xtal.png" target="_blank" rel="noopener">新窗口打开</a></div><figcaption>XTAL 区（300dpi 裁切）：<b>Y2 24MHz</b>（四脚：1/3 悬空为 HOT、2/4 为 GND），<b>C12/C14 18pF</b> 分别接 XTALI/XTALO 到地，<b>R32 1M</b> 跨接 XTALI–XTALO 提供直流反馈偏置。</figcaption></figure>
+    <p>晶振的「负载电容 C<sub>L</sub>」是它工作时看到的等效电容。无源晶振的标称频率是在指定 C<sub>L</sub> 下测的，常见规格 8/10/12/18pF。电路里两颗电容是<b>串联</b>看待（从晶振两端看，C12 与 C14 通过地串联）：</p>
+    <p style="text-align:center">C<sub>L</sub> = C12·C14/(C12+C14) + C<sub>stray</sub> = 18·18/36 + ~3pF = 9 + 3 = <b>12pF</b></p>
+    <p>两端各 18pF、加上约 3pF 的 PCB/引脚寄生，等效 12pF——所以本板选的晶振规格应是 <b>12pF</b>。如果换成 8pF 规格的晶振却仍贴 18pF，实际 C<sub>L</sub> 偏大，频率会偏低（典型灵敏度约 10–20ppm/pF），误差可达 −40~−80ppm，串口波特率随之偏移，表现为「能启动但串口乱码」。</p>
+    <p><b>R32 1M 的作用</b>：CMOS 反相器的输入在晶振起振前处于高阻，1MΩ 把它偏置到线性区（约 VDD/2），提供初始增益，保证起振；同时它消耗的电流只有 3.3V/1M=3.3µA。没有这颗电阻，很多板子会「冷机不起振、热机正常」。</p>
 
-        <text x="20" y="230" fill="#9fb0c7" font-size="10.5">排查顺序：TP4/TP3 电压 → POR_B → 24MHz → 量 BOOT_CFG0–7 的实际电平 → 最后才怀疑介质本身。</text>
-        <text x="20" y="254" fill="#6f7f9c" font-size="10">用万用表逐位量 8 个脚，对照启动表，比反复拨码快得多。拨码接触不良是常见故障。</text>
-        <text x="20" y="278" fill="#ff9c9c" font-size="10">坑：BOOT_CFG 某位与 SD 卡信号复用，卡插入后电平被拉低，导致「插卡就启动不了」。</text>
-      </svg>
-      <figcaption><b>图 3-7</b>　一位 BOOT_CFG 的等效电路与 4.7k 的理由。</figcaption>
-    </figure>
+    <h2><span class="n">3.7.4</span>32.768kHz：RTC 的「秒针」</h2>
+    <p>Y1 是 32.768kHz 音叉晶振，接 <b>RTC_XTALI（T11）/RTC_XTALO（U11）</b>，两端 <b>C2/C3 18pF</b>。为什么不用 1M 反馈电阻？因为 RTC 振荡器是芯片内部专门设计的低功耗结构（内部已有偏置与 AGC），外部只需晶振 + 负载电容，<b>驱动电流只有几百 nA 到几 µA</b>。</p>
+    <p>32.768k = 2<sup>15</sup>，用一个 15 位二进制计数器就能分出 1Hz，这是所有 RTC 都选它的原因。它的精度由晶振本身（±20ppm≈±1.7 秒/天）和负载电容匹配决定，所以 C2/C3 也必须按晶振规格选，不能随手用 18pF 就完事。</p>
 
-    <h2><span class="n">3.7.3</span>与复用功能的冲突</h2>
-    <p>BOOT_CFG 脚大多与 SD/eMMC 或 GPIO 复用。设计上通常这样处理：<b>上电时由上拉/下拉定值，启动后由软件切换为功能脚</b>。问题出在「外部电路」：如果该脚外接了强上拉/强下拉（比如 SD 卡的 47k 上拉），就会与 BOOT 电阻分压，改变采样值。</p>
-    <p>本板 TF 卡信号用 <b>R1–R5 47k</b> 上拉，而 BOOT 用 4.7k/10k——两者阻值差一个量级，分压影响有限，这就是「阻值要拉开差距」的设计理由。</p>
+    <h2><span class="n">3.7.5</span>SNVS_TAMPER0–9：十个「永不休眠」的脚</h2>
+    <p>这一组脚在 SNVS 常电域，主电源关闭后仍能工作，本板把它们分配给了板级功能（这是真实映射，直接背下来很有用）：</p>
+    <table>
+      <thead><tr><th>脚</th><th>球</th><th>板级信号</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">TAMPER0</td><td>R10</td><td>ACC_INT</td><td>车载 ACC 点火检测/唤醒</td></tr>
+        <tr><td class="nm">TAMPER1</td><td>R9</td><td>BT_DISABLE</td><td>蓝牙模块禁用</td></tr>
+        <tr><td class="nm">TAMPER2</td><td>P11</td><td>PERI_PWREN</td><td>外设电源使能</td></tr>
+        <tr><td class="nm">TAMPER3</td><td>P10</td><td>GPIO_DVFS</td><td>动态调压请求</td></tr>
+        <tr><td class="nm">TAMPER4</td><td>P9</td><td>AUD_INT</td><td>音频编解码中断</td></tr>
+        <tr><td class="nm">TAMPER5</td><td>N8</td><td>ENET1_nINT</td><td>以太网 1 中断</td></tr>
+        <tr><td class="nm">TAMPER6</td><td>N11</td><td>ENET2_nINT</td><td>以太网 2 中断</td></tr>
+        <tr><td class="nm">TAMPER7</td><td>N10</td><td>SHIFT_STCP</td><td>74HC595 移位寄存器锁存</td></tr>
+        <tr><td class="nm">TAMPER8</td><td>N9</td><td>SHIFT_nOE</td><td>595 输出使能</td></tr>
+        <tr><td class="nm">TAMPER9</td><td>R6</td><td>LCD_DISP</td><td>屏显示使能</td></tr>
+      </tbody>
+    </table>
+    <p>注意 TAMPER 的「本来含义」是防拆检测（tamper），但在本板被当作普通常电 GPIO 用。读图时不要被名字限制——<b>看它接到什么网络，比看球的名字更重要</b>。</p>
 
-    <div class="box pit">
-      <h5>三个启动故障的真实原因</h5>
-      <p><b>1. 拨码氧化/接触不良：</b>某位时高时低，现象是「十次里成功三次」。</p>
-      <p><b>2. 上拉电阻虚焊：</b>该位浮空，Boot ROM 读到不确定值。</p>
-      <p><b>3. 启动表版本不匹配：</b>照着别的板子的表拨码，位定义不同。</p>
+    <h2><span class="n">3.7.6</span>BOOT_MODE 复用为移位寄存器</h2>
+    <p>BOOT_MODE0（T10）、BOOT_MODE1（U10）除了复位时采样启动模式，还被复用成 <b>SHIFT_SDI / SHIFT_SHCP</b>——即 74HC595 的串行数据与移位时钟。原因很实际：<b>启动模式只在复位瞬间采样一次</b>，之后这两个球就自由了，正好拿来驱动底板上的移位寄存器（扩展 LED/继电器等输出）。</p>
+    <p>这种「一个球两种人生」的设计在本板反复出现（LCD_DATA 与 BOOT_CFG、CSI 与 USDHC2、NAND 与 SD2）。看懂的标志是：<b>图上把两个网络名叠画在同一根线上，用空格分开</b>。</p>
+
+    <h2><span class="n">3.7.7</span>上电时序与实测</h2>
+    <ol class="steps">
+      <li>DC5V 到位（量 MINI 底板 DCDC_5V）</li>
+      <li>3.3V 到位（量 CORE TP5 附近或 U8 输出）</li>
+      <li>SNVS 3.3V 到位（TP4）——这一步不对，后面全白搭</li>
+      <li>POR_B 由低变高（示波器看 P8 焊盘/测试点）</li>
+      <li>24MHz 起振（示波器 ×10 探头碰 XTALI，幅度约 1Vpp）</li>
+      <li>DDR 1.35V 与 VREF 0.675V</li>
+      <li>串口出 uboot 打印</li>
+    </ol>
+    <p>常见故障：<b>POR_B 一直低</b> → MAX809R 的 VDD 没到或 0Ω 虚焊；<b>24MHz 不起振</b> → 晶振贴反/负载电容错/R32 缺失；<b>起振但频率偏</b> → 负载电容与晶振规格不匹配。</p>
+
+    <div class="demo">
+      <div class="dh"><b>晶振负载电容与频率偏差</b><span>改两颗电容与寄生电容，看等效 C<sub>L</sub> 与 ppm 偏差</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+          <div><div class="lbl">C12 <b id="c1n">18</b> pF</div><input id="c1" type="range" min="5" max="33" step="1" value="18" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">C14 <b id="c2n">18</b> pF</div><input id="c2" type="range" min="5" max="33" step="1" value="18" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">寄生 C<sub>stray</sub> <b id="csn">3</b> pF</div><input id="cs" type="range" min="0" max="10" step="0.5" value="3" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">晶振规格 C<sub>L</sub> <b id="cln">12</b> pF</div><input id="cl" type="range" min="6" max="20" step="1" value="12" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="xOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
     </div>
 
-    <h3>自测</h3>
-    <details class="quiz"><summary>拨码全部拨到 ON 却不启动，第一步做什么？</summary><div class="ans">用万用表逐位量 BOOT_CFG0–7 的实际电平，确认「ON」到底给的是 0 还是 1，再对照本板启动表。不要凭拨码位置推断电平。</div></details>
-    <details class="quiz"><summary>为什么 BOOT_CFG 的阻值要和复用功能的上拉阻值拉开数量级？</summary><div class="ans">避免分压改变采样电平。例如 4.7k 上拉与 47k 上拉并联，等效变化约 9%，仍在阈值内；若两者都是 10k，变化就是 50%，可能读错。</div></details>
-    <details class="quiz"><summary>采样发生在什么时候？之后这些脚能当普通 IO 吗？</summary><div class="ans">在 POR_B 释放后的极短窗口内采样并锁存；之后可由软件复用为功能脚（GPIO/SD 等），所以同一脚既做配置又做功能。</div></details>
+    <h3>练习（答案在折叠里）</h3>
+    <details class="quiz"><summary>1. ONOFF 与 POR_B 有什么区别？</summary><div class="ans">ONOFF 是软开关（长按进/出低功耗）；POR_B 是硬复位，复位全部寄存器并重新采样 BOOT。</div></details>
+    <details class="quiz"><summary>2. 18pF+18pF+3pF 寄生的等效负载电容？</summary><div class="ans">9+3=12pF。</div></details>
+    <details class="quiz"><summary>3. R32 1M 不贴会怎样？</summary><div class="ans">反相器无直流偏置，可能不起振，尤其低温/低压时。</div></details>
+    <details class="quiz"><summary>4. MAX809R 的 RST 为什么要经 0Ω 到 POR_B？</summary><div class="ans">便于返工断开复位源，改由按键/调试器复位；0Ω 是可断导线。</div></details>
+    <details class="quiz"><summary>5. SNVS_TAMPER5/6 在本板接什么？</summary><div class="ans">ENET1_nINT / ENET2_nINT 两路以太网中断。</div></details>
+    <details class="quiz"><summary>6. BOOT_MODE0/1 复位后还能干什么？</summary><div class="ans">复用为 SHIFT_SDI/SHIFT_SHCP，驱动 74HC595。</div></details>
 
-        <h2>原页对照</h2>
-    <figure class="fig sch">
-      <div class="scroller"><a href="../../assets/img/sch/mini_p1.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/mini_p1.png" alt="MINI V2.2 原理图第 1 页" loading="lazy"></a></div>
-      <figcaption><b>原页 · MINI p1</b>　第 1 页 BOOT 区：8 位拨码 SW + R43–R50 各 10k 上拉到 DCDC_3V3。旁边那张对照表本身就是真值表：只有 D1 ON = USB，D1+D2 ON = MicroSD，D1+D3 ON = eMMC，D1+D4 ON = NAND。<a class="zoom" href="../../assets/img/sch/mini_p1.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
-    </figure>
-    <div class="ch-nav"><a href="c06.html"><span>上一章</span><b>← 3.6 核心板第 6 页</b></a>
-      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.8 MINI 第 1 页 →</b></a></div>
+    <div class="ch-nav">
+      <a href="c06.html"><span>上一章</span><b>← 3.6 LCD、以太网、GPIO</b></a>
+      <a class="nx" id="chNavNext" href="c08.html"><span>下一章</span><b>3.8 核心板第 7 页：BOOT 配置的 47K 阵列 →</b></a>
+    </div>
   </main>
 </div>
-<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
-<script>renderPart('p3','c07.html');</script>
-</body></html>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p3','c07.html');
+(function(){
+  function calc(){
+    var c1=+document.getElementById('c1').value, c2=+document.getElementById('c2').value, cs=+document.getElementById('cs').value, cl=+document.getElementById('cl').value;
+    document.getElementById('c1n').textContent=c1; document.getElementById('c2n').textContent=c2;
+    document.getElementById('csn').textContent=cs.toFixed(1); document.getElementById('cln').textContent=cl;
+    var ceq=c1*c2/(c1+c2)+cs;
+    var ppm=(ceq-cl)/cl*15*1000/1000; // 简化：15ppm/pF，相对偏差
+    var ppm2=(ceq-cl)*15;
+    document.getElementById('xOut').innerHTML=
+      '等效 C<sub>L</sub> = '+c1+'×'+c2+'/('+c1+'+'+c2+') + '+cs.toFixed(1)+' = <b style="color:#5ff1ef">'+ceq.toFixed(1)+' pF</b><br>'+
+      '与规格 '+cl+'pF 的差：'+(ceq-cl).toFixed(1)+' pF → 频率偏差约 <b style="color:#5ff1ef">'+ppm2.toFixed(0)+' ppm</b>（按 15ppm/pF 估算）<br>'+
+      '换算到串口：115200 波特率下偏差 '+ppm2.toFixed(0)+'ppm ≈ '+(115200*Math.abs(ppm2)*1e-6).toFixed(1)+' bit/s；超过约 2% 就会乱码<br>'+
+      '<span style="color:#6f7f9c;font-size:11.5px">注：实际灵敏度随晶振切型与规格不同，8–20ppm/pF 都常见，这里取中值。</span>';
+  }
+  ['c1','c2','cs','cl'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+</style>
+</body>
+</html>
+

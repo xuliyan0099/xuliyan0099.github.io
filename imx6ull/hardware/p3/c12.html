@@ -1,9 +1,11 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>3.12 一页看全板 | 第三篇 · 逐页读真实原理图 | i.MX6ULL 学习手册</title>
-<meta name="description" content="把 12 页压成一张信号地图：电源树、总线清单、测试点、故障定位矩阵；以及从「读图」到「自己画」的过渡。">
-<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+<title>3.12 MINI 第 3–4 页：以太网与电源树，一页看全板 | 第三篇 | i.MX6ULL 学习手册</title>
+<meta name="description" content="MINI p3 以太网：SR8201F、25MHz 12pF、R31 22R、RBIAS 2.49K、ATK9111A 变压器与 510R LED；MINI p4 电源树：SS34 防反接、两片 DCJW5060T_6、49.9K/15K 与 84.5K/15K 反推、TVS、USB 供电与 CH340。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -14,95 +16,173 @@
   <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
 <div class="shell">
   <aside id="sidebar"><div class="vol-h">第三篇 · 逐页读真实原理图</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 12 章<span class="sep">/</span>约 20 分钟</div>
-    <h1>一页看全板：把 12 页压成一张图</h1>
-    <p class="lede">读完前面 11 章，你脑子里应该有一张表：<b>哪一路电源喂谁、哪条总线连哪、出问题先量哪里</b>。这一章把它压成一页，作为以后翻图纸的「索引」，也是进入第四篇（自己设计）的跳板。</p>
+    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 12 章<span class="sep">/</span>约 70 分钟</div>
+    <h1>MINI 第 3–4 页：以太网与电源树，一页看全板</h1>
+    <p class="lede">最后两页是底线：<b>p3 把「网线」变成「RMII 信号」，p4 把「墙上的 12V」变成「板上的 5V 与 3.3V」</b>。这两页把前面所有章节串起来——电源错，网口不亮；网口错，系统看起来「像启动失败」。读完这一章，你应该能在 10 分钟内说出一块陌生板子的电源树与信号地图。</p>
+
+    <figure class="fig sch"><div class="scroller"><img loading="lazy" src="../../assets/img/sch/mini_p3_phy.png" alt="MINI p3 以太网 PHY 区：SR8201F、25MHz 晶振、RBIAS 2.49K、MDC/MDIO 上拉"><a class="zoom" href="../../assets/img/sch/mini_p3_phy.png" target="_blank" rel="noopener">新窗口打开</a></div><figcaption>PHY 区（300dpi 裁切）：<b>U11 SR8201F</b>，TXC/TXD0–3/TX_EN、RXC/RXD0–3/CRS_DV/RX_ER、MDC/MDIO、LED0/LED1、RESET、RBIAS；<b>X1 25MHz</b> + C19/C20 12pF；<b>R31 22Ω</b> 串在 TX_CLK；<b>R33/R34 4.7K</b> 上拉 MDC/MDIO；<b>R63 10K</b> 在 RESET；<b>R64 2.49K</b> 在 RBIAS；<b>R29/R30 1K</b> 为 LED 限流。</figcaption></figure>
+
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>不看图纸说出六路电源的来源与去向</li>
-        <li>按「现象 → 先量哪 → 再查哪」定位常见故障</li>
-        <li>说出这块板「如果要自己画」，哪五处最容易翻车</li>
+        <li>说清 PHY、变压器、RJ45 三者的分工，以及 RMII 与 MII 的区别</li>
+        <li>解释 25MHz 晶振为什么用 12pF、RBIAS 2.49K 为什么必须 1%</li>
+        <li>说出 L3 220R@2A 与 L4 120R@2A 为什么取不同值</li>
+        <li>用反馈电阻反推两片 DCJW5060 的输出，并解释前馈 R52 1K+C11 102 的作用</li>
+        <li>画出全板电源树与信号地图，指出三条最关键的依赖链</li>
       </ol>
     </div>
 
-    <h2><span class="n">3.12.1</span>六路电源一页表</h2>
+    <h2><span class="n">3.12.1</span>以太网：三块东西各管一段</h2>
+    <p>网口不是一颗芯片，而是三块：</p>
     <table>
-      <thead><tr><th>轨</th><th>来源</th><th>电压</th><th>喂谁</th><th>测试点</th></tr></thead>
+      <thead><tr><th>部件</th><th>本板位号</th><th>负责</th><th>不负责</th></tr></thead>
       <tbody>
-        <tr><td class="nm">DC5V</td><td>底板输入 + D1 TVS + SS34</td><td>5.0V</td><td>两片底板 DCDC、USB VBUS</td><td>入口</td></tr>
-        <tr><td class="nm">DCDC_5V</td><td>U6 + L1 4.7µH</td><td>5.0V</td><td>核心板输入、USB Host</td><td>—</td></tr>
-        <tr><td class="nm">DCDC_3V3</td><td>U9 + L2 4.7µH</td><td>3.3V</td><td>NVCC_GPIO、上拉、底板外设</td><td>—</td></tr>
-        <tr><td class="nm">VDD_ARM_SOC</td><td>核心板 U1（MT3420B 类）+ 2.2µH</td><td>1.35V</td><td>SoC 内核</td><td>TP3</td></tr>
-        <tr><td class="nm">DRAM_1V35</td><td>核心板 DCDC</td><td>1.35V</td><td>DDR3L</td><td>TP7</td></tr>
-        <tr><td class="nm">SNVS / CSI / SD</td><td>U7 / U12 / U9 开关</td><td>3.3 / 2.8 / 1.8–3.3V</td><td>RTC / 摄像头 / SD 卡</td><td>TP4 / TP8 / TP6</td></tr>
+        <tr><td class="nm">PHY</td><td>U11 SR8201F</td><td>把 RMII 数字信号变成模拟差分（MLT-3 编码），自协商 10/100M</td><td>不隔离、不驱动长线</td></tr>
+        <tr><td class="nm">网络变压器</td><td>ATK9111A</td><td>电气隔离（1.5kV）、共模抑制、阻抗 1:1 变换</td><td>不做协议</td></tr>
+        <tr><td class="nm">RJ45</td><td>集成变压器座</td><td>机械连接、LED 指示</td><td>不处理信号</td></tr>
       </tbody>
     </table>
+    <p><b>RMII 与 MII</b>：MII 需要 4 位数据 + 独立 TX/RX 时钟（共 16 根线）；RMII 只用 2 位数据 + 50MHz 参考时钟（7 根线）。本板用 RMII，所以 PHY 的 <b>RX_DV(IPD)</b> 脚要按图注配置为 RMII 模式（图上明确写「0 = MII mode，1 = RMII mode」），<b>RXD3(IPD)</b> 配置 TXC 方向（0=输出，1=输入）。这两个脚是「用硬件跳线选模式」的典型：读图时看到 (IPD) 就表示「内部默认下拉，靠外部上拉改值」。</p>
+    <p><b>PHY 地址 0x01</b>：图上写「PHY ADDR: 0x01」，由 LED0/PHYAD0 与 LED1/PHYAD1 两个脚的电平决定（表：00→0x00，01→0x01，10→0x02，11→0x03）。Linux 设备树里 <code>phy-handle</code> 必须与这个地址一致，否则 <b>mdio 读不到 PHY，网口起不来</b>——这是最常见的「网口不亮」原因之一。</p>
 
-    <h2><span class="n">3.12.2</span>故障定位矩阵</h2>
+    <h2><span class="n">3.12.2</span>25MHz、12pF 与 2.49K</h2>
+    <p>X1 是 <b>25MHz</b> 晶振（RMII 的参考时钟由 PHY 内部 PLL 从 25MHz 倍频到 50MHz），两端 <b>C19/C20 12pF</b>：C<sub>L</sub>=12/2+3≈9pF，对应 9pF 规格晶振。频率偏差会直接变成 RMII 时钟偏差，导致 CRC 错包率上升。</p>
+    <p><b>R64 2.49K</b> 接 RBIAS 到地，是 PHY 内部偏置电流的「基准电阻」。它决定发送驱动的幅度与接收阈值，<b>必须 1%</b>；用 5% 会让眼图幅度偏差 ±5%，长线（>50m）时丢包。</p>
+    <p><b>R31 22Ω</b> 串在 TX_CLK（25MHz 输出给 MAC 的时钟），与前面 LCD PCLK 同理：时钟线要串阻抑制振铃。<b>R63 10K</b> 是 RESET 上拉，保证 PHY 默认不复位；<b>R33/R34 4.7K</b> 上拉 MDC/MDIO，因为 MDIO 是双向开漏线。</p>
+
+    <h2><span class="n">3.12.3</span>L3 220R 与 L4 120R：两种磁珠不是随便选</h2>
+    <figure class="fig sch"><div class="scroller"><img loading="lazy" src="../../assets/img/sch/mini_p3_rj45.png" alt="MINI p3 变压器与 RJ45 区：ATK9111A、TD±/RD±、LED 510R、L3/L4 电源滤波"><a class="zoom" href="../../assets/img/sch/mini_p3_rj45.png" target="_blank" rel="noopener">新窗口打开</a></div><figcaption>变压器/RJ45 区（300dpi 裁切）：<b>ATK9111A</b> 的 TD+/TD-/RD+/RD- 与 TCT/RCT 中心抽头；<b>R35/R91 510Ω</b> 为网口 LED 限流；<b>L3 220R,2.0A,0.05Ω DCR</b> 与 <b>L4 120R,2A</b> 分别给 VENET_3V3 与 PHY 的 DVDD33/AVDD33 滤波。</figcaption></figure>
+    <p>两颗磁珠都用在电源上，但取值不同：</p>
+<ul>
+      <li><b>L3 220Ω@100MHz、2A、DCR 0.05Ω</b>：给 <b>VENET_3V3</b>（PHY 的 IO 电源）滤波，阻值大、抑制高频噪声强；</li>
+      <li><b>L4 120Ω@2A</b>：给 <b>DVDD33/AVDD33</b>（PHY 内部数字/模拟）滤波，阻值小一些，避免在负载跳变时产生过大压降。</li>
+    </ul>
+    <p><b>关键约束</b>：磁珠的额定电流必须大于该路最大电流（这里是 2A，远大于 PHY 的 200mA），否则磁珠饱和后阻抗崩塌，等于一根导线；DCR 决定直流压降，0.05Ω×0.2A=10mV，可忽略。</p>
+    <p>网口 LED：<b>R35/R91 510Ω</b> 限流，3.3V 下约 6mA，亮度足够且不超 LED 额定。LED 的阳极接 VENET_3V3、阴极由 PHY 的 LED 脚拉低点亮——这也是「低有效」的常见画法。</p>
+
+    <h2><span class="n">3.12.4</span>电源树：从墙上的 12V 到板上的 3.3V</h2>
+    <figure class="fig sch"><div class="scroller"><img loading="lazy" src="../../assets/img/sch/mini_p4_dcdc5.png" alt="MINI p4 第一级 DCDC：U6 DCJW5060T_6、L2 4.7µH、R56 84.5K/R69 15K、R54 1K+C30 102 前馈"><a class="zoom" href="../../assets/img/sch/mini_p4_dcdc5.png" target="_blank" rel="noopener">新窗口打开</a></div><figcaption>第一级（300dpi 裁切）：<b>U6 DCJW5060T_6</b>，BST 经 C9 104 自举，SW→<b>L2 4.7µH</b>→输出节点（挂 <b>C16 470µF + C27 104</b>），反馈 <b>R56 84.5K 1% / R69 15K 1%</b>，前馈 <b>R54 1K + C30 102</b>；输入侧 C31 10µF + C33 104。</figcaption></figure>
+    <p>整条链是这样的：</p>
+    <ol class="steps">
+      <li><b>DC_IN1</b>（电源座）→ <b>F1 2A 保险</b> → <b>VD2 SS34</b>（防反接，正向 0.5V 压降）→ <b>VM</b>（约 12V）</li>
+      <li><b>VM</b> → <b>U6 DCJW5060T_6</b>（Buck，L2 4.7µH）→ <b>5V</b> 档（反馈 84.5K/15K）</li>
+      <li><b>5V</b> → <b>U4 DCJW5060T_6</b>（Buck，L1 4.7µH）→ <b>DCDC_3V3</b>（反馈 49.9K/15K）</li>
+      <li><b>3.3V</b> → 核心板 U7/U6/U8/U9/U11/U12 六路 → SoC/DDR/eMMC/PHY</li>
+      <li><b>5V</b> → USB Host 开关 U14、CAN 收发器 U5、RS485 的 VCC</li>
+    </ol>
+    <p><b>反推验证</b>：DCJW5060 的反馈基准约 <b>0.765V</b>。两路分别验算：</p>
+    <p style="text-align:center">5V 档：0.765×(1+84.5/15)=0.765×6.633=<b>5.07V</b><br>3.3V 档：0.765×(1+49.9/15)=0.765×4.327=<b>3.31V</b></p>
+    <p>两路都落在标称值 ±2% 内，说明这个基准值反推正确。这也是「读图能验证设计」的典型例子：<b>不用信标签，用电阻算一遍</b>。</p>
+    <p><b>前馈 R54 1K + C30 102</b>：跨在「上反馈电阻」两端（从 SW 节点到 FB），在反馈环路里制造一个零点，抵消输出电容的极点，提升负载跳变时的响应。零点频率 f≈1/(2π×1k×1n)=<b>159kHz</b>，正好落在环路带宽附近。</p>
+    <p><b>470µF 输出电容</b>：为什么这么大？因为下一级（3.3V Buck 与核心板）在启动瞬间要抽脉冲电流，5V 母线必须有储能。<b>C16 470µF 也决定了上电时的浪涌</b>：12V→5V 启动瞬间，470µF 从 0 充到 5V 需要约 2.35mC 电荷，若限流 1A，充电时间约 2.4ms。</p>
+
+    <h2><span class="n">3.12.5</span>保护：SS34、两个 TVS、保险丝</h2>
+    <p>顺序很重要：<b>保险丝在前、TVS 在后</b>。故障时 TVS 先钳位、保险丝再熔断，两者配合才能既保护又不误断。</p>
+    <ul>
+      <li><b>VD2 SS34</b>（3A 肖特基）：防反接。接反时它反偏，整板不工作；正常时正向压降 0.5V，12V 变成 11.5V，损耗 0.5×I。</li>
+      <li><b>D1 SMBJ5.0A</b>：并在 5V 母线上，钳位约 9.2V（@1A），吸收浪涌；</li>
+      <li><b>D2 SMBJ3.3A</b>：并在 3.3V 母线上，钳位约 6.5V。</li>
+    </ul>
+    <p><b>判据</b>：TVS 的钳位电压必须低于后级芯片的绝对最大电压。SMBJ5.0A 钳位 9.2V，而后级 DCJW5060 的 VIN 绝对最大通常 30V+，安全；SMBJ3.3A 钳位 6.5V，而 3.3V 域芯片绝对最大多为 4.0V——<b>这里其实有风险</b>，6.5V 已超过多数 3.3V 器件的极限。实际靠「TVS 动作时间 ns 级 + 保险丝」的组合控制能量，但严格设计应选钳位更低的器件（如 SMBJ3.3A 的低钳位版本或再加一级限流）。读图时能发现这一点，就已经超过「看懂连线」的层次。</p>
+
+    <h2><span class="n">3.12.6</span>USB 与 CH340：两条独立路径</h2>
+    <figure class="fig sch"><div class="scroller"><img loading="lazy" src="../../assets/img/sch/mini_p4_usb.png" alt="MINI p4 USB 区：MT9700 电源开关、SI2302、Type-C CC 电阻、CH340C 与两颗 SGM3157"><a class="zoom" href="../../assets/img/sch/mini_p4_usb.png" target="_blank" rel="noopener">新窗口打开</a></div><figcaption>USB 区（300dpi 裁切）：<b>U14 MT9700HT5</b>（VIN/OUT/ISET/EN，ILimit=1.3A，R81 5.1K 设定限流）；<b>MOS1 SI2302 + R83 49.9K</b> 做 OTG 供电切换；<b>U8 CH340C</b> + <b>U12/U13 SGM3157</b> 把 UART1 切到 USB 串口；<b>U7 XC6206</b> 给 CH340 提供 UART_3V3。</figcaption></figure>
+    <p>本板有两个 USB 口，功能完全不同：</p>
     <table>
-      <thead><tr><th>现象</th><th>先量</th><th>再查</th><th>常见根因</th></tr></thead>
+      <thead><tr><th>口</th><th>路径</th><th>用途</th></tr></thead>
       <tbody>
-        <tr><td class="nm">完全不启动</td><td>TP4 → TP3 → POR_B</td><td>24MHz、BOOT_CFG</td><td>SNVS 没电、复位未释放、拨码错</td></tr>
-        <tr><td class="nm">串口无输出</td><td>UART TX 波形</td><td>CH340、UART 选择脚</td><td>TX/RX 接反、U12/U13 选错通道</td></tr>
-        <tr><td class="nm">DDR 不稳</td><td>TP7 纹波、VREF</td><td>ZQ、CK/DQS 走线</td><td>VREF 噪声、ZQ 精度、等长超标</td></tr>
-        <tr><td class="nm">认不到卡</td><td>NVCC_SD、CMD 上拉</td><td>47k、卡座</td><td>上拉漏贴、电压未切换</td></tr>
-        <tr><td class="nm">CAN 不通</td><td>TXD/RXD 电平</td><td>终端、共模</td><td>RXD 5V 直灌、终端错</td></tr>
-        <tr><td class="nm">网口不通</td><td>PHY 供电/复位</td><td>25MHz、MDIO</td><td>晶振不起振、地址脚错</td></tr>
+        <tr><td class="nm">USB HOST（A 型）</td><td>5V → U14 MT9700（限流 1.3A）→ VBUS；D-/D+ 接 USB_OTG2</td><td>插 U 盘/键鼠，SoC 作主机</td></tr>
+        <tr><td class="nm">USB OTG（Type-C）</td><td>VBUS 经 MOS1 SI2302 切换；CC1/CC2 各 5.1K 下拉</td><td>作设备（连 PC）或供电</td></tr>
+        <tr><td class="nm">USB 串口</td><td>CH340C ↔ SGM3157 ↔ UART1_TXD/RXD</td><td>调试控制台，与 OTG 共用 Type-C</td></tr>
       </tbody>
     </table>
+    <p><b>R77/R78 5.1K</b> 是 Type-C 的 CC 下拉，告诉充电器「我是设备，请给 5V」；<b>R81 5.1K</b> 设定 MT9700 的限流 1.3A（I<sub>limit</sub>=K/R）；<b>R84 10K / R86 15K</b> 是 CH340 的分压/配置，决定其工作模式。</p>
+    <p><b>为什么 CH340 要单独一颗 XC6206（U7）？</b>因为 CH340 的 V3 脚需要 3.3V（内部 LDO 输出），外部再给一路 3.3V 可以让它稳定工作；同时 UART_3V3 与主 3.3V 隔离，避免 USB 插拔的浪涌影响 SoC。</p>
+    <p><b>SGM3157 的作用</b>：UART1 既接调试串口（排针），又接 CH340。两颗模拟开关由 <b>SGM_CTRL</b> 控制，实现「二选一」，避免两个发送源对打。这与 3.11 节 LCD 上的用法完全一样。</p>
 
-    <figure class="fig">
-      <svg viewBox="0 0 880 330" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <rect x="16" y="16" width="420" height="230" rx="10" fill="#141c2e" stroke="#3a4560"/>
-        <text x="32" y="40" fill="#eaf3ff" font-size="11">全板信号地图</text>
-        <text x="32" y="72" fill="#ffd79a" font-size="10">电源：DC5V → 5V/3.3V → 1.35V/2.8V/SNVS</text>
-        <text x="32" y="96" fill="#9df5f4" font-size="10">存储：eMMC（8 位）、NAND（8 位复用）、TF</text>
-        <text x="32" y="120" fill="#9df5f4" font-size="10">网络：RMII → SR8201F → 变压器 → RJ45</text>
-        <text x="32" y="144" fill="#9df5f4" font-size="10">现场总线：CAN（5V）、RS485（3.3V）</text>
-        <text x="32" y="168" fill="#9df5f4" font-size="10">人机：RGB LCD（SGM3157 切换）、按键、LED、蜂鸣器</text>
-        <text x="32" y="192" fill="#9df5f4" font-size="10">调试：JTAG、UART（CH340）、USB OTG</text>
-        <text x="32" y="216" fill="#6f7f9c" font-size="9">每个域都有自己的「上拉 + 串阻 + 测试点」三件套</text>
+    <h2><span class="n">3.12.7</span>把 12 页压成一张地图</h2>
+    <p>现在回到全局。整块板可以这样记：</p>
+    <table>
+      <thead><tr><th>层</th><th>核心板（8 页）</th><th>底板（4 页）</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">电源</td><td>p1 六路、p2 CAP 脚</td><td>p4 12V→5V→3.3V、TVS、USB 供电</td></tr>
+        <tr><td class="nm">计算</td><td>p3 DDR、p4 存储</td><td>—</td></tr>
+        <tr><td class="nm">接口</td><td>p5 LCD/ENET/GPIO/USB/SD、p6 控制与时钟</td><td>p2 TF/CAN/485/屏/摄像头、p3 以太网</td></tr>
+        <tr><td class="nm">连接</td><td>p7 BOOT、p8 60pin</td><td>p1 60pin 与拨码</td></tr>
+      </tbody>
+    </table>
+    <p><b>三条最关键的依赖链</b>（排错时按链走）：</p>
+    <ol>
+      <li><b>启动链</b>：12V → 5V → 3.3V → SNVS 3.3V → POR_B 释放 → 24MHz → BOOT 采样 → 存储读取 → 串口输出。</li>
+      <li><b>显示链</b>：3.3V → NVCC_LCDIF → PCLK（R43）→ 24 根数据 → 40pin 座 → 屏；背光独立（BLT_PWM）。</li>
+      <li><b>网络链</b>：3.3V → L3/L4 → PHY → 25MHz → 变压器 → RJ45；MDIO 地址必须与设备树一致。</li>
+    </ol>
+    <p>任何一条链断了，现象都很像「板子坏了」，但定位方法完全不同：启动链看电压与复位，显示链看时钟与数据，网络链看 PHY 地址与 LED。这就是「会读原理图」和「会背原理图」的区别。</p>
 
-        <rect x="456" y="16" width="400" height="230" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
-        <text x="472" y="40" fill="#eaf3ff" font-size="11">自己画板时最易翻车的五处</text>
-        <text x="472" y="72" fill="#ff9c9c" font-size="10">① DDR：VREF、ZQ、等长</text>
-        <text x="472" y="96" fill="#ff9c9c" font-size="10">② 电源：反馈分压、软启动、时序</text>
-        <text x="472" y="120" fill="#ff9c9c" font-size="10">③ 复位/时钟：POR_B、24MHz 负载电容</text>
-        <text x="472" y="144" fill="#ff9c9c" font-size="10">④ 启动：BOOT_CFG 上下拉与拨码定义</text>
-        <text x="472" y="168" fill="#ff9c9c" font-size="10">⑤ 接口：终端/上拉/电平匹配</text>
-        <text x="472" y="200" fill="#9fb0c7" font-size="9.5">这五处不是「细节」，是「能不能跑起来」</text>
-        <text x="472" y="222" fill="#6f7f9c" font-size="9">第四篇会把它们逐个变成可计算的步骤</text>
-
-        <text x="16" y="276" fill="#9fb0c7" font-size="10.5">读图到设计的跨越：读图回答「是什么」，设计要回答「为什么是这个值、换一个行不行」。</text>
-        <text x="16" y="300" fill="#6f7f9c" font-size="10">下一步（第四篇）：电流预算 → DCDC 计算 → LDO 热设计 → 去耦 → 上下拉/终端 → 复位晶振 → 采样 → 故障注入。</text>
-        <text x="16" y="324" fill="#ff9c9c" font-size="10">自检：能否在不看图纸的情况下，说出 TP3/TP4/TP6/TP7/TP8 各测什么？</text>
-      </svg>
-      <figcaption><b>图 3-12</b>　全板信号地图与「自己画板」的五处高风险。</figcaption>
-    </figure>
-
-    <div class="box tip">
-      <h5>把这一页打印出来</h5>
-      <p>建议把这张表和 3.12.1 的电源表打印贴在工位：调试时先对照「现象 → 先量哪」，比翻 12 页 PDF 快得多。这也是老工程师「一眼看出问题」的秘密——不是记性好，是手里有索引。</p>
+    <div class="demo">
+      <div class="dh"><b>DCDC 反馈反算与效率</b><span>改 Vref/上下电阻/输入输出，看输出、占空比、损耗</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+          <div><div class="lbl">V<sub>ref</sub> <b id="vn">0.765</b> V</div><input id="v" type="range" min="0.6" max="1.0" step="0.005" value="0.765" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">R<sub>top</sub> <b id="rn">49.9</b> kΩ</div><input id="r1" type="range" min="10" max="120" step="0.1" value="49.9" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">R<sub>bot</sub> <b id="bn">15</b> kΩ</div><input id="r2" type="range" min="5" max="60" step="0.1" value="15" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">负载电流 <b id="in">1.0</b> A</div><input id="i" type="range" min="0.1" max="3" step="0.1" value="1" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+          <div><div class="lbl">输入电压 <b id="vin">5.0</b> V</div><input id="vi" type="range" min="4" max="24" step="0.1" value="5" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">电感 DCR <b id="dn">0.05</b> Ω</div><input id="d" type="range" min="0.01" max="0.3" step="0.01" value="0.05" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="pOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
     </div>
 
-    <h3>自测</h3>
-    <details class="quiz"><summary>不看图纸，说出五个测试点各测什么。</summary><div class="ans">TP3：VDD_ARM_SOC_IN 1.35V；TP4：VDD_SNVS_3V3 3.3V；TP6：NVCC_SD（1.8/3.3V）；TP7：DRAM_1V35；TP8：NVCC_CSI 2.8V。</div></details>
-    <details class="quiz"><summary>「认不到 TF 卡」的三步排查是什么？</summary><div class="ans">① 量 NVCC_SD 是否有电、电压是否正确；② 量 CMD 上拉（47k）是否存在；③ 查卡座与 DAT 线，最后才怀疑 SoC 控制器配置。</div></details>
-    <details class="quiz"><summary>为什么说「这五处决定能不能跑起来」？</summary><div class="ans">因为它们直接决定 SoC 的上电、时钟、复位、启动介质与内存访问。任何一处错，系统根本进不到内核，后面所有软件调试都无从谈起。</div></details>
+    <h3>练习（答案在折叠里）</h3>
+    <details class="quiz"><summary>1. PHY、变压器、RJ45 各管什么？</summary><div class="ans">PHY 管数字↔模拟；变压器管隔离与共模；RJ45 管机械与 LED。</div></details>
+    <details class="quiz"><summary>2. 49.9K/15K、Vref 0.765 的输出？</summary><div class="ans">0.765×4.327≈3.31V。</div></details>
+    <details class="quiz"><summary>3. R54 1K+C30 102 的作用？</summary><div class="ans">前馈零点（约 159kHz），改善负载瞬态响应。</div></details>
+    <details class="quiz"><summary>4. RBIAS 2.49K 为什么 1%？</summary><div class="ans">决定 PHY 驱动幅度与接收阈值，偏差直接影响眼图与长线丢包。</div></details>
+    <details class="quiz"><summary>5. 网口不亮先查什么？</summary><div class="ans">3.3V→L3/L4、PHY 复位、25MHz、MDIO 地址与设备树是否一致。</div></details>
+    <details class="quiz"><summary>6. SMBJ3.3A 钳位 6.5V 有何隐患？</summary><div class="ans">超过多数 3.3V 芯片绝对最大（约 4V），需靠保险丝/限流控制能量，严格设计应选更低钳位。</div></details>
+    <details class="quiz"><summary>7. 为什么 CH340 要单独 LDO？</summary><div class="ans">隔离 USB 插拔浪涌，给 V3 稳定 3.3V，避免影响 SoC。</div></details>
 
-        <h2>原页对照</h2>
-    <figure class="fig sch">
-      <div class="scroller"><a href="../../assets/img/sch/core_p1.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/core_p1.png" alt="CORE V2.0 原理图第 1 页" loading="lazy"></a></div>
-      <figcaption><b>原页 · CORE p1</b>　全板信号地图的第一块拼图：六路电源、TP1–TP8 测试点、电源容差表。剩下三块在 MINI p1（接口与配置）、p2（低速外设）、p3（以太网与排针）。四页拼起来才是完整的一块板。<a class="zoom" href="../../assets/img/sch/core_p1.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
-    </figure>
-    <div class="ch-nav"><a href="c11.html"><span>上一章</span><b>← 3.11 MINI 第 4 页</b></a>
-      <a class="nx" id="chNavNext" href="../index.html"><span>本篇完</span><b>进入第四篇 →</b></a></div>
+    <div class="ch-nav">
+      <a href="c11.html"><span>上一章</span><b>← 3.11 MINI 第 2 页</b></a>
+      <a class="nx" id="chNavNext" href="../p4/c01.html"><span>下一篇</span><b>第四篇 · 设计与计算 →</b></a>
+    </div>
   </main>
 </div>
-<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
-<script>renderPart('p3','c12.html');</script>
-</body></html>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p3','c12.html');
+(function(){
+  function calc(){
+    var v=+document.getElementById('v').value, r1=+document.getElementById('r1').value, r2=+document.getElementById('r2').value;
+    var i=+document.getElementById('i').value, vi=+document.getElementById('vi').value, d=+document.getElementById('d').value;
+    document.getElementById('vn').textContent=v.toFixed(3); document.getElementById('rn').textContent=r1.toFixed(1);
+    document.getElementById('bn').textContent=r2.toFixed(1); document.getElementById('in').textContent=i.toFixed(1);
+    document.getElementById('vin').textContent=vi.toFixed(1); document.getElementById('dn').textContent=d.toFixed(2);
+    var vo=v*(1+r1/r2);
+    var duty=vo/vi*100;
+    var pout=vo*i, ploss=i*i*d, eff=(pout/(pout+ploss))*100;
+    document.getElementById('pOut').innerHTML=
+      'V<sub>out</sub> = '+v.toFixed(3)+'×(1+'+r1.toFixed(1)+'/'+r2.toFixed(1)+') = <b style="color:#5ff1ef">'+vo.toFixed(2)+' V</b><br>'+
+      '占空比 D ≈ V<sub>out</sub>/V<sub>in</sub> = <b style="color:#5ff1ef">'+duty.toFixed(1)+'%</b>'+(duty>90?'（占空比过高，接近 dropout，需检查输入电压）':'')+'<br>'+
+      'DCR 损耗 = I²×DCR = '+i.toFixed(1)+'²×'+d.toFixed(2)+' = <b style="color:#5ff1ef">'+ploss.toFixed(2)+' W</b>；仅此一项效率 '+(eff).toFixed(1)+'%<br>'+
+      '（实际还要加开关损耗、栅极驱动、静态电流，实测效率通常再低 5–10%）';
+  }
+  ['v','r1','r2','i','vi','d'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+</style>
+</body>
+</html>

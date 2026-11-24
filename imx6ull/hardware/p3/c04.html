@@ -1,9 +1,11 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>3.4 核心板第 3 页：DDR3L | 第三篇 · 逐页读真实原理图 | i.MX6ULL 学习手册</title>
-<meta name="description" content="DDR3L 的电源、VREF 1.5k 分压与 2µF、ZQ 校准、DQS 差分、ODT 与走线；为什么 DDR 调试失败多半在读图阶段就注定。">
-<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+<title>3.4 核心板第 3 页：DDR3L 的 96 个球怎么接 | 第三篇 | i.MX6ULL 学习手册</title>
+<meta name="description" content="CORE p3 逐球解读：NT5CC256M16EP-EK 的地址/数据/DQS/控制/电源分组，VREF 1.5K 分压、ZQ 240Ω、时钟 470Ω+2.2pF 端接、ODT 下拉、去耦配置与容量带宽计算。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -14,141 +16,164 @@
   <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
 <div class="shell">
   <aside id="sidebar"><div class="vol-h">第三篇 · 逐页读真实原理图</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 4 章<span class="sep">/</span>约 30 分钟</div>
-    <h1>核心板第 3 页：DDR3L 是怎么接的</h1>
-    <p class="lede">DDR 是整块板最「苛刻」的部分：<b>1.35V 电源、0.675V 参考、240Ω 校准、差分 DQS、等长走线</b>。这一页上的每一颗电阻都在解决一个具体问题。读懂它，你就知道为什么 DDR 不稳定时「换颗粒」往往没用。</p>
+    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 4 章<span class="sep">/</span>约 60 分钟</div>
+    <h1>核心板第 3 页：DDR3L 的 96 个球怎么接</h1>
+    <p class="lede">这一页（IMX6ULL_CORE_LVDDR3.SchDoc）只有一个主角：<b>U5，NT5CC256M16EP-EK</b>，一颗 16 位 DDR3L 颗粒，512MB。看起来密密麻麻，其实只有五组线：地址、数据（含 DQS 差分）、控制、电源、特殊（ZQ/VREF）。把五组分清，剩下的就是「哪根线该多长、哪个电阻为什么是这个值」。</p>
+
+    <figure class="fig sch"><div class="scroller"><img loading="lazy" src="../../assets/img/sch/core_p3_ddr.png" class="tall" alt="CORE p3 的 DDR3L 颗粒 U5 全符号：地址、数据、DQS、控制、电源、ZQ 与 VREF"><a class="zoom" href="../../assets/img/sch/core_p3_ddr.png" class="tall" target="_blank" rel="noopener">新窗口打开</a></div><figcaption>U5 全符号（300dpi 裁切）。左侧从上到下依次是 <b>DRAM_ADDR0–14 + SDBA0–2</b>（地址/块地址）、<b>CS/RAS/CAS/WE/ODT</b>（控制）、<b>SDCLK0_P/N + SDCKE0 + RESET_B</b>；右侧 <b>DQ0–15 + LDQS/UDQS 差分 + LDM/UDM</b>；右下 <b>ZQ0/ZQ1 接 240R、VREFCA/VREFDQ 接 DRAM_VREF</b>；底部 9 个 VDD + 9 个 VDDQ。</figcaption></figure>
+
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>说出 DDR3L 与 DDR3 的电压差异，以及为什么不能混用</li>
-        <li>解释 VREF 用 1.5k/1.5k 分压 + 2µF 电容的完整理由</li>
-        <li>说清 ZQ 240Ω 与 ODT 的作用</li>
-        <li>在原理图上找出「最可能让 DDR 跑不起来」的四处</li>
+        <li>从型号算出容量：256M×16 = 4Gb = 512MB，并说出 15 位行地址 + 10 位列地址 + 8 bank 的来历</li>
+        <li>解释 VREF 为什么用 1.5K/1.5K 分压、为什么每颗 VREF 脚还要并 224</li>
+        <li>说出 ZQ 240Ω、时钟 470Ω+2.2pF、ODT 10K 下拉各自解决什么问题</li>
+        <li>区分「单端 50Ω」与「差分 100Ω」的走线要求，知道 DQS 为什么必须差分</li>
+        <li>用万用表/示波器按顺序判断 DDR 不工作的故障层级</li>
       </ol>
     </div>
 
-    <h2><span class="n">3.4.1</span>DDR3L 的六个关键网络</h2>
+    <h2><span class="n">3.4.1</span>型号与容量：一颗芯片就是 512MB</h2>
+    <p><b>NT5CC256M16EP-EK</b> 拆开读：<b>256M</b> = 每颗 256M 个存储单元（word），<b>16</b> = 每个 word 16 位，<b>E</b> = 电压 1.35V（DDR3L），<b>K</b> = 商业温度。所以单颗容量：</p>
+    <p style="text-align:center">256M × 16 bit = 4096 Mbit = <b>4Gb = 512MB</b></p>
+    <p>它的内部组织是 8 个 bank，每个 bank 有 2<sup>15</sup>=32768 行、2<sup>10</sup>=1024 列：</p>
+    <p style="text-align:center">8 × 32768 × 1024 × 16 bit = 4,294,967,296 bit = 4Gb</p>
+    <p>所以图纸上地址线是 <b>A0–A14 共 15 根</b>（行地址）、<b>BA0–BA2 共 3 根</b>（8 个 bank）、列地址复用 A0–A9。这也解释了为什么 A10 后面标 <b>/AP</b>（Auto Precharge）、A12 标 <b>/BC</b>（Burst Chop）——它们是复用功能，不是额外引脚。</p>
+    <p><b>为什么只用一颗？</b>i.MX6ULL 的 DDR 控制器是 16 位数据总线，一颗 x16 颗粒刚好占满，不需要并列两颗。带宽：16 bit × 400MHz × 2（上下沿）= <b>1.6GB/s</b>，对于 528MHz 的 A7 足够。</p>
+
+    <h2><span class="n">3.4.2</span>五组信号，各管什么</h2>
     <table>
-      <thead><tr><th>网络</th><th>作用</th><th>本板实现</th><th>判据</th></tr></thead>
+      <thead><tr><th>组</th><th>本页网络</th><th>方向</th><th>要点</th></tr></thead>
       <tbody>
-        <tr><td class="nm">DRAM_1V35</td><td>DDR 主电源（DDR3L 为 1.35V）</td><td>DCDC 输出，TP7 可测</td><td>1.35V ±5%，纹波小</td></tr>
-        <tr><td class="nm">DDR_VREF</td><td>输入比较参考 = VDDQ/2</td><td><b>R54/R55 各 1.5k</b> 分压 + <b>C65 2µF</b> + <b>C66 104</b></td><td>0.675V ±1%，低噪声</td></tr>
-        <tr><td class="nm">DDR_ZQ</td><td>输出阻抗校准</td><td>240Ω 精度 1% 到地</td><td>阻值精度直接决定驱动强度</td></tr>
-        <tr><td class="nm">DQS_P/N</td><td>数据选通（差分）</td><td>与 DQ 成组等长</td><td>组内偏差小，组间可放宽</td></tr>
-        <tr><td class="nm">CK_P/N</td><td>时钟（差分）</td><td>源同步，靠近颗粒</td><td>走线最短、阻抗 50Ω</td></tr>
-        <tr><td class="nm">ODT / CKE / CS</td><td>终端、时钟使能、片选</td><td>按参考设计接</td><td>上电默认状态必须正确</td></tr>
+        <tr><td class="nm">地址/块地址</td><td>DRAM_ADDR0–14、DRAM_SDBA0–2</td><td>SoC → DDR</td><td>单端 50Ω，同组等长（±50mil）</td></tr>
+        <tr><td class="nm">数据</td><td>DRAM_DATA0–15、DRAM_DQM0/1</td><td>双向</td><td>按字节通道分组等长，DQM 是字节屏蔽</td></tr>
+        <tr><td class="nm">数据选通</td><td>DRAM_SDQS0_P/N、SDQS1_P/N</td><td>双向</td><td><b>差分 100Ω</b>，与对应 DQ 组等长</td></tr>
+        <tr><td class="nm">控制</td><td>CS0_B、RAS_B、CAS_B、SDWE_B、ODT0、SDCKE0、RESET_B</td><td>SoC → DDR</td><td>全部低有效（_B），与时钟一起等长</td></tr>
+        <tr><td class="nm">时钟</td><td>DRAM_SDCLK0_P/N</td><td>SoC → DDR</td><td>差分 100Ω，<b>RC 端接</b>（R47 470R + C51 2.2pF）</td></tr>
+        <tr><td class="nm">电源</td><td>VDD1–9、VDDQ1–9、VSS1–12、VSSQ1–9</td><td>—</td><td>VDD=VDDQ=DRAM_1V35；17×224 + 2×22µF 去耦</td></tr>
+        <tr><td class="nm">特殊</td><td>ZQ0/ZQ1/ZQPAD、VREFCA/VREFDQ</td><td>—</td><td>240Ω 校准 + 0.675V 参考</td></tr>
       </tbody>
     </table>
+    <p><b>一个看图陷阱</b>：U5 的 <b>NC_J1 / NC_M7 / NC_J9 / NC_L1 / NC_L9</b> 五个球，引脚名写着 NC（不接），但图纸上它们连着 <b>DRAM_ODT1、DRAM_ADDR15、DRAM_SDCKE1、DRAM_CS1_B、DRAM_ZQ1</b>。因为这颗颗粒是 16 位、单 rank，用不到 ODT1/CS1/ADDR15；但 SoC 侧这些信号仍然引出，PCB 上就走到 NC 球。读图时要分清「功能不用」与「物理没接」。</p>
 
-    <h2><span class="n">3.4.2</span>VREF：一颗电容决定的稳定性</h2>
-    <p>VREF 是 DDR 接收端判断 0/1 的门槛，等于 VDDQ/2 = 0.675V。分压电阻 R54/R55 各 1.5k，总阻 3k，<b>分压电流 = 1.35V/3k = 0.45mA</b>，等效源阻抗 R1∥R2 = 750Ω（注意 750Ω 是内阻，不是总阻，别用它算电流）。</p>
-    <p><b>C65 的 2µF 不是随便放的：</b>它与 750Ω 构成低通，截止频率 f = 1/(2π×750×2µF) ≈ 106Hz。也就是说，100Hz 以上的电源噪声被大幅衰减，VREF 保持干净。而 C66 的 0.1µF 负责更高的频段（几十 MHz），两者并联覆盖宽频。</p>
-    <div class="box deep">
-      <h5>为什么不能省掉分压电阻、直接用 DCDC 分两路</h5>
-      <p>因为 VREF 需要「跟随 VDDQ 变化」：电源有一点波动时，参考也要同比例动，接收端才不会误判。用独立 LDO 生成 0.675V 反而会在电源波动时产生相对偏移。分压是「比例跟随」，这是它的本质优势。</p>
-    </div>
+    <h2><span class="n">3.4.3</span>VREF：0.675V 从哪来</h2>
+    <p>DDR3L 的输入缓冲用「参考电压」判断高低：V<sub>IH</sub>/V<sub>IL</sub> 都是以 VREF 为中心。VREF 必须等于电源的一半：</p>
+    <p style="text-align:center">V<sub>REF</sub> = 1.35V × 1500/(1500+1500) = <b>0.675V</b></p>
+    <p>本页用 <b>R54 1.5K、R55 1.5K</b> 从 DRAM_1V35 分压，图上注释 <b>#Note: 1K/1.5K are OK</b>——意思是 1K 也能用（分压电流从 450µA 增到 675µA，噪声抗性更好但功耗更大）。</p>
+    <p>关键细节：分压出来的 0.675V 不能直接拉根长线送到芯片，必须<b>每个 VREF 脚就近并电容</b>。<span class="nm">VREFCA（M8）</span>与<span class="nm">VREFDQ（H1）</span>各并一颗 <b>224</b>（C53、C54），分压节点再并 <b>22µF（C65）+ 104（C66）</b>。原因：VREF 是高阻节点，任何一点数字噪声灌进来都会让采样判决偏移，表现为「跑 memtester 随机出错」。</p>
+    <p>算一下分压电阻的误差影响：若 R54 是 ±1%（1.5K±15Ω），VREF 偏差约 ±6.8mV，占 0.675V 的 1%。DDR3L 规范允许 VREF 偏差约 ±1%，所以<b>必须用 1% 电阻</b>，5% 电阻会让时序余量直接消失。</p>
 
-    <figure class="fig">
-      <svg viewBox="0 0 880 340" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <rect x="20" y="18" width="410" height="200" rx="10" fill="#141c2e" stroke="#3a4560"/>
-        <text x="36" y="42" fill="#eaf3ff" font-size="11">VREF 分压 + 电容滤波</text>
-        <line x1="120" y1="70" x2="120" y2="86" stroke="#ffb84d"/>
-        <text x="128" y="78" fill="#ffd79a" font-size="9">1.35V</text>
-        <rect x="108" y="86" width="24" height="30" rx="3" fill="rgba(255,184,77,.15)" stroke="#ffb84d"/>
-        <text x="138" y="106" fill="#ffd79a" font-size="9">R54 1.5k</text>
-        <line x1="120" y1="116" x2="120" y2="136" stroke="#5ff1ef"/>
-        <text x="130" y="132" fill="#9df5f4" font-size="9">VREF 0.675V</text>
-        <rect x="108" y="136" width="24" height="30" rx="3" fill="rgba(255,184,77,.15)" stroke="#ffb84d"/>
-        <text x="138" y="156" fill="#ffd79a" font-size="9">R55 1.5k</text>
-        <line x1="120" y1="166" x2="120" y2="182" stroke="#6f7f9c"/>
-        <line x1="106" y1="182" x2="134" y2="182" stroke="#6f7f9c"/>
-        <line x1="170" y1="136" x2="170" y2="176" stroke="#5ce1a0"/>
-        <rect x="158" y="120" width="24" height="16" rx="3" fill="rgba(92,225,160,.15)" stroke="#5ce1a0"/>
-        <text x="192" y="130" fill="#9df3c2" font-size="9">C65 2µF</text>
-        <rect x="158" y="160" width="24" height="16" rx="3" fill="rgba(92,225,160,.15)" stroke="#5ce1a0"/>
-        <text x="192" y="172" fill="#9df3c2" font-size="9">C66 104</text>
-        <line x1="170" y1="176" x2="170" y2="190" stroke="#6f7f9c"/>
-        <line x1="156" y1="190" x2="184" y2="190" stroke="#6f7f9c"/>
-        <text x="36" y="204" fill="#6f7f9c" font-size="9">750Ω × 2µF → 截止约 106Hz</text>
+    <h2><span class="n">3.4.4</span>ZQ：240Ω 是「校准标尺」</h2>
+    <p>U5 的 <b>ZQ0（L8）</b>与<b>ZQ1（L9）</b>各接 <b>R48/R49 = 240R</b> 到地，<b>ZQPAD（N4）</b>接 <b>R52 240R</b>。作用：DDR 内部输出驱动器的阻抗（ODT/OCD）靠这颗精密电阻校准。控制器会发 ZQ 校准命令，内部比较「240Ω 对应的电流」，据此调整输出阻抗，保证在 50Ω 传输线上不反射。</p>
+    <ul>
+      <li><b>必须 1%</b>：240Ω±1% 是 JEDEC 规定；用 5% 会让 ODT 阻抗偏离，眼图张开度变差。</li>
+      <li><b>必须单独走线到地</b>：不能和数字地混在一根细线上，否则校准值被 IR drop 污染。</li>
+      <li><b>R53 10K</b> 是 ZQPAD 的附加偏置（不同封装/不同颗粒的 ZQPAD 处理略有差异），不是分压。</li>
+    </ul>
 
-        <rect x="450" y="18" width="400" height="200" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
-        <text x="466" y="42" fill="#eaf3ff" font-size="11">ZQ 与 ODT：两个「隐形」电阻</text>
-        <text x="466" y="72" fill="#9df5f4" font-size="10">ZQ 240Ω（1%）</text>
-        <text x="466" y="92" fill="#9fb0c7" font-size="9.5">上电校准输出阻抗，决定驱动强度与摆幅</text>
-        <text x="466" y="118" fill="#9df5f4" font-size="10">ODT 片内终端</text>
-        <text x="466" y="138" fill="#9fb0c7" font-size="9.5">读写时把总线端接匹配，抑制反射</text>
-        <text x="466" y="164" fill="#ff9c9c" font-size="9.5">ZQ 用 5% 电阻：校准偏差 → 眼图变窄</text>
-        <text x="466" y="186" fill="#6f7f9c" font-size="9">这两项都在颗粒内部生效，但由外部决定</text>
+    <h2><span class="n">3.4.5</span>时钟端接：470Ω + 2.2pF 是什么套路</h2>
+    <figure class="fig sch"><div class="scroller"><img loading="lazy" src="../../assets/img/sch/core_p3_clk.png" alt="DDR 时钟 SDCLK0_P/N 的 RC 端接：R47 470R + C51 2.2pF、C52 2.2pF"><a class="zoom" href="../../assets/img/sch/core_p3_clk.png" target="_blank" rel="noopener">新窗口打开</a></div><figcaption>CORE p3 时钟端接区（原图裁切）：<b>R47 470R</b> 串在 DRAM_SDCLK0_P 上，<b>C51/C52 2.2pF</b> 分别对 P/N 到地，图上注释 <b>#Note: CLK termination: Place RXX close to U2</b>（RXX 指 R47，U2 为早期位号，实物即 U5 附近的 DDR 颗粒）。</figcaption></figure>
+    <p>这不是普通的串联匹配，而是 DDR3 常用的 <b>RC 端接（也叫「虚拟端接」的一种简化）</b>：</p>
+    <ul>
+      <li><b>470Ω 串联</b>：把驱动器的快速边沿「钝化」，减小过冲与 EMI，同时不完全吃掉幅度（470Ω 与走线 50Ω 分压，到达颗粒仍有约 0.9 倍幅度）。</li>
+      <li><b>2.2pF 到地</b>：与 470Ω 构成低通，时间常数 τ=470×2.2p=1.03ns，截止约 154MHz——对 400MHz 时钟的基频影响可控，但能压掉 1GHz 以上的振铃。</li>
+      <li><b>贴近颗粒放置</b>：注释特意写「Place RXX close to U2」，因为端接要放在「信号到达端」，放在 SoC 侧就变成源端匹配，效果完全不同。</li>
+    </ul>
+    <p>注意：时钟是<b>差分</b>的，P/N 各有一套 RC，且 C51/C52 必须对称布放，否则差分失衡会转化成共模噪声。</p>
 
-        <text x="20" y="248" fill="#9fb0c7" font-size="10.5">DDR3L vs DDR3：1.35V vs 1.5V。混用的后果是颗粒寿命骤降、时序余量消失，且不会立刻坏。</text>
-        <text x="20" y="272" fill="#6f7f9c" font-size="10">DQS 与 DQ 是「组内等长」：同一 byte lane 内偏差要小，不同 lane 之间可以放宽，这是 DDR 走线的核心规则。</text>
-        <text x="20" y="296" fill="#ff9c9c" font-size="10">读图必查：VREF 是否有 2µF？ZQ 是否为 1%？CK/DQS 是否成对？ODT/CS 上电默认对不对？</text>
-      </svg>
-      <figcaption><b>图 3-4</b>　VREF 的比例跟随与宽频滤波。</figcaption>
-    </figure>
+    <h2><span class="n">3.4.6</span>ODT 与「10K 下拉」</h2>
+    <p>图上 <b>R50/R51 = 10K</b> 接在 <b>DRAM_ODT0/ODT1</b> 到地，作用是「未驱动时给一个确定电平」。DDR 的 ODT 脚高有效（内部端接开启），若悬空，CMOS 输入可能停在阈值附近，内部端接时开时关，读眼图会看到随机塌陷。10K 下拉保证默认关闭。</p>
+    <p>这与 I2C 的上拉逻辑正好相反：<b>上拉用于「默认无效、需要时拉低」的低有效信号；下拉用于「默认关闭、需要时拉高」的高有效信号</b>。看图时先判断极性，再判断该上拉还是下拉。</p>
+
+    <h2><span class="n">3.4.7</span>去耦与布局：17 颗 224 的含义</h2>
+    <p>U5 底部 9 个 VDD + 9 个 VDDQ 全部接 DRAM_1V35，旁边一排 <b>C67–C78</b>：1 颗 224 + 1 颗 22µF + 10 颗 224，再加芯片上方的 C58 22µF、C59–C64 六颗 224。合计 <b>17 颗 224 + 2 颗 22µF</b>。</p>
+    <p>为什么这么多：DDR 在读写突发时电流变化极快（DI/dt 可达 mA/ps 级），每个电源球都需要「本地电荷池」。经验公式：<b>每颗 224 服务 1–2 个电源球</b>，距离 ≤3mm，过孔直达地平面。</p>
+    <p>本板 PCB 上这 17 颗 224 就贴在颗粒背面正对球位——这也是为什么核心板能做得很小：正面只放 DDR 颗粒，去耦全在背面。</p>
+
+    <h2><span class="n">3.4.8</span>故障判据：DDR 不工作时按顺序查</h2>
+    <table>
+      <thead><tr><th>层级</th><th>测什么</th><th>正常值</th><th>异常含义</th></tr></thead>
+      <tbody>
+        <tr><td>1 电源</td><td>VDD/VDDQ（任一颗 224 焊盘）</td><td>1.35V ±3%</td><td>0V → 上游 U11/L3 未工作；偏低 → 负载短路</td></tr>
+        <tr><td>2 参考</td><td>DRAM_VREF（C53 正端）</td><td>0.675V ±1%</td><td>偏离 → 分压电阻错值或 VREF 脚漏电</td></tr>
+        <tr><td>3 校准</td><td>ZQ 焊盘对地</td><td>240Ω ±1%</td><td>开路 → 颗粒没焊好/ZQ 球虚焊</td></tr>
+        <tr><td>4 时钟</td><td>SDCLK_P/N（示波器差分）</td><td>400MHz、0.9V 幅度、无振铃</td><td>无时钟 → SoC 的 DDR 时钟未使能（时钟门控）</td></tr>
+        <tr><td>5 复位</td><td>DRAM_RESET_B</td><td>上电后由低变高</td><td>一直低 → POR 未释放</td></tr>
+        <tr><td>6 数据</td><td>DQ 静态阻抗</td><td>各脚对地 40–60Ω（内部 ODT 关闭时高阻）</td><td>某脚 0Ω → 颗粒或 SoC 损坏</td></tr>
+      </tbody>
+    </table>
+    <p>顺序不能颠倒：<b>电源→参考→校准→时钟→复位→数据</b>。跳过 VREF 直接看数据线，是最常见的误判来源。</p>
 
     <div class="demo">
-      <div class="dh"><b>VREF 与滤波计算器</b><span>给 VDDQ 与分压电阻，算 VREF、电流与截止频率</span></div>
+      <div class="dh"><b>DDR 容量 / VREF / 端接计算器</b><span>改位宽与行列数，看容量；改分压电阻，看 VREF 偏差</span></div>
       <div class="db">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-          <div><div style="font-size:12px;color:#9fb0c7">VDDQ <b id="vv" style="color:#5ff1ef">1.35</b> V</div><input id="v" type="range" min="1.2" max="1.8" step="0.01" value="1.35" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12px;color:#9fb0c7">分压电阻 <b id="rv" style="color:#5ff1ef">1.5</b> kΩ</div><input id="r" type="range" min="0.5" max="10" step="0.1" value="1.5" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12px;color:#9fb0c7">滤波电容 <b id="cv" style="color:#5ff1ef">2.0</b> µF</div><input id="c" type="range" min="0.01" max="10" step="0.01" value="2" style="width:100%;accent-color:#5ff1ef"></div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+          <div><div class="lbl">数据位宽</div><select id="w" class="inp"><option>16</option><option>8</option><option>32</option></select></div>
+          <div><div class="lbl">行地址位 <b id="rn">15</b></div><input id="row" type="range" min="12" max="16" step="1" value="15" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">列地址位 <b id="cn">10</b></div><input id="col" type="range" min="9" max="11" step="1" value="10" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">Bank 数 <b id="bn">8</b></div><input id="bnk" type="range" min="4" max="8" step="4" value="8" style="width:100%;accent-color:#5ff1ef"></div>
         </div>
-        <div id="vrefOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
+          <div><div class="lbl">R<sub>top</sub> <b id="r1n">1.5</b> kΩ</div><input id="r1" type="range" min="1" max="3" step="0.1" value="1.5" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">R<sub>bot</sub> <b id="r2n">1.5</b> kΩ</div><input id="r2" type="range" min="1" max="3" step="0.1" value="1.5" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">时钟频率 <b id="fn">400</b> MHz</div><input id="f" type="range" min="100" max="533" step="1" value="400" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="dOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
       </div>
     </div>
 
-    <h2><span class="n">3.4.3</span>本板 DDR 部分的四个读图检查点</h2>
-    <ol class="steps">
-      <li><b>电源</b>：DRAM_1V35 是否来自独立 DCDC，纹波是否在手册限值内（TP7 可测）。</li>
-      <li><b>VREF</b>：R54/R55 是否等值 1.5k、C65 是否 2µF、C66 是否 0.1µF，节点是否远离开关电源。</li>
-      <li><b>ZQ</b>：240Ω、1%、靠近颗粒的 ZQ 脚，走线不要绕远。</li>
-      <li><b>时钟与选通</b>：CK_P/N、DQS_P/N 是否差分对、是否有串联阻尼（常见 0Ω 预留）。</li>
-    </ol>
-    <div class="box pit">
-      <h5>四个「换颗粒也治不好」的 DDR 问题</h5>
-      <p><b>1. VREF 噪声大：</b>分压点靠近电感/开关节点，误码率随负载变化。</p>
-      <p><b>2. ZQ 用了 5% 电阻：</b>校准后驱动强度偏差，眼图窄，跑不满频率。</p>
-      <p><b>3. CK 与 DQS 走线长度差太多：</b>采样窗口偏移，高温/低压时偶发失败。</p>
-      <p><b>4. 电源纹波超标：</b>读写突发时电流跳变，电压塌陷导致时序失效。</p>
+    <h3>练习（答案在折叠里）</h3>
+    <details class="quiz"><summary>1. NT5CC256M16EP 的「256M16」怎么算容量？</summary><div class="ans">256M word × 16 bit = 4Gb = 512MB。</div></details>
+    <details class="quiz"><summary>2. 为什么 VREF 要 0.675V？</summary><div class="ans">DDR3L 输入缓冲以电源一半为判决中心，1.35/2=0.675V；偏离会吃掉时序余量。</div></details>
+    <details class="quiz"><summary>3. ZQ 电阻为什么必须 1%？</summary><div class="ans">它是输出阻抗校准的标尺，误差直接转化为 ODT 阻抗误差与反射。</div></details>
+    <details class="quiz"><summary>4. R47 470Ω + C51 2.2pF 的时间常数与截止频率？</summary><div class="ans">τ=1.03ns，f≈154MHz。</div></details>
+    <details class="quiz"><summary>5. ODT 为什么用 10K 下拉而不是上拉？</summary><div class="ans">ODT 高有效，下拉保证默认关闭；上拉会让内部端接常开，增加功耗与反射。</div></details>
+    <details class="quiz"><summary>6. DQS 为什么必须差分、100Ω？</summary><div class="ans">DQS 是数据采样时钟，差分抗共模噪声、100Ω 匹配传输线，保证采样沿位置稳定。</div></details>
+    <details class="quiz"><summary>7. 16 位、400MHz DDR 的峰值带宽？</summary><div class="ans">16×400M×2=12.8Gbit/s=1.6GB/s。</div></details>
+
+    <div class="ch-nav">
+      <a href="c03.html"><span>上一章</span><b>← 3.3 SoC 电源球与 CAP 脚</b></a>
+      <a class="nx" id="chNavNext" href="c05.html"><span>下一章</span><b>3.5 核心板第 4 页：eMMC 与 NAND →</b></a>
     </div>
-
-    <h3>自测</h3>
-    <details class="quiz"><summary>VREF 量到 0.62V 而不是 0.675V，可能是哪里问题？</summary><div class="ans">先查分压电阻是否有一颗虚焊或值错（1.5k/1.5k 才得一半）；再查 VDDQ 本身是否偏低；最后查是否有负载（漏电）把节点拉低。</div></details>
-    <details class="quiz"><summary>为什么 VREF 电容取 2µF 而不是 0.1µF？</summary><div class="ans">因为分压源阻抗 750Ω 较大，需要大电容才能把截止频率压到 100Hz 级，滤掉电源的低频波动；0.1µF 单独用只能滤高频，低频噪声照样进来。两者并联覆盖全频段。</div></details>
-    <details class="quiz"><summary>DDR3L 颗粒能焊到 1.5V 的 DDR3 板上吗？</summary><div class="ans">不能。DDR3L 额定 1.35V，长期 1.5V 会加速老化、发热，且时序参数不同，可能直接跑不起来。必须核对颗粒型号与板级电压。</div></details>
-
-        <h2>原页对照</h2>
-    <figure class="fig sch">
-      <div class="scroller"><a href="../../assets/img/sch/core_p3.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/core_p3.png" alt="CORE V2.0 原理图第 3 页" loading="lazy"></a></div>
-      <figcaption><b>原页 · CORE p3</b>　第 3 页：DDR3L（NT5CC256M16EP-EK）。DQ/DQS/DM 按 100Ω 差分走，地址线共享，ZQ 240Ω 1%，VREF 由 R54/R55 各 1.5k 分压 + C65 2µF/C66 0.1µF 滤波（右下角虚线框内就是它）。<a class="zoom" href="../../assets/img/sch/core_p3.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
-    </figure>
-    <div class="ch-nav"><a href="c03.html"><span>上一章</span><b>← 3.3 核心板第 2 页</b></a>
-      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.5 核心板第 4 页 →</b></a></div>
   </main>
 </div>
-<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
 <script>
 renderPart('p3','c04.html');
 (function(){
   function calc(){
-    var v=+document.getElementById('v').value, r=+document.getElementById('r').value*1000, c=+document.getElementById('c').value*1e-6;
-    document.getElementById('vv').textContent=v.toFixed(2);
-    document.getElementById('rv').textContent=(r/1000).toFixed(1);
-    document.getElementById('cv').textContent=(c*1e6).toFixed(2);
-    var vref=v/2, i=v/(2*r), req=r/2, f=1/(2*Math.PI*req*c);
-    document.getElementById('vrefOut').innerHTML=
-      '<b style="color:#eaf3ff;font-size:15px">VREF = '+vref.toFixed(3)+' V　分压电流 '+(i*1000).toFixed(2)+' mA</b><br>'+
-      '等效源阻抗 '+(req).toFixed(0)+' Ω　低通截止 ≈ '+f.toFixed(0)+' Hz<br>'+
-      '<span style="color:'+(f<200?'#9df3c2':'#ffd79a')+'">'+(f<200?'滤波覆盖低频电源波动，合适':'截止偏高，低频噪声会进 VREF')+'</span><br>'+
-      '<span style="color:#6f7f9c;font-size:11.5px">判据：截止频率应远低于负载跳变/开关频率（常见 1kHz 以上），所以 2µF 配 750Ω 是常见组合。</span>';
+    var w=+document.getElementById('w').value;
+    var row=+document.getElementById('row').value, col=+document.getElementById('col').value, bnk=+document.getElementById('bnk').value;
+    var r1=+document.getElementById('r1').value, r2=+document.getElementById('r2').value, f=+document.getElementById('f').value;
+    document.getElementById('rn').textContent=row; document.getElementById('cn').textContent=col; document.getElementById('bn').textContent=bnk;
+    document.getElementById('r1n').textContent=r1.toFixed(1); document.getElementById('r2n').textContent=r2.toFixed(1);
+    document.getElementById('fn').textContent=f;
+    var bits=Math.pow(2,row)*Math.pow(2,col)*bnk*w;
+    var gb=bits/1e9, MB=gb/8*1000/1000*1000; // bits->bytes
+    var bytes=bits/8;
+    var vref=1.35*r2/(r1+r2);
+    var bw=w*f*2/8/1000;
+    document.getElementById('dOut').innerHTML=
+      '容量 = 2<sup>'+row+'</sup>×2<sup>'+col+'</sup>×'+bnk+'×'+w+' bit = <b style="color:#5ff1ef">'+(bits/1e9).toFixed(1)+' Gb = '+(bytes/1024/1024).toFixed(0)+' MB</b><br>'+
+      'V<sub>REF</sub> = 1.35×'+r2.toFixed(1)+'/('+r1.toFixed(1)+'+'+r2.toFixed(1)+') = <b style="color:#5ff1ef">'+vref.toFixed(3)+' V</b>（理想 0.675V，偏差 '+((vref-0.675)/0.675*100).toFixed(1)+'%）<br>'+
+      '峰值带宽 = '+w+'×'+f+'MHz×2 = <b style="color:#5ff1ef">'+bw.toFixed(2)+' GB/s</b><br>'+
+      '分压电流 = 1.35/('+(r1+r2).toFixed(1)+'k) = '+(1350/(r1+r2)).toFixed(0)+' µA';
   }
-  ['v','r','c'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  ['w','row','col','bnk','r1','r2','f'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
   calc();
 })();
 </script>
-</body></html>
+<style>
+.fig .lbl,.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .inp{width:100%;background:#0a1020;color:#5ff1ef;border:1px solid #2a3a55;border-radius:8px;padding:6px}
+</style>
+</body>
+</html>
+
+

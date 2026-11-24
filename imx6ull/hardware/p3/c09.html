@@ -1,9 +1,11 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>3.9 MINI 第 2 页：TF 卡与低速外设 | 第三篇 · 逐页读真实原理图 | i.MX6ULL 学习手册</title>
-<meta name="description" content="TF 卡 47k 上拉、CAN TJA1050 与 120Ω、RS485 SP3485 自动方向、LED/按键/蜂鸣器、RGB LCD 模拟开关、摄像头接口。">
-<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+<title>3.9 核心板第 8 页：60pin 连接器与整板信号 | 第三篇 | i.MX6ULL 学习手册</title>
+<meta name="description" content="CORE p8：J1/J2 两个 60pin 板对板连接器，120 个触点如何分配电源、LCD、CSI、SD、ENET、USB、UART、I2C、CAN、JTAG；地弹与串联电感估算。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -14,95 +16,150 @@
   <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
 <div class="shell">
   <aside id="sidebar"><div class="vol-h">第三篇 · 逐页读真实原理图</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 9 章<span class="sep">/</span>约 28 分钟</div>
-    <h1>MINI 第 2 页：TF 卡与低速外设</h1>
-    <p class="lede">这一页是「接口大杂烩」：TF 卡、CAN、RS485、LED、按键、蜂鸣器、RGB LCD、摄像头。它们有个共同点——<b>每个接口都靠几颗电阻决定成败</b>。这一章按接口逐个拆，每处给出「错一个会怎样」。</p>
+    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 9 章<span class="sep">/</span>约 50 分钟</div>
+    <h1>核心板第 8 页：60pin 连接器与整板信号</h1>
+    <p class="lede">这是核心板最后一页（IMX6ULL_CORE_PIN.SchDoc），也是「核心板与底板的合同」：<b>J1、J2 两个 60 pin 连接器，共 120 个触点</b>，把 SoC 几乎所有可用信号引出去。读这一页的方法和前面不同——不要逐根看，而要<b>按组归类，再算连接器本身的代价</b>。</p>
+
+    <figure class="fig sch"><div class="scroller"><img loading="lazy" src="../../assets/img/sch/core_p8_pin.png" alt="CORE p8：J1 与 J2 两个 60pin 连接器的引脚与网络名"><a class="zoom" href="../../assets/img/sch/core_p8_pin.png" target="_blank" rel="noopener">新窗口打开</a></div><figcaption>J1/J2 全图（300dpi 裁切）：两个连接器型号均为 <b>3710M060046G3FT01</b>，各 1–60 脚。左列是 J1（多为 LCD/CSI/SD 侧），右列是 J2（多为 GPIO/UART/CAN/ENET/JTAG 侧）。顶部还有 <b>TP1/TP2</b> 两个测试点接 CLK1_P/CLK1_N。</figcaption></figure>
+
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>说出 TF 卡 47k 上拉、CAN 120Ω 终端、RS485 22Ω 串阻各自的作用</li>
-        <li>解释 RS485 自动方向电路（Q4 + R23 + D6）的工作原理</li>
-        <li>说清蜂鸣器为什么用 PNP 高边、按键为什么要 10k 上拉</li>
+        <li>把 120 个触点按功能分成七组，并说出每组的代表信号</li>
+        <li>解释为什么电源与地要占十几个触点，而不是各一个</li>
+        <li>估算连接器 1nH 串联电感在 24 根数据同时翻转时的地弹电压</li>
+        <li>说出热插拔时「地先接触」的物理原因</li>
+        <li>由核心板定义反推底板网络名（IMX1/IMX2 的来历）</li>
       </ol>
     </div>
 
-    <h2><span class="n">3.9.1</span>逐个接口看</h2>
+    <h2><span class="n">3.9.1</span>120 个触点怎么分组</h2>
     <table>
-      <thead><tr><th>接口</th><th>核心器件</th><th>关键外围</th><th>作用与错误后果</th></tr></thead>
-      <tbody>
-        <tr><td class="nm">TF 卡（SDIO）</td><td>CARD1 座</td><td><b>R1–R5 47k 上拉</b></td><td>CMD/DAT 空闲保持高；漏贴 → 识别不到卡或读写随机失败</td></tr>
-        <tr><td class="nm">CAN</td><td>U5 TJA1050（5V）</td><td><b>R57 510Ω</b>、120Ω 终端</td><td>510Ω 限制 TXD 电流/阻尼；终端只在两端</td></tr>
-        <tr><td class="nm">RS485</td><td>U10 SP3485（3.3V）</td><td><b>R23 10k、R27 22Ω、D6 MBR0520</b></td><td>Q4 自动方向；R27 阻尼；120Ω 终端在 A/B 端</td></tr>
-        <tr><td class="nm">LED</td><td>LED + <b>R6 510Ω</b></td><td>—</td><td>限流约 2.5mA；阻值过小会烧 LED 或 IO</td></tr>
-        <tr><td class="nm">按键 KEY0</td><td>轻触开关</td><td><b>R12 10k 上拉</b></td><td>按下拉低、松开回高；无上拉则悬空乱跳</td></tr>
-        <tr><td class="nm">蜂鸣器</td><td><b>Q1 SS8550（PNP）</b></td><td><b>R21 1k</b> 基极</td><td>高边开关；基极直接接 GPIO 会超电流</td></tr>
-        <tr><td class="nm">RGB LCD</td><td><b>U1–U3 SGM3157</b></td><td><b>R18 10k、R64/R65 10k</b></td><td>切换 LCD 信号/电压；R18 定默认状态</td></tr>
-        <tr><td class="nm">摄像头</td><td>P1 18pin</td><td><b>R7/R13 10k</b></td><td>I2C 上拉与复位/使能默认电平</td></tr>
+      <thead><tr><th>组</th><th>代表信号</th><th>大约触点数</th></tr>
+      </thead><tbody>
+        <tr><td class="nm">电源/地</td><td>DC5V、GND、VDD_COIN_3V、USB_OTG1_VBUS、USB_OTG2_VBUS</td><td>15–20</td></tr>
+        <tr><td class="nm">显示</td><td>LCD_DATA0–23、LCD_DE/PCLK/HSYNC/VSYNC、LCD_DISP</td><td>约 28</td></tr>
+        <tr><td class="nm">摄像头</td><td>CSI_DATA0–7、CSI_MCLK/PIXCLK/VSYNC/HSYNC、CSI_RESET/PWDN</td><td>约 12</td></tr>
+        <tr><td class="nm">存储/卡</td><td>SD1_CLK/CMD/DATA0–3、SD1_VSELECT、SD1_nRST、USDHC1_CD_B</td><td>约 8</td></tr>
+        <tr><td class="nm">网络</td><td>ENET1/2 的 TXD/RXD/TXEN/CRS_DV/TX_CLK、ENET_MDIO/MDC、ENET1/2_INT</td><td>约 16</td></tr>
+        <tr><td class="nm">串行总线</td><td>UART1–5 的 TX/RX/CTS/RTS、I2C1/2、CAN1/2、ECSPI3/4</td><td>约 20</td></tr>
+        <tr><td class="nm">控制/调试</td><td>RESET、ONOFF、BOOT_MODE0/1、JTAG_TCK/TMS/TDI/TDO/nTRST/MOD、SNVS_TAMPER0–9、GPIO_0–9</td><td>约 25</td></tr>
       </tbody>
     </table>
+    <p>分组的意义：<b>底板设计时按组规划走线</b>。例如 LCD 组要等长、ENET 组要差分、JTAG 组要短而直，这些约束在连接器上就已经「埋好」——同一组的脚通常排在一起（J1 集中 LCD/CSI/SD，J2 集中 GPIO/UART/CAN/ENET/JTAG）。</p>
 
-    <h2><span class="n">3.9.2</span>RS485 自动方向：四颗元件的配合</h2>
-    <p>半双工 RS485 需要「发送时 DE 有效、接收时 DE 无效」。MINI 不用 GPIO 控制，而是用 <b>Q4（SS8050）+ R23 10k + R27 22Ω + D6（MBR0520）</b> 做「发送自动使能」：</p>
-    <ol class="steps">
-      <li>UART TX 空闲为高 → Q4 截止 → DE 被 R23 拉低 → 处于接收。</li>
-      <li>开始发送，TX 出现低电平 → Q4 导通 → DE 拉高 → 收发器进入发送。</li>
-      <li>发送结束回到高 → Q4 截止 → 自动回到接收。</li>
-      <li>R27 串在 TX 与基极之间，限制基极电流并阻尼边沿；D6 加速关断（泄放基极电荷）。</li>
-      </ol>
-    <p>这个电路的代价是<b>波特率不能太高</b>（Q4 的开关速度限制），且发送第一位可能被截断——所以很多设计改用 GPIO 直接控制 DE。</p>
+    <h2><span class="n">3.9.2</span>电源与地为什么占十几个脚</h2>
+    <p>DC5V 与 GND 在连接器上各有多个触点并联，原因有三：</p>
+    <ul>
+      <li><b>电流</b>：一个 0.5mm 间距连接器触点额定约 0.5A，底板总电流可能 1–2A，必须并联 4–6 个；</li>
+      <li><b>接触电阻</b>：单触点约 20–30mΩ，并联后降到 5mΩ，压降与发热都下降；</li>
+      <li><b>回流路径</b>：每根高速信号都需要「最近的地」作为回流，地脚分散布置才能让回流路径短。</li>
+    </ul>
+    <p>算一下接触电阻的代价：若 5V 供电 1A 只用一个触点（25mΩ），压降 25mV、功耗 25mW；看起来不大，但连接器多次插拔后接触电阻可能升到 100mΩ，压降 100mV、发热 100mW，且压降会让底板 5V 掉到 4.9V，影响 DCDC 输入裕量。<b>这就是「电源脚要并联」的实际理由</b>。</p>
 
-    <figure class="fig">
-      <svg viewBox="0 0 860 300" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <rect x="20" y="18" width="410" height="190" rx="10" fill="#141c2e" stroke="#3a4560"/>
-        <text x="36" y="42" fill="#eaf3ff" font-size="11">RS485 自动方向</text>
-        <line x1="70" y1="80" x2="160" y2="80" stroke="#5ff1ef"/>
-        <text x="74" y="74" fill="#9df5f4" font-size="9">UART TX</text>
-        <rect x="120" y="86" width="22" height="26" rx="3" fill="rgba(92,225,160,.15)" stroke="#5ce1a0"/>
-        <text x="146" y="104" fill="#9df3c2" font-size="9">R27 22Ω</text>
-        <text x="70" y="140" fill="#9fb0c7" font-size="9">Q4 导通 → DE 高 → 发送</text>
-        <line x1="200" y1="110" x2="200" y2="150" stroke="#5ff1ef"/>
-        <rect x="180" y="150" width="70" height="34" rx="4" fill="rgba(255,255,255,.03)" stroke="#8b7bff"/>
-        <text x="215" y="172" fill="#c8c0ff" font-size="9" text-anchor="middle">SP3485</text>
-        <text x="36" y="204" fill="#6f7f9c" font-size="9">A/B 端各挂 120Ω（只在总线两端）</text>
+    <h2><span class="n">3.9.3</span>连接器的隐形代价：1nH 串联电感</h2>
+    <p>每个触点在电气上近似一个 <b>1nH 的电感</b>（引脚长度约 1mm，约 1nH/mm）。它对低速信号无所谓，但对「多根同时翻转」是灾难：</p>
+    <p style="text-align:center">V<sub>地弹</sub> = L × N × (dI/dt)</p>
+    <p>代入本板 LCD 的最坏情况：24 根数据同时从 0→1，每根驱动电流约 8mA，边沿 1ns：</p>
+    <p style="text-align:center">dI/dt = 24 × 8mA / 1ns = 0.192 A/ns<br>V = 1nH × 0.192 A/ns = <b>0.19V</b></p>
+    <p>0.19V 的地弹意味着「地」瞬间抬高 0.19V，接收端的判决阈值随之偏移——在 3.3V 系统里占 6%，足以让眼图闭合。解决办法不是「换更好的连接器」，而是：</p>
+    <ul>
+      <li><b>多放地脚</b>，让返回电流分摊到多个 1nH 并联（N 个并联 → L/N）；</li>
+      <li><b>数据线交错排列</b>（signal-ground-signal），每根信号旁边都有地；</li>
+      <li><b>降低边沿速率</b>：SoC 的 LCD 接口可配置驱动强度（DSE），从 8mA 档降到 4mA 档，地弹减半。</li>
+    </ul>
 
-        <rect x="450" y="18" width="390" height="190" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
-        <text x="466" y="42" fill="#eaf3ff" font-size="11">三种终端的取舍</text>
-        <text x="466" y="72" fill="#9df5f4" font-size="10">不加终端</text>
-        <text x="466" y="92" fill="#9fb0c7" font-size="9.5">短距（&lt;1m）、低速可用；长线反射严重</text>
-        <text x="466" y="118" fill="#9df5f4" font-size="10">两端各 120Ω</text>
-        <text x="466" y="138" fill="#9fb0c7" font-size="9.5">标准做法；断电量 A/B 约 60Ω</text>
-        <text x="466" y="164" fill="#ff9c9c" font-size="10">每节点都贴</text>
-        <text x="466" y="184" fill="#9fb0c7" font-size="9.5">并联后 &lt;60Ω，驱动器带不动、幅度塌</text>
+    <h2><span class="n">3.9.4</span>热插拔：为什么地要「先接触」</h2>
+    <p>板对板连接器一般不是为热插拔设计的，但很多人调试时会带电插拔。风险在于：</p>
+    <ol>
+      <li>若电源脚先接触、地脚后接触，电流会从信号脚「找地」，把 IO 的 ESD 二极管当回流路径烧掉；</li>
+      <li>若地先接触、电源后接触，电流走正常路径，芯片安全。</li>
+    </ol>
+    <p>所以高质量连接器会把「地脚做得更长」，实现「地先通、后断」。本板是普通板对板连接器，<b>结论就是：不要带电插拔</b>。这也是维修时最常见的「核心板好好的，底板 IO 全烧」的原因。</p>
 
-        <text x="20" y="246" fill="#9fb0c7" font-size="10.5">CAN 的 510Ω（R57）不是终端：它串在 TXD 路径上做阻尼/限流；CAN 终端另有 120Ω。</text>
-        <text x="20" y="270" fill="#6f7f9c" font-size="10">按键 10k 上拉 + 内部消抖：硬件只保证电平确定，抖动仍需软件处理。</text>
-        <text x="20" y="294" fill="#ff9c9c" font-size="10">坑：TF 卡上拉接到固定 3.3V，切 1.8V 模式时持续灌电。</text>
-      </svg>
-      <figcaption><b>图 3-9</b>　RS485 自动方向与终端取舍。</figcaption>
-    </figure>
+    <h2><span class="n">3.9.5</span>由这页反推底板</h2>
+    <p>核心板把信号命名为「原始名」（LCD_DATA0、CSI_MCLK…），底板则把它们重新组织成 IMX1（A1–A60）与 IMX2（B1–B60）两个符号。于是同一根线有三个名字：</p>
+    <table>
+      <thead><tr><th>核心板</th><th>底板连接器</th><th>底板功能网络</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">LCD_DATA0</td><td>IMX1 某脚</td><td>接 40pin LCD 排座的 LCD_R0</td></tr>
+        <tr><td class="nm">CSI_MCLK</td><td>IMX1 某脚</td><td>经 R32 22Ω 接摄像头 P1 的 CSI_MCLK</td></tr>
+        <tr><td class="nm">USDHC1_CLK</td><td>IMX1 某脚</td><td>接 TF 卡的 CLK/SCK</td></tr>
+      </tbody>
+    </table>
+    <p>调试时「按名字搜」比「按脚号搜」可靠：在底板上找 <b>LCD_DATA0</b> 一定能追到核心板，而 A1/B1 这种脚号只在连接器符号里出现。</p>
 
-    <div class="box tip">
-      <h5>蜂鸣器为什么用 PNP 而不是 NPN</h5>
-      <p>PNP 做高边开关：发射极接 3.3V、集电极接蜂鸣器、基极经 1k 由 GPIO 拉低导通。好处是蜂鸣器一端直接接地，布线与「低边 NPN」相反但同样简单；坏处是默认状态要确保关断（基极上拉或 GPIO 初始为高）。</p>
+    <h2><span class="n">3.9.6</span>这一页的读图陷阱</h2>
+    <ul>
+      <li><b>同一功能出现两次</b>：ENET1_TXD0 与 ENET2_TXD0 都在 J2 上——不是重复，是两路独立 MAC。</li>
+      <li><b>USB_OTG1_VBUS 与 USB_OTG2_VBUS 是「检测输入」</b>，不是供电输出；底板上它们接分压电阻。</li>
+      <li><b>VDD_COIN_3V</b> 只出现在 J1 的一个脚上，是纽扣电池的正极，不要误接 3.3V。</li>
+      <li><b>TP1/TP2</b> 是 CLK1_P/N 的测试点，不是信号源；它们引出来是为了测 SoC 的参考时钟。</li>
+    </ul>
+
+    <div class="demo">
+      <div class="dh"><b>连接器地弹/压降估算</b><span>改同时翻转线数、单线电流、边沿、触点电感，看地弹与电源压降</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+          <div><div class="lbl">同时翻转 N <b id="nn">24</b></div><input id="n" type="range" min="1" max="48" step="1" value="24" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">单线电流 <b id="in">8</b> mA</div><input id="i" type="range" min="2" max="24" step="1" value="8" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">边沿 <b id="tn">1.0</b> ns</div><input id="t" type="range" min="0.2" max="5" step="0.1" value="1" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">触点电感 <b id="ln">1.0</b> nH</div><input id="l" type="range" min="0.3" max="3" step="0.1" value="1" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+          <div><div class="lbl">供电电流 <b id="an">1.0</b> A</div><input id="a" type="range" min="0.2" max="3" step="0.1" value="1" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">并联电源脚 <b id="pn">4</b> 个</div><input id="p" type="range" min="1" max="8" step="1" value="4" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="gOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
     </div>
 
-    <h3>自测</h3>
-    <details class="quiz"><summary>RS485 只能收不能发，先查哪颗元件？</summary><div class="ans">查 Q4 与 R23：若 Q4 没导通（虚焊/损坏），DE 永远为低，收发器一直处于接收。也查 R27 是否虚焊导致基极没有驱动。</div></details>
-    <details class="quiz"><summary>TF 卡识别不到，47k 上拉漏贴会有什么现象？</summary><div class="ans">CMD 线在初始化时无法保持高电平，卡不响应命令，表现为「完全不识别」或「偶发识别后读写失败」。</div></details>
-    <details class="quiz"><summary>CAN 只在一端贴 120Ω 会怎样？</summary><div class="ans">另一端反射不被吸收，长线/高速率下误码率升高；示波器上能看到明显的振铃。标准做法是总线物理两端各一个。</div></details>
+    <h3>练习（答案在折叠里）</h3>
+    <details class="quiz"><summary>1. J1/J2 各多少脚？</summary><div class="ans">各 60 脚，共 120 个触点。</div></details>
+    <details class="quiz"><summary>2. 24 线 ×8mA / 1ns 的地弹？</summary><div class="ans">0.192A/ns ×1nH=0.19V。</div></details>
+    <details class="quiz"><summary>3. 电源脚为什么要并联 4–6 个？</summary><div class="ans">分摊电流与接触电阻、降低压降与发热、提供回流。</div></details>
+    <details class="quiz"><summary>4. 为什么不建议带电插拔？</summary><div class="ans">普通连接器无「地先接触」设计，电流会经信号脚 ESD 二极管回流而烧 IO。</div></details>
+    <details class="quiz"><summary>5. USB_OTG1_VBUS 是输出还是输入？</summary><div class="ans">输入，用于检测 VBUS 是否存在，不是给外设供电。</div></details>
+    <details class="quiz"><summary>6. 底板 IMX1 与核心板 J1 是什么关系？</summary><div class="ans">同一物理连接器的两端符号，A1–A60 对应 J1 的 1–60。</div></details>
 
-        <h2>原页对照</h2>
-    <figure class="fig sch">
-      <div class="scroller"><a href="../../assets/img/sch/mini_p2.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/mini_p2.png" alt="MINI V2.2 原理图第 2 页" loading="lazy"></a></div>
-      <figcaption><b>原页 · MINI p2</b>　第 2 页 TF CARD 区：R1–R5 各 47k 上拉（CMD/DATA 在初始化阶段是开漏），卡座 CD 脚检测插拔。旁边还有 CAN(TJA1050)、RS485(SP3485)、LED、按键、蜂鸣器。<a class="zoom" href="../../assets/img/sch/mini_p2.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
-    </figure>
-    <div class="ch-nav"><a href="c08.html"><span>上一章</span><b>← 3.8 MINI 第 1 页</b></a>
-      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.10 MINI 第 3 页 →</b></a></div>
+    <div class="ch-nav">
+      <a href="c08.html"><span>上一章</span><b>← 3.8 BOOT 配置的 47K 阵列</b></a>
+      <a class="nx" id="chNavNext" href="c10.html"><span>下一章</span><b>3.10 MINI 第 1 页：连接器、拨码、I2C 与 JTAG →</b></a>
+    </div>
   </main>
 </div>
-<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
-<script>renderPart('p3','c09.html');</script>
-</body></html>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p3','c09.html');
+(function(){
+  function calc(){
+    var n=+document.getElementById('n').value, i=+document.getElementById('i').value, t=+document.getElementById('t').value, l=+document.getElementById('l').value;
+    var a=+document.getElementById('a').value, p=+document.getElementById('p').value;
+    document.getElementById('nn').textContent=n; document.getElementById('in').textContent=i;
+    document.getElementById('tn').textContent=t.toFixed(1); document.getElementById('ln').textContent=l.toFixed(1);
+    document.getElementById('an').textContent=a.toFixed(1); document.getElementById('pn').textContent=p;
+    var didt=n*i*1e-3/(t*1e-9); // A/s
+    var vg=l*1e-9*didt; // V
+    var rdrop=a*0.025/p;
+    document.getElementById('gOut').innerHTML=
+      'dI/dt = '+n+'×'+i+'mA/'+t.toFixed(1)+'ns = <b style="color:#5ff1ef">'+(didt/1e9).toFixed(3)+' A/ns</b><br>'+
+      '地弹 V = L×dI/dt = '+l.toFixed(1)+'nH × '+(didt/1e9).toFixed(3)+'A/ns = <b style="color:#5ff1ef">'+(vg*1000).toFixed(0)+' mV</b>（占 3.3V 的 '+(vg/3.3*100).toFixed(1)+'%）<br>'+
+      '电源压降 = I×R<sub>contact</sub>/并联数 = '+a.toFixed(1)+'A×25mΩ/'+p+' = <b style="color:#5ff1ef">'+(rdrop*1000).toFixed(0)+' mV</b>，功耗 '+(a*a*0.025/p*1000).toFixed(0)+' mW<br>'+
+      (vg*1000>100?'<span style="color:#ffb4a8">地弹 >100mV，需增加地脚、交错排列或降低驱动强度</span>':'<span style="color:#9ff5c0">地弹可控</span>');
+  }
+  ['n','i','t','l','a','p'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+</style>
+</body>
+</html>
+
