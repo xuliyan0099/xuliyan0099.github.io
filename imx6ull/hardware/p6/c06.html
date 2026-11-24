@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>6.6 量产测试与认证：ICT/FCT、烧录工装、老化、CE/FCC | 第六篇 · 进阶 | i.MX6ULL 学习手册</title>
+<meta name="description" content="讲测试金字塔（ICT/FCT/老化/抽检）、工装与烧录流程、老化 48 小时的判据、CE/FCC/CCC 的测试项与周期，并算测试节拍与产能。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第六篇 · 进阶</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第六篇 · 进阶</span><span class="sep">/</span>第 6 章<span class="sep">/</span>约 55 分钟</div>
+    <h1>量产测试与认证：ICT/FCT、烧录工装、老化、CE/FCC</h1>
+    <p class="lede">从「一块能跑」到「一千块都能跑」，靠的是<b>测试流程</b>而不是运气。这一章讲测试金字塔、工装设计、烧录与老化，最后给认证的测试项与周期，并把节拍算成产能。</p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>设计 ICT / FCT / 老化 / 抽检四层测试，并知道各层抓什么缺陷</li>
+        <li>算测试覆盖率与漏检率的关系（DPPM 视角）</li>
+        <li>设计烧录工装：供电、串口、USB、按键、指示灯</li>
+        <li>说出老化 48 小时的判据与加速方法</li>
+        <li>列出 CE/FCC/CCC 的主要测试项与周期</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">6.6.1</span>测试金字塔：四层各管什么</h2>
+    <table>
+      <thead><tr><th>层</th><th>测什么</th><th>抓什么缺陷</th><th>耗时</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">ICT（在线测试）</td><td>元件值、短路/开路、极性</td><td>贴错、漏贴、连锡、错值</td><td>10–30s</td></tr>
+        <tr><td class="nm">FCT（功能测试）</td><td>上电、电压、串口、网口、USB、DDR</td><td>装配错、虚焊、固件问题</td><td>1–3min</td></tr>
+        <tr><td class="nm">老化（Burn-in）</td><td>满载 48h + 温度</td><td>早期失效（浴盆曲线左端）</td><td>48h</td></tr>
+        <tr><td class="nm">抽检（OQA）</td><td>外观、包装、抽样功能</td><td>批次性问题</td><td>按 AQL</td></tr>
+      </tbody>
+    </table>
+    <p>ICT 抓「装错」，FCT 抓「装坏」，老化抓「早夭」，抽检抓「批次」。四层缺一层，就会有一类缺陷流到客户手里。</p>
+
+    <h2><span class="n">6.6.2</span>覆盖率与 DPPM</h2>
+    <p>假设单板有 1000 个「可能失效点」，测试覆盖 95%，漏检的 5% 中有 1% 真的失效：</p>
+    <p style="text-align:center">流出率 ≈ 5%×1% = <b>0.05% = 500 DPPM</b></p>
+    <p>要降到 50 DPPM，覆盖率需提到 99.5% 或增加一层测试。这就是为什么「多测一项」往往比「换个更好的供应商」更划算。</p>
+    <p>成本账：FCT 每板 2 分钟，按 30 元/小时人工 = 1 元/板；返修一块板成本约 50 元。所以只要 FCT 能拦住 2% 的不良，就回本了。</p>
+
+    <h2><span class="n">6.6.3</span>工装：把「手动」变成「一次压下去」</h2>
+    <p>典型 FCT 工装包含：</p>
+    <ul>
+      <li><b>定位与压紧</b>：定位柱 + 快速夹钳，保证探针接触一致；</li>
+      <li><b>探针</b>：测试点直径 ≥1mm、间距 ≥2.54mm（5.7 节已要求）；</li>
+      <li><b>供电</b>：12V/2A 限流电源，带电流表（判据：空载 &lt;50mA）；</li>
+      <li><b>通信</b>：USB 转串口（CH340）+ USB Host，接测试电脑；</li>
+      <li><b>指示</b>：工装上的 PASS/FAIL 灯 + 蜂鸣器，操作员不用看屏幕；</li>
+      <li><b>防呆</b>：连接器防反插、板子防倒装（用不对称定位柱）。</li>
+    </ul>
+    <p>工装本身也要「可维护」：探针是消耗品（约 10 万次），要能单独更换；线束要留检修口。</p>
+
+    <h2><span class="n">6.6.4</span>烧录流程：镜像、MAC、SN</h3>
+    <ol>
+      <li><b>裸板烧录</b>：i.MX6ULL 用 USB OTG + 串口下载模式（BOOT_MODE=01），通过 UUU/官方工具把 U-Boot、内核、rootfs 写入 eMMC；</li>
+      <li><b>写 MAC</b>：从公司 MAC 池按序分配，写入 OTP 或环境变量，<b>不能重复</b>；</li>
+      <li><b>写 SN</b>：与外壳标签一致，写入 eMMC 的固定分区；</li>
+      <li><b>校验</b>：读回 CRC 与版本号，记录到 MES 系统；</li>
+      <li><b>锁板</b>：烧录完成后关闭下载模式（拨码切回内部启动），防止产线误操作。</li>
+    </ol>
+    <p>量产最常见的批量问题就是「MAC 重复」——两台设备同网段会冲突断网，排查极难。所以 MAC 分配必须有数据库与防重机制。</p>
+
+    <h2><span class="n">6.6.5</span>老化：48 小时的判据</p>
+    <p>浴盆曲线：早期失效（0–100h）占现场故障的 50% 以上，老化就是把这段「提前消耗掉」。</p>
+    <ul>
+      <li>条件：满载（跑 DDR 压力 + 网口 ping + USB 读写）、环境 40–50°C、48 小时；</li>
+      <li>判据：期间重启次数 0、串口无 panic、电流波动 &lt;10%、温度稳定；</li>
+      <li>加速：温度每升 10°C 寿命减半（同 6.5），所以 50°C 老化 48h ≈ 常温 96h 的等效。</li>
+    </ul>
+
+    <h2><span class="n">6.6.6</span>认证：CE / FCC / CCC</h2>
+    <table>
+      <thead><tr><th>认证</th><th>主要标准</th><th>测试项</th><th>周期/费用</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">CE（欧盟）</td><td>EN 55032（EMI）、EN 55035（EMS）</td><td>辐射/传导发射、ESD、EFT、浪涌、抗扰</td><td>3–6 周，2–5 万元</td></tr>
+        <tr><td class="nm">FCC（美国）</td><td>Part 15 Subpart B</td><td>辐射/传导发射（Class B）</td><td>2–4 周，1–2 万元</td></tr>
+        <tr><td class="nm">CCC（中国）</td><td>GB 4943.1 / GB/T 9254</td><td>安全 + EMI</td><td>4–8 周，1–3 万元</td></tr>
+        <tr><td class="nm">RoHS/REACH</td><td>有害物质</td><td>材料声明/检测</td><td>1–2 周，几千元</td></tr>
+      </tbody>
+    </table>
+    <p>做认证前先「预扫」：用近场探头 + 频谱仪在实验室粗测，超标点先改（磁珠、屏蔽、滤波），否则正式测试一次不过就是几周时间成本。</p>
+
+    <h2><span class="n">6.6.7</span>节拍与产能</h2>
+    <p>单板 FCT 2 分钟 + 上下料 1 分钟 = 3 分钟/板/工位。一个工位一小时 20 板，两个工位 40 板/小时；一天 8 小时 = 320 板。</p>
+    <p>若订单是 1000 板/月，1 个工位 3 天就能测完——瓶颈往往在「老化 48h」，需要按 48h 的容量配老化架（1000 板需要 1000 个老化位）。</p>
+
+    <div class="demo">
+      <div class="dh"><b>测试节拍 / 产能 / DPPM 计算器</b><span>算 UPH、日产能、漏检率对应的 DPPM</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+          <div><div class="lbl">单板测试时间 <b id="tv">2.0</b> min</div><input id="t" class="r" type="range" min="0.5" max="10" step="0.1" value="2"></div>
+          <div><div class="lbl">上下料时间 <b id="lv">1.0</b> min</div><input id="l" class="r" type="range" min="0.2" max="5" step="0.1" value="1"></div>
+          <div><div class="lbl">工位数 <b id="nv">2</b></div><input id="n" class="r" type="range" min="1" max="10" step="1" value="2"></div>
+          <div><div class="lbl">测试覆盖率 <b id="cv">95</b> %</div><input id="c" class="r" type="range" min="50" max="100" step="0.5" value="95"></div>
+          <div><div class="lbl">漏检部分中真实失效率 <b id="fv">1.0</b> %</div><input id="f" class="r" type="range" min="0.1" max="10" step="0.1" value="1"></div>
+        </div>
+        <div id="prodOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h3>练习</h3>
+    <details class="quiz"><summary>1. ICT 与 FCT 分别抓什么缺陷？</summary><div class="ans">ICT 抓装错（错值/漏贴/连锡）；FCT 抓装坏（虚焊/功能）。</div></details>
+    <details class="quiz"><summary>2. 95% 覆盖、漏检 1% 真实失效，DPPM 多少？</summary><div class="ans">5%×1%=0.05%=500 DPPM。</div></details>
+    <details class="quiz"><summary>3. 烧录时 BOOT_MODE 要设成什么？</summary><div class="ans">01（Serial Downloader），烧完切回内部启动。</div></details>
+    <details class="quiz"><summary>4. 老化 48h 的四个判据？</summary><div class="ans">重启 0、无 panic、电流波动 &lt;10%、温度稳定。</div></details>
+    <details class="quiz"><summary>5. CE 的 EMI/EMS 对应哪两个标准？</summary><div class="ans">EN 55032（EMI）、EN 55035（EMS）。</div></details>
+    <details class="quiz"><summary>6. 为什么 MAC 重复是最难查的批量问题？</summary><div class="ans">两台设备同网段冲突断网，现场表现为随机掉线，难复现。</div></details>
+
+    <div class="ch-nav">
+      <a href="c05.html"><span>上一篇</span><b>← 6.5 降额与可靠性</b></a>
+      <a class="nx" id="chNavNext" href="../index.html"><span>回到</span><b>硬件篇总目录 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p6','c06.html');
+(function(){
+  function calc(){
+    var t=+document.getElementById('t').value, l=+document.getElementById('l').value;
+    var n=+document.getElementById('n').value, c=+document.getElementById('c').value/100, f=+document.getElementById('f').value/100;
+    var cycle=t+l, uph=60/cycle*n, day=uph*8;
+    var leak=(1-c)*f*1e6;
+    document.getElementById('tv').textContent=t.toFixed(1);
+    document.getElementById('lv').textContent=l.toFixed(1);
+    document.getElementById('nv').textContent=n;
+    document.getElementById('cv').textContent=(c*100).toFixed(1);
+    document.getElementById('fv').textContent=(f*100).toFixed(1);
+    document.getElementById('prodOut').innerHTML=
+      '节拍 = '+(cycle).toFixed(1)+' min/板/工位 ⇒ UPH = <b style="color:#5ff1ef">'+uph.toFixed(0)+' 板/小时</b><br>'+
+      '日产能（8h）= <b style="color:#5ff1ef">'+day.toFixed(0)+' 板</b><br>'+
+      '漏检 DPPM = (1−覆盖率)×失效率 = <b style="color:'+(leak>200?'#ff8f80':'#9ff5c0')+'">'+leak.toFixed(0)+' DPPM</b><br>'+
+      '提示：老化 48h 是真正的产能瓶颈，按 48h 容量配老化位';
+  }
+  ['t','l','n','c','f'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .r{width:100%;accent-color:#5ff1ef}
+</style>
+</body>
+</html>
+
+

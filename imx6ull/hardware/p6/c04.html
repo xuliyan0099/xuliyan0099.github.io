@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>6.4 热设计：热阻链、散热片、导热垫、风道 | 第六篇 · 进阶 | i.MX6ULL 学习手册</title>
+<meta name="description" content="用热阻链 Tj=Ta+P(θjc+θTIM+θsa) 算 SoC 结温，讲自然对流与强制风冷的 h 值、散热片面积估算、导热垫热阻与机箱风道。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第六篇 · 进阶</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第六篇 · 进阶</span><span class="sep">/</span>第 4 章<span class="sep">/</span>约 55 分钟</div>
+    <h1>热设计：热阻链、散热片、导热垫、风道</h1>
+    <p class="lede">热设计就是「把热阻串起来算」。<b>T<sub>j</sub> = T<sub>a</sub> + P×(θ<sub>jc</sub>+θ<sub>TIM</sub>+θ<sub>sa</sub>)</b>——四个数字，一个公式，剩下的都是查表与选型。这一章把每一段都算成本板的具体值。</p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>画出一条完整热阻链，并指出哪一段最值得优化</li>
+        <li>按 h 与面积算散热片的热阻，区分自然对流与强制风冷</li>
+        <li>算导热垫/导热硅脂的热阻，知道厚度为什么越小越好</li>
+        <li>设计机箱风道（进风口、出风口、死角）</li>
+        <li>用热电偶/热像仪做热平衡实测并判定是否达标</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">6.4.1</span>热阻链：四段串联</h2>
+    <p>热量从芯片结（junction）到环境空气，经过四段：</p>
+    <table>
+      <thead><tr><th>段</th><th>符号</th><th>典型值</th><th>优化手段</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">结→壳</td><td>θ<sub>jc</sub></td><td>BGA 约 15–25 K/W（含 PCB）</td><td>底部散热焊盘、过孔阵列</td></tr>
+        <tr><td class="nm">壳→散热片</td><td>θ<sub>TIM</sub></td><td>导热垫 1mm/3W 约 3 K/W</td><td>更薄、更高导热系数</td></tr>
+        <tr><td class="nm">散热片→空气</td><td>θ<sub>sa</sub></td><td>自然对流 8–15 K/W</td><td>加大面积、强制风冷</td></tr>
+        <tr><td class="nm">空气→环境</td><td>θ<sub>ca</sub></td><td>机箱内 2–10 K/W</td><td>风道、开孔</td></tr>
+      </tbody>
+    </table>
+    <p>本板假设 SoC 功耗 2W、环境 40°C、θ<sub>jc</sub>=20、θ<sub>TIM</sub>=3、θ<sub>sa</sub>=10：</p>
+    <p style="text-align:center">T<sub>j</sub> = 40 + 2×(20+3+10) = 40 + 66 = <b>106°C</b></p>
+    <p>低于 125°C 上限，但只剩 19°C 余量——夏天密闭机箱 50°C 时就是 116°C，很危险。优化优先级：θ<sub>jc</sub>（BGA 散热焊盘）> θ<sub>sa</sub>（散热片）> θ<sub>TIM</sub>。</p>
+
+    <h2><span class="n">6.4.2</span>散热片：面积与 h 决定一切</h2>
+    <p>散热片到空气的热阻：</p>
+    <p style="text-align:center">θ<sub>sa</sub> ≈ 1/(h·A<sub>eff</sub>)</p>
+    <p>h 是对流换热系数：自然对流 5–10 W/(m²·K)，强制风冷 20–50。A<sub>eff</sub> 是「有效面积」= 投影面积 × 鳍片系数（一般 3–6 倍）。</p>
+    <p>例：50×50mm 散热片、5 片鳍、A<sub>eff</sub>=0.0025×5=0.0125m²，自然对流 h=8：</p>
+    <p style="text-align:center">θ<sub>sa</sub> = 1/(8×0.0125) = <b>10 K/W</b></p>
+    <p>若加风扇把 h 提到 30：θ<sub>sa</sub>=2.7 K/W，T<sub>j</sub> 从 106 降到 71°C——风冷的效果远大于「换个更大的散热片」。</p>
+    <p>注意：鳍片间距不能太小（自然对流要 ≥6mm 才不憋气），否则面积再大 h 也会掉。</p>
+
+    <h2><span class="n">6.4.3</span>导热垫与硅脂：厚度是敌人</h2>
+    <p>界面材料热阻：</p>
+    <p style="text-align:center">θ<sub>TIM</sub> = t/(k·A)</p>
+    <p>取 1mm 厚、k=3 W/(m·K)、面积 100mm²（0.0001m²）：</p>
+    <p style="text-align:center">θ = 0.001/(3×0.0001) = <b>3.3 K/W</b></p>
+    <p>若换成 0.2mm 薄垫（同 k）：θ=0.67 K/W，降 2.6K/W——相当于省下 0.5W×2.6=1.3°C。所以「薄」比「高导热系数」更有效：0.5mm/6W 的垫 ≈ 0.83 K/W，优于 1mm/8W 的 1.25 K/W。</p>
+    <p>硅脂（k≈1–3、厚度 0.05mm）热阻约 0.2 K/W，但需要压力与长期稳定性；导热垫胜在「有弹性、容忍间隙」。</p>
+
+    <h2><span class="n">6.4.4</span>机箱风道：进冷风、出热风、避开死角</h2>
+    <ul>
+      <li><b>进风口在底部/前部</b>，出风口在顶部/后部，形成「下进上出」的自然对流；</li>
+      <li><b>风扇朝同一方向</b>，不要一个吹一个吸（会短路循环）；</li>
+      <li><b>SoC/DCDC 放在风道中央</b>，不要藏在连接器后面；</li>
+      <li><b>开孔面积 ≥ 风扇面积</b>，进风不足时风压再大也没用。</li>
+    </ul>
+    <p>实测技巧：用一根香/烟雾看气流方向，比看图纸直观得多。</p>
+
+    <h2><span class="n">6.4.5</span>实测：热平衡与判据</h2>
+    <ol>
+      <li>贴热电偶（K 型）在 SoC 顶面、DCDC、LDO、机箱内空气；</li>
+      <li>满载运行，每 5 分钟记录，直到连续两次读数差 &lt;1°C（约 15–25 分钟）；</li>
+      <li>判据：T<sub>j</sub>（估算）= 壳温 + P×θ<sub>jc</sub>×0.3，&lt;100°C 为佳，&lt;125°C 为底线；</li>
+      <li>环境温度取「最坏情况」（夏天密闭 50°C），不是实验室 25°C。</li>
+    </ol>
+    <p>热像仪更快，但要先设发射率（见 5.6）；两者结合最可靠。</p>
+
+    <div class="demo">
+      <div class="dh"><b>热阻链 / 结温计算器</b><span>输入功耗、环境、三段热阻，算 T<sub>j</sub> 与裕量</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div><div class="lbl">功耗 P <b id="pv">2.0</b> W</div><input id="p" class="r" type="range" min="0.2" max="10" step="0.1" value="2"></div>
+          <div><div class="lbl">环境 T<sub>a</sub> <b id="tav">40</b> °C</div><input id="ta" class="r" type="range" min="0" max="70" step="1" value="40"></div>
+          <div><div class="lbl">θ<sub>jc</sub> <b id="jcv">20</b> K/W</div><input id="jc" class="r" type="range" min="5" max="60" step="1" value="20"></div>
+          <div><div class="lbl">θ<sub>TIM</sub> <b id="timv">3</b> K/W</div><input id="tim" class="r" type="range" min="0.2" max="10" step="0.1" value="3"></div>
+          <div><div class="lbl">θ<sub>sa</sub> <b id="sav">10</b> K/W</div><input id="sa" class="r" type="range" min="1" max="30" step="0.5" value="10"></div>
+        </div>
+        <div id="th2Out" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h3>练习</h3>
+    <details class="quiz"><summary>1. 热阻链四段是哪四段？</summary><div class="ans">θ<sub>jc</sub>、θ<sub>TIM</sub>、θ<sub>sa</sub>、θ<sub>ca</sub>。</div></details>
+    <details class="quiz"><summary>2. 2W、Ta=40、θ 合计 33，T<sub>j</sub> 多少？</summary><div class="ans">40+66=106°C。</div></details>
+    <details class="quiz"><summary>3. 50×50mm、A<sub>eff</sub>=0.0125m²、h=8，θ<sub>sa</sub>？</summary><div class="ans">10 K/W。</div></details>
+    <details class="quiz"><summary>4. 为什么导热垫越薄越好？</summary><div class="ans">θ=t/(kA)，厚度线性影响热阻。</div></details>
+    <details class="quiz"><summary>5. 风冷为什么比加大散热片有效？</summary><div class="ans">h 从 8 提到 30，θ<sub>sa</sub> 降 3 倍以上；面积只能线性增加。</div></details>
+    <details class="quiz"><summary>6. 热平衡怎么判定？</summary><div class="ans">连续两次读数差 &lt;1°C（约 15–25 分钟）。</div></details>
+
+    <div class="ch-nav">
+      <a href="c03.html"><span>上一篇</span><b>← 6.3 信号完整性基础</b></a>
+      <a class="nx" id="chNavNext" href="c05.html"><span>下一章</span><b>6.5 降额与可靠性 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p6','c04.html');
+(function(){
+  function calc(){
+    var p=+document.getElementById('p').value, ta=+document.getElementById('ta').value;
+    var jc=+document.getElementById('jc').value, tim=+document.getElementById('tim').value, sa=+document.getElementById('sa').value;
+    var sum=jc+tim+sa, tj=ta+p*sum;
+    document.getElementById('pv').textContent=p.toFixed(1);
+    document.getElementById('tav').textContent=ta;
+    document.getElementById('jcv').textContent=jc;
+    document.getElementById('timv').textContent=tim.toFixed(1);
+    document.getElementById('sav').textContent=sa.toFixed(1);
+    var cls=tj>125?'#ff8f80':(tj>100?'#ffd79a':'#9ff5c0');
+    var tip=tj>125?'超上限，必须加风冷/散热片/降功耗':(tj>100?'余量不足，建议优化 θjc 或 θsa':'安全');
+    document.getElementById('th2Out').innerHTML=
+      '总热阻 = '+jc+'+'+tim.toFixed(1)+'+'+sa.toFixed(1)+' = <b style="color:#5ff1ef">'+sum.toFixed(1)+' K/W</b><br>'+
+      'T<sub>j</sub> = T<sub>a</sub>+P×Σθ = <b style="color:'+cls+'">'+tj.toFixed(0)+' °C</b>（'+tip+'）<br>'+
+      '裕量 = '+(125-tj).toFixed(0)+' °C；若环境升到 50°C，T<sub>j</sub> = '+(50+p*sum).toFixed(0)+' °C';
+  }
+  ['p','ta','jc','tim','sa'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .r{width:100%;accent-color:#5ff1ef}
+</style>
+</body>
+</html>
+

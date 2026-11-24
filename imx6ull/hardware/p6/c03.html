@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>6.3 信号完整性基础：传输线判据、四种端接、眼图与 TDR | 第六篇 · 进阶 | i.MX6ULL 学习手册</title>
+<meta name="description" content="给传输线判据公式、四种端接的取舍与实算、眼图模板、TDR 定位不连续点的距离换算，并用本板 470Ω/22Ω 串阻做实例。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第六篇 · 进阶</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第六篇 · 进阶</span><span class="sep">/</span>第 3 章<span class="sep">/</span>约 60 分钟</div>
+    <h1>信号完整性基础：传输线判据、四种端接、眼图与 TDR</h1>
+    <p class="lede">「线短就没事」是错的——<b>决定要不要当传输线看，是边沿时间，不是频率</b>。这一章给判据公式、四种端接的取舍、眼图怎么读，以及用 TDR 把反射点算成毫米。</p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>用 t<sub>r</sub> 与传播延迟判断一条线要不要端接</li>
+        <li>选源端/并联/戴维南/AC 端接，并算出电阻值</li>
+        <li>读懂眼图的眼高、眼宽与模板关系</li>
+        <li>用 TDR 的往返时间算出不连续点的位置</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">6.3.1</span>传输线判据：看边沿，不看频率</h2>
+    <p>当信号的上升时间与走线延迟可比时，走线必须按传输线处理。判据：</p>
+    <p style="text-align:center">L<sub>crit</sub> ≈ t<sub>r</sub>/(2×延迟/单位长度)</p>
+    <p>FR4 表层约 6ps/mm（内层约 5.9ps/mm）。例：</p>
+    <table>
+      <thead><tr><th>信号</th><th>t<sub>r</sub></th><th>L<sub>crit</sub></th><th>结论</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">I2C 100kHz</td><td>~300ns</td><td>25m</td><td>板内任何长度都不必端接</td></tr>
+        <tr><td class="nm">UART 115200</td><td>~10ns</td><td>0.83m</td><td>板内不必</td></tr>
+        <tr><td class="nm">RMII 50MHz</td><td>~2ns</td><td>167mm</td><td>板内 &lt;100mm 通常可</td></tr>
+        <tr><td class="nm">DDR3L 400MHz</td><td>~0.5ns</td><td>42mm</td><td><b>超过 42mm 必须端接</b></td></tr>
+        <tr><td class="nm">USB HS 480Mbps</td><td>~0.3ns</td><td>25mm</td><td>必须按差分传输线设计</td></tr>
+      </tbody>
+    </table>
+    <p>注意：这是「要不要端接」的判据，不是「能不能走」的判据。DDR 的线长往往超过 42mm，所以必须靠 ODT（片内端接）+ 源端串阻来控制。</p>
+
+    <h2><span class="n">6.3.2</span>四种端接</h2>
+    <table>
+      <thead><tr><th>方式</th><th>接法</th><th>功耗</th><th>适用</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">源端串阻</td><td>驱动器 → R<sub>s</sub> → 线</td><td>低</td><td>点对点、单向（本板 DDR 时钟 470Ω、CSI_MCLK 22Ω）</td></tr>
+        <tr><td class="nm">并联端接</td><td>线末端 → R → GND（或 VDD）</td><td>高（直流一直耗）</td><td>短线、低速</td></tr>
+        <tr><td class="nm">戴维南</td><td>两个电阻分压到 VDD/2</td><td>中</td><td>总线、需要偏置</td></tr>
+        <tr><td class="nm">AC 端接</td><td>R + C 串联到地</td><td>低</td><td>高速时钟、DDR 地址</td></tr>
+      </tbody>
+    </table>
+    <p><b>源端串阻</b>的原理：驱动器输出阻抗 Z<sub>out</sub>（CMOS 约 10–30Ω）加上 R<sub>s</sub> 等于线阻抗 Z<sub>0</sub>（50Ω），实现「源端匹配」，反射回到源端被吸收。取 R<sub>s</sub>=50−Z<sub>out</sub>：</p>
+    <p style="text-align:center">Z<sub>out</sub>=10Ω ⇒ R<sub>s</sub>=40Ω；Z<sub>out</sub>=30Ω ⇒ R<sub>s</sub>=20Ω</p>
+    <p>本板 CSI_MCLK 串 <b>22Ω</b>、DDR 时钟串 <b>470Ω</b>（后者是「弱驱动 + 阻尼」，因为 DDR 时钟是差分、驱动强，470Ω 主要压过冲）。这两个值都不是「随手」，而是按驱动器阻抗与线阻抗调的。</p>
+
+    <h2><span class="n">6.3.3</span>反射与振铃：怎么读波形</h2>
+    <p>反射系数 Γ=(Z<sub>L</sub>−Z<sub>0</sub>)/(Z<sub>L</sub>+Z<sub>0</sub>)。开路端 Γ=+1（全反射），短路端 Γ=−1。典型波形特征：</p>
+    <ul>
+      <li><b>过冲</b>：第一次到达末端时电压超过稳态 20% 以上 → 端接不足；</li>
+      <li><b>振铃</b>：多次来回反射形成的衰减振荡 → 阻抗不连续 + 损耗低；</li>
+      <li><b>台阶</b>：波形中途出现平台 → 中间有阻抗突变（如过孔、连接器）。</li>
+    </ul>
+    <p>判据：过冲 ≤10% V<sub>swing</sub>、振铃在 3 个周期内衰减到 5% 以内。</p>
+
+    <h2><span class="n">6.3.4</span>眼图：把一千个 bit 叠起来</h2>
+    <p>眼图是把所有 bit 周期的波形叠加，形成「眼睛」。三个关键量：</p>
+    <ul>
+      <li><b>眼高</b>：垂直开口，反映噪声与幅度余量；</li>
+      <li><b>眼宽</b>：水平开口，反映抖动（jitter）与上升时间；</li>
+      <li><b>模板（mask）</b>：标准规定的「禁区」，眼图不能侵入。</li>
+    </p>
+    <p>USB 2.0 HS 的眼图模板要求眼高 ≥525mV、眼宽 ≥0.45UI（约 0.94ns）。DDR3L 的读取眼图由控制器训练决定，实测眼宽应 &gt;0.6UI。</p>
+    <p>眼图变差的三类原因：幅度不足（驱动/端接）、抖动大（时钟质量/电源噪声）、边沿慢（带宽/负载电容）。</p>
+
+    <h2><span class="n">6.3.5</span>TDR：把反射算成距离</h2>
+    <p>TDR 发射阶跃，测反射回来的时间。不连续点距离：</p>
+    <p style="text-align:center">d = (t<sub>往返</sub>×v)/2</p>
+    <p>v≈170mm/ns（内层）。若反射在 2ns 后出现：d=2×170/2=<b>170mm</b>。这告诉你「问题在第 170mm 处」——如果板只有 100mm 长，那就是连接器或电缆。</p>
+    <p>TDR 还能读出阻抗：波形平台高度对应 Z<sub>L</sub>。50Ω 线上出现 60Ω 平台 = 线宽偏窄或参考平面有洞。</p>
+
+    <h2><span class="n">6.3.6</span>实测注意</h2>
+    <ul>
+      <li>测高速信号用<b>差分探头</b>或「双通道相减」，单端探头会引入地环路；</li>
+      <li>探头带宽 ≥3 倍信号带宽（0.35/t<sub>r</sub>）；</li>
+      <li>测眼图要「长存储 + 时钟恢复」，不能用普通触发；</li>
+      <li>测 TDR 要先校准（短路/开路/50Ω 负载）。</li>
+    </ul>
+
+    <div class="demo">
+      <div class="dh"><b>传输线 / 端接 / TDR 计算器</b><span>算临界长度、源端串阻、TDR 定位距离</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+          <div><div class="lbl">上升时间 t<sub>r</sub> <b id="trv">0.5</b> ns</div><input id="tr" class="r" type="range" min="0.1" max="20" step="0.1" value="0.5"></div>
+          <div><div class="lbl">驱动器 Z<sub>out</sub> <b id="zov">15</b> Ω</div><input id="zo" class="r" type="range" min="5" max="60" step="1" value="15"></div>
+          <div><div class="lbl">线阻抗 Z<sub>0</sub> <b id="z0v">50</b> Ω</div><input id="z0" class="r" type="range" min="30" max="120" step="1" value="50"></div>
+          <div><div class="lbl">TDR 往返时间 <b id="tv">2.0</b> ns</div><input id="t" class="r" type="range" min="0.1" max="10" step="0.1" value="2"></div>
+        </div>
+        <div id="siOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h3>练习</h3>
+    <details class="quiz"><summary>1. DDR3L t<sub>r</sub>=0.5ns 的临界线长？</summary><div class="ans">0.5ns/(2×6ps/mm)≈42mm。</div></details>
+    <details class="quiz"><summary>2. Z<sub>out</sub>=20Ω、Z<sub>0</sub>=50Ω，源端串阻取多少？</summary><div class="ans">30Ω。</div></details>
+    <details class="quiz"><summary>3. 源端串阻为什么能吸收反射？</summary><div class="ans">源端阻抗与线阻抗匹配，反射回到源端被吸收不再往返。</div></details>
+    <details class="quiz"><summary>4. 眼图三个关键量？</summary><div class="ans">眼高、眼宽、模板（mask）。</div></details>
+    <details class="quiz"><summary>5. TDR 反射 2ns 后出现，距离多少？</summary><div class="ans">2×170/2=170mm。</div></details>
+    <details class="quiz"><summary>6. 为什么测高速信号要用差分探头？</summary><div class="ans">避免地环路与共模噪声，保持带宽与阻抗匹配。</div></details>
+
+    <div class="ch-nav">
+      <a href="c02.html"><span>上一篇</span><b>← 6.2 EMI 与屏蔽</b></a>
+      <a class="nx" id="chNavNext" href="c04.html"><span>下一章</span><b>6.4 热设计 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p6','c03.html');
+(function(){
+  function calc(){
+    var tr=+document.getElementById('tr').value, zo=+document.getElementById('zo').value;
+    var z0=+document.getElementById('z0').value, t=+document.getElementById('t').value;
+    var lc=(tr*1000)/(2*6); // mm
+    var rs=z0-zo, d=t*170/2;
+    document.getElementById('trv').textContent=tr.toFixed(1);
+    document.getElementById('zov').textContent=zo;
+    document.getElementById('z0v').textContent=z0;
+    document.getElementById('tv').textContent=t.toFixed(1);
+    document.getElementById('siOut').innerHTML=
+      '临界线长 = t<sub>r</sub>/(2×6ps/mm) ≈ <b style="color:#5ff1ef">'+lc.toFixed(0)+' mm</b><br>'+
+      '源端串阻 R<sub>s</sub> = Z<sub>0</sub>−Z<sub>out</sub> = <b style="color:#5ff1ef">'+rs+' Ω</b>'+(rs<=0?'（Z<sub>out</sub>≥Z<sub>0</sub>，无需串阻，可加小电感阻尼）':'')+'<br>'+
+      'TDR 定位距离 d = t×v/2 = <b style="color:#5ff1ef">'+d.toFixed(0)+' mm</b>（v≈170mm/ns）';
+  }
+  ['tr','zo','z0','t'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .r{width:100%;accent-color:#5ff1ef}
+</style>
+</body>
+</html>
+

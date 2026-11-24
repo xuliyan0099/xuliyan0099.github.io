@@ -86,12 +86,12 @@ window.PARTS = [
     sub: '不只是能跑，还要跑得住',
     intro: 'ESD 与浪涌、EMI、信号完整性、热设计、降额与可靠性、量产测试与认证入门。',
     chapters: [
-      { n: '6.1', t: 'ESD 与浪涌', s: 'TVS 选型、钳位、放哪儿才有用', f: 'c01.html', ready: false },
-      { n: '6.2', t: 'EMI 与屏蔽', s: '辐射从哪来、地平面、磁珠与共模电感', f: 'c02.html', ready: false },
-      { n: '6.3', t: '信号完整性基础', s: '反射、端接、眼图、TDR', f: 'c03.html', ready: false },
-      { n: '6.4', t: '热设计', s: '结温、散热片、铜箔、风道', f: 'c04.html', ready: false },
-      { n: '6.5', t: '降额与可靠性', s: '温度循环、MTBF、三防', f: 'c05.html', ready: false },
-      { n: '6.6', t: '量产测试与认证', s: 'ICT/FCT、烧录工装、老化、CE/FCC', f: 'c06.html', ready: false }
+      { n: '6.1', t: 'ESD 与浪涌', s: 'TVS 四步选型、24A 钳位、布局铁律', f: 'c01.html', ready: true },
+      { n: '6.2', t: 'EMI 与屏蔽', s: '差模/共模、磁珠、λ/20 缝隙、近场定位', f: 'c02.html', ready: true },
+      { n: '6.3', t: '信号完整性基础', s: '传输线判据、四种端接、眼图、TDR 定位', f: 'c03.html', ready: true },
+      { n: '6.4', t: '热设计', s: '热阻链、散热片 h 值、导热垫、风道', f: 'c04.html', ready: true },
+      { n: '6.5', t: '降额与可靠性', s: '五条降额、温度循环、FIT/MTBF、电容寿命', f: 'c05.html', ready: true },
+      { n: '6.6', t: '量产测试与认证', s: 'ICT/FCT/老化、工装烧录、CE/FCC、产能', f: 'c06.html', ready: true }
     ]
   }
 ];
@@ -101,6 +101,7 @@ window.PART_OF = function (n) {
   var map = { '1': 'p1', '2': 'p2', '3': 'p3', '4': 'p4', '5': 'p5', '6': 'p6' };
   return map[major] || 'p1';
 };
+
 
 
 

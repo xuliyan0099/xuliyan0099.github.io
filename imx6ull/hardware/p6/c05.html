@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>6.5 降额与可靠性：温度循环、MTBF、电容寿命 | 第六篇 · 进阶 | i.MX6ULL 学习手册</title>
+<meta name="description" content="给出一套降额准则（功率/电压/电流/结温）、Coffin-Manson 温度循环寿命估算、MTBF 与 FIT 的算法、电解电容 10°C 翻倍规则与三防工艺。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第六篇 · 进阶</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第六篇 · 进阶</span><span class="sep">/</span>第 5 章<span class="sep">/</span>约 55 分钟</div>
+    <h1>降额与可靠性：温度循环、MTBF、电容寿命</h1>
+    <p class="lede">「能跑」和「跑三年不出事」是两件事。<b>可靠性是可以用数字设计的</b>：降额比例、温度循环次数、FIT 累加、电容寿命公式。这一章把它们全部变成可算的量。</p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>按五条降额准则检查一块板的余量</li>
+        <li>用 Coffin-Manson 估算温度循环寿命</li>
+        <li>用 FIT 累加算 MTBF，并知道它不代表「无故障」</li>
+        <li>用「10°C 翻倍」规则算电解电容的实际寿命</li>
+        <li>选对三防工艺（涂敷/灌封/气密）</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">6.5.1</span>五条降额准则</h2>
+    <table>
+      <thead><tr><th>项目</th><th>降额到</th><th>为什么</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">电阻功率</td><td>≤50–60% 额定</td><td>温升与长期漂移</td></tr>
+        <tr><td class="nm">电容电压</td><td>≤50–80% 额定</td><td>陶瓷直流偏压会掉容值；电解降寿命</td></tr>
+        <tr><td class="nm">连接器电流</td><td>≤50% 每触点</td><td>接触电阻随温升上升，形成热失控</td></tr>
+        <tr><td class="nm">结温</td><td>≤80% T<sub>j,max</sub>（约 100°C）</td><td>Arrhenius：每降 10°C 寿命翻倍</td></tr>
+        <tr><td class="nm">电感饱和</td><td>I<sub>peak</sub> ≤70% I<sub>sat</sub></td><td>饱和后电感量骤降、电流失控</td></tr>
+      </tbody>
+    </table>
+    <p>本板对照：DCDC 电感 4.7µH 的 I<sub>sat</sub> 约 3A，峰值 1.74A = 58%，符合；连接器 0.5A/触点并联 4 个，总 1.5A 峰值 = 75%，略高但可接受；LDO 结温 55°C = 44% T<sub>j,max</sub>，很安全。</p>
+
+    <h2><span class="n">6.5.2</span>温度循环：焊点是最脆弱的一环</h2>
+    <p>PCB 与元件 CTE 不同（FR4 约 3.5e-6/°C，焊料约 20e-6/°C），温度循环会在焊点产生剪切应变。Coffin-Manson 经验式：</p>
+    <p style="text-align:center">N<sub>f</sub> = C·(ΔT)<sup>−n</sup>，n≈1.9</p>
+    <p>即温差翻倍，寿命降到约 <b>1/3.7</b>。举例：</p>
+    <table>
+      <thead><tr><th>ΔT</th><th>相对寿命</th><th>适用场景</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">40°C</td><td>1.0（基准）</td><td>室内消费</td></tr>
+        <tr><td class="nm">80°C</td><td>0.27</td><td>户外/车规</td></tr>
+        <tr><td class="nm">120°C</td><td>0.14</td><td>严苛工业</td></tr>
+      </tbody>
+    </table>
+    <p>标准测试：<b>-40 ~ +85°C，100 次循环</b>（消费级）、<b>-40 ~ +125°C，1000 次</b>（车规 AEC-Q100）。本板作为学习板，做 100 次 -40~85 已足够暴露焊点问题。</p>
+
+    <h2><span class="n">6.5.3</span>MTBF 与 FIT：算出来的是「概率」</p>
+    <p>FIT = 每 10<sup>9</sup> 小时的失效数。MTBF = 1/ΣFIT（单位小时）。</p>
+    <p>简化估算（MIL-HDBK-217F 的 parts count 思路）：每类元件给一个基准 λ<sub>b</sub>，再乘温度/质量系数。典型量级：</p>
+    <table>
+      <thead><tr><th>元件</th><th>典型 FIT</th><th>数量</th><th>贡献</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">电阻</td><td>1</td><td>100</td><td>100</td></tr>
+        <tr><td class="nm">电容（陶瓷）</td><td>2</td><td>80</td><td>160</td></tr>
+        <tr><td class="nm">电容（电解）</td><td>20</td><td>4</td><td>80</td></tr>
+        <tr><td class="nm">IC（SoC）</td><td>50</td><td>1</td><td>50</td></tr>
+        <tr><td class="nm">连接器</td><td>30</td><td>6</td><td>180</td></tr>
+      </tbody>
+    </table>
+    <p>合计约 570 FIT ⇒ MTBF ≈ 1/(570e-9) ≈ <b>175 万小时</b>（约 200 年）。</p>
+    <p>但 MTBF 是统计期望，不代表「200 年不会坏」：它意味着「在 t 时刻，仍有 1/e 的概率存活」。而且它不包含软件死机、误操作、环境异常——这些才是现场故障的大头。</p>
+
+    <h2><span class="n">6.5.4</span>电解电容：10°C 翻倍规则</h2>
+    <p>电解电容寿命与温度近似：</p>
+    <p style="text-align:center">L = L<sub>0</sub>·2<sup>(T<sub>0</sub>−T)/10</sup></p>
+    <p>取 L<sub>0</sub>=2000h@105°C、实际工作 65°C：</p>
+    <p style="text-align:center">L = 2000×2<sup>4</sup> = <b>32000 小时</b>（约 3.6 年连续运行）</p>
+    <p>若放在 DCDC 旁边、壳温 85°C：L=2000×2<sup>2</sup>=8000h（不到 1 年）——这就是「电解电容不要挨着发热源」的量化依据（5.3 节 ≥5mm）。</p>
+
+    <h2><span class="n">6.5.5</span>三防：涂敷、灌封、气密</h2>
+    <table>
+      <thead><tr><th>工艺</th><th>防护</th><th>代价</th><th>适用</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">三防漆（涂敷）</td><td>防潮、防盐雾、轻微防尘</td><td>低，可返修</td><td>工业/户外板</td></tr>
+        <tr><td class="nm">灌封（环氧/聚氨酯）</td><td>防水、防振、导热</td><td>中，不可返修</td><td>车载/水下</td></tr>
+        <tr><td class="nm">气密外壳</td><td>彻底防潮</td><td>高，需呼吸阀</td><td>严苛环境</td></tr>
+      </tbody>
+    </table>
+    <p>注意：三防漆不能涂在连接器、测试点、散热面与光学器件上；涂敷前必须彻底清洗并烘干，否则把潮气「封」在里面，反而更糟。</p>
+
+    <h2><span class="n">6.5.6</span>可靠性验证的最小套餐</h2>
+    <ol>
+      <li>高低温循环 100 次（-40~85°C），每 20 次通电自检；</li>
+      <li>高温高湿 85°C/85%RH 500 小时（双 85），测绝缘与漏电；</li>
+      <li>振动（随机 1g，10–500Hz）2 小时，查焊点与连接器；</li>
+      <li>ESD 接触 ±8kV / 空气 ±15kV，每接口 10 次；</li>
+      <li>老化 48 小时满载，记录温升与重启次数。</li>
+    </ol>
+    <p>这五项做完，一块学习板就具备「能交付」的可靠性证据了。</p>
+
+    <div class="demo">
+      <div class="dh"><b>降额 / 寿命计算器</b><span>算电容寿命、温度循环相对寿命、FIT→MTBF</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div><div class="lbl">电容额定 L<sub>0</sub> <b id="l0v">2000</b> h</div><input id="l0" class="r" type="range" min="500" max="10000" step="100" value="2000"></div>
+          <div><div class="lbl">额定温度 T<sub>0</sub> <b id="t0v">105</b> °C</div><input id="t0" class="r" type="range" min="85" max="125" step="5" value="105"></div>
+          <div><div class="lbl">实际温度 T <b id="tv">65</b> °C</div><input id="t" class="r" type="range" min="20" max="120" step="1" value="65"></div>
+          <div><div class="lbl">循环温差 ΔT <b id="dtv">80</b> °C</div><input id="dt" class="r" type="range" min="10" max="150" step="5" value="80"></div>
+          <div><div class="lbl">总 FIT <b id="fitv">570</b></div><input id="fit" class="r" type="range" min="50" max="5000" step="10" value="570"></div>
+        </div>
+        <div id="relOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h3>练习</h3>
+    <details class="quiz"><summary>1. 五条降额准则里，结温降到哪里？</summary><div class="ans">≤80% T<sub>j,max</sub>，约 100°C。</div></details>
+    <details class="quiz"><summary>2. ΔT 从 40 增到 80，寿命约降为多少？</summary><div class="ans">(2)^1.9≈3.7 倍，即 27%。</div></details>
+    <details class="quiz"><summary>3. 570 FIT 对应 MTBF？</summary><div class="ans">约 175 万小时。</div></details>
+    <details class="quiz"><summary>4. 电解电容 105°C/2000h 工作在 65°C，寿命？</summary><div class="ans">2000×2<sup>4</sup>=32000h。</div></details>
+    <details class="quiz"><summary>5. MTBF 是否等于「不会坏」？</summary><div class="ans">不是，它是统计期望；软件与环境故障不在其中。</div></details>
+    <details class="quiz"><summary>6. 三防漆不能涂哪些地方？</summary><div class="ans">连接器、测试点、散热面、光学器件。</div></details>
+
+    <div class="ch-nav">
+      <a href="c04.html"><span>上一篇</span><b>← 6.4 热设计</b></a>
+      <a class="nx" id="chNavNext" href="c06.html"><span>下一章</span><b>6.6 量产测试与认证 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p6','c05.html');
+(function(){
+  function calc(){
+    var l0=+document.getElementById('l0').value, t0=+document.getElementById('t0').value, t=+document.getElementById('t').value;
+    var dt=+document.getElementById('dt').value, fit=+document.getElementById('fit').value;
+    var life=l0*Math.pow(2,(t0-t)/10);
+    var rel=Math.pow(40/dt,1.9);
+    var mtbf=1/(fit*1e-9)/1e4; // 万小时
+    document.getElementById('l0v').textContent=l0;
+    document.getElementById('t0v').textContent=t0;
+    document.getElementById('tv').textContent=t;
+    document.getElementById('dtv').textContent=dt;
+    document.getElementById('fitv').textContent=fit;
+    document.getElementById('relOut').innerHTML=
+      '电容寿命 = L<sub>0</sub>·2<sup>(T0−T)/10</sup> = <b style="color:#5ff1ef">'+life.toFixed(0)+' h</b>（约 '+(life/8760).toFixed(1)+' 年连续运行）<br>'+
+      '温度循环相对寿命（以 ΔT=40 为基准）= <b style="color:#5ff1ef">'+(rel*100).toFixed(0)+'%</b><br>'+
+      'MTBF = 1/ΣFIT = <b style="color:#5ff1ef">'+(mtbf).toFixed(0)+' 万小时</b>';
+  }
+  ['l0','t0','t','dt','fit'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .r{width:100%;accent-color:#5ff1ef}
+</style>
+</body>
+</html>
+

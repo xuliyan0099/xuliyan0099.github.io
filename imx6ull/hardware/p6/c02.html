@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>6.2 EMI 与屏蔽：辐射从哪来、磁珠怎么选、罩子怎么开缝 | 第六篇 · 进阶 | i.MX6ULL 学习手册</title>
+<meta name="description" content="讲清差模/共模辐射的物理来源、环路面积与频率的双重作用、磁珠与共模电感的选型、屏蔽罩缝隙的 λ/20 规则，以及近场探头的定位流程。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第六篇 · 进阶</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第六篇 · 进阶</span><span class="sep">/</span>第 2 章<span class="sep">/</span>约 55 分钟</div>
+    <h1>EMI 与屏蔽：辐射从哪来、磁珠怎么选、罩子怎么开缝</h1>
+    <p class="lede">EMI 不是玄学，是<b>三个可测量的量</b>：电流、环路面积、频率。这一章把辐射的物理链拆开，算出「面积减 10 倍 = 20dB」「频率减半 = 12dB」，再讲磁珠、共模电感、屏蔽罩的具体用法。</p>
+
+    <figure class="fig sch">
+      <div class="scroller"><img src="../../assets/img/sch/mini_p3_phy.png" alt="MINI 第 3 页 SR8201F 与 L3/L4 磁珠、变压器"></div>
+      <figcaption>MINI 第 3 页裁切：SR8201F（RMII PHY）后接 L3 220R/L4 120R 磁珠与 ATK9111A 变压器——这是「PHY 噪声不进网口、网口共模不进 PHY」的双向隔离。</figcaption>
+    </figure>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>分清差模辐射与共模辐射，说出各自的抑制手段</li>
+        <li>用「电流×面积×频率²」判断哪一项最值得改</li>
+        <li>选磁珠：看 100MHz 阻抗、直流电阻、额定电流三个参数</li>
+        <li>用 λ/20 规则决定屏蔽罩缝隙与通风孔尺寸</li>
+        <li>用近场探头 + 频谱仪按「先定位、再改板」的顺序排查</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">6.2.1</span>辐射的三要素</h2>
+    <p>任何 EMI 问题都能拆成：<b>源（di/dt 或 dv/dt）→ 耦合路径（环路或电缆）→ 天线（长度接近 λ/4）</b>。三要素缺一不可，所以抑制也从三处下手：</p>
+    <table>
+      <thead><tr><th>要素</th><th>本板例子</th><th>抑制</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">源</td><td>DCDC 的 SW 节点（dv/dt 大）、DDR 时钟（di/dt 大）</td><td>缓冲 RC、展频、减小节点面积</td></tr>
+        <tr><td class="nm">路径</td><td>电源环路、地弹、电缆</td><td>减小环路面积、加磁珠/共模电感</td></tr>
+        <tr><td class="nm">天线</td><td>1m 长的电源线、排线</td><td>缩短、双绞、屏蔽、铁氧体磁环</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="n">6.2.2</span>差模辐射：环路是天线</h2>
+    <p>电流环路的辐射场强近似与「<b>面积 × 电流 × 频率²</b>」成正比（远场、小环近似）。三个推论：</p>
+    <ul>
+      <li>环路面积减 10 倍 → 辐射降 <b>20dB</b>；</li>
+      <li>频率减半 → 辐射降 <b>12dB</b>（f² 关系）；</li>
+      <li>电流减半 → 降 <b>6dB</b>。</li>
+    </ul>
+    <p>所以「SW 节点铜箔铺大」是自找麻烦：面积翻倍就是 +6dB。本板 DCDC 的 SW 节点刻意做小，电感紧贴 SW 脚，就是为了压面积。</p>
+    <p>最有效的动作往往是「把输入电容挪到 DCDC 的 VIN/GND 脚旁 1mm 内」——环路面积从 50mm² 降到 5mm²，直接 −20dB。</p>
+
+    <h2><span class="n">6.2.3</span>共模辐射：电缆是天线</h2>
+    <p>共模电流沿电缆流动，电缆长度接近 λ/4 时辐射效率最高。100MHz 时：</p>
+    <p style="text-align:center">λ = 300/f(MHz) = 3 m，λ/4 = <b>0.75 m</b></p>
+    <p>所以「1m 长的电源线」在 100MHz 附近是很好的天线；而 10cm 的板内走线不是（λ/4 需要 75cm）。这就解释了为什么「板内没问题、一插电缆就超标」。</p>
+    <p>抑制共模：</p>
+    <ul>
+      <li><b>共模电感</b>（本板网口变压器 ATK9111A 内含共模扼流）；</li>
+      <li><b>铁氧体磁环</b>夹在电缆上（增加共模阻抗）；</li>
+      <li><b>降低地弹</b>：地平面完整、接口地单点连接；</li>
+      <li><b>屏蔽电缆 + 360° 端接</b>（不是「一根地线」）。</li>
+    </ul>
+
+    <h2><span class="n">6.2.4</span>磁珠：不是「电感」，是「频率相关电阻」</h2>
+    <p>磁珠在低频是电感（几乎不衰减信号），在高频变成电阻（把噪声变热）。选型看三个参数：</p>
+    <table>
+      <thead><tr><th>参数</th><th>含义</th><th>本板 L3/L4</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">Z@100MHz</td><td>100MHz 时的阻抗</td><td>L3 220Ω、L4 120Ω</td></tr>
+        <tr><td class="nm">DCR</td><td>直流电阻（压降与发热）</td><td>L3 0.05Ω、L4 更低</td></tr>
+        <tr><td class="nm">额定电流</td><td>饱和电流</td><td>L3 2.0A、L4 2A</td></tr>
+      </tbody>
+    </table>
+    <p>插入损耗：50Ω 系统中，220Ω 磁珠的理论衰减 = 20log(220/50+1) ≈ <b>14.5dB</b>（实际因寄生电容会低一些）。</p>
+    <p>常见错误：用磁珠给「大电流电源」滤波，结果 DCR 压降 0.2V、发热；或用了 Z@100MHz 很高但 DCR 也高的型号，负载一重就掉压。原则：<b>磁珠只用于小电流信号/局部电源，大电流用 0Ω 或电感</b>。</p>
+
+    <h2><span class="n">6.2.5</span>屏蔽罩：缝隙比材料更重要</h2>
+    <p>屏蔽罩的屏蔽效能取决于「缝隙最长边」而不是厚度。经验规则：</p>
+    <p style="text-align:center">缝隙长度 &lt; λ/20</p>
+    <p>1GHz 时 λ=30cm，λ/20=15mm——所以通风孔阵列（每个孔 &lt;15mm）是有效的，但一条 30mm 的长缝就会漏。对策：</p>
+    <ul>
+      <li>通风孔用「小孔阵列」而不是长条槽；</li>
+      <li>罩子与地平面用「多点弹片/导电泡棉」360° 接触，间距 &lt;λ/20；</li>
+      <li>线缆出入口加「穿墙式滤波连接器」或磁环。</li>
+    </ul>
+
+    <h2><span class="n">6.2.6</span>实测：先定位再改板</h2>
+    <ol>
+      <li><b>近场探头扫板</b>：在频谱仪上扫 30MHz–1GHz，找出辐射最强的区域（通常是 SW 节点、DDR、晶振、连接器）；</li>
+      <li><b>逐项断开</b>：停 DCDC（外部供电）、停 DDR 时钟、拔电缆，看哪一项让峰值下降；</li>
+      <li><b>改一处、测一次</b>：加磁珠、贴铜箔、缩短环路，每次只改一个变量；</li>
+      <li><b>整机复测</b>：装外壳、接实际电缆，按 CISPR 22/EN 55032 的 Class B 限值判定。</li>
+    </ol>
+    <p>没有频谱仪时，可以用「近场探头 + 示波器 FFT」做定性判断——虽然不准，但足以比较「改前/改后」。</p>
+
+    <div class="demo">
+      <div class="dh"><b>波长 / 天线 / 缝隙计算器</b><span>给频率，算 λ、λ/4、近远场边界与屏蔽缝隙上限</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+          <div><div class="lbl">频率 <b id="fv">100</b> MHz</div><input id="f" class="r" type="range" min="10" max="1000" step="10" value="100"></div>
+          <div><div class="lbl">电缆长度 <b id="lv">1.0</b> m</div><input id="l" class="r" type="range" min="0.05" max="3" step="0.05" value="1"></div>
+        </div>
+        <div id="emiOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h3>练习</h3>
+    <details class="quiz"><summary>1. 环路面积减 10 倍，辐射降多少 dB？</summary><div class="ans">20dB。</div></details>
+    <details class="quiz"><summary>2. 100MHz 的 λ 与 λ/4 各是多少？</summary><div class="ans">λ=3m，λ/4=0.75m。</div></details>
+    <details class="quiz"><summary>3. 为什么 1m 电缆在 100MHz 是有效天线？</summary><div class="ans">长度接近 λ/4，共模电流辐射效率最高。</div></details>
+    <details class="quiz"><summary>4. 磁珠选型看哪三个参数？</summary><div class="ans">Z@100MHz、DCR、额定电流。</div></details>
+    <details class="quiz"><summary>5. 1GHz 时屏蔽缝隙上限？</summary><div class="ans">λ/20=15mm。</div></details>
+    <details class="quiz"><summary>6. 为什么大电流电源不能用磁珠滤波？</summary><div class="ans">DCR 造成压降与发热，且容易饱和。</div></details>
+
+    <div class="ch-nav">
+      <a href="c01.html"><span>上一篇</span><b>← 6.1 ESD 与浪涌</b></a>
+      <a class="nx" id="chNavNext" href="c03.html"><span>下一章</span><b>6.3 信号完整性基础 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p6','c02.html');
+(function(){
+  function calc(){
+    var f=+document.getElementById('f').value, L=+document.getElementById('l').value;
+    var lam=300/f, q=lam/4, r=lam/(2*Math.PI), gap=lam/20;
+    document.getElementById('fv').textContent=f;
+    document.getElementById('lv').textContent=L.toFixed(2);
+    document.getElementById('emiOut').innerHTML=
+      'λ = 300/f = <b style="color:#5ff1ef">'+lam.toFixed(2)+' m</b>，λ/4 = '+q.toFixed(2)+' m<br>'+
+      '近/远场边界 r=λ/2π ≈ <b style="color:#5ff1ef">'+r.toFixed(2)+' m</b><br>'+
+      '屏蔽缝隙上限 λ/20 = <b style="color:#5ff1ef">'+(gap*1000).toFixed(1)+' mm</b><br>'+
+      '电缆 '+L.toFixed(2)+'m '+(L>q*0.7?'<span style="color:#ff8b80">接近/超过 λ/4，是有效天线</span>':'<span style="color:#9ff5c0">短于 λ/4，辐射效率较低</span>');
+  }
+  ['f','l'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .r{width:100%;accent-color:#5ff1ef}
+</style>
+</body>
+</html>
+
