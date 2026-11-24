@@ -1,9 +1,11 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>2.7 接口与逻辑 IC | 第二篇 · 元器件深度解剖 | i.MX6ULL 学习手册</title>
-<meta name="description" content="模拟开关 SGM3157、RS485 SP3485、CAN TJA1050、以太网 PHY SR8201F、USB 转串口 CH340 的选型参数。">
-<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+<title>2.7 接口与逻辑 IC：模拟开关、RS485/CAN 收发器、以太网 PHY | 第二篇 · 元器件深度解剖 | i.MX6ULL 学习手册</title>
+<meta name="description" content="SGM3157 的 Ron/带宽/电荷注入，SP3485 与 TJA1050 的 DE/RE 与共模范围，SR8201F + 变压器 + RJ45 的分工与 100Ω 差分。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -14,105 +16,143 @@
   <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
 <div class="shell">
   <aside id="sidebar"><div class="vol-h">第二篇 · 元器件深度解剖</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第二篇 · 元器件</span><span class="sep">/</span>第 7 章<span class="sep">/</span>约 24 分钟</div>
+    <div class="ch-meta"><span class="lv">第二篇 · 元器件</span><span class="sep">/</span>第 7 章<span class="sep">/</span>约 55 分钟</div>
     <h1>接口与逻辑 IC：板子的「翻译官」</h1>
-    <p class="lede">SoC 只会 3.3V 的并行/串行信号，而外面是 ±12V 的 RS485、5V 的 CAN、差分以太网、USB。中间这些芯片负责<b>电平、协议、阻抗、隔离</b>四件事。看懂它们，你才知道一根线为什么这么接。</p>
+    <p class="lede">SoC 只会 3.3V 的单端/并行信号，外面却是 RS485 的差分 ±12V 共模、CAN 的 5V 驱动、以太网的隔离变压器、USB 的 5V 电源。中间这些芯片负责<b>电平、协议、阻抗、隔离</b>四件事。看懂它们，你才知道一根线为什么这么接、为什么这里要 22Ω、那里要 120Ω。</p>
+
     <figure class="fig">
-      <img src="../../assets/img/parts/rj45_mag.jpg" alt="内置网络变压器的 RJ45 连接器实拍" loading="lazy">
-      <figcaption><b>实拍 · 2.7</b>　内置隔离变压器与共模电感的 RJ45 网口（HR911105A 类）。<b>为什么网口要带变压器</b>：① 电气隔离，防两边地电位差打坏 PHY；② 共模抑制，挡住双绞线上的共模噪声；③ 阻抗与电平匹配。板上 U11 SR8201F 是 PHY，ATK9111A 是网络变压器，两者之间差分对按 100Ω 走。</figcaption>
+      <img src="../../assets/img/parts/rj45_mag.jpg" alt="内置变压器的 RJ45 网口实拍" loading="lazy">
+      <figcaption><b>实拍 · RJ45 带磁</b>　内置隔离变压器与共模电感的网口。<b>为什么网口必须带变压器</b>：① 电气隔离，隔开两边地电位差（几伏到几百伏的共模）；② 共模抑制，挡住双绞线上的共模噪声；③ 阻抗/电平匹配。板上 U11（SR8201F）是 PHY，ATK9111A 是网络变压器，两者之间是 100Ω 差分对。</figcaption>
     </figure>
 
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>说出模拟开关的 R<sub>on</sub>、带宽、电荷注入三个关键参数各自影响什么</li>
-        <li>解释 RS485/CAN 收发器的 DE/RE、fail-safe、终端与共模范围</li>
-        <li>知道以太网 PHY 与变压器的分工，以及 LED/地址脚怎么配置</li>
+        <li>说出模拟开关的 R<sub>on</sub>、带宽、电荷注入三个参数各自影响什么</li>
+        <li>解释 RS485 的 DE/RE、fail-safe、终端 120Ω 与共模范围</li>
+        <li>说清 CAN 收发器为什么常常 5V 供电、TXD 却能接 3.3V</li>
+        <li>知道以太网 PHY 与变压器、RJ45 的分工，以及 100Ω 差分与 25MHz 晶振的作用</li>
+        <li>判断「一根线为什么这么接」：串阻、终端、上拉分别解决什么</li>
       </ol>
     </div>
 
     <h2><span class="n">2.7.1</span>模拟开关 SGM3157：便宜好用的「信号闸门」</h2>
-    <p>MINI 板第 2 页有 <b>U1 / U2 / U3（SGM3157）</b>用于 RGB LCD 的信号切换，第 4 页 <b>U12 / U13</b> 用于 UART1 / UART3 选择到 CH340。它是 SPDT（单刀双掷），用一个 GPIO 决定信号走 A 还是 B。</p>
+    <p>MINI 板第 4 页有 <b>U12/U13（SGM3157）</b>把 CH340 的 TX/RX 在 UART1 与 UART3 之间切换。它是 SPDT（单刀双掷），一个 GPIO 决定信号走 A 还是 B。</p>
     <table>
-      <thead><tr><th>参数</th><th>影响</th><th>选型判据</th></tr></thead>
+      <thead><tr><th>参数</th><th>典型值</th><th>影响</th></tr></thead>
       <tbody>
-        <tr><td class="nm">R<sub>on</sub></td><td>导通电阻，串在信号里形成分压与延时</td><td>驱动 LED/继电器等负载时不合适；数字信号要看与接收端阻抗之比</td></tr>
-        <tr><td class="nm">带宽</td><td>能过多高的频率</td><td>RGB LCD 像素时钟可达几十 MHz，要选带宽足够的</td></tr>
-        <tr><td class="nm">电荷注入</td><td>切换瞬间把电荷灌进线路，形成毛刺</td><td>高阻/采样节点上必须考虑</td></tr>
-        <tr><td class="nm">V<sub>cc</sub> 与信号范围</td><td>信号不能超出电源轨</td><td>3.3V 供电就不能过 5V 信号</td></tr>
+        <tr><td class="nm">R<sub>on</sub></td><td>几 Ω–十几 Ω</td><td>串在信号里形成分压与 RC 延时；驱动负载时要算压降</td></tr>
+        <tr><td class="nm">带宽（−3dB）</td><td>几十–几百 MHz</td><td>决定能不能过高速信号；UART 115200 完全够，RGB LCD 像素时钟就要核</td></tr>
+        <tr><td class="nm">电荷注入</td><td>几 pC</td><td>切换瞬间把电荷灌进高阻节点，形成毛刺；采样/高阻节点必须考虑</td></tr>
+        <tr><td class="nm">V<sub>CC</sub> 与信号范围</td><td>0–V<sub>CC</sub></td><td>3.3V 供电就不能过 5V 信号，否则削顶/漏电</td></tr>
       </tbody>
     </table>
+    <p><b>关键认知</b>：模拟开关不是「理想导线」。它的 R<sub>on</sub> 随信号电压变化（Ron flatness），在音频/ADC 前级会造成失真；它还有「先断后通」（break-before-make）时间，切换瞬间输出会短暂悬空。</p>
+    <p>本板用它做 UART 切换，属于「低速、数字、容差大」的场合，所以 cheap 的 SGM3157 完全够。若换成切换 ADC 输入，就要选低电荷注入、Ron 平坦的型号。</p>
 
-    <h2><span class="n">2.7.2</span>RS485：U10 SP3485</h2>
-    <p>3.3V 供电、半双工、差分 A/B。要点：</p>
+    <h2><span class="n">2.7.2</span>RS485：U10 SP3485 与自动方向电路</h2>
+    <p>3.3V 供电、半双工、差分 A/B。四个要点：</p>
     <ul>
-      <li><b>DE/RE</b> 控制发送/接收；MINI 用 <b>Q4 + R23 10k + R27 22Ω + D6 MBR0520</b> 做自动方向（检测 TX 活动），省掉一个 GPIO。</li>
-      <li><b>fail-safe</b>：总线空闲时差分电压应保证接收端输出高；没有 fail-safe 的收发器要靠外部偏置电阻。</li>
-      <li><b>共模范围</b>：-7V ~ +12V，超出就可能烧；现场要加 TVS 与共模电感。</li>
-      <li><b>终端 120Ω</b>：只加在总线两端，断电量 A/B 应约 60Ω。</li>
+      <li><b>DE/RE</b>：DE 高=发送，RE 低=接收。MINI 用 <b>Q4（SS8050）+ R23 10k + R27 22Ω + D6（MBR0520）</b>做「自动方向」：TXD 空闲为高 → 保持接收；TXD 出现低电平（起始位）→ 立即切到发送；发送结束后靠 R27/D6 的充放电延时切回接收。省掉一个 GPIO，也避开「软件切换时序不准」的竞态。</li>
+      <li><b>fail-safe</b>：总线空闲（所有节点都接收）时差分电压应保证接收端输出高。没有内部 fail-safe 的收发器，要靠外部偏置电阻（A 上拉、B 下拉）建立 &gt;200mV 的差分。本板 SP3485 属于带 fail-safe 的类型。</li>
+      <li><b>共模范围</b>：−7V ~ +12V。现场地电位差、浪涌超出就会烧；所以长线要加 TVS 与共模电感。</li>
+      <li><b>终端 120Ω</b>：只加在总线两端，中间节点不加。断电量 A/B 之间应约 60Ω（两个 120Ω 并联）——这是判断终端是否装对的快速方法。</li>
     </ul>
+    <p><b>R27 22Ω 的作用</b>：串在 A/B 与连接器之间，限流+阻尼。外部接错线、热插拔、浪涌时它先受损，保住 U10。这与第 1.10 章的「串阻」是同一类设计。</p>
 
-    <h2><span class="n">2.7.3</span>CAN：U5 TJA1050</h2>
-    <p>5V 供电、1Mbps、差分 CANH/CANL。<b>TXD 由 SoC 3.3V 驱动没问题</b>（V<sub>IH</sub> 最小 2.0V），但 <b>RXD 输出接近 5V</b>——这是读图时的关键检查点：必须有分压/串阻，或选 3.3V 兼容型号，否则长期灌入 3.3V IO。</p>
-    <p>CAN 的 <b>120Ω 终端</b>同样只在两端；节点数多时还要看<b>总线负载率</b>与<b>共模扼流圈</b>。</p>
+    <h2><span class="n">2.7.3</span>CAN：U5 TJA1050 与 5V 供电的尴尬</h2>
+    <p>TJA1050 是经典的高速 CAN 收发器：<b>V<sub>CC</sub>=5V</b>，CANH/CANL 差分，最高 1Mbps。它的 TXD 输入门限按 5V 逻辑设计，但通常能接受 3.3V 高电平（V<sub>IH</sub>≈2.0V 的 TTL 门限）；<b>RXD 输出是 5V 电平</b>，直接接 3.3V SoC 就过压——必须分压或串阻+钳位，或选带 V<sub>IO</sub> 脚的型号（如 TJA1051T/3）。</p>
+    <p>本板把 TJA1050 用在 MINI 的 CAN 口（U5），配 <b>R57 510R</b> 等外围。这里正是第 1.9 章「3.3V 与 5V 能不能直连」的真实案例：<b>同一个器件，TXD 方向能直连、RXD 方向不能</b>。</p>
+    <p>CAN 总线终端同样是 120Ω，两端各一个；总线长度与速率成反比（1Mbps 约 40m，125kbps 可到 500m 以上）。</p>
 
-    <h2><span class="n">2.7.4</span>以太网：PHY + 变压器</h2>
-    <p>MINI 用 <b>U11 SR8201F</b>（10/100 PHY）+ <b>ATK9111A 网络变压器</b> + <b>25MHz 晶振 E1（12pF 负载电容）</b>。分工：</p>
-    <ol class="steps">
-      <li><b>PHY</b>：完成 MII/RMII 与差分信号的编解码、自协商、LED 指示。</li>
-      <li><b>变压器</b>：隔离（耐压）、共模抑制、阻抗匹配。</li>
-      <li><b>RJ45</b>：带 LED 与终端电阻/ESD。</li>
-    </ol>
-    <p>PHY 的 <b>地址脚</b>（PHYAD）与 <b>LED 脚</b> 常复用，靠上下拉电阻在复位时采样，决定 MDIO 地址与灯的行为——这类「配置脚」在原理图上必须逐个核对，错了就是「PHY 找不到」。</p>
+    <h2><span class="n">2.7.4</span>以太网：PHY + 变压器 + RJ45 的分工</h2>
+    <table>
+      <thead><tr><th>环节</th><th>本板器件</th><th>负责什么</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">MAC</td><td>SoC 内部 FEC</td><td>帧组装、CRC、DMA</td></tr>
+        <tr><td class="nm">PHY</td><td>U11 SR8201F</td><td>编解码（4B/5B、MLT-3）、自适应、RMII 接口</td></tr>
+        <tr><td class="nm">变压器</td><td>ATK9111A</td><td>隔离、共模抑制、阻抗匹配</td></tr>
+        <tr><td class="nm">连接器</td><td>RJ45（带磁）</td><td>机械连接、LED 指示</td></tr>
+      </tbody>
+    </table>
+    <p>几个容易被忽略的点：</p>
+    <ul>
+      <li><b>25MHz 晶振</b>：PHY 的参考时钟，RMII 模式下 SoC 与 PHY 共用 50MHz（或各自 25MHz）。频偏会直接体现为链路不稳。</li>
+      <li><b>100Ω 差分</b>：TX±/RX± 必须按 100Ω 差分走线，等长、少过孔；否则回波损耗变差，长线误码。</li>
+      <li><b>中心抽头供电</b>：电压型 PHY 的变压器中心抽头要接电源（常 3.3V）并加去耦，电流型则不接——接错会烧 PHY 或链路不通。</li>
+      <li><b>LED 脚</b>：链路/活动指示，极性由 PHY 的 LED 配置寄存器决定，硬件上常是「灌电流」接法。</li>
+    </ul>
+    <p>本板 L3（220R@100MHz 磁珠）+ C13（10µF）给 PHY 电源做 π 型滤波：磁珠挡高频、电容供本地电荷。这是「数字芯片 + 模拟前端」共存的常规做法。</p>
 
-    <figure class="fig">
-      <svg viewBox="0 0 860 300" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <rect x="24" y="20" width="400" height="190" rx="10" fill="#141c2e" stroke="#3a4560"/>
-        <text x="40" y="44" fill="#eaf3ff" font-size="11">四种接口 IC 的分工</text>
-        <text x="40" y="74" fill="#9df5f4" font-size="10">SGM3157：信号选路</text>
-        <text x="40" y="92" fill="#9fb0c7" font-size="9.5">Ron 几 Ω；看带宽与电荷注入</text>
-        <text x="40" y="118" fill="#9df5f4" font-size="10">SP3485：RS485 差分收发</text>
-        <text x="40" y="136" fill="#9fb0c7" font-size="9.5">3.3V；DE/RE；fail-safe；120Ω 终端</text>
-        <text x="40" y="162" fill="#9df5f4" font-size="10">TJA1050：CAN 收发</text>
-        <text x="40" y="180" fill="#9fb0c7" font-size="9.5">5V 供电；RXD 电平要核对</text>
-        <text x="40" y="200" fill="#9df5f4" font-size="10">SR8201F：以太网 PHY</text>
+    <h2><span class="n">2.7.5</span>USB：MT9700 电源开关与 CH340</h2>
+    <p><b>U14（MT9700）</b>是 USB Host 的限流开关：内部 MOS + 限流（约 1.3A）+ 热关断，EN 由 GPIO 控制。它的价值是<b>把「外设短路」与「主板烧毁」隔开</b>：插上一个坏 U 盘，MT9700 限流/关断，SoC 不受影响。</p>
+    <p><b>U7（CH340）</b>是 USB→UART 桥，给调试串口用。它自带 3.3V/5V 选择，本板用 3.3V 侧以匹配 SoC。CH340 的 TX/RX 再经 U12/U13 模拟开关分配到 UART1/UART3——这就是「一颗芯片解决协议，一颗开关解决路由」的组合。</p>
 
-        <rect x="450" y="20" width="386" height="190" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
-        <text x="466" y="44" fill="#eaf3ff" font-size="11">读接口 IC 图纸的四问</text>
-        <text x="466" y="74" fill="#9fb0c7" font-size="10">① 供电电压与 IO 电平是否匹配？</text>
-        <text x="466" y="98" fill="#9fb0c7" font-size="10">② 方向控制脚（DE/RE、SEL）默认状态？</text>
-        <text x="466" y="122" fill="#9fb0c7" font-size="10">③ 总线上有没有终端/偏置/保护？</text>
-        <text x="466" y="146" fill="#9fb0c7" font-size="10">④ 配置脚（地址/LED/模式）采样对不对？</text>
-        <text x="466" y="176" fill="#ff9c9c" font-size="9.5">这四问能定位 80% 的「接口不通」</text>
-
-        <text x="24" y="240" fill="#9fb0c7" font-size="10.5">CH340（U7）在 MINI 上做 USB 转串口，3.3V 供电则 IO 即 3.3V，可直接接 SoC UART；5V 供电就必须转换。</text>
-        <text x="24" y="264" fill="#6f7f9c" font-size="10">SW 拨码（D1–D8）与 R43–R50 10k 决定启动介质，本质是「用电阻写配置字节」。</text>
-        <text x="24" y="288" fill="#ff9c9c" font-size="10">反例：RS485 A/B 接反，通信「时通时不通」，因为空闲态电平反了。</text>
-      </svg>
-      <figcaption><b>图 2-7</b>　接口 IC 的分工与读图四问。</figcaption>
-    </figure>
-
-    <h2><span class="n">2.7.5</span>ESD 与保护：接口的第一个「守门员」</h2>
-    <p>所有对外接口都要过 ESD（接触 ±8kV、空气 ±15kV 是常见要求）。做法是：<b>接口座 → TVS/ESD 阵列 → 串阻/共模电感 → 收发器</b>。ESD 器件要选<b>低电容</b>（否则破坏差分阻抗）与<b>低钳位</b>（保护后级）。</p>
-    <div class="box pit">
-      <h5>三个现场故障</h5>
-      <p><b>1. RS485 只贴一个终端：</b>短距离能用，长线反射严重、误码率高。</p>
-      <p><b>2. CAN 节点多但终端贴了四五个：</b>等效 30Ω，幅度塌陷，通信距离骤减。</p>
-      <p><b>3. 以太网变压器中心抽头接错电压：</b>PHY 侧与线缆侧的上拉电压不同，链路协商失败。</p>
+    <div class="demo">
+      <div class="dh"><b>RS485 终端与偏置估算</b><span>给终端电阻、偏置电阻、节点数，算空闲差分电压与负载</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+          <div><div style="font-size:12px;color:#9fb0c7">终端 R<sub>t</sub> <b id="t1v" style="color:#5ff1ef">120</b> Ω</div><input id="t1" type="range" min="60" max="220" step="5" value="120" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">偏置上拉 R<sub>b</sub> <b id="t2v" style="color:#5ff1ef">560</b> Ω</div><input id="t2" type="range" min="100" max="2000" step="10" value="560" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">节点数 <b id="t3v" style="color:#5ff1ef">8</b></div><input id="t3" type="range" min="2" max="64" step="1" value="8" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">供电 <b id="t4v" style="color:#5ff1ef">3.3</b> V</div><input id="t4" type="range" min="3" max="5.5" step="0.1" value="3.3" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="rsOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
     </div>
 
-    <h3>自测</h3>
-    <details class="quiz"><summary>为什么模拟开关不能用来驱动 LED？</summary><div class="ans">因为 R<sub>on</sub> 有几 Ω，几 mA 到几十 mA 电流下会产生明显压降与发热，且开关的电流能力有限。它只适合传信号，不适合传功率。</div></details>
-    <details class="quiz"><summary>TJA1050 用 5V 供电，SoC 是 3.3V，最该检查哪根线？</summary><div class="ans">RXD（收发器→SoC）。TXD 方向 3.3V 满足 V<sub>IH</sub>；RXD 高电平接近 5V，需要分压或串阻限流，否则超过 3.3V IO 的绝对最大。</div></details>
-    <details class="quiz"><summary>PHY 地址脚为什么要上下拉？</summary><div class="ans">因为地址在复位期间由引脚电平采样决定，芯片没有独立地址寄存器。上下拉把引脚在上电时固定成某个组合，从而设定 MDIO 地址。</div></details>
+    <div class="box pit">
+      <h5>五个坑</h5>
+      <p>① RS485 每个节点都加 120Ω：总线负载过重，驱动能力不足、通信距离骤减。</p>
+      <p>② CAN 的 RXD（5V）直连 3.3V SoC：长期过压，IO 慢慢失效。</p>
+      <p>③ 以太网变压器中心抽头接错（该接电源的接了地）：链路直接不通。</p>
+      <p>④ 模拟开关切 5V 信号却用 3.3V 供电：削顶、漏电、串扰。</p>
+      <p>⑤ USB 不加限流开关：一个短路的外设就能把 5V 轨拉塌、烧 SoC。</p>
+    </div>
 
-    <div class="ch-nav"><a href="c05.html"><span>上一章</span><b>← 2.5 三极管与 MOS</b></a>
-      <a class="nx" id="chNavNext" href="c08.html"><span>下一章</span><b>2.8 怎么读数据手册 →</b></a></div>
+    <h3>练习（答案在折叠里）</h3>
+    <details class="quiz"><summary>1. RS485 总线两端各 120Ω，断电量 A-B 应是多少？</summary><div class="ans">60Ω（两个 120Ω 并联）；若量到 120Ω 说明只装了一个终端。</div></details>
+    <details class="quiz"><summary>2. TJA1050 的 RXD 能直接接 3.3V SoC 吗？</summary><div class="ans">不能。RXD 是 5V 输出，需分压/串阻钳位，或换带 V<sub>IO</sub> 的型号。</div></details>
+    <details class="quiz"><summary>3. 以太网差分为什么必须是 100Ω？</summary><div class="ans">与变压器/电缆的特征阻抗匹配，减少反射与回波损耗；阻抗不匹配会造成误码。</div></details>
+    <details class="quiz"><summary>4. 模拟开关的电荷注入在什么场合最致命？</summary><div class="ans">高阻节点、采样保持、ADC 前级——注入电荷形成电压毛刺，且无法被低阻源吸收。</div></details>
+    <details class="quiz"><summary>5. MT9700 这类限流开关解决什么问题？</summary><div class="ans">把外设短路/过流隔离在开关内部，靠限流与热关断保护主板电源与 SoC。</div></details>
+    <details class="quiz"><summary>6. 为什么 RS485 自动方向电路要加 D6 与 R27？</summary><div class="ans">用二极管与电阻构成充放电延时，保证发送完最后一个字节后才切回接收，避免截断末位。</div></details>
+
+    <div class="ch-nav">
+      <a href="c06.html"><span>上一章</span><b>← 2.6 电源 IC</b></a>
+      <a class="nx" id="chNavNext" href="c08.html"><span>下一章</span><b>2.8 晶振与蜂鸣器 →</b></a>
+    </div>
   </main>
 </div>
-<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
-<script>renderPart('p2','c07.html');</script>
-</body></html>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p2','c07.html');
+(function(){
+  function calc(){
+    var rt=+document.getElementById('t1').value, rb=+document.getElementById('t2').value;
+    var n=+document.getElementById('t3').value, vcc=+document.getElementById('t4').value;
+    document.getElementById('t1v').textContent=rt;
+    document.getElementById('t2v').textContent=rb;
+    document.getElementById('t3v').textContent=n;
+    document.getElementById('t4v').textContent=vcc.toFixed(1);
+    var rterm=rt/2, rload=2*rb+rterm;
+    var dv=vcc*rterm/rload;
+    var iload=vcc/rload*1000;
+    document.getElementById('rsOut').innerHTML=
+      '<b style="color:#eaf3ff;font-size:15px">空闲差分电压 ≈ '+(dv*1000).toFixed(0)+' mV</b> '+(dv>0.2?'<span style="color:#9df3c2">（&gt;200mV，fail-safe 成立）</span>':'<span style="color:#ff9c9c">（不足 200mV，需减小偏置电阻）</span>')+'<br>'+
+      '两端终端并联后 '+rterm.toFixed(0)+' Ω，偏置回路总阻 '+rload.toFixed(0)+' Ω，静态电流 '+(iload).toFixed(1)+' mA<br>'+
+      '节点数 '+n+'：每节点输入阻抗通常 ≥12kΩ，并联后 '+(12000/n).toFixed(0)+' Ω，对上面的估算影响很小<br>'+
+      '<span style="color:#6f7f9c;font-size:11.5px">偏置电阻只在「总线两端」，中间节点不加；实际还要考虑线缆直流电阻与共模范围。</span>';
+  }
+  ['t1','t2','t3','t4'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+</body>
+</html>

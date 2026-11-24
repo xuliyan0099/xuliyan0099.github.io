@@ -1,9 +1,11 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>2.8 怎么读数据手册 | 第二篇 · 元器件深度解剖 | i.MX6ULL 学习手册</title>
-<meta name="description" content="绝对最大值与推荐工作条件的区别、电气特性表的测试条件、时序图、热阻与封装图；六步读法与常见陷阱。">
-<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+<title>2.8 怎么读数据手册：六步法 | 第二篇 · 元器件深度解剖 | i.MX6ULL 学习手册</title>
+<meta name="description" content="绝对最大值不是工作条件、typ 不能用于设计、每个数字都有测试条件；用本板型号后缀、hFE 分档、I2C 时序与热阻逐条演示六步法。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -14,102 +16,180 @@
   <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
 <div class="shell">
   <aside id="sidebar"><div class="vol-h">第二篇 · 元器件深度解剖</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第二篇 · 元器件</span><span class="sep">/</span>第 8 章<span class="sep">/</span>约 26 分钟</div>
+    <div class="ch-meta"><span class="lv">第二篇 · 元器件</span><span class="sep">/</span>第 8 章<span class="sep">/</span>约 50 分钟</div>
     <h1>怎么读数据手册：六步法</h1>
-    <p class="lede">一份规格书几十页，真正要读的只有五块：<b>绝对最大值、推荐工作条件、电气特性表、时序图、封装与热阻</b>。其余是营销与封装细节。这一章用六步法把它们串起来，并列出十个最常见的误读。</p>
+    <p class="lede">一份规格书几十页，真正要读的只有五块：<b>型号后缀、绝对最大值、推荐工作条件、电气特性（含测试条件）、时序与热阻</b>。剩下的多是营销与封装细节。这一章用本板真实型号做六步法演练，并列出十个最常见的误读——每一条都能在板子上找到对应的坑。</p>
+
     <figure class="fig">
       <img src="../../assets/img/parts/xtal_3225.jpg" alt="3225 封装无源晶振实拍" loading="lazy">
-      <figcaption><b>实拍 · 2.8</b>　3225（3.2×2.5mm）四脚无源晶振。<b>丝印只有频率</b>（如 25.000、54.000），负载电容 CL、ESR、精度 ppm、温度范围全部要查手册。板上 Y2 是 24MHz、配 C12/C13 18pF——CL 选错会让频率偏几十 ppm，串口还能通，USB/Ethernet 就会出错。</figcaption>
+      <figcaption><b>实拍 · 3225 无源晶振</b>　本体只印频率（如 25.000、24.000），<b>负载电容 CL、ESR、精度 ppm、温度范围全部要查手册</b>。板上 Y2 是 24MHz，配 C12/C14 18pF；CL 选错会让频率偏几十 ppm——串口还能通，USB/以太网就会出错。这是「丝印不等于参数」的最好例子。</figcaption>
     </figure>
 
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>一眼区分「绝对最大额定」与「推荐工作条件」，不再拿极限值当设计值</li>
+        <li>从型号后缀判断电压、封装、温度等级、包装</li>
+        <li>一眼区分「绝对最大额定」与「推荐工作条件」，不再拿极限当设计值</li>
         <li>在电气特性表里找到测试条件，判断这个数在你的工况下是否成立</li>
-        <li>用时序图核对建立/保持时间，说清一个接口为什么「理论上能通、实际不通」</li>
+        <li>读时序表核对建立/保持时间，解释「理论上能通、实际不通」</li>
+        <li>用 R<sub>θJA</sub> 与降额曲线判断热是否过关，并看懂 Layout 推荐图</li>
       </ol>
     </div>
 
-    <h2><span class="n">2.8.1</span>六步法</h2>
-    <ol class="steps">
-      <li><b>看标题页与型号后缀</b>：同一系列不同后缀可能耐压、精度、封装、温度等级完全不同（例如 LDO 的固定输出版本）。</li>
-      <li><b>读 Absolute Maximum Ratings</b>：这是「不损坏」的边界，<b>不是</b>工作条件。超过就可能永久损坏，哪怕只一瞬间。</li>
-      <li><b>读 Recommended Operating Conditions</b>：这才是设计允许的区间（电压、温度、负载）。设计点应落在区间中部，不是边缘。</li>
-      <li><b>读 Electrical Characteristics</b>：每个数都有测试条件（V<sub>in</sub>、I<sub>out</sub>、T<sub>a</sub>、频率）。min/typ/max 三列里，<b>设计用 min 或 max，不用 typ</b>。</li>
-      <li><b>读时序图与开关特性</b>：建立/保持、上升/下降、传播延迟、死区。接口能不能通，往往由这几张图决定。</li>
-      <li><b>读封装、热阻与 Layout 建议</b>：R<sub>θJA</sub>、焊盘尺寸、散热过孔、推荐走线。规格书里的 Layout 图是最低要求。</li>
-    </ol>
-
-    <figure class="fig">
-      <svg viewBox="0 0 860 320" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <rect x="24" y="20" width="400" height="210" rx="10" fill="#141c2e" stroke="#3a4560"/>
-        <text x="40" y="44" fill="#eaf3ff" font-size="11">三个区间的区别</text>
-        <line x1="70" y1="150" x2="380" y2="150" stroke="#3a4560"/>
-        <rect x="90" y="120" width="160" height="30" fill="rgba(92,225,160,.15)" stroke="rgba(92,225,160,.5)"/>
-        <text x="104" y="140" fill="#9df3c2" font-size="9.5">推荐工作区</text>
-        <rect x="250" y="100" width="120" height="70" fill="rgba(255,184,77,.12)" stroke="rgba(255,184,77,.4)"/>
-        <text x="258" y="122" fill="#ffd79a" font-size="9">可工作但不保证</text>
-        <text x="258" y="140" fill="#ffd79a" font-size="9">指标</text>
-        <text x="100" y="176" fill="#9fb0c7" font-size="9">绝对最大 ────────────────</text>
-        <line x1="90" y1="186" x2="370" y2="186" stroke="#ff9c9c" stroke-width="1.4"/>
-        <text x="100" y="204" fill="#ff9c9c" font-size="9">超过此线：可能永久损坏</text>
-
-        <rect x="450" y="20" width="386" height="210" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
-        <text x="466" y="44" fill="#eaf3ff" font-size="11">电气特性表怎么读</text>
-        <text x="466" y="72" fill="#9fb0c7" font-size="10">列：Symbol | Min | Typ | Max | Unit | Test Condition</text>
-        <text x="466" y="98" fill="#5ff1ef" font-size="10">关键在最后一列：条件不成立，数就不成立</text>
-        <text x="466" y="126" fill="#9fb0c7" font-size="10">V<sub>IH</sub> = 2.0V @ V<sub>CC</sub>=5V, T<sub>a</sub>=25°C</text>
-        <text x="466" y="148" fill="#9fb0c7" font-size="10">→ 换到 3.3V 供电或 85°C，必须重查</text>
-        <text x="466" y="176" fill="#ff9c9c" font-size="9.5">最危险：拿 Typ 当设计值</text>
-        <text x="466" y="198" fill="#6f7f9c" font-size="9">批量生产里 Typ 只代表「典型样品」</text>
-
-        <text x="24" y="258" fill="#9fb0c7" font-size="10.5">时序判据：数据要在时钟沿前 t<sub>su</sub> 稳定、沿后 t<sub>h</sub> 保持；总线上还要考虑传播延迟与走线延时。</text>
-        <text x="24" y="282" fill="#6f7f9c" font-size="10">用示波器量「眼图」比读表更真实，但读表能告诉你去量哪里、判据是多少。</text>
-        <text x="24" y="306" fill="#ff9c9c" font-size="10">反例：DDR 时序按 Typ 计算通过，量产批次落在 Max 侧，出现偶发启动失败。</text>
-      </svg>
-      <figcaption><b>图 2-8</b>　三个区间与电气特性表读法。</figcaption>
-    </figure>
-
-    <h2><span class="n">2.8.2</span>十个常见误读</h2>
+    <h2><span class="n">2.8.1</span>第一步：型号后缀里有一半信息</h2>
     <table>
-      <thead><tr><th>#</th><th>误读</th><th>正确做法</th></tr></thead>
+      <thead><tr><th>本板型号</th><th>后缀含义</th><th>看错会怎样</th></tr></thead>
       <tbody>
-        <tr><td class="nm">1</td><td>把绝对最大值当工作电压</td><td>设计点落在推荐工作区，且留 10–20% 余量</td></tr>
-        <tr><td class="nm">2</td><td>用 Typ 值做设计</td><td>用 Min/Max；Typ 只用于估算</td></tr>
-        <tr><td class="nm">3</td><td>忽略测试温度</td><td>85°C 环境的参数要重查或按曲线外推</td></tr>
-        <tr><td class="nm">4</td><td>忽略负载条件</td><td>R<sub>ds(on)</sub>、V<sub>ce(sat)</sub>、V<sub>dropout</sub> 都随电流变</td></tr>
-        <tr><td class="nm">5</td><td>忽略封装热阻</td><td>用实际铜箔面积对应的 R<sub>θJA</sub></td></tr>
-        <tr><td class="nm">6</td><td>只看典型曲线不看最坏列</td><td>曲线是 typ，表里有 min/max</td></tr>
-        <tr><td class="nm">7</td><td>把「耐压」当「工作电压」</td><td>电容/二极管耐压要降额 50% 或按标准降额</td></tr>
-        <tr><td class="nm">8</td><td>忽略输入/输出电容的 ESR 要求</td><td>LDO 稳定性、DCDC 纹波都依赖它</td></tr>
-        <tr><td class="nm">9</td><td>时序只算芯片，不算走线</td><td>加传播延迟与 PCB 延时（约 6mil/ps 量级）</td></tr>
-        <tr><td class="nm">10</td><td>不读 Errata</td><td>芯片勘误表里常有「已知缺陷与规避方法」</td></tr>
+        <tr><td class="nm">ME6209A33M3G</td><td>A33=3.3V 固定输出、M3=SOT-23、G=无铅</td><td>买成 A50 就是 5V 输出，直接烧 3.3V 器件</td></tr>
+        <tr><td class="nm">XC6206P282MR</td><td>282=2.8V、P=活性高、MR=SOT-23</td><td>282 与 332 差 0.5V，CSI 电平不对、摄像头不出图</td></tr>
+        <tr><td class="nm">SMBJ5.0A</td><td>5.0=V<sub>RWM</sub>、A=单向</td><td>买成 SMBJ5.0CA（双向）用于直流轨，钳位特性不同</td></tr>
+        <tr><td class="nm">TJA1050T/CM,118</td><td>T=SO8、/CM=版本、118=卷带</td><td>换成 TJA1050T/3 才有 V<sub>IO</sub> 脚，脚位不同</td></tr>
+        <tr><td class="nm">MT3420B</td><td>固定 V<sub>ref</sub>=0.6V，B 为版本</td><td>换成别的系列，V<sub>ref</sub> 变了，输出全错</td></tr>
       </tbody>
     </table>
+    <p><b>后缀错一位，等于换了一颗器件</b>。采购/替换前必须比对完整型号，不能只看前面几个字符——这是硬件工程师最容易犯的低级错误，也是唯一「不需要动脑、只需要细心」的一步。</p>
 
-    <div class="box deep">
-      <h5>一个真实的读表推演</h5>
-      <p>假设你要用一颗 3.3V LDO 给 SD 卡供电，卡在写入瞬间要 200mA 脉冲。规格书写「I<sub>out</sub> = 300mA，V<sub>dropout</sub> = 200mV @ 300mA」。但你要核对三件事：① 脉冲电流下的瞬态响应（规格书的负载阶跃图）；② 输出电容是否满足稳定性（有的 LDO 要求 ESR 下限）；③ 200mA 时的实际压差是否让 V<sub>out</sub> 掉出 3.3V±10%。三条都对上，才叫「能用」。</p>
+    <h2><span class="n">2.8.2</span>第二步：绝对最大值 ≠ 工作条件</h2>
+    <p>两者是完全不同的概念：</p>
+    <table>
+      <thead><tr><th>栏目</th><th>含义</th><th>怎么用</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">Absolute Maximum Ratings</td><td>「不永久损坏」的边界，瞬时也不能超</td><td>只用于判断「会不会坏」，<b>不能作为设计点</b></td></tr>
+        <tr><td class="nm">Recommended Operating Conditions</td><td>厂家保证功能的区间</td><td>设计点应落在<b>区间中部</b>，不是边缘</td></tr>
+        <tr><td class="nm">Electrical Characteristics</td><td>在特定测试条件下的 min/typ/max</td><td>设计用 min 或 max，<b>不用 typ</b></td></tr>
+      </tbody>
+    </table>
+    <p>例：SoC 的 IO 绝对最大常标「−0.5V ~ V<sub>DD</sub>+0.5V」，推荐工作却是「0 ~ V<sub>DD</sub>」。这意味着 3.4V 的瞬间尖峰不会立刻坏，但它不在推荐区间——长期打 ESD 二极管，寿命会缩短。</p>
+    <p>又例：SMBJ5.0A 的 V<sub>RWM</sub>=5V 是「推荐工作上限」，V<sub>BR</sub>≈6.4–7V 是「开始击穿」，V<sub>C</sub>≈9.2V 是「钳位残压」。三个数对应三种状态，混用就会得出「5V TVS 输出也是 5V」的错误结论。</p>
+
+    <h2><span class="n">2.8.3</span>第三步：min / typ / max 三列，只用两列</h2>
+    <p>规格书每行参数常有三列。工程上只信两列：</p>
+    <ul>
+      <li><b>min</b>：用于「不能低于」的判断——h<sub>FE</sub> 最小值、V<sub>OH</sub> 最小值、I<sub>sat</sub> 最小值。</li>
+      <li><b>max</b>：用于「不能高于」的判断——V<sub>CE(sat)</sub> 最大值、V<sub>F</sub> 最大值、I<sub>R</sub> 最大值、R<sub>ds(on)</sub> 最大值。</li>
+      <li><b>typ</b>：只用于「估算典型效率/典型波形」，<b>永远不作为设计余量的依据</b>。</li>
+    </ul>
+    <p>算例：SS8550 的 h<sub>FE</sub> typ 可能是 200，min 85。你按 200 算出 I<sub>b</sub>=0.5mA 就够，实际遇到 85 的片子只能驱动 42mA，蜂鸣器不响。<b>用 min 算，得到 I<sub>b</sub>≥1.2mA 才安全</b>——本板用 2.6mA，就是按 min 再留 2 倍。</p>
+    <p>这也解释了为什么「同一块板，有的蜂鸣器响、有的不响」：不是焊接问题，是 h<sub>FE</sub> 落在分档的不同位置。</p>
+
+    <h2><span class="n">2.8.4</span>第四步：每个数字后面的测试条件</h2>
+    <p>这是整章最核心的一条。<b>脱开条件读数字，等于读错</b>：</p>
+    <table>
+      <thead><tr><th>参数</th><th>标注条件</th><th>你的工况不同时</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">V<sub>F</sub>=0.45V</td><td>@I<sub>F</sub>=1A、25°C</td><td>0.1A 时约 0.3V；125°C 时更低</td></tr>
+        <tr><td class="nm">R<sub>ds(on)</sub>=30mΩ</td><td>@V<sub>gs</sub>=10V</td><td>3.3V 驱动可能 150–200mΩ</td></tr>
+        <tr><td class="nm">C=22µF</td><td>@0V 偏压、25°C</td><td>3.3V 偏压下可能只剩 12µF</td></tr>
+        <tr><td class="nm">h<sub>FE</sub>=120–200</td><td>@V<sub>CE</sub>=1V、I<sub>C</sub>=100mA</td><td>I<sub>C</sub>=10mA 时增益更低</td></tr>
+        <tr><td class="nm">P<sub>D</sub>=0.35W</td><td>@T<sub>a</sub>=25°C、标准焊盘</td><td>85°C 环境按降额只剩 0.1–0.15W</td></tr>
+      </tbody>
+    </table>
+    <p><b>读法</b>：先找你要用的那一行，再读它右边的条件，最后问「我的电路是不是这个条件」。不是，就去找曲线图（datasheet 里几乎都有 V<sub>F</sub>–I<sub>F</sub>、R<sub>ds(on)</sub>–V<sub>gs</sub>、C–V<sub>DC</sub> 的曲线），按曲线取值。</p>
+
+    <h2><span class="n">2.8.5</span>第五步：时序表比电气表更容易「坑死人」</h2>
+    <p>接口能不能通，往往不由电压决定，而由时序决定。要读的是四个量：</p>
+    <ul>
+      <li><b>t<sub>su</sub>（建立时间）</b>：数据必须在时钟边沿前稳定多久；</li>
+      <li><b>t<sub>h</sub>（保持时间）</b>：时钟边沿后还要保持多久；</li>
+      <li><b>t<sub>r</sub>/t<sub>f</sub></b>：上升/下降时间上限；</li>
+      <li><b>t<sub>co</sub>（时钟到输出）</b>：决定总线上能挂几个器件、能跑多快。</li>
+    </ul>
+    <p>算例（I2C 400kHz）：规范给 t<sub>r</sub> ≤300ns。本板 4.7k 上拉 + 100pF 总线 → t<sub>r</sub>≈1.03µs，<b>直接超标 3 倍</b>。所以「硬件能通信」不代表「符合规范」——示波器上看到的是一个「圆角方波」，逻辑分析仪可能还能解出来，换个从机就失败。</p>
+    <p>再例（SPI）：SoC 的 t<sub>co</sub> 最大 8ns、从机 t<sub>su</sub> 最小 5ns，走线延时 1ns —— 余量只有 2ns。加一个电平转换芯片（传播延迟 3–5ns）就把余量吃光。<b>时序余量必须按 max+max 累加，不能按 typ 估</b>。</p>
+
+    <h2><span class="n">2.8.6</span>第六步：热阻、降额曲线与 Layout 图</h2>
+    <p>规格书最后几页常有三个「不起眼但要命」的内容：</p>
+    <ol>
+      <li><b>R<sub>θJA</sub> / R<sub>θJC</sub></b>：结到环境/结到壳的热阻。用它把「P<sub>D</sub>=0.35W」换算成「我的环境能扛多少」。</li>
+      <li><b>降额曲线</b>：功率/电流随温度下降的比例。电阻 70°C 起降、电解按 10°C 寿命减半，都在这一页。</li>
+      <li><b>Recommended Land Pattern / Layout</b>：焊盘尺寸、散热过孔、走线建议。这是厂家的「最低要求」，不是「参考」。</li>
+    </ol>
+    <p>本板 CORE 的电源区域之所以看起来「电容排得很密」，就是按 Layout 建议把输入电容紧贴芯片。原理图上看不出差别，PCB 上差 5mm 就是两种结果。</p>
+
+    <div class="demo">
+      <div class="dh"><b>最坏情况输出偏差（min/max 思维）</b><span>给 V<sub>ref</sub> 容差与电阻容差，算 DCDC 输出的最坏区间</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+          <div><div style="font-size:12px;color:#9fb0c7">V<sub>ref</sub> <b id="av" style="color:#5ff1ef">0.768</b> V</div><input id="vref" type="range" min="0.5" max="1.3" step="0.002" value="0.768" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">V<sub>ref</sub> 容差 <b id="bv" style="color:#5ff1ef">1.0</b> %</div><input id="vtol" type="range" min="0.1" max="5" step="0.1" value="1" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">R<sub>top</sub> <b id="cv" style="color:#5ff1ef">49.9</b> kΩ</div><input id="rt" type="range" min="1" max="200" step="0.1" value="49.9" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">电阻容差 <b id="dv" style="color:#5ff1ef">1.0</b> %</div><input id="rtol" type="range" min="0.05" max="5" step="0.05" value="1" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="dOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
     </div>
+
+    <h2><span class="n">2.8.7</span>十个常见误读（每条都对应一个真实事故）</h2>
+    <ol>
+      <li>把 Absolute Maximum 当工作电压用（3.6V 标称，实际设计在 3.6V）。</li>
+      <li>用 typ 值做设计（h<sub>FE</sub> 200 → 批量一半不饱和）。</li>
+      <li>忽略 V<sub>F</sub> 的测试电流（按 1A 的 0.45V 算 10mA 的电路）。</li>
+      <li>忽略 R<sub>ds(on)</sub> 的 V<sub>gs</sub> 条件（3.3V 驱动 10V 器件）。</li>
+      <li>忽略电容的直流偏压降容（22µF 当 22µF 用）。</li>
+      <li>忽略温度对漏电/增益的影响（85°C 时肖特基漏电翻 60 倍）。</li>
+      <li>不读时序表（I2C 上拉按「能通就行」选）。</li>
+      <li>不读降额曲线（0.35W 的管子跑 0.3W）。</li>
+      <li>不看 Layout 建议（输入电容放远、FB 走长线）。</li>
+      <li>型号后缀错位（A33 买成 A50）。</li>
+    </ol>
 
     <div class="box tip">
-      <h5>建立自己的「一页摘要」</h5>
-      <p>每用一颗新芯片，抄一页纸：供电范围、关键 IO 电平、最大电流、热阻、必须的外围、三个最坑的点。三个月后再用，你只需要看这一页，不必重读 60 页 PDF。</p>
+      <h5>六步法速查</h5>
+      <p>① 型号后缀 → ② 绝对最大（只判坏不判用）→ ③ 推荐区间（设计点居中）→ ④ 电气表 min/max + 条件 → ⑤ 时序表按 max 累加 → ⑥ 热阻/降额/Layout。每一步都问一句：<b>「这个数是在什么条件下测的？我的电路是不是这个条件？」</b></p>
     </div>
 
-    <h3>自测</h3>
-    <details class="quiz"><summary>规格书写 V<sub>IH</sub>=2.0V（min），你给 1.9V 高电平，为什么不行？</summary><div class="ans">因为 min 表示「至少 2.0V 才保证被识别为高」。1.9V 落在不确定区，可能读成 0 也可能读成 1，且随温度/批次变化。设计要给到 2.0V 以上并留余量。</div></details>
-    <details class="quiz"><summary>为什么绝对最大值不能当设计值？</summary><div class="ans">绝对最大值是「不造成永久损坏」的边界，通常只允许瞬时达到，且不保证功能正常。长期工作在极限附近，寿命与可靠性都会急剧下降。</div></details>
-    <details class="quiz"><summary>时序「理论上够」但实测偶发失败，先查什么？</summary><div class="ans">先查时序余量：把 Typ 换成 Max、加上走线延时与负载电容造成的边沿变慢，再看建立/保持是否还为正。然后用示波器在接收端（不是发送端）量眼图。</div></details>
+    <div class="box pit">
+      <h5>三个「看起来没问题」的坑</h5>
+      <p>① 表格里 typ 一列很漂亮，min/max 一列很吓人——设计只能按吓人的那一列。</p>
+      <p>② 曲线图比表格更准：表格给的是「某一点」，曲线给的是「全区间」。</p>
+      <p>③ 不同厂家的同一型号可能脚位/参数都不同，替换必须重新读手册。</p>
+    </div>
 
-    <div class="ch-nav"><a href="c07.html"><span>上一章</span><b>← 2.7 接口与逻辑 IC</b></a>
-      <a class="nx" id="chNavNext" href="../index.html"><span>本篇完</span><b>返回篇目录 →</b></a></div>
+    <h3>练习（答案在折叠里）</h3>
+    <details class="quiz"><summary>1. h<sub>FE</sub> typ=200、min=85，按哪个设计？为什么？</summary><div class="ans">按 min=85。typ 只是一半以上器件的水平，批量里必然有落在 min 的个体。</div></details>
+    <details class="quiz"><summary>2. R<sub>ds(on)</sub>=30mΩ@V<sub>gs</sub>=10V，3.3V 驱动能直接用吗？</summary><div class="ans">不能保证。要查 2.5–3.3V 那一行或曲线，否则可能高 4–6 倍。</div></details>
+    <details class="quiz"><summary>3. 22µF/6.3V X5R 在 3.3V 下还能算 22µF 吗？</summary><div class="ans">不能，常只剩 50–70%，纹波与环路都要按实际容值重算。</div></details>
+    <details class="quiz"><summary>4. I2C 400kHz 的 t<sub>r</sub> 上限是多少？4.7k+100pF 合格吗？</summary><div class="ans">300ns；1.03µs 超标，不能用于 400kHz。</div></details>
+    <details class="quiz"><summary>5. 为什么时序余量要按 max+max 累加？</summary><div class="ans">最坏情况下两个器件都取最慢值，余量才是保证的；按 typ 估会在批量里翻车。</div></details>
+    <details class="quiz"><summary>6. 同一个 SOT-23-5 封装，LDO 能直接换另一家的吗？</summary><div class="ans">不能。脚位定义各厂不同，必须比对 Pin Configuration，否则 IN/OUT 接反。</div></details>
+
+    <div class="ch-nav">
+      <a href="c07.html"><span>上一章</span><b>← 2.7 接口与逻辑 IC</b></a>
+      <a class="nx" id="chNavNext" href="../p3/c01.html"><span>下一篇</span><b>第三篇 · 逐页读原理图 →</b></a>
+    </div>
+
+    <p style="margin-top:28px;font-size:13px;color:#7f90ad">第二篇到此结束：八类器件从「丝印怎么读」走到「规格书怎么用」。第三篇开始逐页拆 MINI 4 页 + CORE 8 页原理图，每页一章，逐个网络、逐颗器件说清取值理由。</p>
   </main>
 </div>
-<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
-<script>renderPart('p2','c08.html');</script>
-</body></html>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p2','c08.html');
+(function(){
+  function calc(){
+    var vref=+document.getElementById('vref').value, vtol=+document.getElementById('vtol').value/100;
+    var rt=+document.getElementById('rt').value, rtol=+document.getElementById('rtol').value/100;
+    document.getElementById('av').textContent=vref.toFixed(3);
+    document.getElementById('bv').textContent=(vtol*100).toFixed(1);
+    document.getElementById('cv').textContent=rt.toFixed(1);
+    document.getElementById('dv').textContent=(rtol*100).toFixed(2);
+    var rb=15, nom=vref*(1+rt/rb);
+    var lo=vref*(1-vtol)*(1+(rt*(1-rtol))/(rb*(1+rtol)));
+    var hi=vref*(1+vtol)*(1+(rt*(1+rtol))/(rb*(1-rtol)));
+    document.getElementById('dOut').innerHTML=
+      '<b style="color:#eaf3ff;font-size:15px">标称 '+nom.toFixed(2)+' V，最坏区间 '+lo.toFixed(2)+' – '+hi.toFixed(2)+' V</b><br>'+
+      '偏差 '+((hi-lo)/nom*100).toFixed(2)+'%（R<sub>bottom</sub> 固定按 15.0k 计）<br>'+
+      (Math.abs(hi-lo)>0.15?'<span style="color:#ff9c9c">超过 ±5% 的常见容差：后级器件可能超压或欠压，需 0.1% 电阻或标定。</span>':'<span style="color:#9df3c2">在常见容差范围内。</span>')+'<br>'+
+      '<span style="color:#6f7f9c;font-size:11.5px">这就是「min/max 思维」：不看 typ，只看两端；WCS（worst case）比 typ 更接近真实批量。</span>';
+  }
+  ['vref','vtol','rt','rtol'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+</body>
+</html>
