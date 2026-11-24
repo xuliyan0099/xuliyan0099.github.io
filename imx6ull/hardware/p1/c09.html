@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1.9 数字电平 | 第一篇 · 电学与器件基础 | i.MX6ULL 学习手册</title>
-<meta name="description" content="VIH/VIL/绝对最大额定、3.3V 与 5V 混接的四种处理、开漏与上拉、i.MX6ULL 的 IO 电压域约束。">
+<title>1.9 数字电平：3.3V 与 5V 到底能不能直连 | 第一篇 · 电学与器件基础 | i.MX6ULL 学习手册</title>
+<meta name="description" content="VOH/VOL、VIH/VIL、噪声容限与扇出，四种电平转换方案，以及板上 NVCC_SD 1.8/3.3V 切换、SGM3157 模拟开关的真实用法。">
 <link rel="stylesheet" href="../../assets/style.css">
 <link rel="stylesheet" href="../../assets/book.css">
 <link rel="stylesheet" href="../../assets/mobile.css">
@@ -18,135 +18,149 @@
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
 
 <div class="shell">
-  <aside id="sidebar">
-    <div class="vol-h">第一篇 · 电学与器件基础</div>
-    <ol id="sideList"></ol>
-    <div class="vol-nav" id="volNav"></div>
-  </aside>
-
+  <aside id="sidebar"><div class="vol-h">第一篇 · 电学与器件基础</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第一篇 · 电学基础</span><span class="sep">/</span>第 9 章<span class="sep">/</span>约 24 分钟</div>
-    <h1>数字电平：0 和 1 之间的那条线</h1>
-    <p class="lede">「3.3V 是 1、0V 是 0」只说对了一半。真正决定能不能通信的，是<b>输出方保证的高电平能不能达到输入方认定的高电平</b>——也就是 V<sub>OH</sub> &gt; V<sub>IH</sub>。这一章把这条规则落实到 MINI 板的几处混压接口上。</p>
+    <div class="ch-meta"><span class="lv">第一篇 · 电学基础</span><span class="sep">/</span>第 9 章<span class="sep">/</span>约 45 分钟</div>
+    <h1>数字电平：3.3V 与 5V 到底能不能直连</h1>
+    <p class="lede">「3.3V 输出接 5V 输入」不是看数字大小，而是看四个门限：<b>V<sub>OH</sub>、V<sub>OL</sub>、V<sub>IH</sub>、V<sub>IL</sub></b>。它们之间的余量叫噪声容限，决定了你的板子在温度、负载、干扰下还能不能可靠识别 0 和 1。这一章把四个门限讲清，再给四种电平转换方案，最后落到本板：SD 卡 1.8/3.3V 切换、SGM3157 模拟开关、DDR 1.35V。</p>
 
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>区分 V<sub>OH</sub>/V<sub>OL</sub>（输出保证）与 V<sub>IH</sub>/V<sub>IL</sub>（输入认定）</li>
-        <li>说出 5V 与 3.3V 互连的四种安全做法，并指出哪种最不可靠</li>
-        <li>解释开漏输出为什么必须配上拉，上拉值怎么定</li>
-        <li>在原理图上核对 CAN、USB 转串口、SD 卡这三处电平是否真的兼容</li>
+        <li>画出 V<sub>OH</sub>/V<sub>OL</sub>/V<sub>IH</sub>/V<sub>IL</sub> 四条线与噪声容限</li>
+        <li>判断「3.3V 驱动 5V TTL / 5V CMOS」是否可靠，并说清差在哪</li>
+        <li>给出四种电平转换方案及其代价（分压、MOS 双向、专用芯片、开漏上拉）</li>
+        <li>解释扇出、上升时间、负载电容对数字链路的影响</li>
+        <li>读懂板上 NVCC_SD 的 1.8V/3.3V 切换与 SGM3157 模拟开关的用途</li>
       </ol>
     </div>
 
-    <h2><span class="n">1.9.1</span>四个参数，一条不等式</h2>
+    <h2><span class="n">1.9.1</span>四个门限：数字世界的「判决线」</h2>
+    <p>数字接口的规范只关心四个电压：</p>
     <table>
-      <thead><tr><th>参数</th><th>含义</th><th>归属</th><th>典型（3.3V CMOS）</th></tr></thead>
+      <thead><tr><th>参数</th><th>含义</th><th>典型（3.3V CMOS）</th></tr></thead>
       <tbody>
-        <tr><td class="nm">V<sub>OH</sub></td><td>输出为高时，保证的最低电压（在指定电流下）</td><td>驱动器</td><td>≥ 2.4V（Io 较小时接近 3.3V）</td></tr>
-        <tr><td class="nm">V<sub>OL</sub></td><td>输出为低时，保证的最高电压</td><td>驱动器</td><td>≤ 0.4V</td></tr>
-        <tr><td class="nm">V<sub>IH</sub></td><td>被认定为高所需的最低输入电压</td><td>接收器</td><td>≥ 2.0V（部分 0.7×VDD）</td></tr>
-        <tr><td class="nm">V<sub>IL</sub></td><td>被认定为低所需的最高输入电压</td><td>接收器</td><td>≤ 0.8V</td></tr>
+        <tr><td class="nm">V<sub>OH</sub></td><td>输出高电平的最小值（带规定负载）</td><td>≥ V<sub>DD</sub>−0.4 ≈ 2.9V</td></tr>
+        <tr><td class="nm">V<sub>OL</sub></td><td>输出低电平的最大值</td><td>≤ 0.4V</td></tr>
+        <tr><td class="nm">V<sub>IH</sub></td><td>输入认「1」的最低电压</td><td>≥ 0.7×V<sub>DD</sub> ≈ 2.3V</td></tr>
+        <tr><td class="nm">V<sub>IL</sub></td><td>输入认「0」的最高电压</td><td>≤ 0.3×V<sub>DD</sub> ≈ 1.0V</td></tr>
       </tbody>
     </table>
-    <p>工程判据只有两条：<b>V<sub>OH(min)</sub> &gt; V<sub>IH(max)</sub></b>，<b>V<sub>OL(max)</sub> &lt; V<sub>IL(min)</sub></b>，并且<b>任何时候都不能超过接收器的绝对最大额定</b>（i.MX6ULL 的 IO 一般按 3.6V 级别，不是 5V 容忍）。</p>
+    <p>两个噪声容限：</p>
+    <p style="text-align:center">高电平容限 = V<sub>OH</sub> − V<sub>IH</sub> ≈ 2.9−2.3 = <b>0.6V</b><br>低电平容限 = V<sub>IL</sub> − V<sub>OL</sub> ≈ 1.0−0.4 = <b>0.6V</b></p>
+    <p>这就是「3.3V 系统能容忍 0.6V 干扰」的由来。凡是设计得当的接口，两个容限都不小于 0.3–0.5V；容限为负，就是「规范上就不保证」。</p>
 
-    <figure class="fig">
-      <svg viewBox="0 0 900 340" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <rect x="30" y="26" width="410" height="210" rx="10" fill="#141c2e" stroke="#3a4560"/>
-        <text x="46" y="52" fill="#eaf3ff" font-size="11.5">电平窗口：中间那段是「不确定区」</text>
-        <line x1="70" y1="90" x2="400" y2="90" stroke="#6f7f9c"/>
-        <line x1="70" y1="200" x2="400" y2="200" stroke="#6f7f9c"/>
-        <rect x="150" y="90" width="200" height="110" fill="rgba(255,184,77,.12)" stroke="rgba(255,184,77,.4)"/>
-        <text x="250" y="150" fill="#ffd79a" font-size="10" text-anchor="middle">禁止停留区</text>
-        <line x1="110" y1="130" x2="400" y2="130" stroke="#5ff1ef" stroke-dasharray="5 3"/>
-        <text x="76" y="126" fill="#9df5f4" font-size="9.5">VIH 2.0V</text>
-        <line x1="110" y1="176" x2="400" y2="176" stroke="#5ce1a0" stroke-dasharray="5 3"/>
-        <text x="76" y="190" fill="#9df3c2" font-size="9.5">VIL 0.8V</text>
-        <text x="70" y="222" fill="#9fb0c7" font-size="9">输入在 0.8–2.0V 之间时，芯片可能读到 0 也可能读到 1，而且会耗额外电流</text>
+    <h2><span class="n">1.9.2</span>3.3V → 5V：三种接收端的差别</h2>
+    <p>关键在接收端的 V<sub>IH</sub>：</p>
+    <ul>
+      <li><b>5V TTL</b>（老 74LS 系列）：V<sub>IH</sub> 固定 2.0V。3.3V 输出的 2.9V &gt; 2.0V → <b>可以直接驱动</b>。</li>
+      <li><b>5V CMOS</b>（74HC/HCT）：V<sub>IH</sub>=0.7×5=3.5V。3.3V 输出只有 2.9–3.3V → <b>不保证</b>，可能识别成 0 或抖动。HCT 系列是特例（TTL 门限，2.0V），可以兼容。</li>
+      <li><b>5V 容忍输入（5V-tolerant）</b>：手册明确写「输入可到 5.5V」，则 5V 器件可以直接驱动 3.3V 器件；但反过来 3.3V 驱动 5V CMOS 仍看 V<sub>IH</sub>。</li>
+    </ul>
+    <p><b>反方向（5V → 3.3V）更危险</b>：i.MX6ULL 的 GPIO 由 NVCC_GPIO=3.3V 供电，<b>不是 5V 容忍</b>。5V 直接灌进 IO，会经 ESD 二极管灌到 3.3V 轨，轻则抬压、重则烧 IO。必须做电平转换或至少串阻+钳位。</p>
 
-        <rect x="470" y="26" width="400" height="210" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
-        <text x="486" y="52" fill="#eaf3ff" font-size="11.5">5V 输出 → 3.3V 输入：四种做法</text>
-        <text x="486" y="80" fill="#9df3c2" font-size="10">① 分压（2k/3.3k）：便宜，但速度受 RC 限制</text>
-        <text x="486" y="104" fill="#9df3c2" font-size="10">② 串阻 + 钳位：靠接收器内部 ESD 二极管，不推荐</text>
-        <text x="486" y="128" fill="#9df3c2" font-size="10">③ MOS 电平转换：双向、速度快、成本略高</text>
-        <text x="486" y="152" fill="#9df3c2" font-size="10">④ 专用电平转换芯片：最稳，适合总线</text>
-        <text x="486" y="182" fill="#ff9c9c" font-size="10">最不可靠：直接连</text>
-        <text x="486" y="204" fill="#9fb0c7" font-size="9.5">5V 高电平会通过 ESD 二极管灌入 3.3V 域，长期损伤 IO</text>
-
-        <text x="30" y="272" fill="#9fb0c7" font-size="10.5">开漏输出只主动拉低、不主动拉高，所以必须外部上拉；上拉电阻与总线电容共同决定上升时间。</text>
-        <text x="30" y="296" fill="#6f7f9c" font-size="10">判据：I2C 400kHz 下，4.7k 上拉 + 100pF 总线电容，上升时间约 0.7×R×C ≈ 0.33µs，仍小于 300ns 级限值的一半余量。</text>
-      </svg>
-      <figcaption><b>图 1-8</b>　电平窗口与 5V→3.3V 的四种处理方式。</figcaption>
-    </figure>
-
-    <h2><span class="n">1.9.2</span>开漏与上拉：为什么 I2C 必须 4.7k</h2>
-    <p>I2C 的 SDA/SCL 是<b>开漏</b>：任何设备只能拉低，不能拉高。高电平完全靠上拉电阻。MINI 板第 1 页的 <b>R40 / R42 / R57（4.7k）</b>就是干这个的，分别挂在 I2C1/I2C2 上。</p>
-    <p>上拉值太小 → 拉低时耗电大（I = V/R，4.7k 在 3.3V 下约 0.7mA，可接受；1k 就是 3.3mA，多设备时浪费）；上拉太大 → 上升沿变慢，400kHz 下可能读错。经验值：<b>100kHz 用 4.7k–10k，400kHz 用 2.2k–4.7k</b>，总线电容大时取小。</p>
-
-    <h2><span class="n">1.9.3</span>在 MINI 板上核对三处混压接口</h2>
+    <h2><span class="n">1.9.3</span>四种电平转换方案</h2>
     <table>
-      <thead><tr><th>接口</th><th>器件与供电</th><th>信号方向</th><th>要核对什么</th></tr></thead>
+      <thead><tr><th>方案</th><th>适用</th><th>代价 / 风险</th></tr></thead>
       <tbody>
-        <tr><td>CAN</td><td>U5 TJA1050，VCC=5V</td><td>TXD 由 SoC 3.3V 驱动；RXD 回 SoC</td><td>TJA1050 的 V<sub>IH</sub> 最低 2.0V，3.3V 驱动没问题；<b>RXD 高电平接近 VCC</b>，回灌 3.3V IO 前必须有分压/串阻或选用 3.3V 兼容型号——这是读图时最该盯的一处</td></tr>
-        <tr><td>USB 转串口</td><td>U7（CH340 类），3.3V 供电</td><td>双向</td><td>VCC 接 3.3V 时 IO 电平即 3.3V，可直接连；若接 5V 就必须转换</td></tr>
-        <tr><td>SD 卡</td><td>TF 座，NVCC_SD 可 1.8/3.3V 切换</td><td>双向</td><td>卡在 1.8V 模式时，上拉必须跟着切到 1.8V，不能固定接 3.3V</td></tr>
+        <tr><td class="nm">电阻分压</td><td>单向、低速（&lt;100kHz）</td><td>高电平被压低、上升沿变慢、功耗常驻</td></tr>
+        <tr><td class="nm">MOS 双向</td><td>I2C 等双向开漏总线</td><td>需要两侧上拉；速率受 RC 限制</td></tr>
+        <tr><td class="nm">专用电平转换芯片</td><td>高速、多路、双向</td><td>成本、要选对方向与速率</td></tr>
+        <tr><td class="nm">开漏 + 上拉到目标电压</td><td>单向/双向、低速</td><td>只能拉低，高电平靠上拉；速率受 RC 限制</td></tr>
       </tbody>
     </table>
+    <p>算例：5V → 3.3V 用 10k/20k 分压，得到 5×20/30=3.33V，看似刚好；但接收端 V<sub>IH</sub>=2.3V，余量只有 1V，且分压电阻与线容构成 RC，100kHz 以上边沿就圆了。<b>分压只适合「慢速、单向、不关键」的信号。</b></p>
+    <p>MOS 双向转换的经典结构：一个 NMOS，栅极接 3.3V，源极接 3.3V 侧、漏极接 5V 侧，两侧各加上拉。3.3V 侧拉低时，MOS 体二极管先导通把 5V 侧拉低，然后沟道建立，双方都到低；5V 侧拉低时同理。它的巧妙之处是<b>自动识别方向</b>，I2C 常用这个结构。</p>
+
+    <h2><span class="n">1.9.4</span>扇出、上升时间与负载电容</h2>
+    <p>一个输出能带几个输入，取决于<b>电流能力</b>与<b>电容负载</b>：</p>
+    <ul>
+      <li><b>直流扇出</b>：I<sub>OH</sub>/I<sub>IH</sub> 与 I<sub>OL</sub>/I<sub>IL</sub> 取小者。CMOS 输入几乎不吸电流，所以扇出可以很大；TTL 输入要吸 0.4–1.6mA，扇出就小。</li>
+      <li><b>交流扇出</b>：每个输入有 3–10pF 电容，走线也有电容；t<sub>r</sub>≈2.2RC 会随负载增大而变慢，超过协议上限就出错。</li>
+      <li><b>驱动强度可调</b>：SoC 的 IO 通常可配驱动电流（如 4/8/12/16mA），强驱动边沿快但 EMI 大。</li>
+    </ul>
+    <p>本板的 I2C 就是典型：4.7k 上拉 + 100pF 总线电容，t<sub>r</sub>≈1µs，100kHz 勉强、400kHz 不行（第 1.2 章算过）。</p>
+
+    <h2><span class="n">1.9.5</span>本板的三个真实电平场景</h2>
+    <h3>① SD 卡：1.8V 与 3.3V 切换（NVCC_SD）</h3>
+    <p>U9（TMI6030）的输出不是固定 3.3V，而是由 <b>SD1_VSELECT</b> 选择：VSELECT=0 时约 3.27V，=1 时约 1.81V（CORE p1 上就印着这两个数）。原因：SD 3.0 规范在高速模式下要求 1.8V 信号，卡初始化用 3.3V，切到高速再降到 1.8V。<b>同一组引脚，两种电平</b>——这是「电平不是常量」的最好例子。</p>
+    <h3>② UART 调试口：SGM3157 模拟开关</h3>
+    <p>MINI p4 用 U12/U13（SGM3157，单刀双掷模拟开关）把 CH340 的 TX/RX 在 UART1 与 UART3 之间切换。模拟开关不是电平转换，它只是「换线」，但要求<b>信号幅度在它的供电范围内</b>（3.3V 供电、信号 0–3.3V），否则会削顶或漏电。</p>
+    <h3>③ DDR：1.35V 域</h3>
+    <p>DDR3L 的 IO 是 1.35V，与 3.3V 域之间没有直接连线（SoC 内部有专用 DDR 接口）。读图时看到 DRAM_* 网络，就不要指望它和 GPIO 直连——它们属于不同的电平域。</p>
+
+    <h2><span class="n">1.9.6</span>怎么测：示波器看边沿，万用表只能看「平均」</h2>
+    <ol class="steps">
+      <li><b>示波器</b>：看 V<sub>OH</sub>/V<sub>OL</sub> 实际值、上升时间、过冲/振铃。探头要短地线，否则你看到的是探头振铃而不是电路。</li>
+      <li><b>万用表</b>：只能测「平均电压」。一个 1MHz、50% 占空的方波，万用表读到 1.65V——<b>不要用它判断数字电平</b>。</li>
+      <li><b>逻辑分析仪</b>：看协议层的 0/1 与时序，比示波器更适合排查「偶尔错一位」。</li>
+    </ol>
+    <p>一个实用判据：如果 V<sub>OH</sub> 实测只有 2.4V（规范 2.9V），先怀疑<b>负载过重/上拉冲突/驱动能力配置过低</b>，而不是接收端坏了。</p>
+
     <div class="box pit">
-      <h5>最常见的三个电平事故</h5>
-      <p><b>1. 拿 5V 传感器直接接 GPIO。</b>短时间「能用」，几个月后 IO 漏电、ADC 读数漂移。</p>
-      <p><b>2. 双向总线只做单向转换。</b>TX 方向转了，RX 方向没转，通信「只能发不能收」。</p>
-      <p><b>3. 上拉接到了错误的电压域。</b>1.8V 模式的 SD 卡上拉到 3.3V，会经 ESD 二极管持续灌电。</p>
+      <h5>三个常见事故</h5>
+      <p>① <b>5V 传感器直接接 3.3V GPIO</b>：开机瞬间 IO 被灌到 4.5V，ESD 二极管长期导通，几个月后 IO 失效。</p>
+      <p>② <b>用万用表判断 UART 是否有数据</b>：读到 1.6V 就以为「坏了」，其实是在正常翻转。</p>
+      <p>③ <b>I2C 上拉接到 5V</b>：3.3V 器件输入被拉到 5V，靠内部钳位硬扛，长期漏电发热。</p>
     </div>
 
     <div class="demo">
-      <div class="dh"><b>电平兼容判断器</b><span>输入驱动与接收器参数，直接给结论</span></div>
+      <div class="dh"><b>噪声容限与电平兼容判断器</b><span>选驱动/接收电平，直接算两个容限与是否兼容</span></div>
       <div class="db">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-          <div><div style="font-size:12px;color:#9fb0c7">驱动 VOH = <b id="ohv" style="color:#5ff1ef">3.3</b> V</div><input id="oh" type="range" min="1.5" max="5.5" step="0.1" value="3.3" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12px;color:#9fb0c7">接收 VIH = <b id="ihv" style="color:#5ff1ef">2.0</b> V</div><input id="ih" type="range" min="0.6" max="4.5" step="0.1" value="2.0" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12px;color:#9fb0c7">接收绝对最大 = <b id="amv" style="color:#5ff1ef">3.6</b> V</div><input id="am" type="range" min="1.8" max="6" step="0.1" value="3.6" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">驱动器 V<sub>DD</sub> <b id="v1v" style="color:#5ff1ef">3.3</b> V</div><input id="v1" type="range" min="1.2" max="5.5" step="0.05" value="3.3" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">接收器 V<sub>DD</sub> <b id="v2v" style="color:#5ff1ef">5.0</b> V</div><input id="v2" type="range" min="1.2" max="5.5" step="0.05" value="5" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">接收器类型
+            <select id="typ" style="background:#0a1020;color:#5ff1ef;border:1px solid #2a3a55;border-radius:6px;padding:2px 4px">
+              <option value="cmos">CMOS（0.7/0.3 VDD）</option>
+              <option value="ttl">TTL（2.0/0.8V 固定）</option>
+            </select></div></div>
         </div>
         <div id="lvOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
       </div>
     </div>
 
-    <h3>自测</h3>
-    <details class="quiz"><summary>5V 器件输出高 4.8V，3.3V 芯片 VIH=2.0V、绝对最大 3.6V，能直连吗？</summary><div class="ans">不能。虽然「认得出高」，但 4.8V 超过绝对最大额定 3.6V，电流会经 ESD 二极管灌入 3.3V 域，属于长期损伤。必须分压、串阻+钳位或用电平转换。</div></details>
-    <details class="quiz"><summary>I2C 上拉从 4.7k 改成 47k 会怎样？</summary><div class="ans">上升沿变慢约 10 倍，400kHz 下可能还没升到 VIH 就被采样，通信随机失败；同时抗干扰变差。代价是省电（拉低电流从 0.7mA 降到 0.07mA）。</div></details>
-    <details class="quiz"><summary>为什么开漏输出不能省上拉？</summary><div class="ans">因为开漏只有一个下拉管，关断时输出是高阻，没有器件把线拉高。不加上拉，线就「浮空」，读数不确定。</div></details>
+    <h2><span class="n">1.9.7</span>四个设计误区</h2>
+    <ol>
+      <li><b>只看「3.3 &lt; 5」，不看门限。</b>TTL 能收、CMOS 不一定能收。</li>
+      <li><b>忽略 5V 容忍性。</b>i.MX6ULL 的 IO 不是 5V 容忍。</li>
+      <li><b>上拉电压与器件电源不一致。</b>I2C 上拉到 5V，3.3V 器件被过压。</li>
+      <li><b>用万用表测翻转信号。</b>读到的是平均值，不是电平。</li>
+    </ol>
 
-    <div class="ch-nav">
-      <a href="c08.html"><span>上一章</span><b>← 1.8 运放与比较器</b></a>
-      <a class="nx" id="chNavNext" href="c10.html"><span>下一章</span><b>1.10 四种小电阻 →</b></a>
-    </div>
+    <h3>练习（答案在折叠里）</h3>
+    <details class="quiz"><summary>1. 3.3V CMOS 输出（V<sub>OH</sub>=2.9V）驱动 5V CMOS（V<sub>IH</sub>=3.5V），兼容吗？</summary><div class="ans">不兼容：2.9 &lt; 3.5，接收端可能识别不出高电平；需电平转换或选 HCT（TTL 门限）器件。</div></details>
+    <details class="quiz"><summary>2. 3.3V 输出驱动 5V TTL（V<sub>IH</sub>=2.0V）呢？</summary><div class="ans">兼容，余量 0.9V。</div></details>
+    <details class="quiz"><summary>3. 5V 信号直接接 i.MX6ULL GPIO 会怎样？</summary><div class="ans">IO 非 5V 容忍，5V 会经 ESD 二极管灌入 3.3V 轨，可能抬高电源、损坏 IO。</div></details>
+    <details class="quiz"><summary>4. NVCC_SD 在 VSELECT=0/1 时分别是多少？为什么？</summary><div class="ans">约 3.27V / 1.81V；SD 初始化用 3.3V，高速模式切 1.8V。</div></details>
+    <details class="quiz"><summary>5. 4.7k 上拉、100pF 总线，t<sub>r</sub> 多少？能跑 400kHz 吗？</summary><div class="ans">2.2RC≈1.03µs；400kHz 规范上限 300ns，不行。</div></details>
+    <details class="quiz"><summary>6. 万用表测 UART TX 读到 1.6V，说明什么？</summary><div class="ans">多半是 50% 占空的方波平均值，信号在正常翻转；要用示波器/逻辑分析仪判断。</div></details>
+
+    <div class="ch-nav"><a href="c08.html"><span>上一章</span><b>← 1.8 运放与比较器</b></a>
+      <a class="nx" id="chNavNext" href="c10.html"><span>下一章</span><b>1.10 四种小电阻 →</b></a></div>
   </main>
 </div>
-
-<script src="../../assets/parts.js"></script>
-<script src="../../assets/part.js"></script>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
 <script>
 renderPart('p1','c09.html');
 (function(){
   function calc(){
-    var oh=+document.getElementById('oh').value, ih=+document.getElementById('ih').value, am=+document.getElementById('am').value;
-    document.getElementById('ohv').textContent=oh.toFixed(1);
-    document.getElementById('ihv').textContent=ih.toFixed(1);
-    document.getElementById('amv').textContent=am.toFixed(1);
-    var okLevel = oh>ih, okAbs = oh<=am, margin=(oh-ih);
-    var color = (okLevel&&okAbs)?'#9df3c2':(okAbs?'#ffd79a':'#ff9c9c');
-    var verdict = (!okAbs) ? '不安全：驱动高电平超过接收器绝对最大额定，必须做电平转换'
-                : (!okLevel ? '逻辑不兼容：达不到 VIH，接收器可能读成 0'
-                : '可直接连接');
+    var v1=+document.getElementById('v1').value, v2=+document.getElementById('v2').value, typ=document.getElementById('typ').value;
+    document.getElementById('v1v').textContent=v1.toFixed(2);
+    document.getElementById('v2v').textContent=v2.toFixed(2);
+    var voh=v1-0.4, vol=0.4;
+    var vih = typ==='ttl'?2.0:0.7*v2, vil = typ==='ttl'?0.8:0.3*v2;
+    var nh=voh-vih, nl=vil-vol;
+    var ok=nh>0 && nl>0;
     document.getElementById('lvOut').innerHTML=
-      '<b style="color:'+color+';font-size:15px">'+verdict+'</b><br>'+
-      '逻辑余量 VOH−VIH = '+margin.toFixed(2)+' V　'+(okAbs?('距绝对最大还有 '+(am-oh).toFixed(2)+' V'):'超出绝对最大 '+(oh-am).toFixed(2)+' V')+'<br>'+
-      '<span style="color:#6f7f9c;font-size:11.5px">工程习惯：逻辑余量建议 ≥0.3V；电压余量建议 ≥10%，高速信号还要看上升时间与总线电容。</span>';
+      '<b style="color:#eaf3ff;font-size:15px">高容限 '+nh.toFixed(2)+' V　低容限 '+nl.toFixed(2)+' V　'+(ok?'<span style="color:#9df3c2">兼容</span>':'<span style="color:#ff9c9c">不保证</span>')+'</b><br>'+
+      '驱动 V<sub>OH</sub>≈'+voh.toFixed(2)+'V，V<sub>OL</sub>≈'+vol.toFixed(2)+'V；接收 V<sub>IH</sub>='+vih.toFixed(2)+'V，V<sub>IL</sub>='+vil.toFixed(2)+'V<br>'+
+      (nh>0.3?'高电平余量充足。':'高电平余量偏小：考虑电平转换/上拉到接收端电压。')+'<br>'+
+      '<span style="color:#6f7f9c;font-size:11.5px">这是直流门限；高速时还要看上升时间、过冲与容性负载。</span>';
   }
-  ['oh','ih','am'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  ['v1','v2'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  document.getElementById('typ').addEventListener('change',calc);
   calc();
 })();
 </script>
-</body>
-</html>
+</body></html>

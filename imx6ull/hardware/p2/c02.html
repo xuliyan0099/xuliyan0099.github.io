@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>2.2 电容 | 第二篇 · 元器件深度解剖 | i.MX6ULL 学习手册</title>
-<meta name="description" content="MLCC 材质 C0G/X7R/X5R/Y5V、直流偏压降容、ESR 与自谐振、钽与聚合物、22µF+0.1µF 的真实原因。">
+<title>2.2 电容：介质代码、直流偏压降容、自谐振 | 第二篇 · 元器件深度解剖 | i.MX6ULL 学习手册</title>
+<meta name="description" content="X7R 到底是什么意思、22µF 为什么在 3.3V 下只剩一半、0.1µF 与 22µF 并联的反谐振峰在哪；用本板 C12/C21/C29/C32/C24 算清。">
 <link rel="stylesheet" href="../../assets/style.css">
 <link rel="stylesheet" href="../../assets/book.css">
 <link rel="stylesheet" href="../../assets/mobile.css">
@@ -20,130 +20,164 @@
 <div class="shell">
   <aside id="sidebar"><div class="vol-h">第二篇 · 元器件深度解剖</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第二篇 · 元器件</span><span class="sep">/</span>第 2 章<span class="sep">/</span>约 28 分钟</div>
-    <h1>电容：容值只是开始</h1>
-    <p class="lede">标称 10µF 的 0402 电容，在 3.3V 直流偏压下可能只剩 4µF——这就是为什么「图纸上一个 22µF 就够」的电源，实测纹波却超标。<b>电容的真实容值取决于材质、封装、偏压、温度和频率</b>。这一章把五个变量逐个讲清。</p>
-    <figure class="fig">
-      <img src="../../assets/img/parts/cap_mlcc.jpg" alt="0603 多层陶瓷电容实拍" loading="lazy">
-      <figcaption><b>实拍 · 2.2a</b>　0603 多层陶瓷电容（MLCC）。<b>本体上没有丝印</b>，容量、耐压、介质（C0G/X5R/X7R）全在料盘标签与料号里——这是电容与电阻最大的差别：电阻能读码，电容只能查 BOM。两端亮色是镍/锡镀层，中间是陶瓷体；同封装下容量越大、耐压越高，介质层越薄，机械应力下越容易裂。</figcaption>
-    </figure>
+    <div class="ch-meta"><span class="lv">第二篇 · 元器件</span><span class="sep">/</span>第 2 章<span class="sep">/</span>约 55 分钟</div>
+    <h1>电容：介质代码、直流偏压降容、自谐振</h1>
+    <p class="lede">电容是「写着 22µF，实际只有 11µF」的器件。三个原因：<b>介质代码决定温漂、直流偏压吃掉容值、ESL 决定它从哪个频率开始失效</b>。所以电源上永远不是一个容值，而是一串容值并联。这一章把 X5R/X7R 代码、降容曲线、自谐振频率、反谐振峰逐个算出来，再落到本板 C12、C21–C23、C29、C32。</p>
 
-    <figure class="fig">
-      <img src="../../assets/img/parts/ecap_smd.jpg" alt="贴片铝电解电容实拍" loading="lazy">
-      <figcaption><b>实拍 · 2.2b</b>　贴片铝电解电容。<b>顶部黑色半圆 = 负极</b>，丝印「220 / 35V」= 220µF/35V。它与 MLCC 是两种东西：容量大（µF–mF）、耐压高，但 ESR 大、寿命随温度指数下降（105°C/2000h 是常见规格），纹波电流有硬上限。板上输入 47µF/25V 就是它。</figcaption>
-    </figure>
-
+    <div class="photo">
+      <figure class="fig"><img src="../../assets/img/parts/cap_mlcc.jpg" alt="MLCC 贴片陶瓷电容实拍" loading="lazy"><figcaption><b>实拍 · MLCC</b>　无丝印、只有颜色。0603 的 1µF 与 0.1µF 外观完全一样，<b>只能靠包装标签或 LCR 表分辨</b>——这是贴片电容最容易混料的地方。</figcaption></figure>
+      <figure class="fig"><img src="../../assets/img/parts/ecap_smd.jpg" alt="贴片铝电解电容 220µF/35V" loading="lazy"><figcaption><b>实拍 · 铝电解</b>　「220 35V」大字 + <b>黑色半圆/色带 = 负极</b>。装反会鼓包、爆浆。铝电解的 ESR 比 MLCC 大一个量级，但容量/价格比高。</figcaption></figure>
+    </div>
 
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>根据容值与稳定性要求，从 C0G / X7R / X5R / Y5V 中选出正确材质</li>
-        <li>解释 22µF 与 0.1µF 并联为什么不能只留一个</li>
-        <li>说出 ESR、ESL 与自谐振频率的关系，判断一颗电容在目标频率上还有没有用</li>
-        <li>知道钽电容与聚合物电容的失效模式，以及为什么钽必须降额 50%</li>
+        <li>把 X7R / X5R / Y5V / C0G 的字母数字拆成「温度范围 + 容差」</li>
+        <li>估算某容值在某直流偏压下还剩多少（降容），并解释为什么封装与耐压影响很大</li>
+        <li>算出一颗电容的自谐振频率，判断它在目标频率上还是「电容」还是「电感」</li>
+        <li>解释 22µF + 0.1µF 并联的反谐振峰，以及怎么用第三个容值压平</li>
+        <li>区分铝电解、钽、聚合物电容的失效模式与降额规则</li>
       </ol>
     </div>
 
-    <h2><span class="n">2.2.1</span>四种材质：先看介质，再看容值</h2>
+    <h2><span class="n">2.2.1</span>介质代码：X7R 三个字符各有含义</h2>
+    <p>「X7R」不是型号，是 EIA 的温度特性代码：</p>
     <table>
-      <thead><tr><th>材质</th><th>容值范围</th><th>容差</th><th>温度特性</th><th>用途</th></tr></thead>
+      <thead><tr><th>代码</th><th>低温</th><th>高温</th><th>容值变化</th></tr></thead>
       <tbody>
-        <tr><td class="nm">C0G / NP0</td><td>1pF–100nF</td><td>±1–5%</td><td>极稳（±30ppm/°C）</td><td>晶振负载电容、滤波、定时、谐振</td></tr>
-        <tr><td class="nm">X7R</td><td>1nF–10µF</td><td>±10–20%</td><td>−55~125°C，±15%</td><td>通用去耦、旁路</td></tr>
-        <tr><td class="nm">X5R</td><td>100nF–100µF</td><td>±20%</td><td>−55~85°C，±15%</td><td>大容量去耦、DC-DC 输出</td></tr>
-        <tr><td class="nm">Y5V</td><td>10nF–10µF</td><td>−20~+80%</td><td>−30~85°C，极差</td><td>只适合对容值不敏感的场合，慎用</td></tr>
+        <tr><td class="nm">C0G / NP0</td><td>−55°C</td><td>+125°C</td><td>±30ppm/°C（几乎不变）</td></tr>
+        <tr><td class="nm">X7R</td><td>−55°C</td><td>+125°C</td><td>±15%</td></tr>
+        <tr><td class="nm">X5R</td><td>−55°C</td><td>+85°C</td><td>±15%</td></tr>
+        <tr><td class="nm">Y5V</td><td>−30°C</td><td>+85°C</td><td>+22%/−82%</td></tr>
       </tbody>
     </table>
-    <p>MINI 板第 1 页的 <b>C12 / C13（18pF）</b>挂在 24MHz 晶振两端，必须是 <b>C0G</b>：晶振的负载电容精度直接决定频偏，X7R 的 ±15% 会让频偏超出规格。</p>
+    <p>解读规则：第一个字母给低温，数字给高温（5=85°C、7=125°C、6=105°C），第二个字母给容差（R=±15%、V=+22/−82%）。所以 <b>X7R = −55~125°C、±15%</b>；X5R 只是上限低到 85°C，容差一样。</p>
+    <p><b>关键区分</b>：C0G 是「I 类」——容值由几何尺寸决定，几乎不随温度/电压/时间变；X7R/X5R/Y5V 是「II 类」——靠高介电常数陶瓷（BaTiO₃）堆容量，代价就是容值随温度、偏压、老化都变。<b>定时、谐振、滤波（要求精确截止频率）必须 C0G；去耦、旁路可以用 X7R。</b></p>
+    <p>本板 <b>C12/C14 18pF</b> 挂在 24MHz 晶振两端，图上标的就是 C0G。若换成 X7R，±15% 的容值误差直接把晶振频率拉到规格外——晶振厂给的负载电容是「必须精确」的参数。</p>
 
-    <div class="box deep">
-      <h5>直流偏压降容：最容易踩的坑</h5>
-      <p>高介电常数材质（X5R/X7R）在直流电场下极化被「钉住」，有效容值下降。经验数据（0402/0603 封装）：</p>
-      <ul>
-        <li>10µF / 6.3V X5R，在 3.3V 偏压下常只剩 <b>40–60%</b>；</li>
-        <li>22µF / 6.3V 在 3.3V 下剩 <b>50–70%</b>；</li>
-        <li>10µF / 25V 在 3.3V 下几乎不掉（电压余量大）；</li>
-        <li>同容值下，<b>封装越大、耐压越高，降容越小</b>。</li>
-      </ul>
-      <p>所以「用 6.3V 耐压的 10µF 做 3.3V 电源输出」是最常见的隐性失效：纹波算出来没问题，实测却超标一倍。</p>
-    </div>
+    <h2><span class="n">2.2.2</span>直流偏压降容：22µF 变 11µF</h2>
+    <p>II 类陶瓷在直流电场下畴壁被钉住，介电常数下降。 datasheet 里那条「Capacitance vs DC Bias」曲线常被忽略：</p>
+    <table>
+      <thead><tr><th>器件</th><th>在 3.3V 偏压下剩余容量</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">10µF / 6.3V X5R 0603</td><td>约 40–60%</td><td>最坏只剩一半</td></tr>
+        <tr><td class="nm">22µF / 6.3V X5R 0805</td><td>约 50–70%</td><td>本板 C24 就是这一类</td></tr>
+        <tr><td class="nm">22µF / 16V X5R 1206</td><td>约 80–90%</td><td>耐压余量大，降容小</td></tr>
+        <tr><td class="nm">10µF / 25V X7R 1210</td><td>≈95%</td><td>大封装 + 高耐压</td></tr>
+      </tbody>
+    </table>
+    <p>规律：<b>同样容值，封装越大、耐压越高，降容越小</b>（电场强度低）。这也是为什么「用小封装大容量」在电源设计里经常翻车——你以为放了 22µF，实际只有 11µF，纹波按两倍算才对得上实测。</p>
+    <p>算例：本板 DCDC_3V3（U4）输出端 <b>C29 470µF 铝电解 + C28 104 + C24? 22µF</b>。铝电解不受直流偏压影响（但 ESR 大），22µF 陶瓷负责高频，104 负责更高频——三者分工不同，缺一个都会在某段频率上阻抗抬高。</p>
+
+    <h2><span class="n">2.2.3</span>ESR、ESL 与自谐振：电容什么时候变成电感</h2>
+    <p>真实电容的模型是 <b>C + ESR + ESL 串联</b>。阻抗：</p>
+    <p style="text-align:center">|Z| = √(ESR² + (2πfL − 1/(2πfC))²)</p>
+    <p>在 <b>f<sub>0</sub>=1/(2π√(LC))</b> 处虚部抵消，阻抗最低（只剩 ESR）；超过 f<sub>0</sub> 后呈感性，阻抗又上升。<b>「0.1µF 能滤 100MHz」是错的——它在几十 MHz 就变成电感了。</b></p>
+    <p>算例：</p>
+    <ul>
+      <li>10µF 0805，ESL≈1nH：f<sub>0</sub>=1/(2π√(1nH×10µF))≈<b>1.6MHz</b>。它在 1MHz 以下才是「电容」。</li>
+      <li>0.1µF 0402，ESL≈0.5nH：f<sub>0</sub>≈<b>22MHz</b>。</li>
+      <li>18pF 0402，ESL≈0.5nH：f<sub>0</sub>≈<b>1.7GHz</b>——所以小容值适合射频旁路。</li>
+    </ul>
+    <p>结论：<b>容值越小，自谐振越高</b>。要覆盖宽频段，必须多个容值并联，让每颗在自己那段「低于 f<sub>0</sub>」的区间工作。</p>
+
+    <h2><span class="n">2.2.4</span>并联的反谐振：两个容值之间有个坑</h2>
+    <p>22µF（f<sub>0</sub>≈1MHz）与 0.1µF（f<sub>0</sub>≈22MHz）并联，在两者之间会形成一个<b>反谐振峰</b>：22µF 已呈感性、0.1µF 仍呈容性，两者并联近似 LC 并联谐振，阻抗出现尖峰（可能比单颗还高）。</p>
+    <p>位置估算：f<sub>anti</sub>≈1/(2π√(L<sub>22µ</sub>×C<sub>0.1µ</sub>))=1/(2π√(1nH×0.1µF))≈<b>16MHz</b>。这个频率上，你的去耦网络比只有一颗电容时更差。</p>
+    <p>解法有三：① 加中间容值（如 1µF）把峰削平；② 选 ESL 更小的封装（0402）；③ 在关键频率上用<b>平面电容/埋容</b>。工程上「10µF + 1µF + 0.1µF + 1nF」四级并联是常见配方，就是为了把反谐振峰压到可接受水平。</p>
 
     <figure class="fig">
-      <svg viewBox="0 0 900 380" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <rect x="30" y="26" width="400" height="220" rx="10" fill="#141c2e" stroke="#3a4560"/>
-        <text x="46" y="52" fill="#eaf3ff" font-size="11.5">阻抗随频率：每颗电容只在自己那段有用</text>
-        <line x1="70" y1="200" x2="400" y2="200" stroke="#3a4560"/>
-        <line x1="70" y1="80" x2="70" y2="200" stroke="#3a4560"/>
-        <text x="52" y="84" fill="#6f7f9c" font-size="9">|Z|</text>
-        <text x="390" y="216" fill="#6f7f9c" font-size="9">f</text>
-        <path d="M80 100 C 130 105 160 150 190 172 C 210 182 230 172 260 150 C 300 120 350 108 395 104" stroke="#5ff1ef" stroke-width="2" fill="none"/>
-        <line x1="196" y1="80" x2="196" y2="200" stroke="#ffb84d" stroke-dasharray="4 3"/>
-        <text x="150" y="76" fill="#ffd79a" font-size="9">自谐振 f0</text>
-        <text x="86" y="140" fill="#9fb0c7" font-size="9">容性段：越往低频阻抗越高</text>
-        <text x="250" y="140" fill="#9fb0c7" font-size="9">感性段：ESL 主导，频率越高越差</text>
-        <text x="86" y="228" fill="#9fb0c7" font-size="10">谷底 ≈ ESR。谷底越深、越宽，滤波越有效。</text>
+      <svg viewBox="0 0 900 360" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="24" y="20" width="860" height="240" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="44" y="46" fill="#eaf3ff" font-size="11.5">|Z| 随频率：单颗 vs 两级并联 vs 三级并联</text>
+        <line x1="80" y1="230" x2="850" y2="230" stroke="#2a3a55"/>
+        <line x1="80" y1="60" x2="80" y2="230" stroke="#2a3a55"/>
+        <text x="60" y="64" fill="#6f7f9c" font-size="9">|Z|</text>
+        <text x="836" y="246" fill="#6f7f9c" font-size="9">f</text>
+        <text x="96" y="246" fill="#6f7f9c" font-size="8.5">10kHz</text>
+        <text x="300" y="246" fill="#6f7f9c" font-size="8.5">1MHz</text>
+        <text x="520" y="246" fill="#6f7f9c" font-size="8.5">20MHz</text>
+        <text x="740" y="246" fill="#6f7f9c" font-size="8.5">200MHz</text>
 
-        <rect x="460" y="26" width="410" height="220" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
-        <text x="476" y="52" fill="#eaf3ff" font-size="11.5">为什么 22µF 与 0.1µF 要并联</text>
-        <text x="476" y="84" fill="#9df5f4" font-size="10">22µF（1206 X5R）</text>
-        <text x="476" y="102" fill="#9fb0c7" font-size="9.5">ESL 较大 → f0 低（几十 kHz–1MHz 级）</text>
-        <text x="476" y="120" fill="#9fb0c7" font-size="9.5">管低频段的大电流（负载跳变、纹波基频）</text>
-        <text x="476" y="152" fill="#9df5f4" font-size="10">0.1µF（0402 X7R）</text>
-        <text x="476" y="170" fill="#9fb0c7" font-size="9.5">封装小、ESL 小 → f0 高（几十 MHz 级）</text>
-        <text x="476" y="188" fill="#9fb0c7" font-size="9.5">管高频段（开关边沿、数字翻转的 di/dt）</text>
-        <text x="476" y="216" fill="#ff9c9c" font-size="9.5">去掉任何一颗，都会留下一个阻抗峰</text>
-        <text x="476" y="238" fill="#6f7f9c" font-size="9">本质：不是「容值叠加」，是「频率分工」</text>
-
-        <text x="30" y="286" fill="#9fb0c7" font-size="10.5">VREF 上的 2µF（C65）为什么不用 0.1µF：DDR 参考电压是直流慢变信号，要的是「稳」而不是「快」，大容值把噪声积分掉。</text>
-        <text x="30" y="310" fill="#6f7f9c" font-size="10">而复位脚 C14 的 104（0.1µF）要的是「快速吸收尖峰」，所以选小封装高谐振频率。</text>
-        <text x="30" y="338" fill="#ff9c9c" font-size="10">反例：把 0.1µF 全部换成 10µF，低频纹波更好但高频尖峰反而变差——因为大容值封装大、ESL 高。</text>
+        <path d="M86 92 C 130 120 170 190 205 208 C 220 214 240 200 270 160 C 320 110 420 92 560 88 C 700 84 800 96 848 110" stroke="#9fb0c7" stroke-width="1.6" fill="none" stroke-dasharray="5 4"/>
+        <path d="M86 98 C 140 130 180 200 212 210 C 235 214 258 178 282 150 C 320 118 360 96 395 92 C 430 96 452 130 470 150 C 500 160 520 120 560 104 C 650 96 780 100 848 108" stroke="#5ff1ef" stroke-width="2" fill="none"/>
+        <path d="M86 100 C 150 135 190 205 215 212 C 240 214 262 176 290 148 C 330 116 370 94 400 92 C 430 98 450 128 468 148 C 498 158 516 120 540 106 C 570 100 600 98 630 100 C 660 104 680 128 700 146 C 730 156 760 120 800 108 C 820 104 840 106 848 108" stroke="#9df3c2" stroke-width="2.2" fill="none"/>
+        <circle cx="468" cy="148" r="5" fill="none" stroke="#ff9c9c" stroke-width="1.6"/>
+        <text x="452" y="172" fill="#ff9c9c" font-size="9">反谐振峰</text>
+        <text x="86" y="286" fill="#9fb0c7" font-size="10">灰虚线：单颗 22µF（1MHz 后变电感）　青线：+0.1µF（16MHz 出现反谐振峰）</text>
+        <text x="86" y="308" fill="#9fb0c7" font-size="10">绿线：再补 1µF，峰被削平，整段阻抗被压低</text>
+        <text x="560" y="286" fill="#6f7f9c" font-size="9">ESL≈1nH（22µF）/0.5nH（0.1µF）/0.7nH（1µF）</text>
       </svg>
-      <figcaption><b>图 2-2</b>　电容的频率特性与并联分工。</figcaption>
+      <figcaption><b>图 2-2</b>　去耦不是「容值越大越好」，而是「每段频率都要有一颗低于自谐振的电容」。</figcaption>
     </figure>
 
     <div class="demo">
-      <div class="dh"><b>自谐振与阻抗计算器</b><span>给容值、ESL、ESR，算 f0 与目标频率下的阻抗</span></div>
+      <div class="dh"><b>电容阻抗与自谐振计算器</b><span>给容值、ESL、ESR，算 f<sub>0</sub> 与目标频率上的阻抗</span></div>
       <div class="db">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
           <div><div style="font-size:12px;color:#9fb0c7">容值 <b id="cv" style="color:#5ff1ef">0.1</b> µF</div><input id="c" type="range" min="0.001" max="100" step="0.001" value="0.1" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12px;color:#9fb0c7">ESL <b id="lv" style="color:#5ff1ef">0.6</b> nH</div><input id="l" type="range" min="0.2" max="3" step="0.05" value="0.6" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">ESL <b id="lv" style="color:#5ff1ef">0.5</b> nH</div><input id="l" type="range" min="0.1" max="3" step="0.1" value="0.5" style="width:100%;accent-color:#5ff1ef"></div>
           <div><div style="font-size:12px;color:#9fb0c7">ESR <b id="ev" style="color:#5ff1ef">10</b> mΩ</div><input id="e" type="range" min="1" max="200" step="1" value="10" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12px;color:#9fb0c7">考察频率 <b id="fv" style="color:#5ff1ef">10</b> MHz</div><input id="f" type="range" min="0.01" max="100" step="0.01" value="10" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">考察频率 <b id="fv" style="color:#5ff1ef">10</b> MHz</div><input id="f" type="range" min="0.01" max="500" step="0.01" value="10" style="width:100%;accent-color:#5ff1ef"></div>
         </div>
-        <div id="capOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+        <div id="cOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
       </div>
     </div>
 
-    <h2><span class="n">2.2.2</span>钽电容与聚合物：极性、失效模式、降额</h2>
-    <p><b>钽电容</b>体积小、容值大、ESR 中等，但有两个硬约束：<b>有极性，反接会烧</b>；<b>失效模式是短路</b>（不是开路），严重时会起火。所以行业惯例是：<b>耐压降额 50%、使用环境温度再降额</b>，并且不能承受大的浪涌电流（上电瞬间要串限流或选带浪涌 rated 的型号）。</p>
-    <p><b>聚合物电容（Polymer）</b>ESR 极低（几 mΩ）、失效模式是开路、允许更大纹波电流，逐渐取代钽。代价是价格高，且耐压上限较低（常见 25V 以内）。</p>
-    <div class="box pit">
-      <h5>三个电容事故</h5>
-      <p><b>1. 钽反接：</b>装配或维修时装反，通电后几分钟内冒烟短路。</p>
-      <p><b>2. 用 Y5V 做定时：</b>温度一变容值差 80%，RC 延时完全不同。</p>
-      <p><b>3. 大容值 MLCC 贴得离芯片太远：</b>走线电感把 ESL 优势全抵消，等于没放。</p>
-    </div>
-
-    <h2><span class="n">2.2.3</span>板上五处电容，五种目的</h2>
+    <h2><span class="n">2.2.5</span>电解、钽、聚合物：三种大容量器件的失效模式</h2>
     <table>
-      <thead><tr><th>位号</th><th>容值 / 材质</th><th>位置</th><th>目的与判据</th></tr></thead>
+      <thead><tr><th>类型</th><th>优点</th><th>失效模式</th><th>降额 / 禁忌</th></tr></thead>
       <tbody>
-        <tr><td class="nm">C12 / C13</td><td>18pF C0G</td><td>24MHz 晶振两端</td><td>负载电容匹配：晶振规格 CL=18pF 时，两个 18pF 串联等效 9pF 加寄生电容，需按规格书核对</td></tr>
-        <tr><td class="nm">C14</td><td>104（0.1µF）X7R</td><td>POR_B 复位脚</td><td>吸收复位线上的干扰、与 R33 形成小延时，防止毛刺误复位</td></tr>
-        <tr><td class="nm">电源输入</td><td>22µF + 0.1µF</td><td>DCDC 输入/输出</td><td>大容值稳低频、小容值吸高频尖峰（图 2-2）</td></tr>
-        <tr><td class="nm">C65</td><td>2µF</td><td>DDR VREF 分压点</td><td>把 1.5k/1.5k 分压点的噪声积分掉，保证参考稳定</td></tr>
-        <tr><td class="nm">C66</td><td>104</td><td>VREF 旁</td><td>高频旁路，与 C65 形成「大+小」组合</td></tr>
+        <tr><td class="nm">铝电解</td><td>容量/价格比最高，耐压高</td><td>干涸（寿命随温度每 10°C 减半）、ESR 上升</td><td>纹波电流不超额定；105°C 2000h 是常见寿命</td></tr>
+        <tr><td class="nm">钽</td><td>体积小、容量大、ESR 中</td><td><b>短路失效</b>，可能起火</td><td>电压降额 50%，并串 1–3Ω 限流</td></tr>
+        <tr><td class="nm">聚合物（POSCAP/SP-Cap）</td><td>ESR 极低、无爆浆</td><td>短路（比钽温和）</td><td>降额 20–30%，避免反压/浪涌</td></tr>
       </tbody>
     </table>
+    <p>本板 <b>C32 47µF/25V</b>（VM 输入侧）与 <b>C29 470µF</b>（DCDC_3V3 输出）都是铝电解。选 25V 耐压在 5V 输入上是 5 倍余量，很正常——铝电解的成本随耐压上升不快，但 ESR 会随容量/耐压变化。</p>
+    <p>铝电解的寿命要用「每升 10°C 寿命减半」估算：标称 105°C/2000h，若实际工作 65°C，寿命约 2000×2<sup>4</sup>=32000h≈3.6 年。这不是危言耸听，很多「用了三年就鼓包」的电源就是这个原因。</p>
 
-    <h3>自测</h3>
-    <details class="quiz"><summary>3.3V 电源输出用 0402 10µF/6.3V X5R，实测纹波比计算值大一倍，为什么？</summary><div class="ans">直流偏压让有效容值降到 4–6µF，同时 0402 的 ESR/ESL 偏大。换 0805/1206 的 22µF、或提高耐压到 10V/16V 能显著改善。</div></details>
-    <details class="quiz"><summary>晶振负载电容能用 X7R 的 18pF 吗？</summary><div class="ans">不建议。X7R 容差 ±15% 且随温度/偏压变化，会直接改变晶振负载电容，导致频偏超标甚至不起振。必须 C0G。</div></details>
-    <details class="quiz"><summary>为什么钽电容要降额到 50% 耐压？</summary><div class="ans">因为它的失效模式是短路且可能起火，而击穿风险随电压与温度快速上升。行业惯例按 50%（甚至 60%）降额，并限制浪涌电流。</div></details>
+    <h2><span class="n">2.2.6</span>本板电容清单：每一颗都在干活</h2>
+    <ul>
+      <li><b>C12/C14 18pF C0G</b>（CORE p6）：24MHz 晶振负载电容，必须精确。</li>
+      <li><b>C2/C3 18pF</b>：32.768kHz RTC 晶振负载电容，同上。</li>
+      <li><b>C21/C22/C23 224（0.22µF）</b>（CORE p2）：VDD_SOC_CAP 的十球共用去耦。注意是 <b>224 不是 104</b>——0.22µF 比 0.1µF 更适合这段频率。</li>
+      <li><b>C24 22µF</b>：同一组的体电容，负责低频。</li>
+      <li><b>C65 2µF + C66 104</b>（CORE p3）：DDR VREF 分压的旁路，稳定参考。</li>
+      <li><b>C58–C64</b>：DRAM_1V35 的去耦阵列，每颗靠近一个电源球。</li>
+      <li><b>C13 104</b>（CORE p6）：挂在 <b>POR_B</b>，与 R33 组成 RC 延时，保证复位释放慢于电源稳定。</li>
+      <li><b>C11 102 + R52 1K</b>（MINI p4）：DCDC 反馈的前馈电容，改善瞬态响应（第 1.4 章算过）。</li>
+      <li><b>C28 104 / C29 470µF</b>：3.3V 输出的高频 + 体电容组合。</li>
+    </ul>
+    <p>看这份清单会发现：<b>没有一颗是「随便放的」</b>。小容值管高频、大容值管低频、C0G 管精度、铝电解管储能，各司其职。</p>
+
+    <h2><span class="n">2.2.7</span>怎么测：万用表、LCR、示波器各管一段</h2>
+    <ol class="steps">
+      <li><b>万用表电容档</b>：只能测拆下来的单颗，且在板测量会被并联路径干扰（读数是「整条网络」的等效）。</li>
+      <li><b>LCR 表（1kHz/100kHz）</b>：能测 C、ESR、D 值。判断电解是否老化，看 <b>ESR 是否明显高于同规格新件</b>（翻倍就该换）。</li>
+      <li><b>示波器 + 弹簧地</b>：看电源纹波。探头地线夹太长会把开关噪声当成纹波，务必用短地弹簧、带宽限制 20MHz。</li>
+    </ol>
+    <p>实测判据：3.3V 轨的纹波若在 20MHz 带宽下 &gt;100mV<sub>pp</sub>，先查输出电容是否降容过度、ESR 是否偏大，再怀疑环路。</p>
+
+    <div class="box pit">
+      <h5>五个反直觉事实</h5>
+      <p>① 标 22µF 的 0603 在 3.3V 下可能只剩 11µF。</p>
+      <p>② 0.1µF 在 50MHz 已经不是电容，而是电感。</p>
+      <p>③ 两颗电容并联，中间可能出现比单颗更高的阻抗峰。</p>
+      <p>④ 钽电容必须降额一半，否则短路起火。</p>
+      <p>⑤ 电解电容的寿命按温度「每 10°C 减半」，不是按年限。</p>
+    </div>
+
+    <h3>练习（答案在折叠里）</h3>
+    <details class="quiz"><summary>1. X5R 与 X7R 的差别在哪一项？</summary><div class="ans">高温上限：X5R 到 85°C，X7R 到 125°C；容差都是 ±15%。</div></details>
+    <details class="quiz"><summary>2. 0.1µF、ESL 0.5nH 的自谐振频率？</summary><div class="ans">1/(2π√(0.5nH×0.1µF))≈22.5MHz。</div></details>
+    <details class="quiz"><summary>3. 22µF 与 0.1µF 并联的反谐振峰大概在哪？</summary><div class="ans">≈1/(2π√(1nH×0.1µF))≈16MHz；补一颗 1µF 可削平。</div></details>
+    <details class="quiz"><summary>4. 为什么晶振负载电容必须是 C0G？</summary><div class="ans">X7R 的 ±15% 容值误差直接改变负载电容，把频率拉到规格外；C0G 温漂仅 ±30ppm/°C。</div></details>
+    <details class="quiz"><summary>5. 铝电解 105°C/2000h 工作在 65°C，寿命约多少？</summary><div class="ans">2000×2⁴≈32000h≈3.6 年（每降 10°C 翻倍）。</div></details>
+    <details class="quiz"><summary>6. 为什么 VDD_SOC_CAP 用 224 而不是 104？</summary><div class="ans">该段频率需要的阻抗更低，0.22µF 在相同封装下比 0.1µF 提供更宽的容性区间；同时与 22µF 体电容错开自谐振。</div></details>
 
     <div class="ch-nav">
       <a href="c01.html"><span>上一章</span><b>← 2.1 电阻</b></a>
-      <a class="nx" id="chNavNext" href="c03.html"><span>下一章</span><b>2.3 电感 →</b></a>
+      <a class="nx" id="chNavNext" href="c03.html"><span>下一章</span><b>2.3 电感与磁珠 →</b></a>
     </div>
   </main>
 </div>
@@ -154,22 +188,20 @@
 renderPart('p2','c02.html');
 (function(){
   function calc(){
-    var C=+document.getElementById('c').value*1e-6, L=+document.getElementById('l').value*1e-9;
-    var ESR=+document.getElementById('e').value/1000, f=+document.getElementById('f').value*1e6;
-    document.getElementById('cv').textContent=(+document.getElementById('c').value).toFixed(3).replace(/0+$/,'').replace(/\.$/,'');
-    document.getElementById('lv').textContent=(+document.getElementById('l').value).toFixed(2);
-    document.getElementById('ev').textContent=document.getElementById('e').value;
+    var C=+document.getElementById('c').value*1e-6, L=+document.getElementById('l').value*1e-9, ESR=+document.getElementById('e').value/1000;
+    var f=+document.getElementById('f').value*1e6;
+    document.getElementById('cv').textContent=(C*1e6).toFixed(3);
+    document.getElementById('lv').textContent=(L*1e9).toFixed(1);
+    document.getElementById('ev').textContent=(ESR*1000).toFixed(0);
     document.getElementById('fv').textContent=(f/1e6).toFixed(2);
     var f0=1/(2*Math.PI*Math.sqrt(L*C));
-    var w=2*Math.PI*f;
-    var Xc=1/(w*C), Xl=w*L;
-    var Z=Math.sqrt(ESR*ESR+Math.pow(Xl-Xc,2));
-    var kind = Math.abs(Xl-Xc)/Math.max(Z,1e-9) < 0.1 ? '接近谐振（阻抗最低）' : (Xc>Xl?'容性':'感性');
-    document.getElementById('capOut').innerHTML=
-      '<b style="color:#eaf3ff;font-size:15px">自谐振 f0 ≈ '+(f0/1e6).toFixed(2)+' MHz　谷底阻抗 ≈ '+(ESR*1000).toFixed(1)+' mΩ</b><br>'+
-      '在 '+((f/1e6).toFixed(2))+' MHz：|Z| ≈ '+(Z*1000).toFixed(1)+' mΩ（'+kind+'）<br>'+
-      '<span style="color:'+(f>f0*3?'#ff9c9c':'#9df3c2')+'">'+(f>f0*3?'已远超谐振点：这颗电容在此频率基本失效，靠更小容值/更小封装的那颗顶':'仍在有效区间')+'</span><br>'+
-      '<span style="color:#6f7f9c;font-size:11.5px">ESL 主要来自封装与过孔：0402 约 0.3–0.6nH，0603 约 0.6–1nH，过孔每个约 0.3–0.5nH。贴得越近、过孔越少，f0 越高。</span>';
+    var X=2*Math.PI*f*L-1/(2*Math.PI*f*C);
+    var Z=Math.sqrt(ESR*ESR+X*X);
+    document.getElementById('cOut').innerHTML=
+      '<b style="color:#eaf3ff;font-size:15px">自谐振 f<sub>0</sub> = '+(f0/1e6).toFixed(2)+' MHz　在 '+(f/1e6).toFixed(2)+' MHz 处 |Z| = '+(Z*1000).toFixed(2)+' mΩ</b><br>'+
+      '该频率下 '+(X<0?'呈<b style="color:#9df3c2">容性</b>（还有滤波作用）':'呈<b style="color:#ff9c9c">感性</b>（已失效，等于一根小电感）')+'<br>'+
+      '容抗 '+(1/(2*Math.PI*f*C)*1000).toFixed(1)+' mΩ，感抗 '+(2*Math.PI*f*L*1000).toFixed(1)+' mΩ<br>'+
+      '<span style="color:#6f7f9c;font-size:11.5px">ESL 随封装变化：0402≈0.4–0.6nH，0603≈0.8nH，0805≈1nH，1206≈1.5nH。</span>';
   }
   ['c','l','e','f'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
   calc();
