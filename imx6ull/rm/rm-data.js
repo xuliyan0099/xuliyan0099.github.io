@@ -248,7 +248,7 @@ window.RM =
       "sub": "信任链、eFUSE、RTC、防拆、JTAG",
       "intro": "最后一篇是「不常开、但出事就得翻」的部分：安全启动的信任链与 eFUSE 烧写、常电域的 RTC 与防拆、JTAG 与边界扫描、地址空间保护。原则是：讲清风险与不可逆操作，绝不鼓励随手烧熔丝。",
       "chapters": [
-        { "n": 11, "zh": "系统安全总览与信任链", "en": "System Security", "pp": "381–386", "pages": 6, "pri": "read", "batch": 6,
+        { "n": 11, "zh": "系统安全总览与信任链", "en": "System Security", "pp": "381–386", "pages": 6, "pri": "read", "batch": 6, "ready": true,
           "line": "六页讲清 CSU、SNVS、DCP、HAB、SJC 各自守哪一段。",
           "pts": ["信任链：ROM → HAB → 内核", "DCP 与 CSU 的加密/访问控制"] },
         { "n": 37, "zh": "eFUSE 控制器 OCOTP", "en": "On-Chip OTP Controller", "pp": "2381–2434", "pages": 54, "pri": "table", "batch": 6,
