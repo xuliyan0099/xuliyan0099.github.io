@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1.1 三种基本量 | 第一篇 · 电学与器件基础 | i.MX6ULL 学习手册</title>
+<meta name="description" content="电压、电流、电阻在这块板子上怎么量：五路电压域、测试点 TP3–TP7、万用表档位、GND 参考与常见误判。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">第一篇 · 电学与器件基础</div>
+    <ol id="sideList"></ol>
+    <div class="vol-nav" id="volNav"></div>
+  </aside>
+
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第一篇 · 电学基础</span><span class="sep">/</span>第 1 章<span class="sep">/</span>约 20 分钟</div>
+    <h1>三种基本量：电压、电流、电阻</h1>
+    <p class="lede">硬件所有的判断，最后都落到三个数：<b>某两点之间的电压、流过某条路的电流、某段路的电阻</b>。这三个量量不准，后面所有「应该是多少」都是猜。这一章不讲理论，只讲在这块板子上<b>量哪儿、用哪个档、读数多少算正常</b>。</p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>说出这块板子上五路主要电压的标称值与允许范围，并找到对应的测试点</li>
+        <li>正确使用万用表的电压档、通断档、电阻档，知道「量电压要并联、量电流要串联」</li>
+        <li>解释为什么「GND 是所有测量的参考点」，以及量错参考点会得到什么荒谬结论</li>
+        <li>在板上量出 3.3V、1.35V、0V 三种电平，并判断哪一路异常</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">1.1.1</span>这块板子上有哪几种电压</h2>
+    <p>核心板第 1 页右下角有一张 <b>I.MX6ULL PWR</b> 表，列出每一路的 min/typ/max。按它在板上找点，是读图与测量的第一步：</p>
+    <table>
+      <thead><tr><th>电压域</th><th>标称</th><th>板上网络名</th><th>大致用途</th><th>测试点</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">输入</td><td>5V</td><td><code>DC5V</code></td><td>底板 DC 座 / USB 供电</td><td>电源座或排针</td></tr>
+        <tr><td class="nm">IO 与常电</td><td>3.3V</td><td><code>DCDC_3V3</code>、<code>NVCC_GPIO</code></td><td>IO、eMMC、PHY、LCD</td><td>TP4（SNVS 侧）、各处 3.3V 点</td></tr>
+        <tr><td class="nm">内核与 DDR</td><td>1.35V</td><td><code>VDD_ARM_SOC_IN</code>、<code>DRAM_1V35</code></td><td>Cortex-A7、DDR3L</td><td><b>TP3</b>、<b>TP7</b></td></tr>
+        <tr><td class="nm">常电域</td><td>3.0V</td><td><code>VDD_SNVS_3V3</code></td><td>RTC、唤醒、常开逻辑</td><td>TP4</td></tr>
+        <tr><td class="nm">SD 卡</td><td>1.8 / 3.3V</td><td><code>NVCC_SD</code></td><td>TF 卡信号电平（可切换）</td><td>TP6</td></tr>
+        <tr><td class="nm">摄像头</td><td>2.8V</td><td><code>NVCC_CSI</code></td><td>CSI 接口（由 U12 产生）</td><td>TP8</td></tr>
+      </tbody>
+    </table>
+    <p>注意最容易被忽略的一条：<b>3.0V 不等于 3.3V</b>。SNVS 是独立的一路（U7 ME6209A33 从 DC3V 产生 3.3V，再经内核稳压成 3.0V 域），量错点会得出「电源坏了」的错误结论。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 900 400" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="40" y="40" width="220" height="300" rx="12" fill="#141c2e" stroke="#3a4560"/>
+        <text x="150" y="68" fill="#eaf3ff" font-size="12" text-anchor="middle">核心板（俯视）</text>
+        <rect x="80" y="90" width="140" height="120" rx="8" fill="rgba(95,241,239,.08)" stroke="#5ff1ef"/>
+        <text x="150" y="150" fill="#9df5f4" font-size="11" text-anchor="middle">U1 i.MX6ULL</text>
+        <text x="150" y="170" fill="#6f7f9c" font-size="9.5" text-anchor="middle">BGA 球朝下</text>
+
+        <circle cx="240" cy="120" r="4" fill="#ffb84d"/><text x="252" y="124" fill="#ffd79a" font-size="9.5">TP3 1.35V</text>
+        <circle cx="240" cy="150" r="4" fill="#ffb84d"/><text x="252" y="154" fill="#ffd79a" font-size="9.5">TP5 3.3V</text>
+        <circle cx="240" cy="180" r="4" fill="#5ce1a0"/><text x="252" y="184" fill="#9df3c2" font-size="9.5">TP4 3.0V</text>
+        <circle cx="240" cy="210" r="4" fill="#8b7bff"/><text x="252" y="214" fill="#c8c0ff" font-size="9.5">TP6 SD 电压</text>
+        <circle cx="240" cy="240" r="4" fill="#5ff1ef"/><text x="252" y="244" fill="#9df5f4" font-size="9.5">TP7 DRAM 1.35V</text>
+        <circle cx="240" cy="270" r="4" fill="#ff9c9c"/><text x="252" y="274" fill="#ffc0c0" font-size="9.5">TP8 2.8V</text>
+
+        <rect x="300" y="40" width="270" height="150" rx="12" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="316" y="66" fill="#eaf3ff" font-size="11.5">量电压：并联</text>
+        <text x="316" y="90" fill="#9fb0c7" font-size="10.5">黑笔接 GND，红笔接测试点</text>
+        <text x="316" y="112" fill="#9fb0c7" font-size="10.5">档位：直流 20V 或自动量程</text>
+        <text x="316" y="134" fill="#9fb0c7" font-size="10.5">读数 = 该点相对 GND 的电位</text>
+        <text x="316" y="160" fill="#ff9c9c" font-size="10.5">红黑接反 → 显示负值，不是故障</text>
+
+        <rect x="300" y="210" width="270" height="130" rx="12" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="316" y="236" fill="#eaf3ff" font-size="11.5">量电流：串联</text>
+        <text x="316" y="260" fill="#9fb0c7" font-size="10.5">断开供电线，把表串进去</text>
+        <text x="316" y="282" fill="#ff9c9c" font-size="10.5">直接并联在电源上量电流 = 短路</text>
+        <text x="316" y="306" fill="#9fb0c7" font-size="10.5">更常用：限流电源直接读电流</text>
+        <text x="316" y="328" fill="#6f7f9c" font-size="9.5">首板调试必备：5V/500mA 限流</text>
+
+        <rect x="600" y="40" width="270" height="300" rx="12" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="616" y="68" fill="#eaf3ff" font-size="11.5">三条读数判据</text>
+        <text x="616" y="96" fill="#9df3c2" font-size="10.5">1.35V 域：1.30–1.40V</text>
+        <text x="616" y="116" fill="#6f7f9c" font-size="9.5">低于 1.2 → DCDC 没起或负载短路</text>
+        <text x="616" y="146" fill="#9df3c2" font-size="10.5">3.3V 域：3.20–3.40V</text>
+        <text x="616" y="166" fill="#6f7f9c" font-size="9.5">3.30V 常见；3.05V 说明带载跌落</text>
+        <text x="616" y="196" fill="#9df3c2" font-size="10.5">3.0V 常电域：2.90–3.10V</text>
+        <text x="616" y="216" fill="#6f7f9c" font-size="9.5">掉到 0 → RTC 与唤醒全失效</text>
+        <text x="616" y="252" fill="#eaf3ff" font-size="10.5">读数抖动 &gt; ±0.1V</text>
+        <text x="616" y="272" fill="#9fb0c7" font-size="10.5">多半是表笔接触不良，或探头地太长</text>
+        <text x="616" y="300" fill="#6f7f9c" font-size="9.5">量 1.35V 这种低压时，用短地弹簧而非鳄鱼夹</text>
+        <text x="616" y="324" fill="#6f7f9c" font-size="9.5">否则开关噪声会把读数抬高几十 mV</text>
+      </svg>
+      <figcaption><b>图 1-1</b>　板上的测试点与量法。所有电压都是「相对 GND」的电位，所以黑笔永远先找 GND。</figcaption>
+    </figure>
+
+    <div class="demo">
+      <div class="dh"><b>量哪一路</b><span>选一个电压域，看测试点、正常范围与异常判读</span></div>
+      <div class="db">
+        <div id="rails" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        <div id="railOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7;min-height:130px"></div>
+      </div>
+    </div>
+
+    <h2><span class="n">1.1.2</span>电阻：不要断电就量「在板电阻」</h2>
+    <p>电阻档最常被误用：直接在线量一颗电阻，读数往往比标称小很多。原因很简单——<b>它和板子上其他路径并联了</b>。要判断一颗电阻是好是坏，正确做法是：断电、至少一端翘起（或拆下），再量。</p>
+    <table>
+      <thead><tr><th>想确认什么</th><th>怎么量</th><th>正常读数</th><th>异常说明</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">上拉电阻是否装错</td><td>断电，量该网络对 3.3V 的电阻</td><td>≈ 标称（10k / 4.7k）</td><td>远小于标称 → 别处有并联或短路</td></tr>
+        <tr><td class="nm">是否短路到地</td><td>断电，量该网络对 GND</td><td>几百 Ω 以上（电容充电会爬升）</td><td>接近 0Ω → 短路，禁止上电</td></tr>
+        <tr><td class="nm">走线是否断</td><td>通断档，量两端焊盘</td><td>响（&lt; 几 Ω）</td><td>不响 → 断线或过孔开路</td></tr>
+        <tr><td class="nm">电容是否击穿</td><td>断电，量电容两端</td><td>先低后升（充电）</td><td>一直为 0 → 击穿</td></tr>
+      </tbody>
+    </table>
+    <div class="box pit">
+      <h5>三个会让读数骗你的情况</h5>
+      <p><b>1. 板上有电。</b>万用表电阻档会给被测电路注入电流，有电时读数完全不可信。断电并等电容放完电再量。</p>
+      <p><b>2. 手捏着表笔。</b>人体电阻几百 kΩ 会并联进去，量 10k 上拉时读数明显偏小。</p>
+      <p><b>3. 量的是「网络」不是「元件」。</b>同一个网络上有多个元件，你量到的是它们的并联结果。</p>
+    </div>
+
+    <h2><span class="n">1.1.3</span>电流：只在必要时量，而且要串联</h2>
+    <p>电流是「流过某条路」的量，不存在「某点的电流」。所以量电流必须把这条路<b>断开</b>，把表串进去。板上更实用的做法有两个：</p>
+    <ol class="steps">
+      <li><b>用限流电源读。</b>把 5V 电源设成 5V/500mA 限流，直接看它显示的电流。这是首板调试的标准做法，既能量电流又能防烧板。</li>
+      <li><b>用 0Ω 电阻当分流点。</b>原理图上不少地方有 0Ω 跳线（比如 <code>R33 0R</code> 串在 POR_B 上），拆掉它串入电流表或换成分流电阻，就能测某一段的电流。</li>
+    </ol>
+    <p>典型参考值（5V 输入侧，板子跑 Linux 空闲）：约 <b>200–400mA</b>；启动峰值可能到 <b>600–800mA</b>；屏幕亮起再加 100–300mA。看到 1A 以上且不发烫，先怀疑有短路。</p>
+
+    <h2><span class="n">1.1.4</span>GND：所有测量的基准，也是最大的坑</h2>
+    <p>「电压是两点之间的电位差」。你量 1.35V，量的其实是「测试点相对 GND」的电位。所以：</p>
+    <ul>
+      <li>黑笔必须接在<b>这块板子的 GND</b>，不能接在别的地方（比如电脑机箱、另一个电源的负极）。</li>
+      <li>板上 GND 与 <code>AGND</code> 可能是两个网络（模拟地单独走），量模拟电路要以 AGND 为参考。</li>
+      <li>用示波器时，探头的地夹就是这个「黑笔」。地夹位置不对，波形会带一堆噪声，甚至短路。</li>
+    </ul>
+
+    <div class="box deep">
+      <h5>为什么这块板要分「3.0V 常电」和「3.3V 主电源」</h5>
+      <p>因为 RTC 与唤醒逻辑要在整机断电后继续活着（否则时间丢失、无法按键唤醒）。所以设计上给它单独一路：<code>VDD_SNVS_3V3</code>，由 U7 从 <code>DC3V</code> 产生，再经内核内部 LDO 降到 3.0V 域，并由纽扣电池 <code>VDD_COIN_3V</code> 兜底（原理图上标了「确认断电放电 &gt; 40µA 才可用」）。这一路的电流只有几 µA 到几百 µA，所以用小 LDO 完全够。</p>
+    </div>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>量 TP3 得到 1.05V，说明什么？</summary><div class="ans">1.35V 域异常。先确认黑笔确实在 GND、表在直流档；再看这一路是否被负载拉塌（DDR 或内核短路）、DCDC（U6 MT3420B）是否正常起振、反馈分压电阻是否虚焊。不要先怀疑 SoC 坏了。</div></details>
+    <details class="quiz"><summary>为什么「在板量 10k 上拉」读数常常只有 2–3k？</summary><div class="ans">因为它与被拉网络上的其他元件并联了：芯片内部 ESD 二极管、其他上拉、去耦电容的漏电都会参与。要判断这颗电阻本身，必须断电并把它一端翘起再量。</div></details>
+    <details class="quiz"><summary>量 3.3V 时读数在 3.28–3.35V 之间跳，正常吗？</summary><div class="ans">正常。开关电源本身有纹波（几十 mV），负载也在变化。判断「稳不稳」要看纹波峰峰值（示波器 AC 耦合、20mV/格），而不是看万用表最后一位。但若跳到 3.0V 以下，就要查负载与电感。</div></details>
+
+    <div class="ch-nav">
+      <a href="../index.html"><span>返回</span><b>← 硬件全书目录</b></a>
+      <a class="nx" id="chNavNext" href="c02.html"><span>下一章</span><b>1.2 欧姆定律与分压 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p1','c01.html');
+(function(){
+  var R=[
+    {k:'v135',n:'1.35V 内核/DDR',tp:'TP3 / TP7',ok:'1.30–1.40V',bad:'&lt;1.20V：DCDC 未起或负载短路；&gt;1.45V：反馈分压异常，别接 SoC'},
+    {k:'v33',n:'3.3V 主电源',tp:'TP5 / 各处 3.3V',ok:'3.20–3.40V',bad:'3.05V 左右：带载跌落，查电感与线阻；0V：前级 DCDC 没工作'},
+    {k:'v30',n:'3.0V 常电',tp:'TP4',ok:'2.90–3.10V',bad:'0V：RTC 与唤醒全失效；偏低：纽扣电池或 U7 欠压'},
+    {k:'sd',n:'SD 电压（可切）',tp:'TP6',ok:'1.80V 或 3.30V',bad:'既不是 1.8 也不是 3.3 → VSELECT 脚配置错'},
+    {k:'csi',n:'2.8V 摄像头',tp:'TP8',ok:'2.75–2.85V',bad:'0V：U12（XC6206P282）没输出或使能脚没拉高'}
+  ];
+  var b=document.getElementById('rails'),o=document.getElementById('railOut');
+  b.innerHTML=R.map(function(x){return '<button data-k="'+x.k+'" style="cursor:pointer;padding:9px 12px;border-radius:9px;border:1px solid rgba(120,150,200,.26);background:rgba(255,255,255,.04);color:#cfdcf7;font-size:12.5px">'+x.n+'</button>'}).join('');
+  function show(k){
+    var s=R.filter(function(x){return x.k===k})[0];
+    o.innerHTML='<b style="color:#eaf3ff">'+s.n+'</b><br>测试点：'+s.tp+'　正常范围：<b style="color:#9df3c2">'+s.ok+'</b><br><span style="color:#ff9c9c">异常判读：</span>'+s.bad+'<br><span style="color:#6f7f9c;font-size:11.5px">量之前先确认黑笔在 GND；低压域用短地弹簧，避免噪声抬高读数。</span>';
+    Array.prototype.forEach.call(b.querySelectorAll('button'),function(x){
+      var on=x.dataset.k===k; x.style.borderColor=on?'#5ff1ef':'rgba(120,150,200,.26)'; x.style.background=on?'rgba(95,241,239,.12)':'rgba(255,255,255,.04)';
+    });
+  }
+  b.addEventListener('click',function(e){var x=e.target.closest('button[data-k]'); if(x) show(x.dataset.k)});
+  show('v135');
+})();
+</script>
+</body>
+</html>

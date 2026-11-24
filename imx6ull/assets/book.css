@@ -137,3 +137,9 @@ ol.steps>li::before{
   #topbar,#sidebar,.ch-nav,.demo{display:none}
   .book{max-width:none}
 }
+
+/* —— 硬件全书：侧栏“筹备中”条目与篇目录块 —— */
+#sidebar ol li.pending span.no{color:#8fa3c4}
+#sidebar ol li.pending{opacity:.45}
+#sidebar ol li.pending .sub{color:#8fa3c4}
+.part-block .pl{max-width:74ch}

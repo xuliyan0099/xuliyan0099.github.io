@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1.5 电感与磁珠 | 第一篇 · 电学与器件基础 | i.MX6ULL 学习手册</title>
+<meta name="description" content="电感怎么储能、DCDC 的 2.2µH 怎么选、纹波怎么算、饱和电流是什么、磁珠为什么不能当电感用。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">第一篇 · 电学与器件基础</div>
+    <ol id="sideList"></ol>
+    <div class="vol-nav" id="volNav"></div>
+  </aside>
+
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第一篇 · 电学基础</span><span class="sep">/</span>第 5 章<span class="sep">/</span>约 24 分钟</div>
+    <h1>电感与磁珠：两个被混淆的元件</h1>
+    <p class="lede">电感和磁珠外形几乎一样，很多板上都标着 <code>L</code>，但它们做的是完全不同的事：<b>电感是储能元件，参与能量转换；磁珠是高频电阻，只负责吃掉噪声。</b>把磁珠当电感用，DCDC 会直接失效；把电感当磁珠用，噪声一点没滤掉。</p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>说出电感的两个核心参数：感值（µH）与饱和电流（A）</li>
+        <li>用纹波公式算出 DCDC 电感的电流波动，并判断会不会饱和</li>
+        <li>解释核心板上 L2（2.2µH）为什么配在这颗 DCDC 上</li>
+        <li>区分电感、磁珠、共模电感各自的使用场景</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">1.5.1</span>电感的两条基本规律</h2>
+    <p style="text-align:center">U = L·di/dt　　E = ½·L·I²</p>
+    <p>第一条说明「电感阻碍电流突变」，所以 DCDC 用它做能量搬运的「中转站」；第二条说明「它储存能量」，所以断电瞬间会产生反向电压（这也是继电器、电机需要续流二极管的原因）。</p>
+
+    <h2><span class="n">1.5.2</span>这块板上的 L2：2.2µH 是算出来的</h2>
+    <p>核心板第 1 页，<b>U6（MT3420B）</b>把 <code>DC5V</code> 降到 1.35V 给 ARM/SOC 与 DDR 用，输出端接 <b>L2 = 2.2µH</b>，再配 <b>22µF + 0.1µF</b> 输出电容。这个感值决定了「电流纹波有多大」：</p>
+    <p style="text-align:center">ΔI = V<sub>out</sub>·(V<sub>in</sub> − V<sub>out</sub>) / (L·f<sub>sw</sub>·V<sub>in</sub>)</p>
+    <p>取 V<sub>in</sub>=5V、V<sub>out</sub>=1.35V、L=2.2µH、f<sub>sw</sub>=1MHz：</p>
+    <p style="text-align:center">ΔI = (1.35×3.65) / (2.2µH×1MHz×5) ≈ 0.45A</p>
+    <p>也就是说：如果负载 1A，电感电流会在 0.78A 到 1.23A 之间摆动。选电感时，<b>饱和电流必须大于峰值 1.23A</b>，而且要留 20–30% 余量，所以通常选 1.5–2A 的型号。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 900 400" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <!-- 三角波 -->
+        <rect x="30" y="26" width="380" height="220" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="46" y="50" fill="#eaf3ff" font-size="11.5">电感电流是三角波，不是直流</text>
+        <line x1="60" y1="200" x2="390" y2="200" stroke="#3a4560"/>
+        <line x1="60" y1="200" x2="60" y2="60" stroke="#3a4560"/>
+        <path d="M60 150 L100 110 L140 150 L180 110 L220 150 L260 110 L300 150 L340 110 L380 150" stroke="#5ff1ef" stroke-width="2" fill="none"/>
+        <line x1="60" y1="130" x2="390" y2="130" stroke="#ffb84d" stroke-dasharray="4 3"/>
+        <text x="330" y="124" fill="#ffd79a" font-size="9.5">平均 = 负载电流</text>
+        <text x="70" y="104" fill="#9fb0c7" font-size="9">峰值 = 平均 + ΔI/2</text>
+        <text x="70" y="176" fill="#9fb0c7" font-size="9">谷值 = 平均 − ΔI/2</text>
+        <text x="46" y="228" fill="#6f7f9c" font-size="9.5">ΔI 太大 → 峰值撞上饱和电流 → 感值骤降 → 纹波更大 → 发热失控</text>
+
+        <!-- 磁珠 vs 电感 -->
+        <rect x="430" y="26" width="200" height="220" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="446" y="50" fill="#eaf3ff" font-size="11.5">电感 vs 磁珠</text>
+        <text x="446" y="80" fill="#9df3c2" font-size="10.5">电感</text>
+        <text x="446" y="98" fill="#9fb0c7" font-size="9.5">存能量、参与转换</text>
+        <text x="446" y="114" fill="#9fb0c7" font-size="9.5">看感值 H 与饱和电流</text>
+        <text x="446" y="146" fill="#c8c0ff" font-size="10.5">磁珠</text>
+        <text x="446" y="164" fill="#9fb0c7" font-size="9.5">高频呈电阻，消耗噪声</text>
+        <text x="446" y="180" fill="#9fb0c7" font-size="9.5">单位是 Ω @ 100MHz</text>
+        <text x="446" y="196" fill="#9fb0c7" font-size="9.5">不许过直流大电流</text>
+        <text x="446" y="222" fill="#ff9c9c" font-size="9.5">混用 = 功能失效</text>
+
+        <!-- 参数 -->
+        <rect x="650" y="26" width="220" height="220" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="666" y="50" fill="#eaf3ff" font-size="11.5">选型只看三个数</text>
+        <text x="666" y="80" fill="#9df5f4" font-size="10.5">L：感值（µH）</text>
+        <text x="666" y="98" fill="#6f7f9c" font-size="9.5">决定纹波大小</text>
+        <text x="666" y="126" fill="#9df5f4" font-size="10.5">Isat：饱和电流（A）</text>
+        <text x="666" y="144" fill="#6f7f9c" font-size="9.5">超过就失感，必须留余量</text>
+        <text x="666" y="172" fill="#9df5f4" font-size="10.5">DCR：直流电阻（mΩ）</text>
+        <text x="666" y="190" fill="#6f7f9c" font-size="9.5">决定导通损耗与发热</text>
+        <text x="666" y="216" fill="#6f7f9c" font-size="9">屏蔽式优先：漏磁小，干扰低</text>
+
+        <text x="30" y="300" fill="#9fb0c7" font-size="10.5">一个常被忽略的细节：DCDC 的电感要贴着芯片放，回路（SW → 电感 → 输出电容 → GND）越小，辐射与纹波越小。</text>
+        <text x="30" y="324" fill="#6f7f9c" font-size="10">判据：用示波器看 SW 脚波形，振铃越大，说明布局回路越长、寄生越大。</text>
+        <text x="30" y="352" fill="#ffb84d" font-size="10">这块板上 L2 若发热明显：先查负载是否超 1A，再查电感是否饱和（换大 Isat 型号），最后查 DCR 是否选大了。</text>
+      </svg>
+      <figcaption><b>图 1-4</b>　电感的电流是三角波，纹波大小由感值、开关频率与输入输出压差共同决定。</figcaption>
+    </figure>
+
+    <div class="demo">
+      <div class="dh"><b>DCDC 纹波与饱和判断</b><span>改感值与频率，看电感电流峰值会不会撞上饱和</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
+          <div><div style="font-size:12px;color:#9fb0c7">Vin = <b id="iv" style="color:#5ff1ef">5</b> V</div><input id="vin" type="range" min="3" max="24" step="0.1" value="5" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">Vout = <b id="ov" style="color:#5ff1ef">1.35</b> V</div><input id="vout" type="range" min="0.6" max="5" step="0.05" value="1.35" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">L = <b id="lv" style="color:#5ff1ef">2.2</b> µH</div><input id="l" type="range" min="0.5" max="22" step="0.1" value="2.2" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">负载 = <b id="il" style="color:#5ff1ef">1.0</b> A</div><input id="iload" type="range" min="0.1" max="2" step="0.05" value="1" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="rippleOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h2><span class="n">1.5.3</span>磁珠：只在噪声路径上用</h2>
+    <p>磁珠（ferrite bead）在规格书上标的是「100MHz 时的阻抗，单位 Ω」。它本质是一个<b>随频率变化的电阻</b>：低频几乎为 0Ω，高频把噪声能量变成热。常见用法：</p>
+    <ul>
+      <li><b>电源入口串联磁珠：</b>挡住从外部进来的高频干扰，同时配电容组成 LC 滤波。</li>
+      <li><b>模拟供电隔离：</b>在 ADC、音频供电前串磁珠，把数字噪声隔开。</li>
+      <li><b>USB/网口共模电感：</b>那是另一种元件（共模扼流圈），专门抑制共模噪声，不能与磁珠混为一谈。</li>
+    </ul>
+    <div class="box pit">
+      <h5>三种典型误用</h5>
+      <p><b>1. 用磁珠替代 DCDC 电感。</b>磁珠不能储能，开关电源立刻失效，甚至烧芯片。</p>
+      <p><b>2. 磁珠放在大电流路径。</b>磁珠额定电流通常只有几十到几百 mA，过 1A 就饱和发热，甚至烧断。</p>
+      <p><b>3. 磁珠 + 大电容做电源滤波。</b>可能形成 LC 谐振，在某些频段放大噪声；要按阻抗曲线选，并做阻尼。</p>
+    </div>
+
+    <h2><span class="n">1.5.4</span>断电瞬间：电感的反向电压</h2>
+    <p>电感电流不能突变，所以断开瞬间 U = L·di/dt 会冲得很高。这就是为什么：</p>
+    <ul>
+      <li>继电器、电机、蜂鸣器要并联续流二极管（板上的 <code>RB521S-30</code> 一类肖特基就是这个角色）。</li>
+      <li>DCDC 的 SW 脚会有振铃，需要 RC 吸收或优化布局。</li>
+      <li>热插拔大电感负载时，要在接口加 TVS 钳位。</li>
+    </ul>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>L=2.2µH、Vin=5V、Vout=1.35V、f=1MHz，纹波约多少？</summary><div class="ans">ΔI = 1.35×(5−1.35)/(2.2µH×1MHz×5) ≈ 0.45A。也就是 1A 负载时峰值约 1.23A，电感 Isat 至少要 1.5A 以上。</div></details>
+    <details class="quiz"><summary>为什么「换个大感值」不一定更好？</summary><div class="ans">感值大，纹波小，但体积大、DCR 大、瞬态响应变慢（负载跳变时电流跟不上）。工程上是在纹波、效率、瞬态、体积之间折中，不是越大越好。</div></details>
+    <details class="quiz"><summary>板子上一个 L 标号，怎么判断它是电感还是磁珠？</summary><div class="ans">看规格书/丝印型号：电感给感值（如 2.2µH）与饱和电流；磁珠给「Ω @ 100MHz」与额定电流。也可以看位置：DCDC 输出后、与 SW 脚相连的一定是电感；串在电源入口或模拟供电前的一般是磁珠。</div></details>
+
+    <div class="ch-nav">
+      <a href="c04.html"><span>上一章</span><b>← 1.4 电容</b></a>
+      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>1.6 二极管家族 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p1','c05.html');
+(function(){
+  function calc(){
+    var vin=+document.getElementById('vin').value, vout=+document.getElementById('vout').value;
+    var L=+document.getElementById('l').value*1e-6, il=+document.getElementById('iload').value;
+    var f=1e6;
+    var dI=vout*(vin-vout)/(L*f*vin);
+    document.getElementById('iv').textContent=vin.toFixed(1);
+    document.getElementById('ov').textContent=vout.toFixed(2);
+    document.getElementById('lv').textContent=L*1e6>10?(L*1e6).toFixed(1):(L*1e6).toFixed(1);
+    document.getElementById('il').textContent=il.toFixed(2);
+    var peak=il+dI/2, valley=il-dI/2;
+    var warn = peak>2 || dI>il;
+    document.getElementById('rippleOut').innerHTML=
+      '<b style="color:#eaf3ff;font-size:15px">ΔI ≈ '+(dI*1000).toFixed(0)+' mA</b>（占负载 '+(dI/il*100).toFixed(0)+'%）<br>'+
+      '峰值 '+(peak*1000).toFixed(0)+' mA　谷值 '+(valley*1000).toFixed(0)+' mA '+(valley<0?'<span style="color:#ffb84d">（谷值为负 → 进入 DCM 断续模式）</span>':'')+'<br>'+
+      '<span style="color:'+(warn?'#ff9c9c':'#9df3c2')+'">'+(warn?'峰值偏高：需选 Isat ≥ '+(peak*1.3).toFixed(1)+'A 的电感，或增大感值/提高频率':'峰值可接受，按 1.3 倍余量选 Isat 即可')+'</span><br>'+
+      '<span style="color:#6f7f9c;font-size:11.5px">估算假设：CCM 连续导通、理想开关、f=1MHz。真实值受 DCR、死区、芯片限流影响，选型时以实测为准。</span>';
+  }
+  ['vin','vout','l','iload'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+</body>
+</html>
