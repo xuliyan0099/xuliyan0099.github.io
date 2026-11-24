@@ -1,0 +1,26 @@
+@startuml
+autonumber
+participant "Workflow" as W
+participant "StepRunner" as R
+participant "SnapshotStore" as S
+participant "BankAPI" as B
+
+W -> R: run(step=实名)
+R -> B: verifyIdentity
+B --> R: ok
+R -> S: save(snapshot{step=1, userId, bankRef})
+W -> R: run(step=绑卡)
+R -> B: bindCard
+B --> R: ok
+R -> S: save(snapshot{step=2, cardRef})
+W -> R: run(step=风控)
+alt 风控拒绝
+  R -> S: load(step=2)
+  R -> B: unbindCard(cardRef)
+  R -> S: load(step=1)
+  R --> W: Failed(rolledBackTo=1)
+else 通过
+  R -> S: save(step=3)
+  R --> W: Continue
+end
+@enduml

@@ -1,0 +1,280 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0, lane: 0 };
+var state = { step: INIT.step, lane: INIT.lane };
+
+var STEPS = [
+  { h: '能力、引脚与通道号', hint: '12 位 / 1 MS/s / ADCH',
+    note: '这是一个逐次逼近（SAR）型 ADC：最高 12 位、10–11 位精度、单端最多 8 路、采样率上限 1 MS/s。通道选择在 ADC_HC0[ADCH]：00000–01111 是外部通道 0–15，11001 是内部自检通道（接 VREFH），11111 是「关掉 ADC 并隔离输入」。ADCH 写全 1 不只是不转换，它还会把模拟前端从引脚上断开。' },
+  { h: '时钟、采样与转换时间', hint: 'ADICLK / ADIV / ADSTS',
+    note: '转换时钟 ADCK 三选一：IPG、IPG/2、ADACK 异步钟；再用 ADIV 除 1/2/4/8。采样时长由 ADLSMP 与 ADSTS 共同决定：短采样 2/4/6/8 个 ADCK，长采样 12/16/20/24 个。比较相位固定为 8 位 17、10 位 21、12 位 25 个 ADCK。总时间 = SFCAdder + 采样 + 比较 + 后处理，手册给的 40 MHz 例子是 0.95 µs 一次。' },
+  { h: '一次转换的寄存器动作', hint: 'HC0 → COCO → R0',
+    note: '软件触发就是往 ADC_HC0 写 ADCH（ADTRG 在这颗芯片上只支持软件触发）；转换完成后 ADC_HS[COCO0] 置位，读 ADC_R0 取 CDATA（右对齐无符号）；读 R0 会清 COCO0。连续转换靠 GC[ADCO]=1，硬件平均靠 AVGE + AVGS（4/8/16/32 次），而 CFG[OVWREN]=0 时旧数据没读走，新结果直接丢弃——这就是「丢采样」的根源。' },
+  { h: '校准与偏移：精度从这里来', hint: 'CAL / CALF / ADC_OFS',
+    note: '上电或复位后必须先校准，否则精度指标不保证：配好 CFG/GC 后置 CAL=1，等 CAL 自动清 0，再查 GS[CALF] 与 HS[COCO0]。校准期间不能写任何 ADC 寄存器、不能进 stop，否则 CALF 置位、整段校准作废。整套序列最多 14000 个 ADCK 加 100 个总线周期。偏移量在 ADC_OFS：13 位，最高位是符号位，正加负减，超出量程会被钳到 0x0FFF 或 0x0000。' },
+  { h: '比较中断与低功耗', hint: 'ACFE / ADLPC / ADACKEN',
+    note: '比较功能有六种模式，由 ACFGT、ACREN 与 CV1/CV2 的大小关系决定：小于阈值、大于等于阈值、区间外不含端点、区间内含端点等。比较不成立时 COCO0 不置位、结果也不搬进 Rn——所以「开了比较却读不到数」是正常行为。低功耗有 ADLPC（缩短比较器开启时间）与 ADACKEN（让异步钟常开），后者是 stop 模式下还能转换、还能靠比较中断唤醒的唯一前提。' },
+  { h: '在 MINI 板上量一次', hint: 'VREFH 3.3 V / 排针 / 判据',
+    note: '核心板把 ADC_VREFH 经 L13 接到 VDDA_ADC_3P3，也就是 3.3 V 参考，满量程 4095 对应 3.3 V，1 LSB ≈ 0.806 mV。MINI 底板上 ADC 的网络出现在排针区（PADC0IN101/102/103），板上没有传感器，信号要自己从外部给。判据很直接：引脚短到 GND 读 0 附近、短到 3.3 V 读 4095 附近、悬空时读数乱跳、自检通道 11001 应读到接近满偏。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function arrow(x1, y1, x2, y2) {
+  svgEl(scene, 'line', { x1: x1, y1: y1, x2: x2, y2: y2, stroke: 'var(--text-2)', 'stroke-width': 4 });
+  var a = Math.atan2(y2 - y1, x2 - x1), L = 18, W = 9;
+  svgEl(scene, 'path', {
+    d: 'M' + x2 + ' ' + y2 + ' L' + (x2 - L * Math.cos(a) + W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) - W * Math.cos(a)) +
+      ' L' + (x2 - L * Math.cos(a) - W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) + W * Math.cos(a)) + ' Z',
+    fill: 'var(--text-2)', stroke: 'none'
+  });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+
+function drawAbility() {
+  txt(scene, 56, 148, 'SAR 型、12 位、单端 8 路（封装上引出 10 根），通道号由 ADCH 决定', 't24w');
+
+  var CARDS = [
+    ['分辨率', '12 位输出，10–11 位精度', '有效位数 ENOB 最高 10', '差分非线性与增益误差决定实际精度'],
+    ['速度', '最高 1 MS/s', '12 位一次 25 个 ADCK 比较相位', '总线比 ADCK 慢时，连续转换节拍不可控'],
+    ['输入', '单端，最多 8 路（表列 IN0–IN9）', '引脚复用 GPIO1_IO00–IO09（ALT0）', '通道 11001 是内部 VREFSH 自检通道'],
+    ['参考', 'ADC_VREFH 单端参考', 'VREFL 内部接地，无独立球', '参考电压决定 1 LSB 的大小']
+  ];
+  CARDS.forEach(function (c, i) {
+    var x = 56 + i * 460;
+    box(x, 176, 432, 210, 'var(--page)', i === 0 ? 'var(--observe-line)' : 'var(--guide)', i === 0 ? 4 : 2);
+    txt(scene, x + 20, 216, c[0], 't28');
+    txt(scene, x + 20, 254, c[1], 't20w');
+    txt(scene, x + 20, 288, c[2], 't20w');
+    txt(scene, x + 20, 322, c[3], 't20w');
+  });
+
+  box(56, 412, 1812, 178, 'var(--surface)', 'var(--guide)');
+  head(80, 450, 'ADCH 的五位怎么读');
+  txt(scene, 80, 488, '00000–00111 → 外部通道 0–7（这块板实际能用的就是 8 路单端）', 't20w');
+  txt(scene, 80, 522, '11001 → VREFSH 内部通道，硬连到 VRH，用来做自检：应读到接近满量程', 't20w');
+  txt(scene, 80, 556, '11111 → 关闭转换并隔离输入：写这个值不只是不采样，还会把模拟前端从引脚断开', 't20w');
+
+  box(56, 608, 1812, 174, 'var(--page)', 'var(--alert-line)', 4);
+  head(80, 646, '一个容易忽略的细节');
+  txt(scene, 80, 684, '13.1.1 写「最多 8 路单端」，但 13.2 的信号表把这颗芯片的 ADC1_IN0–IN9 都列出来了。', 't20w');
+  txt(scene, 80, 718, '差的那两路不是笔误：能不能用取决于封装与引脚复用，MINI 板上引出的是排针那几根。', 't20w');
+  txt(scene, 80, 752, '所以做产品先查「你的封装引出几根」，再查「复用表里是不是 ALT0」，最后才写 ADCH。', 't20w');
+}
+
+function drawTiming() {
+  txt(scene, 56, 148, '总时间 = SFCAdder + 采样 + 比较 + 后处理，全部以 ADCK 为单位', 't24w');
+
+  box(56, 176, 596, 250, 'var(--page)', 'var(--guide)', 2);
+  head(80, 214, '时钟：ADICLK / ADIV');
+  txt(scene, 80, 252, 'ADC_CFG[ADICLK]：00 IPG ／ 01 IPG÷2 ／ 11 ADACK', 't20w');
+  txt(scene, 80, 286, 'ADC_CFG[ADIV]：00 ÷1 ／ 01 ÷2 ／ 10 ÷4 ／ 11 ÷8', 't20w');
+  txt(scene, 80, 320, 'ADACK 是 ADC 内部异步钟，噪声低，stop 模式下也能转', 't20w');
+  txt(scene, 80, 354, '复位默认：ADICLK=00（IPG），CFG 复位值 0x0000_0200', 't20w');
+  txt(scene, 80, 388, 'fADCK 必须在数据手册给的范围内，太快太慢都测不准', 't20w');
+
+  box(668, 176, 596, 250, 'var(--page)', 'var(--guide)', 2);
+  head(692, 214, '采样：ADLSMP × ADSTS');
+  txt(scene, 692, 252, '短采样（ADLSMP=0）：2 / 4 / 6 / 8 ADCK', 't20w');
+  txt(scene, 692, 286, '长采样（ADLSMP=1）：12 / 16 / 20 / 24 ADCK', 't20w');
+  txt(scene, 692, 320, '源阻抗高（分压器、热敏电阻）→ 选长采样', 't20w');
+  txt(scene, 692, 354, '源阻抗低（运放缓冲）→ 选短采样换速度', 't20w');
+  txt(scene, 692, 388, '默认 ADSTS=10、ADLSMP=0，即 6 个 ADCK', 't20w');
+
+  box(1280, 176, 588, 250, 'var(--page)', 'var(--alert-line)', 4);
+  head(1304, 214, '比较相位与 SFCAdder');
+  txt(scene, 1304, 252, 'BCT：8 位 17 ／ 10 位 21 ／ 12 位 25 ADCK', 't20w');
+  txt(scene, 1304, 286, 'SFCAdder：3 ADCK + 1 ADCK + 2 个总线周期', 't20w');
+  txt(scene, 1304, 320, 'ADACK 未开时额外加 1.5 µs 启动时间', 't20w');
+  txt(scene, 1304, 354, '平均因子：4 / 8 / 16 / 32（AVGS）', 't20w');
+  txt(scene, 1304, 388, '总时间 ≈ [SFC + 采样 + BCT] × 平均次数', 't20w');
+
+  box(56, 452, 1812, 306, 'var(--surface)', 'var(--guide)');
+  head(80, 492, '手册里的三个实算例子（照抄就能对上你的示波器）');
+  txt(scene, 80, 532, '典型：10 位、IPG=ADCK=40 MHz、ADLSMP=0、ADSTS=10 → (5+21+7) ≈ 33 个 ADCK ≈ 0.95 µs。', 't20w');
+  txt(scene, 80, 566, '长转换：12 位、ADCK=5 MHz、长采样 ADSTS=11、平均 32 次 → 单次 10.02 µs，总计 ≈ 320.7 µs。', 't20w');
+  txt(scene, 80, 600, '短转换：8 位、40 MHz、短采样、高速模式 → 比较相位只要 17 个 ADCK，吞吐最高。', 't20w');
+  txt(scene, 80, 640, '工程上先定「要几位 + 要多快」，再用这两条反推 ADCK 与 ADIV，最后校验 fADCK 落在规格内。', 't20w');
+  txt(scene, 80, 674, '反过来的错法很常见：先把 ADIV 设成 ÷8 图省事，结果采样时间不够，读数随源阻抗漂。', 't20w');
+  txt(scene, 80, 708, '判据：同一路直流输入，连续读 100 次，标准差应远小于 1 LSB（12 位约 0.8 mV）；跳得厉害先查采样时长与源阻抗。', 't20w');
+}
+
+function drawFlow() {
+  txt(scene, 56, 148, '软件触发一次转换只动三个寄存器：HC0 写通道、等 HS、读 R0', 't24w');
+
+  box(56, 186, 560, 96, 'var(--page)', 'var(--observe-line)', 4);
+  txt(scene, 80, 224, '① 写 ADC_HC0 = AIEN | ADCH', 't24');
+  txt(scene, 80, 258, '写动作本身就是触发（ADTRG 只支持软件）', 't20w');
+  arrow(616, 234, 692, 234);
+
+  box(704, 186, 540, 96, 'var(--page)', 'var(--guide)', 2);
+  txt(scene, 728, 224, '② 等 ADC_HS[COCO0]', 't24');
+  txt(scene, 728, 258, '置位表示结果已搬进 ADC_R0', 't20w');
+  arrow(1244, 234, 1320, 234);
+
+  box(1332, 186, 536, 96, 'var(--page)', 'var(--guide)', 2);
+  txt(scene, 1356, 224, '③ 读 ADC_R0[CDATA]', 't24');
+  txt(scene, 1356, 258, '读 R0 会自动清 COCO0，不用手动清', 't20w');
+
+  box(56, 314, 892, 218, 'var(--page)', 'var(--guide)', 2);
+  head(80, 352, '寄存器地图（基址 ADC1 0x0219_8000）');
+  txt(scene, 80, 390, 'HC0 +0x00（复位 0x1F）／ HS +0x08 ／ R0 +0x0C', 't20w');
+  txt(scene, 80, 424, 'CFG +0x14（复位 0x200）／ GC +0x18 ／ GS +0x1C', 't20w');
+  txt(scene, 80, 458, 'CV +0x20 ／ OFS +0x24 ／ CAL +0x28', 't20w');
+  txt(scene, 80, 492, 'HC0 与 R0 之间还有 HC1..HC7 与 R1..R7 的影子地址，本芯片只实现通道 0 的软件触发', 't20w');
+
+  box(976, 314, 892, 218, 'var(--page)', 'var(--alert-line)', 4);
+  head(1000, 352, '连续、平均与丢数');
+  txt(scene, 1000, 390, 'GC[ADCO]=1 连续转换：读走一个马上开始下一个', 't20w');
+  txt(scene, 1000, 424, 'GC[AVGE]=1 + CFG[AVGS]：4/8/16/32 次平均后再置 COCO0', 't20w');
+  txt(scene, 1000, 458, 'CFG[OVWREN]=0：旧数据未读，新结果被丢弃且 COCO0 不置位', 't20w');
+  txt(scene, 1000, 492, '所以高速连续采样必须配 DMA 或中断里立刻读，否则你以为在采，其实在丢', 't20w');
+
+  box(56, 552, 1812, 206, 'var(--surface)', 'var(--guide)');
+  head(80, 590, '一次裸机转换的代码骨架（可直接对照寄存器）');
+  txt(scene, 80, 628, 'ADC1_CFG = (0<<0) | (0<<2) | (0<<4) | (0<<5) | (0<<7) | (2<<8) | (0<<11) | (1<<13)；// IPG 时钟、12 位、6 ADCK 采样、软件触发', 't20w');
+  txt(scene, 80, 662, 'ADC1_GC = (1<<6)；// 连续转换；想要单次就置 0，靠写 HC0 触发', 't20w');
+  txt(scene, 80, 696, 'ADC1_HC0 = (1<<7) | 0；// AIEN=1、ADCH=0，写下去即开始', 't20w');
+  txt(scene, 80, 730, '等 COCO0 或进中断，然后 v = ADC1_R0 & 0xFFF；电压 = v / 4095 × VREF', 't20w');
+}
+
+function drawCal() {
+  txt(scene, 56, 148, '校准是一次性投入：不做，精度指标就不成立；做错，整段白做', 't24w');
+
+  box(56, 186, 892, 260, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 224, '校准五步');
+  txt(scene, 80, 262, '① 先把 CFG 配成「实际工作配置」（时钟、采样、参考、低功耗都要定）', 't20w');
+  txt(scene, 80, 296, '② 置 GC[CAL]=1；此时 ADTRG 必须为 0，否则 CAL 拒绝置位并拉 CALF', 't20w');
+  txt(scene, 80, 330, '③ 等 CAL 自动清 0（校准期间不能写任何 ADC 寄存器、不能进 stop）', 't20w');
+  txt(scene, 80, 364, '④ 查 GS[CALF]：0 正常，1 失败；再查 HS[COCO0] 是否置位', 't20w');
+  txt(scene, 80, 398, '⑤ 成功后读 CAL 寄存器里的校准值，可存起来复位后直接写回', 't20w');
+  txt(scene, 80, 432, '耗时上限：14000 个 ADCK + 100 个总线周期', 't20w');
+
+  box(976, 186, 892, 260, 'var(--page)', 'var(--guide)', 2);
+  head(1000, 224, '偏移校正 ADC_OFS');
+  txt(scene, 1000, 262, '13 位：最高位 OFS[12] 是符号位，0 加、1 减', 't20w');
+  txt(scene, 1000, 296, '12 位模式：OFS[11:0] 直接与 CDATA[11:0] 加减', 't20w');
+  txt(scene, 1000, 330, '8 位模式：只用 OFS[11:4]，低位被忽略', 't20w');
+  txt(scene, 1000, 364, '结果越界会被钳位：上限 0x0FFF、下限 0x0000', 't20w');
+  txt(scene, 1000, 398, '用途：去掉运放失调、去掉直流偏置', 't20w');
+  txt(scene, 1000, 432, '偏移量过大会让结果一直贴边，别用它硬拉满量程', 't20w');
+
+  box(56, 470, 1812, 288, 'var(--surface)', 'var(--guide)');
+  head(80, 510, '校准与偏移的边界');
+  txt(scene, 80, 550, '校准修正的是 ADC 内部电容阵列的失配，偏移修正的是你外部电路的直流偏置——两者不能互相替代。', 't20w');
+  txt(scene, 80, 584, '校准值随温度与电压漂移，工业场景建议在温度稳定后重新校准一次，而不是只在上电校一次。', 't20w');
+  txt(scene, 80, 618, '若你的应用会切换多种配置（比如 8 位高速与 12 位高精度交替），要么按最高精度那套校准，要么分别校准并保存。', 't20w');
+  txt(scene, 80, 652, '判据：做完校准后，把同一路已知电压连读 100 次，均值与理论值之差应小于 2 LSB；超过就先怀疑参考电压本身。', 't20w');
+  txt(scene, 80, 686, '另一个判据：CALF 一旦为 1，后面所有读数都不可信——不要用「大概能用」的心态绕过它。', 't20w');
+  txt(scene, 80, 720, '复位会清掉校准寄存器，所以每次上电都要重跑，或者把上次的校准值写回 ADC_CAL。', 't20w');
+}
+
+function drawCompare() {
+  txt(scene, 56, 148, '比较功能让 ADC 自己判断「是否越界」，不需要 CPU 一直读', 't24w');
+
+  box(56, 176, 340, 48, 'var(--surface)', 'var(--line)', 2);
+  txt(scene, 80, 208, 'ACFGT / ACREN', 't24');
+  box(412, 176, 720, 48, 'var(--surface)', 'var(--line)', 2);
+  txt(scene, 436, 208, '比较条件（真 → COCO0 置位并搬数据）', 't24');
+  box(1148, 176, 720, 48, 'var(--surface)', 'var(--line)', 2);
+  txt(scene, 1172, 208, '典型用途', 't24');
+
+  var ROWS = [
+    ['0 / 0', '结果 < CV1（小于阈值）', '过温、欠压的下限报警'],
+    ['1 / 0', '结果 ≥ CV1（大于等于阈值）', '上限报警、超流检测'],
+    ['0 / 1 · CV1≤CV2', '结果 < CV1 或 > CV2（区间外，不含端点）', '正常窗口外的故障'],
+    ['0 / 1 · CV1>CV2', 'CV1 < 结果 < CV2（区间内，不含端点）', '窄窗口内的有效信号'],
+    ['1 / 1 · CV1≤CV2', 'CV1 ≤ 结果 ≤ CV2（区间内，含端点）', '合格区间判定'],
+    ['1 / 1 · CV1>CV2', '结果 ≥ CV1 或 ≤ CV2（区间外，含端点）', '双阈值报警']
+  ];
+  ROWS.forEach(function (r, i) {
+    var y = 236 + i * 52;
+    box(56, y, 340, 44, 'var(--page)', 'var(--guide)', 2);
+    txt(scene, 80, y + 32, r[0], 't20w');
+    box(412, y, 720, 44, 'var(--page)', 'var(--guide)', 2);
+    txt(scene, 436, y + 32, r[1], 't20w');
+    box(1148, y, 720, 44, 'var(--page)', 'var(--guide)', 2);
+    txt(scene, 1172, y + 32, r[2], 't20w');
+  });
+
+  box(56, 588, 892, 170, 'var(--page)', 'var(--alert-line)', 4);
+  head(80, 626, '低功耗的两把钥匙');
+  txt(scene, 80, 664, 'GC[ADLPC]=1：缩短比较器开启时间，换更低的平均功耗', 't20w');
+  txt(scene, 80, 698, 'GC[ADACKEN]=1：异步钟常开 —— stop 模式下仍能转换与比较', 't20w');
+  txt(scene, 80, 732, 'wait 模式下三路时钟都在，转换可以照常完成', 't20w');
+
+  box(976, 588, 892, 170, 'var(--page)', 'var(--guide)', 2);
+  head(1000, 626, '比较模式的三个坑');
+  txt(scene, 1000, 664, '① 比较不成立时 COCO0 不置位、数据不搬 —— 别以为是硬件坏了', 't20w');
+  txt(scene, 1000, 698, '② ACREN=1 时 CV1 与 CV2 的大小关系会翻转语义，写错就反了', 't20w');
+  txt(scene, 1000, 732, '③ 比较可以配合 stop 模式做「超限唤醒」，这是低功耗监测量常用的招', 't20w');
+}
+
+function drawBoard() {
+  txt(scene, 56, 148, '板子上只有参考电压是确定的，信号要你自己给', 't24w');
+
+  box(56, 176, 588, 200, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '参考与供电');
+  txt(scene, 80, 252, 'ADC_VREFH（L13）→ VDDA_ADC_3P3 → DCDC_3V3', 't20w');
+  txt(scene, 80, 286, '1 LSB = 3.3 V / 4096 ≈ 0.806 mV', 't20w');
+  txt(scene, 80, 320, '满量程码 4095 对应 ≈ 3.3 V − 1 LSB', 't20w');
+  txt(scene, 80, 354, 'VREFL 内部接地，板上没有独立引脚可调', 't20w');
+
+  box(668, 176, 588, 200, 'var(--page)', 'var(--guide)', 2);
+  head(692, 214, '引脚与排针');
+  txt(scene, 692, 252, 'ADC1_IN0–IN7 复用 GPIO1_IO00–IO07（ALT0）', 't20w');
+  txt(scene, 692, 286, '底板上出现 PADC0IN101/102/103 三处网络（排针区）', 't20w');
+  txt(scene, 692, 320, '板上没有电位器或传感器，信号需外部输入', 't20w');
+  txt(scene, 692, 354, '测量前把对应 GPIO 的 ALT 切到 ADC，别留在 GPIO 模式', 't20w');
+
+  box(1280, 176, 588, 200, 'var(--page)', 'var(--alert-line)', 4);
+  head(1304, 214, '量之前先想清楚');
+  txt(scene, 1304, 252, '输入阻抗高 → 必须长采样，否则读数偏低', 't20w');
+  txt(scene, 1304, 286, '别直接拿 5 V 信号接进来，超过 VDDA 会打坏引脚', 't20w');
+  txt(scene, 1304, 320, '参考脚旁边要有滤波电容，噪声直接进结果', 't20w');
+  txt(scene, 1304, 354, '悬空引脚读数乱跳是正常的，接上源再看', 't20w');
+
+  box(56, 404, 1812, 354, 'var(--surface)', 'var(--guide)');
+  head(80, 444, '四条判据，十分钟验证你的 ADC 通路');
+  txt(scene, 80, 484, '① 短接到 GND：读数应在 0–3 之间；若明显大于 10，检查参考地是否与板共地。', 't20w');
+  txt(scene, 80, 518, '② 短接到 3.3 V（同一路 VDDA）：读数应在 4090–4095；偏低说明采样时间不足或有分压。', 't20w');
+  txt(scene, 80, 552, '③ 用 1.65 V 分压（两只 10 kΩ）：读数应在 2048±8；偏差大就是校准没做或偏移没设。', 't20w');
+  txt(scene, 80, 586, '④ ADCH=11001（VREFSH 自检）：应读接近 4095 —— 这一条能区分「模拟前端坏了」还是「外部接线错了」。', 't20w');
+  txt(scene, 80, 626, '三条外部、一条内部，正好把「参考、采样、校准、接线」四个可疑点分开。', 't20w');
+  txt(scene, 80, 660, '如果 ①②④ 都正常而 ③ 偏，问题几乎一定在外部电阻精度或分压网络，而不是 ADC 本身。', 't20w');
+  txt(scene, 80, 694, '最后一条经验：读数抖动大约 ±2 LSB 属正常；超过 ±10 LSB 先看电源纹波与地线，而不是先改代码平均。', 't20w');
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawAbility();
+  else if (s === 1) drawTiming();
+  else if (s === 2) drawFlow();
+  else if (s === 3) drawCal();
+  else if (s === 4) drawCompare();
+  else drawBoard();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () {
+  state.step = INIT.step; state.lane = INIT.lane; draw();
+});
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>

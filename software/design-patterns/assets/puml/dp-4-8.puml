@@ -1,0 +1,13 @@
+@startuml
+[*] --> INIT : createPayment
+INIT --> PAYING : payRequested
+PAYING --> SUCCESS : callbackSuccess(验签通过)
+PAYING --> FAILED : callbackFail
+PAYING --> CLOSED : timeout(15min)
+SUCCESS --> [*]
+FAILED --> [*]
+CLOSED --> [*]
+PAYING --> PAYING : duplicateCallback(幂等返回)
+SUCCESS --> SUCCESS : duplicateCallback(不再扣款)
+note right of SUCCESS: 重复/迟到回调只记录，不改金额
+@enduml

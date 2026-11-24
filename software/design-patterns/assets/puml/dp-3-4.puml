@@ -1,0 +1,26 @@
+@startuml
+autonumber
+participant "Client" as C
+participant "TraceMiddleware" as T
+participant "AuthMiddleware" as A
+participant "RateLimitMiddleware" as R
+participant "OrderHandler" as H
+
+C -> T: POST /orders (no traceId)
+T -> T: traceId = uuid()
+T -> A: next(req + traceId)
+A -> A: verify JWT
+alt token 过期
+  A --> T: 401 TOKEN_EXPIRED
+  T --> C: 401 + traceId
+else 通过
+  A -> R: next(req + userId)
+  R -> R: check quota(tenant)
+  alt 超限
+    R --> C: 429 + Retry-After
+  else 放行
+    R -> H: handle(req)
+    H --> R: 201 Created
+  end
+end
+@enduml

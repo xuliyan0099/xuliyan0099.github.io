@@ -1,0 +1,23 @@
+@startuml
+autonumber
+participant "OrderService" as O
+participant "PaymentFactory" as F
+participant "ProviderRegistry" as R
+participant "WeChatProvider" as W
+participant "AlipayProvider" as A
+
+O -> F: create("wechat", merchant, keyVer=3)
+F -> R: lookup("wechat")
+R --> F: WeChatProvider
+F -> W: new(merchant, keyVer)
+F --> O: provider
+O -> W: pay(orderNo, idemKey, 199.00)
+alt 渠道超时
+  O -> F: create("alipay", merchant, keyVer=7)
+  F --> O: AlipayProvider
+  O -> A: pay(同一 idemKey)
+  note right of A: 幂等键不变，避免重复扣款
+else 成功
+  W --> O: tradeNo + SUCCESS
+end
+@enduml

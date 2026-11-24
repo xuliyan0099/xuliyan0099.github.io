@@ -1,0 +1,27 @@
+@startuml
+autonumber
+participant "Gateway" as G
+participant "Router" as R
+participant "Strategy" as S
+participant "Limiter" as L
+participant "Upstream" as U
+
+G -> R: pick(tenant=42, path=/api/order)
+R -> S: select(tenant)
+alt 大租户
+  S --> R: WeightedRoundRobin
+else 缓存型
+  S --> R: ConsistentHash
+end
+R -> S: choose(nodes, key)
+S --> R: node-3
+G -> L: allow(tenant, qps=200)
+alt 超限
+  L --> G: 429 retryAfter=1s
+else 放行
+  L --> G: ok
+  G -> U: proxy(node-3)
+  U --> G: 200
+end
+note over R,S: 策略名随 trace 上报，便于回放
+@enduml

@@ -1,0 +1,28 @@
+@startuml
+autonumber
+participant "OrderService" as O
+participant "FulfillmentBuilder" as B
+participant "Inventory" as I
+participant "Carrier" as C
+
+O -> B: new(orderId)
+O -> B: warehouse("SHA-01")
+B -> I: lockStock(sku, qty)
+I --> B: reserved
+O -> B: carrier("SF", insured=true)
+B -> C: quote(address, weight)
+alt 报价失败
+  C --> B: TIMEOUT
+  B --> O: Retryable("换承运商")
+  O -> B: carrier("JD", insured=true)
+  B -> C: quote(address, weight)
+end
+O -> B: invoice(taxNo, type="VAT")
+O -> B: build()
+B -> B: validate()
+alt 缺报关单
+  B --> O: Invalid("CUSTOMS_DOC_MISSING")
+else 校验通过
+  B --> O: Fulfillment(只读)
+end
+@enduml

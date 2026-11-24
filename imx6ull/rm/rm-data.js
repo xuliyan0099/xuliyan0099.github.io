@@ -62,7 +62,7 @@ window.RM =
           "ready": true,
           "line": "先看域划分与低功耗策略，再去读 18/27/39/51 的寄存器细节。",
           "pts": ["时钟管理：PLL 家族与根时钟分配", "电源域、ONOFF 按键与 DVFS 的关系"] },
-        { "n": 18, "zh": "时钟控制器 CCM：PLL、分频、门控", "en": "Clock Controller Module", "pp": "625–750", "pages": 126, "pri": "read", "batch": 1,
+        { "n": 18, "zh": "时钟控制器 CCM：PLL、分频、门控", "en": "Clock Controller Module", "pp": "625–750", "pages": 126, "pri": "read", "batch": 1, "ready": true,
           "line": "全片时钟的中枢：PLL 怎么锁、根时钟怎么分、CCGR 怎么开门。",
           "pts": ["CCM 时钟树：7 组 PLL 与各根时钟的来源", "CCGR0–7 门控位：外设时钟的第一道开关", "时钟切换握手与低功耗时的时钟停振", "配频：从 24MHz 到 528MHz 的寄存器序列"] },
         { "n": 27, "zh": "电源门控 GPC", "en": "General Power Controller", "pp": "1325–1342", "pages": 18, "pri": "opt", "batch": 6,

@@ -222,6 +222,47 @@ int main()
     
     <div class="prose"><p class="subh">参考教程：<a href="https://www.runoob.com/design-pattern/interpreter-pattern.html" target="_blank" rel="noopener">www.runoob.com</a></p><ul><li><b>树里存共享子表达式</b>同一节点被两个父亲持有，C++ 用 <code>unique_ptr</code> 会直接崩；需要共享就上 <code>shared_ptr</code>。</li><li><b>节点做类型转换</b>求值只依赖孩子接口，不要在 Add 里判断孩子是不是 Number。</li><li><b>递归太深</b>长表达式会爆栈；真实场景要限制深度或改显式栈。</li></ul></div>
   </section>
+
+  <section class="sec" id="s7">
+    <h2><span class="n">07</span>生产实例与 PlantUML</h2>
+    
+    
+    <p class="subh">生产实例：风控规则 DSL（年龄 / 金额 / 地区）</p>
+    <div class="prose">
+      <p>风控规则每天在变，不能每次改代码发版。规则写成表达式：<code>age &lt; 18 or (amount &gt; 5000 and region == "MO")</code>，解析成 AST 后缓存；每笔交易对同一棵树求值。新增规则只加节点，不改求值器。</p>
+<ul><li><b>短路</b>：<code>or</code> 左边为真就不再求右边，降低延迟。</li>
+<li><b>可解释</b>：命中时返回具体命中的子表达式，方便客服解释。</li>
+<li><b>灰度</b>：新规则先影子运行，只记录不拦截。</li></ul>
+      <h3 class="mini-h">生产约束</h3>
+      <ul class="cons"><li>规则文本必须版本化，历史交易按当时版本解释</li><li>求值器不能依赖外部 IO，否则规则不可重放</li><li>节点类型要封闭，避免解析出未知节点导致放行</li></ul>
+    </div>
+    <div class="fig puml-fig">
+      <div class="fig-h"><b>PlantUML · class</b><span>plantuml.com 渲染</span></div>
+      <div class="puml-shot"><img src="../assets/puml/dp-4-3.svg" alt="生产实例：风控规则 DSL（年龄 / 金额 / 地区） 的 PlantUML 图" decoding="async"></div>
+    </div>
+    <details class="puml-box"><summary>PlantUML 源码 · dp-4-3.puml</summary><pre><code>@startuml
+abstract class RuleNode {
+  +eval(ctx): bool
+}
+class And
+class Or
+class Not
+class Compare {
+  +field
+  +op
+  +value
+}
+class Value
+RuleNode &lt;|-- And
+RuleNode &lt;|-- Or
+RuleNode &lt;|-- Not
+RuleNode &lt;|-- Compare
+Compare --&gt; Value
+note right of Compare: age &lt; 18 / amount &gt; 5000
+note bottom of Or: 左真短路，不再求右
+@enduml</code></pre></details>
+    
+  </section>
   <div class="ch-nav" id="chNav"></div>
   </div>
 </div>

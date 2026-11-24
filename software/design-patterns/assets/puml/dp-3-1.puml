@@ -1,0 +1,22 @@
+@startuml
+autonumber
+participant "PaymentCore" as P
+participant "BankAdapter" as A
+participant "SOAPClient" as S
+participant "BankHost" as B
+
+P -> A: transfer(req{amount=199.00, bank="ICBC"})
+A -> A: map fields (yuan->fen, pad bankCode)
+A -> A: sign(SHA1-RSA, privateKey)
+A -> S: send(envelope, timeout=8s)
+S -> B: HTTPS POST /bank/transfer
+alt 银行返回 1003
+  B --> S: fault(1003)
+  S --> A: fault
+  A --> P: INSUFFICIENT_FUNDS
+else 成功
+  B --> S: response(tradeNo)
+  A --> P: TransferResult(tradeNo)
+end
+note over A: 支付核心从未出现 SOAP 字段
+@enduml

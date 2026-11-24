@@ -94,6 +94,11 @@ PARTS = [
 from content_a import C as _CA
 from content_b import C as _CB
 from content_c import C as _CC
+from prod_a import P as _PA
+from prod_b import P as _PB
+from prod_c import P as _PC
+PROD = {}
+PROD.update(_PA); PROD.update(_PB); PROD.update(_PC)
 CONTENT = {}
 CONTENT.update(_CA); CONTENT.update(_CB); CONTENT.update(_CC)
 
@@ -110,7 +115,7 @@ _SEC2 = {
 for _p, _c in [(p, c) for p in PARTS for c in p["chapters"]]:
     if _c["n"] in _SUB:
         _c["s"] = _SUB[_c["n"]]
-        _c["sec"] = ["问题：坏代码长什么样", _SEC2[_c["n"]], "两份实现：C 与 C++", "运行与演示", "C 与 C++ 对照", "代价与坑"]
+        _c["sec"] = ["问题：坏代码长什么样", _SEC2[_c["n"]], "两份实现：C 与 C++", "运行与演示", "C 与 C++ 对照", "代价与坑", "生产实例与 PlantUML"]
 
 ALL = [(p, c) for p in PARTS for c in p["chapters"]]
 TOTAL_MIN = sum(c["min"] for _, c in ALL)
@@ -548,6 +553,25 @@ def build_new(part, ch, c):
     ref = c.get("ref")
     ref_html = f'<p class="subh">参考教程：<a href="{ref}" target="_blank" rel="noopener">{ref.split("/")[2]}</a></p>' if ref else ""
     secs.append(section_shell(6, ch["sec"][5], f'<div class="prose">{ref_html}<ul>{pits}</ul></div>'))
+    prod = PROD.get(ch["n"])
+    if prod:
+        kind = "class" if ("class " in prod["puml"] or "interface " in prod["puml"]) else ("state" if "-->" in prod["puml"] and "participant" not in prod["puml"] else "sequence")
+        slug = "dp-" + ch["n"].replace(".", "-")
+        cons = "".join(f"<li>{esc(x)}</li>" for x in prod["cons"])
+        body7 = f'''
+    <p class="subh">{esc(prod["title"])}</p>
+    <div class="prose">
+      {prod["lead"]}
+      <h3 class="mini-h">生产约束</h3>
+      <ul class="cons">{cons}</ul>
+    </div>
+    <div class="fig puml-fig">
+      <div class="fig-h"><b>PlantUML · {kind}</b><span>plantuml.com 渲染</span></div>
+      <div class="puml-shot"><img src="../assets/puml/{slug}.svg" alt="{esc(prod["title"])} 的 PlantUML 图" decoding="async"></div>
+    </div>
+    <details class="puml-box"><summary>PlantUML 源码 · {slug}.puml</summary><pre><code>{esc(prod["puml"].strip())}</code></pre></details>
+    '''
+        secs.append(section_shell(7, "生产实例与 PlantUML", body7))
 
     chips = "".join(f'<span class="chip{" ok" if i == 0 else ""}">{x}</span>' for i, x in enumerate(c["chips"]))
     page = page_shell(part, ch, ch["t"], c["desc"], "\n".join(secs), chips, c["lede"])
@@ -587,8 +611,8 @@ def build_index():
     body = f"""
   <div class="ch-meta"><span class="lv">设计模式全书</span><span class="sep">/</span>四篇 25 章<span class="sep">/</span>C 与 C++ 双实现</div>
   <h1>设计模式：从一张函数表，到一个可替换的对象</h1>
-  <p class="lede">这套东西不背定义。每个模式都走同一条线：先看它在真实代码里长什么样（通常是坏的），再画清结构，然后给两份实现——一份 C 的（结构体首成员放函数表指针，手工虚表），一份 C++ 的（虚函数 + <code>unique_ptr</code>/<code>shared_ptr</code>）。两份代码用 gcc/g++ <code>-Wall -Wextra</code> 零警告编译，页面上的 RUN 输出就是实际跑出来的结果。例子全部取自网络上成熟的教程：Refactoring Guru 中文版的物流、GUI、文件系统、聊天室、订单等经典场景，解释器一章参考菜鸟教程。</p>
-  <div class="chips"><span class="chip ok">四篇 25 章</span><span class="chip">23 个 GoF 模式全实现</span><span class="chip">每章 6 节</span></div>
+  <p class="lede">这套东西不背定义。每个模式都走同一条线：先看它在真实代码里长什么样（通常是坏的），再画清结构，然后给两份实现——一份 C 的（结构体首成员放函数表指针，手工虚表），一份 C++ 的（虚函数 + <code>unique_ptr</code>/<code>shared_ptr</code>）。两份代码用 gcc/g++ <code>-Wall -Wextra</code> 零警告编译，页面上的 RUN 输出就是实际跑出来的结果。例子全部取自网络上成熟的教程：Refactoring Guru 中文版的物流、GUI、文件系统、聊天室、订单等经典场景，解释器一章参考菜鸟教程。每章末尾再放一个生产实例：并发、幂等、超时、补偿这些真实约束，配一张 PlantUML 时序/类图和可展开的源码。</p>
+  <div class="chips"><span class="chip ok">四篇 25 章</span><span class="chip">23 个 GoF 模式全实现</span><span class="chip">每章 7 节 · 生产实例</span><span class="chip">23 张 PlantUML 图</span></div>
 
   <section class="sec" id="s0">
     <h2><span class="n">0</span>　四篇的关系</h2>

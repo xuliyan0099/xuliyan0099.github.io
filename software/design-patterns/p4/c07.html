@@ -232,6 +232,49 @@ int main()
     
     <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/observer" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>通知中退订</b>遍历时删除元素会让迭代器失效；先拷贝名单或延迟删除。</li><li><b>订阅者比发布者先死</b>C++ 裸指针会悬空；需要弱引用或显式退订。</li><li><b>更新顺序有依赖</b>订阅者互相依赖时，观察者顺序会变成隐式契约；尽量不要让订阅者互相调用。</li></ul></div>
   </section>
+
+  <section class="sec" id="s7">
+    <h2><span class="n">07</span>生产实例与 PlantUML</h2>
+    
+    
+    <p class="subh">生产实例：领域事件 + Outbox 表</p>
+    <div class="prose">
+      <p>订单服务要在同一个数据库事务里改订单状态并通知下游。直接发 MQ 会有“事务回滚了消息已发”的问题。观察者在这里落成 <b>outbox</b>：业务表和 outbox 同事务写入，后台投递器读取 outbox 发消息，下游按 eventId 幂等消费。</p>
+<ul><li><b>至少一次</b>：投递器失败重试，消费者去重。</li>
+<li><b>不阻塞主链</b>：投递异步，订单接口不被 MQ 抖动拖慢。</li>
+<li><b>可回放</b>：outbox 保留 3 天，故障后可重放。</li></ul>
+      <h3 class="mini-h">生产约束</h3>
+      <ul class="cons"><li>业务写入和 outbox 必须同一事务</li><li>投递器要支持多实例，避免重复并发发送</li><li>消费者按 eventId 去重，不能只靠消息顺序</li></ul>
+    </div>
+    <div class="fig puml-fig">
+      <div class="fig-h"><b>PlantUML · sequence</b><span>plantuml.com 渲染</span></div>
+      <div class="puml-shot"><img src="../assets/puml/dp-4-7.svg" alt="生产实例：领域事件 + Outbox 表 的 PlantUML 图" decoding="async"></div>
+    </div>
+    <details class="puml-box"><summary>PlantUML 源码 · dp-4-7.puml</summary><pre><code>@startuml
+autonumber
+participant "OrderTx" as T
+participant "OrderDB" as D
+participant "OutboxPoller" as P
+participant "Kafka" as K
+participant "PointsConsumer" as C
+
+T -&gt; D: BEGIN
+T -&gt; D: UPDATE order SET status=PAID
+T -&gt; D: INSERT outbox(eventId=E9, type=OrderPaid)
+T -&gt; D: COMMIT
+P -&gt; D: SELECT unpublished outbox
+P -&gt; K: publish(E9, key=orderId)
+alt 发送成功
+  K --&gt; C: consume(E9)
+  C -&gt; C: if seen(E9) skip else addPoints
+  P -&gt; D: mark published
+else 发送失败
+  P -&gt; P: retry(backoff)
+  note right: 不丢事件；最多重复，消费端幂等
+end
+@enduml</code></pre></details>
+    
+  </section>
   <div class="ch-nav" id="chNav"></div>
   </div>
 </div>

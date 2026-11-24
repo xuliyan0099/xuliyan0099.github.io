@@ -1,0 +1,20 @@
+@startuml
+autonumber
+participant "OrderService" as O
+participant "EventBus" as B
+participant "InventorySvc" as I
+participant "PointsSvc" as P
+participant "NotifySvc" as N
+
+O -> B: publish(OrderPlaced, key=orderId)
+B -> I: deliver(eventId=E1)
+I --> B: ack
+B -> P: deliver(eventId=E1)
+P --> B: ack
+B -> N: deliver(eventId=E1)
+N --> B: timeout
+B -> B: retry(backoff)
+B -> N: redeliver(E1)
+N --> B: ack
+note over B: 最多重复；消费端按 eventId 去重
+@enduml

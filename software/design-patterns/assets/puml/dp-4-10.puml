@@ -1,0 +1,25 @@
+@startuml
+autonumber
+participant "Scheduler" as S
+participant "SyncJob" as J
+participant "Source" as R
+participant "Sink" as W
+participant "MetaDB" as M
+
+S -> J: run(jobId)
+J -> M: acquireLock(jobId)
+J -> M: loadOffset()
+J -> R: extract(offset)
+R --> J: batch
+J -> J: transform(batch)
+alt 校验失败
+  J -> M: releaseLock()
+  J --> S: Failed(offset unchanged)
+else 通过
+  J -> W: write(batch, txn)
+  J -> M: commitOffset(next) in same txn
+  J -> M: releaseLock()
+  J --> S: Success(rows=N, nextOffset)
+end
+note over J: run() 顺序固定；子类只换 extract/transform
+@enduml

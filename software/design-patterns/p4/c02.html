@@ -250,6 +250,55 @@ int main()
     
     <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/command" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>execute 和 undo 不对称</b>执行改了三个字段，撤销只回滚两个，历史立刻错位。</li><li><b>命令里存业务状态</b>状态应集中在接收者；命令只存“做了什么”。</li><li><b>撤销栈无限增长</b>长会话要限制深度或合并同类命令，否则内存持续上涨。</li></ul></div>
   </section>
+
+  <section class="sec" id="s7">
+    <h2><span class="n">07</span>生产实例与 PlantUML</h2>
+    
+    
+    <p class="subh">生产实例：交易下单命令与撤销补偿</p>
+    <div class="prose">
+      <p>交易系统把“下单/撤单”封装成命令：命令带 clientOrderNo、幂等键、版本号，进持久化队列后由执行器消费。撤单不是删记录，而是产生一条<b>反向命令</b>，两条命令都留在账本里，审计可回放。</p>
+<ul><li><b>幂等</b>：同一 clientOrderNo 重复投递只执行一次。</li>
+<li><b>补偿</b>：撤单失败进入重试队列，超过 3 次转人工。</li>
+<li><b>顺序</b>：同一订单的命令按版本号串行，禁止并发改状态。</li></ul>
+      <h3 class="mini-h">生产约束</h3>
+      <ul class="cons"><li>命令必须持久化后再执行，不能只存在内存队列</li><li>执行与撤销要对称，撤单也要写账本</li><li>重试不能生成新的幂等键</li></ul>
+    </div>
+    <div class="fig puml-fig">
+      <div class="fig-h"><b>PlantUML · sequence</b><span>plantuml.com 渲染</span></div>
+      <div class="puml-shot"><img src="../assets/puml/dp-4-2.svg" alt="生产实例：交易下单命令与撤销补偿 的 PlantUML 图" decoding="async"></div>
+    </div>
+    <details class="puml-box"><summary>PlantUML 源码 · dp-4-2.puml</summary><pre><code>@startuml
+autonumber
+participant "Trader" as T
+participant "CommandQueue" as Q
+participant "Executor" as X
+participant "MatchingEngine" as M
+participant "Ledger" as L
+
+T -&gt; Q: PlaceOrder(clientOrderNo=O1, idem=K1, v=1)
+Q -&gt; X: consume(K1)
+X -&gt; L: check idem(K1)
+alt 已执行
+  X --&gt; T: Duplicate(K1, orderId)
+else 首次
+  X -&gt; M: submit(order)
+  M --&gt; X: accepted(orderId)
+  X -&gt; L: append(PlaceOrder, v=1)
+end
+T -&gt; Q: CancelOrder(orderId, idem=K2, v=2)
+Q -&gt; X: consume(K2)
+X -&gt; M: cancel(orderId)
+alt 撤单被拒
+  M --&gt; X: REJECT(late)
+  X -&gt; Q: retry(3) then manual
+else 成功
+  X -&gt; L: append(CancelOrder, v=2)
+  X --&gt; T: Cancelled
+end
+@enduml</code></pre></details>
+    
+  </section>
   <div class="ch-nav" id="chNav"></div>
   </div>
 </div>

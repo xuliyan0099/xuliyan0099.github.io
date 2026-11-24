@@ -1,0 +1,27 @@
+@startuml
+autonumber
+participant "Web" as W
+participant "CatalogProxy" as P
+participant "LocalCache" as L
+participant "CatalogService" as S
+
+W -> P: getSku("A100")
+P -> L: get("A100")
+alt 命中
+  L --> P: sku(version=7)
+  P --> W: sku
+else 未命中且断路器关闭
+  P -> S: GET /sku/A100 (timeout=300ms)
+  alt 成功
+    S --> P: sku
+    P -> L: put(ttl=60s + jitter)
+    P --> W: sku
+  else 连续失败
+    S --> P: 5xx
+    P -> P: openCircuit(30s)
+    P --> W: stale + degraded=true
+  end
+else 断路器打开
+  P --> W: stale + degraded=true
+end
+@enduml

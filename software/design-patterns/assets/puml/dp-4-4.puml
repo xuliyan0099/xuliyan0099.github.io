@@ -1,0 +1,17 @@
+@startuml
+autonumber
+participant "Exporter" as E
+participant "CursorIterator" as I
+participant "Database" as D
+participant "S3Writer" as W
+
+E -> I: open(table="orders", batch=1000)
+loop 直到没有下一批
+  I -> D: SELECT ... WHERE id > :lastId ORDER BY id LIMIT 1000
+  D --> I: rows[1000] + lastId
+  I --> E: batch
+  E -> W: write(part-000N.csv)
+end
+I --> E: EOF
+note over I: 内存里最多一批；失败从 lastId 续传
+@enduml

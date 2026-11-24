@@ -1,0 +1,29 @@
+@startuml
+autonumber
+participant "Trader" as T
+participant "CommandQueue" as Q
+participant "Executor" as X
+participant "MatchingEngine" as M
+participant "Ledger" as L
+
+T -> Q: PlaceOrder(clientOrderNo=O1, idem=K1, v=1)
+Q -> X: consume(K1)
+X -> L: check idem(K1)
+alt 已执行
+  X --> T: Duplicate(K1, orderId)
+else 首次
+  X -> M: submit(order)
+  M --> X: accepted(orderId)
+  X -> L: append(PlaceOrder, v=1)
+end
+T -> Q: CancelOrder(orderId, idem=K2, v=2)
+Q -> X: consume(K2)
+X -> M: cancel(orderId)
+alt 撤单被拒
+  M --> X: REJECT(late)
+  X -> Q: retry(3) then manual
+else 成功
+  X -> L: append(CancelOrder, v=2)
+  X --> T: Cancelled
+end
+@enduml

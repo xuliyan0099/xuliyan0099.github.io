@@ -1,0 +1,23 @@
+@startuml
+autonumber
+participant "OrderTx" as T
+participant "OrderDB" as D
+participant "OutboxPoller" as P
+participant "Kafka" as K
+participant "PointsConsumer" as C
+
+T -> D: BEGIN
+T -> D: UPDATE order SET status=PAID
+T -> D: INSERT outbox(eventId=E9, type=OrderPaid)
+T -> D: COMMIT
+P -> D: SELECT unpublished outbox
+P -> K: publish(E9, key=orderId)
+alt 发送成功
+  K --> C: consume(E9)
+  C -> C: if seen(E9) skip else addPoints
+  P -> D: mark published
+else 发送失败
+  P -> P: retry(backoff)
+  note right: 不丢事件；最多重复，消费端幂等
+end
+@enduml

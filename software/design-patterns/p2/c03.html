@@ -235,6 +235,54 @@ int main()
     
     <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/builder" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>步骤可以任意跳过</b>建造者要能表达“缺项”，并在 build 时拒绝；不要默认补全。</li><li><b>build 之后还能改</b>成品交付后应视为不可变；否则校验结果立刻失效。</li><li><b>把所有业务都塞进建造者</b>建造者只管拼装与完整性，不要在里面发网络请求、写数据库。</li></ul></div>
   </section>
+
+  <section class="sec" id="s7">
+    <h2><span class="n">07</span>生产实例与 PlantUML</h2>
+    
+    
+    <p class="subh">生产实例：履约单组装（仓、承运商、保价、发票）</p>
+    <div class="prose">
+      <p>履约单有二十多个字段，来自库存、承运商、关税、发票四个系统。直接写一个巨型构造函数，调用方靠位置参数记忆，线上就出现过“保价传成了发票类型”的事故。建造者把每一步变成具名方法，<b>build() 时统一校验</b>：没有保价、没有报关单、地址缺邮编，一律拒绝交付。</p>
+<ul><li><b>部分失败</b>：承运商报价失败时保留已选仓库，允许换承运商重试。</li>
+<li><b>不可变成品</b>：交付后的履约单禁止再改，防止后续步骤偷改运费。</li>
+<li><b>审计</b>：每步记录操作人和时间，出问题能还原拼装过程。</li></ul>
+      <h3 class="mini-h">生产约束</h3>
+      <ul class="cons"><li>build() 之前允许重试某一步，build() 之后成品只读</li><li>校验规则要版本化，历史订单按当时规则解释</li><li>不要把外部调用塞进建造者，网络失败会让半成品长期占用内存</li></ul>
+    </div>
+    <div class="fig puml-fig">
+      <div class="fig-h"><b>PlantUML · sequence</b><span>plantuml.com 渲染</span></div>
+      <div class="puml-shot"><img src="../assets/puml/dp-2-3.svg" alt="生产实例：履约单组装（仓、承运商、保价、发票） 的 PlantUML 图" decoding="async"></div>
+    </div>
+    <details class="puml-box"><summary>PlantUML 源码 · dp-2-3.puml</summary><pre><code>@startuml
+autonumber
+participant "OrderService" as O
+participant "FulfillmentBuilder" as B
+participant "Inventory" as I
+participant "Carrier" as C
+
+O -&gt; B: new(orderId)
+O -&gt; B: warehouse("SHA-01")
+B -&gt; I: lockStock(sku, qty)
+I --&gt; B: reserved
+O -&gt; B: carrier("SF", insured=true)
+B -&gt; C: quote(address, weight)
+alt 报价失败
+  C --&gt; B: TIMEOUT
+  B --&gt; O: Retryable("换承运商")
+  O -&gt; B: carrier("JD", insured=true)
+  B -&gt; C: quote(address, weight)
+end
+O -&gt; B: invoice(taxNo, type="VAT")
+O -&gt; B: build()
+B -&gt; B: validate()
+alt 缺报关单
+  B --&gt; O: Invalid("CUSTOMS_DOC_MISSING")
+else 校验通过
+  B --&gt; O: Fulfillment(只读)
+end
+@enduml</code></pre></details>
+    
+  </section>
   <div class="ch-nav" id="chNav"></div>
   </div>
 </div>

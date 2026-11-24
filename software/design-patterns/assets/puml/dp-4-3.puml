@@ -1,0 +1,21 @@
+@startuml
+abstract class RuleNode {
+  +eval(ctx): bool
+}
+class And
+class Or
+class Not
+class Compare {
+  +field
+  +op
+  +value
+}
+class Value
+RuleNode <|-- And
+RuleNode <|-- Or
+RuleNode <|-- Not
+RuleNode <|-- Compare
+Compare --> Value
+note right of Compare: age < 18 / amount > 5000
+note bottom of Or: 左真短路，不再求右
+@enduml

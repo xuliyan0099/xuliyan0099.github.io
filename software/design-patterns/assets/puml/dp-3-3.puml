@@ -1,0 +1,22 @@
+@startuml
+interface PermissionNode {
+  +check(userId, resource): Decision
+}
+class Department {
+  +children: PermissionNode[]
+  +check(userId, resource)
+}
+class Role {
+  +menus: PermissionNode[]
+  +check(userId, resource)
+}
+class Menu {
+  +resourceId
+  +check(userId, resource)
+}
+Department --> PermissionNode : children
+Role --> PermissionNode : menus
+Department --> Role : contains
+Role --> Menu : grants
+note right of Menu: 命中返回 ALLOW，否则 DENY
+@enduml

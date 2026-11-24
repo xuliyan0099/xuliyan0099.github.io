@@ -1,0 +1,23 @@
+@startuml
+autonumber
+participant "API" as A
+participant "OrderFacade" as F
+participant "Inventory" as I
+participant "Payment" as P
+participant "Notifier" as N
+
+A -> F: placeOrder(clientOrderNo, sku, qty)
+F -> I: reserve(sku, qty)
+I --> F: reservationId
+F -> P: createPayment(orderNo, amount)
+alt 支付单创建失败
+  P --> F: TIMEOUT
+  F -> I: release(reservationId)
+  F --> A: 503 PAYMENT_UNAVAILABLE
+else 成功
+  P --> F: paymentId
+  F -> N: send(OrderPlaced) (异步)
+  F --> A: 201 {orderNo, paymentId}
+end
+note over F: 每步独立超时，总预算 3s；补偿幂等
+@enduml

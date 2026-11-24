@@ -1,0 +1,27 @@
+@startuml
+autonumber
+participant "Employee" as E
+participant "RiskCheck" as R
+participant "Supervisor" as S
+participant "Director" as D
+participant "CFO" as C
+
+E -> R: submit(claim=6800, vendor="V-88")
+R -> R: blacklist + invoice dedup
+alt 命中黑名单
+  R --> E: REJECTED(risk)
+else 通过
+  R -> S: handle(6800)
+  alt <= 1000
+    S --> E: APPROVED by Supervisor
+  else 超过阈值
+    S -> D: handle(6800)
+    alt <= 10000
+      D --> E: APPROVED by Director
+    else 超过阈值
+      D -> C: handle(6800)
+      C --> E: APPROVED by CFO
+    end
+  end
+end
+@enduml

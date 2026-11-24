@@ -226,6 +226,52 @@ int main()
     
     <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/memento" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>快照存指针</b>原对象继续改，快照跟着变；必须深拷贝值。</li><li><b>恢复漏字段</b>文本回去了、光标没回去，用户体验仍然错。</li><li><b>快照无限保存</b>每次按键一份会爆内存；按操作合并或限制数量。</li></ul></div>
   </section>
+
+  <section class="sec" id="s7">
+    <h2><span class="n">07</span>生产实例与 PlantUML</h2>
+    
+    
+    <p class="subh">生产实例：长流程工作流的回滚快照</p>
+    <div class="prose">
+      <p>开户流程有七步：实名、绑卡、风控、授信、签约、激活、通知。第三步失败时，前两步已经落库，不能简单重跑。备忘录在每步成功后保存一个<b>可恢复快照</b>（业务主键 + 状态 + 外部资源 ID），失败时按快照逆序补偿。</p>
+<ul><li><b>持久化</b>：快照写数据库，进程崩溃也能恢复。</li>
+<li><b>幂等</b>：补偿操作重复执行结果一致。</li>
+<li><b>保留期</b>：快照保留 7 天，过期归档，避免无限膨胀。</li></ul>
+      <h3 class="mini-h">生产约束</h3>
+      <ul class="cons"><li>快照要包含外部系统 ID，否则无法撤销远程资源</li><li>恢复只能回到已提交的步骤，不能回到半提交状态</li><li>快照不能存大对象，存引用和版本</li></ul>
+    </div>
+    <div class="fig puml-fig">
+      <div class="fig-h"><b>PlantUML · sequence</b><span>plantuml.com 渲染</span></div>
+      <div class="puml-shot"><img src="../assets/puml/dp-4-6.svg" alt="生产实例：长流程工作流的回滚快照 的 PlantUML 图" decoding="async"></div>
+    </div>
+    <details class="puml-box"><summary>PlantUML 源码 · dp-4-6.puml</summary><pre><code>@startuml
+autonumber
+participant "Workflow" as W
+participant "StepRunner" as R
+participant "SnapshotStore" as S
+participant "BankAPI" as B
+
+W -&gt; R: run(step=实名)
+R -&gt; B: verifyIdentity
+B --&gt; R: ok
+R -&gt; S: save(snapshot{step=1, userId, bankRef})
+W -&gt; R: run(step=绑卡)
+R -&gt; B: bindCard
+B --&gt; R: ok
+R -&gt; S: save(snapshot{step=2, cardRef})
+W -&gt; R: run(step=风控)
+alt 风控拒绝
+  R -&gt; S: load(step=2)
+  R -&gt; B: unbindCard(cardRef)
+  R -&gt; S: load(step=1)
+  R --&gt; W: Failed(rolledBackTo=1)
+else 通过
+  R -&gt; S: save(step=3)
+  R --&gt; W: Continue
+end
+@enduml</code></pre></details>
+    
+  </section>
   <div class="ch-nav" id="chNav"></div>
   </div>
 </div>

@@ -286,6 +286,51 @@ int main()
     
     <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/visitor" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>节点类型判断漏分支</b>访问者必须覆盖所有节点类型，否则统计会漏。</li><li><b>访问者里改节点</b>访问者应只读；要改结构就另开一次操作，别在遍历中改。</li><li><b>双重分派成本</b>每次访问两次虚调用；极热路径要考虑缓存或内联。</li></ul></div>
   </section>
+
+  <section class="sec" id="s7">
+    <h2><span class="n">07</span>生产实例与 PlantUML</h2>
+    
+    
+    <p class="subh">生产实例：SQL 审核里的 AST 访问者</p>
+    <div class="prose">
+      <p>SQL 上线前要审：是否全表扫描、有没有越权表、是否写了笛卡尔积。解析器产出 AST，节点成千上万；如果每种规则都写一遍递归，AST 一升级全崩。访问者把规则搬出节点：解析器只负责 <code>accept</code>，审核规则各自实现 <code>visit</code>。</p>
+<ul><li><b>只读</b>：访问者不改 AST，多个规则可并行跑。</li>
+<li><b>覆盖</b>：未知节点类型默认报错，避免漏审。</li>
+<li><b>性能</b>：一次遍历可组合多个访问者，减少重复递归。</li></ul>
+      <h3 class="mini-h">生产约束</h3>
+      <ul class="cons"><li>节点不要内置审核规则，否则加规则就要改 AST</li><li>访问者要覆盖所有节点类型，未知类型不能放行</li><li>遍历中禁止修改树结构</li></ul>
+    </div>
+    <div class="fig puml-fig">
+      <div class="fig-h"><b>PlantUML · class</b><span>plantuml.com 渲染</span></div>
+      <div class="puml-shot"><img src="../assets/puml/dp-4-11.svg" alt="生产实例：SQL 审核里的 AST 访问者 的 PlantUML 图" decoding="async"></div>
+    </div>
+    <details class="puml-box"><summary>PlantUML 源码 · dp-4-11.puml</summary><pre><code>@startuml
+abstract class SqlNode {
+  +accept(v: Visitor)
+}
+class Select
+class Join
+class TableRef
+class BinaryExpr
+SqlNode &lt;|-- Select
+SqlNode &lt;|-- Join
+SqlNode &lt;|-- TableRef
+SqlNode &lt;|-- BinaryExpr
+interface Visitor {
+  +visitSelect(n)
+  +visitJoin(n)
+  +visitTable(n)
+}
+class PermissionAudit
+class FullScanAudit
+Visitor &lt;|-- PermissionAudit
+Visitor &lt;|-- FullScanAudit
+Select --&gt; Visitor : accept
+note right of PermissionAudit: 越权表 -&gt; BLOCK
+note right of FullScanAudit: 无索引扫描 -&gt; WARN
+@enduml</code></pre></details>
+    
+  </section>
   <div class="ch-nav" id="chNav"></div>
   </div>
 </div>

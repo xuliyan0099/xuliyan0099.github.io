@@ -1,0 +1,22 @@
+@startuml
+class CategoryFlyweight {
+  +categoryId
+  +name
+  +taxRate
+  +templateId
+}
+class CategoryFactory {
+  -cache: Map<Long, CategoryFlyweight>
+  +get(categoryId): CategoryFlyweight
+}
+class Sku {
+  +skuId
+  +categoryId
+  +price
+  +stock
+}
+CategoryFactory --> CategoryFlyweight : caches
+Sku --> CategoryFlyweight : shares
+note right of CategoryFlyweight: 只读；税率变更生成新版本
+note bottom of Sku: 每 SKU 只多存 ID/价格/库存
+@enduml

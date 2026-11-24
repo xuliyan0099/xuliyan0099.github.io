@@ -1,0 +1,22 @@
+@startuml
+autonumber
+participant "Producer" as P
+participant "KafkaChannel" as K
+participant "ProtoCodec" as C
+participant "Broker" as B
+participant "Consumer" as S
+
+P -> K: publish(topic="orders", event, codec=protobuf)
+K -> C: encode(event)
+C --> K: bytes + schemaId
+K -> B: send(partitionKey=orderId, headers{codec})
+B --> S: consume(batch)
+S -> C: decode(bytes, schemaId)
+alt schema 不兼容
+  C --> S: DecodeError
+  S -> B: send(DLQ, raw)
+else 成功
+  C --> S: OrderEvent
+end
+note over K,C: 换 RabbitMQ 只换通道；换 Avro 只换编解码器
+@enduml

@@ -1,0 +1,256 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0, lane: 0 };
+var state = { step: INIT.step, lane: INIT.lane };
+
+var STEPS = [
+  { h: '八块安全件，各守一段', hint: '八件安全件',
+    note: '安全不是一个模块，而是八件东西叠出来的防线：ROM 里的 HAB 验签决定「谁能跑」；CSU 决定「谁能碰哪个外设」；TZASC 决定「DDR 哪一段算安全内存」；TrustZone 决定「CPU 现在处在哪个世界」；SNVS 和 OCOTP 保存「密钥与安全状态」；SJC 决定「JTAG 开不开」；DCP 干加解密的活。任何一层单独拿出来都不牢靠，掉一层就得靠下一层兜。' },
+  { h: '信任链：从熔丝到内核', hint: '熔丝 → CSF → 镜像',
+    note: 'HAB 的根不在代码里，在 eFuse 里：烧进 OCOTP 的 SRK 哈希是唯一可信起点。ROM 启动时读 IVT，找到 CSF，用 CSF 里的证书链验证镜像哈希，验证通过才跳转；SEC_CONFIG 一旦烧成 Closed，未签名镜像直接被拒，连 SDP 下载都受限。这条链断在哪一环，串口都会停在同一个位置——所以排查要先看 HAB 事件寄存器，而不是先怀疑 DDR 初始化。' },
+  { h: 'CSU 的八级权限', hint: '3 bit 八档权限',
+    note: 'CSU 把每个外设的 CSL 字段（3 bit）翻成八种放行组合，身份维度是「安全/非安全 × 特权/用户」。000 全开，111 全关，中间的档位是「只给安全世界」「只给特权」「只给读」这些组合。它是总线级的：即便软件被绕过去，DMA 主设备带着错误的身份去访问，也会在这里被拦下——这正是它存在的意义。' },
+  { h: 'SNVS 与板级真相', hint: '防拆与纽扣电池',
+    note: 'SNVS 是常开域里的安全状态机：防拆引脚电平不对就报警、可以立刻清零 256 bit 的 ZMK、单调计数器挡住回滚攻击、SRTC 靠纽扣电池一直走。但正点原子这块核心板把 SNVS_TAMPER0 借给了加速度计中断，其余九根引到排针，而且没有纽扣电池位——所以断电后时间归零、防拆在断电期间根本不工作。手册写的能力和板子能给的能力，要分开看。' },
+  { h: '上手验证四条', hint: '四条验证命令',
+    note: '验证安全配置不需要复杂工具：U-Boot 里 hab_status 一句话就能告诉你 SEC_CONFIG 是开还是关；fuse read 能看 SRK 哈希烧没烧；把 SJC 改成 No-Debug 后 J-Link 立刻连不上，这是最硬的判据；拔掉电源再上电看 date，时间归零就说明 SNVS 没有独立供电。四个动作分别对应信任链、熔丝、调试口、常开域。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function arrow(x1, y1, x2, y2) {
+  svgEl(scene, 'line', { x1: x1, y1: y1, x2: x2, y2: y2, stroke: 'var(--text-2)', 'stroke-width': 4 });
+  var a = Math.atan2(y2 - y1, x2 - x1), L = 18, W = 9;
+  svgEl(scene, 'path', {
+    d: 'M' + x2 + ' ' + y2 + ' L' + (x2 - L * Math.cos(a) + W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) - W * Math.cos(a)) +
+      ' L' + (x2 - L * Math.cos(a) - W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) + W * Math.cos(a)) + ' Z',
+    fill: 'var(--text-2)', stroke: 'none'
+  });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+
+function drawParts() {
+  txt(scene, 56, 148, '八件安全件，管四件事：谁能跑、谁能碰、密钥存哪、调试口开不开', 't24w');
+
+  var CARDS = [
+    ['HAB', 'ROM 内，无独立基址', 'ROM 里验签，RSA-4096', '读 IVT → CSF → 镜像哈希', '失败即拒绝启动', 'var(--observe-line)', 4],
+    ['CSU', '0x021C0000 · 16 KB', '总线主/从权限矩阵', '每个从设备 3 bit → 8 级', '按主设备身份放行', 'var(--line)', 2],
+    ['SNVS', '常开域 · 独立供电', '安全状态机 + 防拆', 'ZMK 256 bit 可清零', 'SRTC 掉电仍走', 'var(--line)', 2],
+    ['OCOTP', '0x021BC000 · 16 KB', 'eFuse 影子寄存器', 'SRK 哈希、SEC_CONFIG', '烧错不可逆', 'var(--alert-line)', 4],
+    ['TZASC', '0x021D0000 · 16 KB', 'TZC-380 地址控制器', '把 DDR 切成安全/非安全区', '越界访问直接拒', 'var(--line)', 2],
+    ['TrustZone', 'A7 + GIC + WDOG2', '安全/非安全双世界', 'NS 位决定当前世界', 'OCRAM 也可分区', 'var(--line)', 2],
+    ['SJC', '调试口守卫', 'JTAG 四档：Disabled', 'No-Debug / Secure / Enabled', '靠 eFuse 定档', 'var(--line)', 2],
+    ['DCP', '0x02280000 · 16 KB', 'AES-128 ECB/CBC、SHA', '四个密钥槽，写入只读', 'RNGB 出随机数', 'var(--line)', 2]
+  ];
+  CARDS.forEach(function (c, i) {
+    var col = i % 4, row = Math.floor(i / 4);
+    var x = 56 + col * 452, y = 176 + row * 214;
+    box(x, y, 424, 196, 'var(--page)', c[5], c[6]);
+    txt(scene, x + 20, y + 40, c[0], 't28');
+    txt(scene, x + 20, y + 74, c[1], 't20w');
+    txt(scene, x + 20, y + 108, c[2], 't20w');
+    txt(scene, x + 20, y + 140, c[3], 't20w');
+    txt(scene, x + 20, y + 172, c[4], 't20w');
+  });
+
+  box(56, 612, 1812, 140, 'var(--surface)', 'var(--guide)');
+  txt(scene, 80, 650, '一句话记法：HAB 管「谁签的字」，CSU/TZASC 管「能碰哪」，SNVS/OCOTP 管「钥匙在哪」，SJC 管「别人能不能进来」', 't24w');
+  txt(scene, 80, 690, 'HAB 的根是熔丝里的 SRK 哈希；CSU 的根是 CSL 寄存器；SNVS 的根是 OTPMK。三把根都不在内存里，改不了才叫根。', 't20w');
+  txt(scene, 80, 728, '这块 SoC 只有两个 tamper 引脚对外（第 11 章开头那行），但 SNVS 逻辑支持 10 路无源或 5 对有源——板级能引出几根，才是你能用的几根。', 't20w');
+}
+
+function drawChain() {
+  txt(scene, 56, 148, '信任链是「熔丝 → 证书 → 镜像」的一条单向链，任何一环改过就断', 't24w');
+
+  box(56, 186, 520, 96, 'var(--page)', 'var(--alert-line)', 4);
+  txt(scene, 80, 224, 'OCOTP · SRK 哈希（4 × 32 bit 起）', 't24');
+  txt(scene, 80, 258, '烧进去就改不掉，是整条链的根', 't20w');
+
+  arrow(586, 234, 660, 234);
+
+  box(676, 186, 520, 96, 'var(--page)', 'var(--line)', 2);
+  txt(scene, 700, 224, 'ROM → IVT（镜像起始 0x87800000）', 't24');
+  txt(scene, 700, 258, '按 IVT 指针找到 CSF，偏移写在头部', 't20w');
+
+  arrow(1206, 234, 1280, 234);
+
+  box(1296, 186, 572, 96, 'var(--page)', 'var(--line)', 2);
+  txt(scene, 1320, 224, 'CSF 证书链', 't24');
+  txt(scene, 1320, 258, 'CSF 里带 SRK 公钥与镜像哈希签名', 't20w');
+
+  arrow(340, 292, 340, 356);
+  arrow(936, 292, 936, 356);
+  arrow(1552, 292, 1552, 356);
+
+  box(56, 366, 640, 128, 'var(--page)', 'var(--line)', 2);
+  txt(scene, 80, 404, '① 验 SRK：CSF 证书的哈希 == 熔丝里的哈希', 't20w');
+  txt(scene, 80, 438, '不等 → HAB 事件记 SRK mismatch，停在 ROM', 't20w');
+  txt(scene, 80, 472, '串口只打一行跳转失败，看不到更多原因', 't20w');
+
+  box(716, 366, 560, 128, 'var(--page)', 'var(--line)', 2);
+  txt(scene, 740, 404, '② 验镜像：逐个块算 SHA，比对 CSF 签名', 't20w');
+  txt(scene, 740, 438, '镜像被改一个字节 → 哈希对不上', 't20w');
+  txt(scene, 740, 472, '先验 IVT/DCD，再验 U-Boot 正文', 't20w');
+
+  box(1296, 366, 572, 128, 'var(--page)', 'var(--line)', 2);
+  txt(scene, 1320, 404, '③ 放行：SEC_CONFIG 状态决定结局', 't20w');
+  txt(scene, 1320, 438, 'Open：验不过也继续跳（开发板就是这个）', 't20w');
+  txt(scene, 1320, 472, 'Closed：验不过直接停，SDP 也受限', 't20w');
+
+  box(56, 524, 1812, 120, 'var(--surface)', 'var(--guide)');
+  txt(scene, 80, 560, 'SEC_CONFIG 两位在 SRC_SBMR2 里，源头上还是 eFuse——所以「改 SEC_CONFIG」= 「烧熔丝」，不是改个寄存器就能反悔的开关。', 't20w');
+  txt(scene, 80, 594, '签名工具在 i.MX6ULL 上是 CST（Code Signing Tool），输入 SRK 私钥 + CSF 文本 + 镜像，输出带签名的 .bin。正点原子的裸机/Ubuntu 镜像都没签名。', 't20w');
+  txt(scene, 80, 628, '排查口诀：先读 HAB 事件寄存器看是 SRK 还是哈希错，再回头查烧写流程，别先去改 DDR 参数——链断了，DDR 根本没机会跑。', 't20w');
+
+  box(56, 664, 1812, 108, 'var(--page)', 'var(--alert-line)', 4);
+  txt(scene, 80, 700, '一个常见误判：把 SEC_CONFIG 烧成 Closed 之后，板子「连 SDP 都不认了」。这不是芯片坏了，是 ROM 在 Closed 状态下只接受已签名镜像，SDP 下载同样走验签。', 't20w');
+  txt(scene, 80, 736, '补救只有一条路：把 SEC_CONFIG 恢复成 Open 需要烧另一组熔丝位，而熔丝只能从 0 变 1——大多数情况下等于换芯片。', 't20w');
+}
+
+function drawCsu() {
+  txt(scene, 56, 148, 'CSU 用 3 bit 描述「这门外设给谁开」，八个档位覆盖四种身份组合', 't24w');
+
+  box(56, 176, 340, 48, 'var(--surface)', 'var(--line)', 2);
+  txt(scene, 80, 208, 'CSL[2:0]', 't24');
+  var COLS = [['非安全 · 用户', 412], ['非安全 · 特权', 716], ['安全 · 用户', 1020], ['安全 · 特权', 1324]];
+  COLS.forEach(function (c) {
+    box(c[1], 176, 292, 48, 'var(--surface)', 'var(--line)', 2);
+    txt(scene, c[1] + 146, 208, c[0], 't24', 'middle');
+  });
+  box(1632, 176, 236, 48, 'var(--surface)', 'var(--line)', 2);
+  txt(scene, 1750, 208, 'CSL 常量', 't24', 'middle');
+
+  var ROWS = [
+    ['000', 'RD+WR', 'RD+WR', 'RD+WR', 'RD+WR', "8'b1111_1111"],
+    ['001', '无', 'RD+WR', 'RD+WR', 'RD+WR', "8'b1011_1011"],
+    ['010', 'RD', 'RD', 'RD+WR', 'RD+WR', "8'b0011_1111"],
+    ['011', '无', 'RD', 'RD+WR', 'RD+WR', "8'b0011_1011"],
+    ['100', '无', '无', 'RD+WR', 'RD+WR', "8'b0011_0011"],
+    ['101', '无', '无', '无', 'RD+WR', "8'b0010_0010"],
+    ['110', '无', '无', 'RD', 'RD', "8'b0000_0011"],
+    ['111', '无', '无', '无', '无', '任意其它值']
+  ];
+  ROWS.forEach(function (r, i) {
+    var y = 236 + i * 52, hi = i === 0 ? 'var(--alert-line)' : 'var(--line)';
+    box(56, y, 340, 44, 'var(--page)', hi, i === 0 ? 4 : 2);
+    txt(scene, 80, y + 32, r[0], 't24');
+    for (var c = 0; c < 4; c++) {
+      var x = 412 + c * 304;
+      box(x, y, 292, 44, c >= 2 ? 'var(--page)' : 'var(--surface)', 'var(--line)', 2);
+      txt(scene, x + 146, y + 32, r[c + 1], 't20w', 'middle');
+    }
+    box(1632, y, 236, 44, 'var(--page)', 'var(--line)', 2);
+    txt(scene, 1750, y + 32, r[5], 't20w', 'middle');
+  });
+
+  box(56, 664, 1812, 108, 'var(--surface)', 'var(--guide)');
+  txt(scene, 80, 700, 'CSL 是「从设备」的属性，主设备身份来自总线上的特权/安全信号；CSU 还能按策略改写这些信号，防止软件把 DMA 当成跳板去碰自己碰不到的内存。', 't20w');
+  txt(scene, 80, 736, '000 那一档等于把这门外设对全世界开放——调试阶段图省事全写 000，量产时忘了收紧，就是典型的安全事故。', 't20w');
+}
+
+function drawSnvs() {
+  txt(scene, 56, 148, 'SNVS 的职责是「被拆的时候留证据」，不是「挡住拆」', 't24w');
+
+  box(56, 176, 892, 300, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 216, 'SNVS 内部四件事');
+  txt(scene, 80, 256, '① 安全状态机：由 HAB 与防拆电路共同推进', 't20w');
+  txt(scene, 80, 290, '② 主密钥控制：OTPMK 只在熔丝里，ZMK 可清零', 't20w');
+  txt(scene, 80, 324, '③ 防拆检测：JTAG 事件、电源毛刺、密钥 ECC 错', 't20w');
+  txt(scene, 80, 358, '④ 计数器：SRTC 常开走时 + 单调计数器防回滚', 't20w');
+  txt(scene, 80, 392, '被动防拆最多 10 根；有源防拆 5 对（每对占 2 根）', 't20w');
+  txt(scene, 80, 426, '报警后可以：立刻擦 ZMK、拒绝访问、清安全内存、拉中断', 't20w');
+  txt(scene, 80, 458, '系统必须给 SNVS 一路常电（纽扣电池）才谈得上「离线防拆」', 't20w');
+
+  box(976, 176, 892, 300, 'var(--page)', 'var(--alert-line)', 4);
+  head(1000, 216, 'MINI 核心板上的实况');
+  txt(scene, 1000, 256, 'SNVS_TAMPER0/GPIO5_IO00 → ACC_INT（加速度计中断）', 't20w');
+  txt(scene, 1000, 290, 'TAMPER1..9 全部引到排针，可当 GPIO5_IO01..09 用', 't20w');
+  txt(scene, 1000, 324, 'VDD_SNVS_3V3 由 3.3 V 主轨供给，板上没有纽扣电池位', 't20w');
+  txt(scene, 1000, 358, '结论一：断电后 SRTC 停走，上电时间从默认值重来', 't20w');
+  txt(scene, 1000, 392, '结论二：离线防拆不成立，只能做「上电后检测」', 't20w');
+  txt(scene, 1000, 426, '结论三：ZMK/OTPMK 烧了也没有电池支撑清零策略', 't20w');
+  txt(scene, 1000, 458, '要用防拆：自己加纽扣电池到 VDD_SNVS_IN，并留 tamper 走线', 't20w');
+
+  box(56, 516, 1812, 198, 'var(--surface)', 'var(--guide)');
+  head(80, 540, '判据：三分钟判断你的板子有没有「真常开域」');
+  txt(scene, 80, 580, '① 断电 10 秒再上电，U-Boot 里 date 若回到 1970 附近 → SRTC 没有独立供电，SNVS 只在上电期间有效。', 't20w');
+  txt(scene, 80, 614, '② 用万用表量 VDD_SNVS_IN：主电源断开后应为 0 V；若板上真有电池，应保持 2.4–3.6 V。', 't20w');
+  txt(scene, 80, 648, '③ 把某根 TAMPER 引脚短到相反电平并开启防拆：应触发报警中断，同时 ZMK 被擦、安全内存不可读。', 't20w');
+  txt(scene, 80, 682, '④ 读单调计数器：每次启动加一，回滚到旧镜像时数值不倒退——这是防「降级攻击」的唯一硬证据。', 't20w');
+  txt(scene, 80, 722, '反过来看，这也解释了为什么开发板上的 RTC 备份时间总不对：不是驱动写错，是硬件压根没给它留后路。', 't20w');
+}
+
+function drawVerify() {
+  txt(scene, 56, 148, '四个动作，四条判据，不需要专用设备', 't24w');
+
+  box(56, 176, 588, 322, 'var(--page)', 'var(--line)', 2);
+  head(80, 214, '① U-Boot：看信任链状态');
+  txt(scene, 80, 252, '=> hab_status', 't24');
+  txt(scene, 80, 284, 'Secure boot disabled → SEC_CONFIG 还是 Open', 't20w');
+  txt(scene, 80, 316, 'No HAB events found → 开着也验过了', 't20w');
+  txt(scene, 80, 348, 'HAB events 有记录 → 逐条读 event 码', 't20w');
+  txt(scene, 80, 384, '=> fuse read 0 0 8', 't24');
+  txt(scene, 80, 416, '读 bank0 前 8 个字：SEC_CONFIG、SRK 相关位', 't20w');
+  txt(scene, 80, 452, '', 't20w');
+
+  box(668, 176, 588, 322, 'var(--page)', 'var(--line)', 2);
+  head(692, 214, '② 寄存器：直接看地址');
+  txt(scene, 692, 252, '=> md 0x021BC000 4', 't24');
+  txt(scene, 692, 284, 'OCOTP_CTRL：读熔丝影子的入口', 't20w');
+  txt(scene, 692, 316, '=> md 0x021C0000 4', 't24');
+  txt(scene, 692, 348, 'CSU：CSL 配置的起点', 't20w');
+  txt(scene, 692, 380, '=> md 0x021D0000 4', 't24');
+  txt(scene, 692, 412, 'TZASC：DDR 安全区的边界', 't20w');
+  txt(scene, 692, 444, '=> md 0x02280000 4', 't24');
+  txt(scene, 692, 476, 'DCP：密钥槽与状态', 't20w');
+
+  box(1280, 176, 588, 322, 'var(--page)', 'var(--alert-line)', 4);
+  head(1304, 214, '③ 调试口与④ 常开域');
+  txt(scene, 1304, 252, 'SJC 烧成 No-Debug 后：', 't20w');
+  txt(scene, 1304, 284, 'J-Link 报 Could not connect to target', 't20w');
+  txt(scene, 1304, 316, 'OpenOCD 报 JTAG scan 全 0', 't20w');
+  txt(scene, 1304, 348, 'Secure JTAG 档：能扫到 ID，但访问需挑战响应', 't20w');
+  txt(scene, 1304, 384, '断电量 VDD_SNVS_IN，再上电看 date', 't20w');
+  txt(scene, 1304, 416, '时间归零 = 没有常开供电', 't20w');
+  txt(scene, 1304, 448, '时间保留 = 有电池，防拆才可能生效', 't20w');
+
+  box(56, 512, 1812, 214, 'var(--surface)', 'var(--guide)');
+  head(80, 552, '踩坑清单');
+  txt(scene, 80, 586, '① 把 CSU 全写 000 当「解决访问异常」的手段：异常没了，权限也没了；先在 CSL 上做最小放行。', 't20w');
+  txt(scene, 80, 618, '② 以为烧了 SRK 哈希就安全了：哈希要与签名私钥对应，私钥丢了这个板子永远只能跑旧镜像。', 't20w');
+  txt(scene, 80, 650, '③ 用 J-Link 调试器改完 SJC 再想连：No-Debug 是永久封锁，改不回来，只能换芯片。', 't20w');
+  txt(scene, 80, 682, '④ 把 SNVS 当 RTC 用：没有备用电池时它只是「上电计时器」，suspend 期间也不保证走时。', 't20w');
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawParts();
+  else if (s === 1) drawChain();
+  else if (s === 2) drawCsu();
+  else if (s === 3) drawSnvs();
+  else drawVerify();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () {
+  state.step = INIT.step; state.lane = INIT.lane; draw();
+});
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>

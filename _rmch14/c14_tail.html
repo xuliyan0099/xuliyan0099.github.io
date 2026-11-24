@@ -1,0 +1,240 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0, lane: 0 };
+var state = { step: INIT.step, lane: INIT.lane };
+
+var STEPS = [
+  { h: '三座桥，切出整块外设地址', hint: 'AIPS1/2/3 · 每块 16 KB',
+    note: 'AIPSTZ 是 AHB 到 IP 总线的翻译器：一个 1 MB 的空间被切成 32 个 16 KB 的块，每个块接一个外设；另外留两个 global 块给扩展。这颗芯片有三座桥：AIPS-1 管 0x0200_0000 段，AIPS-2 管 0x0210_0000 段，AIPS-3 管 0x0220_0000 段；每个外设的寄存器都落在自己那块 16 KB 的边界上，这就是地址表里「每项都相差 0x4000」的原因。' },
+  { h: '一次访问要几个周期', hint: '读 2 个、写 3 个 hclk',
+    note: '桥不是零成本的：一次外设读最少 2 个 hclk，一次非缓冲写最少 3 个 hclk。64 位访问或跨 32 位边界的非对齐访问，会被拆成两次 32 位 IPS 访问，等于再翻一倍。所以裸机里连续写 100 个寄存器，不是「100 次赋值」的时间，而是按 3 个 hclk 一次累加的——这也是为什么初始化代码里常看到「先攒到局部变量，最后一次性写」。' },
+  { h: 'MPR：给主设备定身份', hint: '4 bit × 16 个主设备',
+    note: 'MPR 里每个主设备占 4 bit：MPL 决定是否强制打成用户态、MTW/MTR 决定是否「可信」、MBW 决定写是否可缓冲。复位值 0x7700_0000 只把 master 0 与 master 1 设成可信，其余全 0。主设备编号是有讲究的：0 是「除 A7、SDMA、CAAM 之外的所有主设备」，1 是 A7 核，2 是 CAAM，3 是 SDMA。' },
+  { h: 'OPACR：给外设定门禁', hint: 'BW / SP / WP / TP',
+    note: 'OPACR 每 16 KB 块一个 4 bit 字段：BW 缓冲写（AIPSTZ 不支持，恒为 0）、SP 是否要求特权、WP 是否允许写、TP 是否拒绝不可信主设备。复位值是 0x4444_4444，也就是 SP=1、WP=0、TP=0——特权可读写、用户态一律被拒。这就是「用户态一碰寄存器就 abort」的直接原因，跟 MMU 权限是两套机制。' },
+  { h: '两条策略叠加，任一拒绝即拦', hint: 'AIPSTZ × CSU / 实测',
+    note: '一个访问要同时过两关：CSU 的总线权限矩阵与 AIPSTZ 的 OPACR。任一侧说不，访问就被终止并返回错误响应，外设根本收不到这次事务。实测判据很直接：把某块 OPACR 的 SP 清 0，再从用户态访问该外设，abort 会消失；改回 1 又立刻复现——这比看文档更能说明是桥在拦，而不是 MPU 或页表。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function arrow(x1, y1, x2, y2) {
+  svgEl(scene, 'line', { x1: x1, y1: y1, x2: x2, y2: y2, stroke: 'var(--text-2)', 'stroke-width': 4 });
+  var a = Math.atan2(y2 - y1, x2 - x1), L = 18, W = 9;
+  svgEl(scene, 'path', {
+    d: 'M' + x2 + ' ' + y2 + ' L' + (x2 - L * Math.cos(a) + W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) - W * Math.cos(a)) +
+      ' L' + (x2 - L * Math.cos(a) - W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) + W * Math.cos(a)) + ' Z',
+    fill: 'var(--text-2)', stroke: 'none'
+  });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+
+function drawBridge() {
+  txt(scene, 56, 148, '一个 1 MB 的窗口切成 32 块 16 KB，每块一个外设；三座桥各管一段', 't24w');
+
+  box(56, 176, 520, 96, 'var(--page)', 'var(--observe-line)', 4);
+  txt(scene, 80, 214, 'AHB 侧：A7 / SDMA / CAAM', 't24');
+  txt(scene, 80, 248, '只有主设备身份，没有「设备地址」概念', 't20w');
+  arrow(586, 224, 662, 224);
+
+  box(674, 176, 520, 96, 'var(--page)', 'var(--guide)', 2);
+  txt(scene, 698, 214, 'AIPSTZ 桥：翻译 + 门禁', 't24');
+  txt(scene, 698, 248, '生成块使能、字节使能、读写数据', 't20w');
+  arrow(1204, 224, 1280, 224);
+
+  box(1292, 176, 576, 96, 'var(--page)', 'var(--guide)', 2);
+  txt(scene, 1316, 214, 'IPS 侧：16 KB 一块的外设', 't24');
+  txt(scene, 1316, 248, '寄存器只认 8/16/32 位对齐访问', 't20w');
+
+  var ROWS = [
+    ['AIPS-1', '0x0207_C000', '0x0200_0000 段外设：GPT、EPIT、GPIO1、IOMUXC 等'],
+    ['AIPS-2', '0x0217_C000', '0x0210_0000 段外设：UART、I2C、SPI、ADC、uSDHC 等'],
+    ['AIPS-3', '0x0227_C000', '0x0220_0000 段外设：DCP、RNGB、EPDC、UART8 等']
+  ];
+  ROWS.forEach(function (r, i) {
+    var y = 300 + i * 64;
+    box(56, y, 240, 52, 'var(--page)', 'var(--observe-line)', i === 0 ? 3 : 2);
+    txt(scene, 76, y + 34, r[0], 't24');
+    box(316, y, 260, 52, 'var(--page)', 'var(--guide)', 2);
+    txt(scene, 336, y + 34, r[1], 't24w');
+    box(596, y, 1272, 52, 'var(--page)', 'var(--guide)', 2);
+    txt(scene, 620, y + 34, r[2], 't20w');
+  });
+
+  box(56, 512, 1812, 262, 'var(--surface)', 'var(--guide)');
+  head(80, 550, '地址为什么都是 0x4000 一跳');
+  txt(scene, 80, 588, '每块 16 KB = 0x4000：GPT1 在 0x0209_0000、GPT2 在 0x0209_4000，差的正好是一块。', 't20w');
+  txt(scene, 80, 622, '这种布局不是美观问题：桥用高位地址选出「哪一块」，块使能一拉，整块 16 KB 都归那一个外设。', 't20w');
+  txt(scene, 80, 656, '所以外设基址必然 16 KB 对齐，寄存器只能在自己的块里偏移；越界访问根本到不了邻居外设。', 't20w');
+  txt(scene, 80, 690, '两个 global 块留给「板上再加东西」的场景——你自定义的 FPGA 挂进来时用它，避免和外设块冲突。', 't20w');
+  txt(scene, 80, 724, '顺带解释一个常见现象：外设寄存器表里大量「Reserved」不是没用，而是这一块里留给未来或未实现功能的地址。', 't20w');
+}
+
+function drawCost() {
+  txt(scene, 56, 148, '桥有固定开销：读 ≥2 个 hclk，非缓冲写 ≥3 个 hclk', 't24w');
+
+  box(56, 186, 588, 210, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 224, '什么算一次「慢访问」');
+  txt(scene, 80, 262, '一次外设读：最少 2 个 hclk 才拿到数据', 't20w');
+  txt(scene, 80, 296, '一次非缓冲写：最少 3 个 hclk 才结束', 't20w');
+  txt(scene, 80, 330, '64 位访问 → 拆成两次 32 位 IPS 访问', 't20w');
+  txt(scene, 80, 364, '跨 32 位边界的非对齐访问 → 同样拆两次', 't20w');
+
+  box(668, 186, 588, 210, 'var(--page)', 'var(--guide)', 2);
+  head(692, 224, '换算成时间');
+  txt(scene, 692, 262, '528 MHz 内核 / AHB 264 MHz：3 个 hclk ≈ 11.4 ns', 't20w');
+  txt(scene, 692, 296, '100 次寄存器写 ≈ 1.1 µs，不是「几个指令周期」', 't20w');
+  txt(scene, 692, 330, '中断里连写 20 个寄存器 ≈ 230 ns，已接近一次上下文切换', 't20w');
+  txt(scene, 692, 364, '这就是「中断要短」的另一半原因：不是 CPU 慢，是桥慢', 't20w');
+
+  box(1280, 186, 588, 210, 'var(--page)', 'var(--alert-line)', 4);
+  head(1304, 224, '怎么把它藏起来');
+  txt(scene, 1304, 262, '攒批：先在局部变量里拼好，最后一次性写回', 't20w');
+  txt(scene, 1304, 296, '用 DMA 搬大数据，CPU 只配描述符', 't20w');
+  txt(scene, 1304, 330, '读多写少时，先读进数组再循环处理', 't20w');
+  txt(scene, 1304, 364, '别在循环条件里反复读同一个外设状态寄存器', 't20w');
+
+  box(56, 418, 1812, 340, 'var(--surface)', 'var(--guide)');
+  head(80, 458, '三个真实场景，说明这点开销怎么放大');
+  txt(scene, 80, 498, '① 初始化 200 个寄存器：按 3 hclk/次算约 600 个 hclk ≈ 2.3 µs —— 听着不多，但在 1 ms 的控制周期里占 0.2%。', 't20w');
+  txt(scene, 80, 534, '② 轮询状态位：while (!(REG & FLAG)); 每次循环至少 2 hclk，编译器优化不掉的，因为它必须重新读。', 't20w');
+  txt(scene, 80, 570, '③ 大量小包写 FIFO：每次 3 hclk，10 万字节就是 30 万个 hclk ≈ 1.1 ms —— 换 DMA 后同样的数据只要搬一次描述符。', 't20w');
+  txt(scene, 80, 610, '所以「外设慢」很少是外设本身慢，多半是桥的固定开销被循环放大了。', 't20w');
+  txt(scene, 80, 644, '优化顺序：先减少访问次数（合并/缓存），再减少每次访问的宽度（32 位对齐），最后才考虑提高 AHB 频率。', 't20w');
+  txt(scene, 80, 678, '判据：同一段初始化代码，改用批量写法后耗时应下降 30% 以上；没降，说明瓶颈不在桥上。', 't20w');
+  txt(scene, 80, 712, '另一个判据：把一次 64 位访问改成两次 32 位后反而更快——这通常说明它本来就被桥拆成了两次。', 't20w');
+}
+
+function drawMpr() {
+  txt(scene, 56, 148, 'MPR：每个主设备 4 bit，复位值 0x7700_0000 只信 master 0 与 1', 't24w');
+
+  box(56, 176, 340, 48, 'var(--surface)', 'var(--line)', 2);
+  txt(scene, 80, 208, '编号', 't24');
+  box(412, 176, 480, 48, 'var(--surface)', 'var(--line)', 2);
+  txt(scene, 436, 208, '主设备', 't24');
+  box(908, 176, 960, 48, 'var(--surface)', 'var(--line)', 2);
+  txt(scene, 932, 208, '说明', 't24');
+
+  var ROWS = [
+    ['Master 0', '其余所有主设备（共享）', '复位后 MTR=1、MTW=1：被当作可信'],
+    ['Master 1', 'Arm A7 CORE', '复位后 MTR=1、MTW=1：被当作可信'],
+    ['Master 2', 'CAAM', '加解密引擎，复位后不可信'],
+    ['Master 3', 'SDMA', 'DMA 引擎，复位后不可信'],
+    ['Master 5', 'Arm M4 Core', '这颗芯片上没有 M4，字段保留']
+  ];
+  ROWS.forEach(function (r, i) {
+    var y = 236 + i * 56;
+    box(56, y, 340, 48, 'var(--page)', 'var(--guide)', 2);
+    txt(scene, 80, y + 32, r[0], 't24');
+    box(412, y, 480, 48, 'var(--page)', 'var(--guide)', 2);
+    txt(scene, 436, y + 32, r[1], 't20w');
+    box(908, y, 960, 48, 'var(--page)', 'var(--guide)', 2);
+    txt(scene, 932, y + 32, r[2], 't20w');
+  });
+
+  box(56, 532, 892, 242, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 570, '4 bit 各管什么（MPROT）');
+  txt(scene, 80, 608, 'bit3 MBW：写是否允许缓冲；AIPSTZ 不支持缓冲，应写 0', 't20w');
+  txt(scene, 80, 642, 'bit2 MTR：读是否「可信」', 't20w');
+  txt(scene, 80, 676, 'bit1 MTW：写是否「可信」', 't20w');
+  txt(scene, 80, 710, 'bit0 MPL：1 保留原特权；0 强制打成用户态（连 hprot 都不看）', 't20w');
+
+  box(976, 532, 892, 242, 'var(--page)', 'var(--alert-line)', 4);
+  head(1000, 570, 'MPL 是最容易被忽略的一位');
+  txt(scene, 1000, 608, 'MPL=0 时，无论代码当前是 SVC 还是 USR，桥都按「用户态」去判权限', 't20w');
+  txt(scene, 1000, 642, '这常用于「把 DMA 降权」：即使 DMA 描述符被篡改，也碰不到特权外设', 't20w');
+  txt(scene, 1000, 676, '反过来，调试时误把 A7 的 MPL 清 0，会突然到处 abort —— 先查这一位', 't20w');
+  txt(scene, 1000, 710, '判据：读 MPR 得 0x7700_0000 是正常上电值；不是这个值，说明有人改过', 't20w');
+}
+
+function drawOpacr() {
+  txt(scene, 56, 148, 'OPACR：每 16 KB 一块 4 bit，复位 0x4444_4444 = 特权可读写、用户全拒', 't24w');
+
+  box(56, 186, 440, 60, 'var(--page)', 'var(--observe-line)', 4);
+  txt(scene, 80, 226, '0x4444_4444 拆开看', 't24');
+
+  var BITS = [['BW', 'bit3', '缓冲写，AIPSTZ 不支持 → 0'], ['SP', 'bit2', '要求特权 → 1'], ['WP', 'bit1', '允许写 → 0'], ['TP', 'bit0', '拒绝不可信 → 0']];
+  BITS.forEach(function (b, i) {
+    var x = 56 + i * 460;
+    box(x, 268, 432, 118, 'var(--page)', i === 1 ? 'var(--alert-line)' : 'var(--guide)', i === 1 ? 4 : 2);
+    txt(scene, x + 20, 306, b[0] + ' · ' + b[1], 't28');
+    txt(scene, x + 20, 344, b[2], 't20w');
+  });
+
+  box(56, 410, 1812, 250, 'var(--surface)', 'var(--guide)');
+  head(80, 448, '四种身份 × 四个门禁位 = 一张放行表');
+  txt(scene, 80, 486, 'SP=1：只有特权（SVC/System）能访问；用户态访问直接产生错误响应，外设收不到这次事务。', 't20w');
+  txt(scene, 80, 520, 'WP=1：整块只读；这对「状态寄存器块」有用，防止误写。', 't20w');
+  txt(scene, 80, 554, 'TP=1：拒绝不可信主设备（哪台可信由 MPR 的 MTR/MTW 决定），拦住 DMA 篡改描述的路径。', 't20w');
+  txt(scene, 80, 588, 'BW 这一位在 AIPSTZ 上是死位：手册明确写「缓冲写不可用，应置 0」，别照着别的芯片抄 1。', 't20w');
+  txt(scene, 80, 622, 'OPACR 有 5 个寄存器（OPACR、OPACR1..4），一共 40 个 4 bit 字段，覆盖 32 块 + 8 个 global 块。', 't20w');
+
+  box(56, 684, 1812, 92, 'var(--page)', 'var(--alert-line)', 4);
+  txt(scene, 80, 720, '一个反直觉点：把 SP 清 0 之后用户态能读写寄存器了，但这不代表「安全」——你同时也把这一整块 16 KB 交给了任何用户态代码。', 't20w');
+  txt(scene, 80, 754, '所以调试期放开、量产前收回，是这块桥最常见的用法；忘了收回就是典型的权限泄漏。', 't20w');
+}
+
+function drawVerify() {
+  txt(scene, 56, 148, '两关叠加：CSU 与 AIPSTZ 任一拒绝，访问就在总线上被终止', 't24w');
+
+  box(56, 186, 560, 200, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 224, '第一关：CSU');
+  txt(scene, 80, 262, '0x021C_0000，按从设备 3 bit（CSL）', 't20w');
+  txt(scene, 80, 296, '决定「哪类主设备能碰哪个外设」', 't20w');
+  txt(scene, 80, 330, '8 档，从全开到全关（见第 11 章）', 't20w');
+
+  box(656, 186, 560, 200, 'var(--page)', 'var(--guide)', 2);
+  head(680, 224, '第二关：AIPSTZ OPACR');
+  txt(scene, 680, 262, 'SP / WP / TP 三个门禁位', 't20w');
+  txt(scene, 680, 296, '决定「这一次访问的形态能不能过」', 't20w');
+  txt(scene, 680, 330, '复位即「特权可读写、用户全拒」', 't20w');
+
+  box(1256, 186, 612, 200, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 224, '被拦之后长什么样');
+  txt(scene, 1280, 262, '总线返回错误响应，外设没被访问', 't20w');
+  txt(scene, 1280, 296, 'CPU 侧表现为 Data Abort / SIGBUS', 't20w');
+  txt(scene, 1280, 330, '读全 0 或 0xFFFFFFFF 之类的「假值」要警惕', 't20w');
+
+  box(56, 418, 1812, 340, 'var(--surface)', 'var(--guide)');
+  head(80, 458, '三条实测判据');
+  txt(scene, 80, 498, '① 读 AIPSTZ1_MPR（0x0207_C000）与 OPACR（+0x40）：正常上电是 0x7700_0000 与 0x4444_4444。', 't20w');
+  txt(scene, 80, 532, '② 把某个外设块的 SP 清 0，再从用户态访问：abort 消失；写回 1 立刻复现 —— 说明拦它的是桥。', 't20w');
+  txt(scene, 80, 566, '③ 用户态访问另一个没放开的块仍然 abort —— 说明「放开的只是那一块」，不是全局。', 't20w');
+  txt(scene, 80, 606, 'Linux 下的等价现象：非 root 打开 /dev/mem 直接被内核拒；root 用 ioremap 也可能因为页表属性再被拦一次。', 't20w');
+  txt(scene, 80, 640, '所以「为什么我的驱动在 root 下能跑、在应用层跑不了」通常有两层原因：MMU 页表 + AIPSTZ 特权位。', 't20w');
+  txt(scene, 80, 674, '排查顺序：先确认地址对不对（16 KB 对齐块内偏移），再确认 MMU 映射属性，最后才动 OPACR —— 顺序反了会白改。', 't20w');
+  txt(scene, 80, 708, '还有一条：改了 OPACR 一定要读回校验。它是 R/W 但某些位可能被固定，写进去不等于生效。', 't20w');
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawBridge();
+  else if (s === 1) drawCost();
+  else if (s === 2) drawMpr();
+  else if (s === 3) drawOpacr();
+  else drawVerify();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () {
+  state.step = INIT.step; state.lane = INIT.lane; draw();
+});
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>

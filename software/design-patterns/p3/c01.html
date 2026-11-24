@@ -222,6 +222,48 @@ int main()
     
     <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/adapter" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>适配器变成业务层</b>它只做接口翻译，不要在适配器里加缓存、重试、权限。</li><li><b>换算有损还假装无损</b>方钉对角线近似成半径会失真；需要精确时应在接口层说明误差。</li><li><b>双向适配</b>两个方向都要就写两个适配器，不要一个类同时继承两边，容易循环依赖。</li></ul></div>
   </section>
+
+  <section class="sec" id="s7">
+    <h2><span class="n">07</span>生产实例与 PlantUML</h2>
+    
+    
+    <p class="subh">生产实例：支付核心适配银行老 SOAP 接口</p>
+    <div class="prose">
+      <p>新支付核心内部是 JSON + REST，但几家地方银行只提供十年前的 SOAP 接口：字段名不同、签名算法不同、错误码是一串数字。适配器把 <code>transfer(req)</code> 翻译成 SOAP 信封，负责签名、超时和错误码映射，支付核心完全看不到 SOAP。</p>
+<ul><li><b>字段映射</b>：金额单位从元转分，收款行行号补零到 12 位。</li>
+<li><b>签名</b>：私钥按银行要求做 SHA1-RSA，适配器内部完成。</li>
+<li><b>错误码</b>：银行 1003 映射为 <code>INSUFFICIENT_FUNDS</code>，上层只认领域错误。</li></ul>
+      <h3 class="mini-h">生产约束</h3>
+      <ul class="cons"><li>适配器只做协议翻译，不承担重试与对账</li><li>签名失败要快速失败，不能把明文请求打出去</li><li>错误码映射表要可配置，新增银行不改核心</li></ul>
+    </div>
+    <div class="fig puml-fig">
+      <div class="fig-h"><b>PlantUML · sequence</b><span>plantuml.com 渲染</span></div>
+      <div class="puml-shot"><img src="../assets/puml/dp-3-1.svg" alt="生产实例：支付核心适配银行老 SOAP 接口 的 PlantUML 图" decoding="async"></div>
+    </div>
+    <details class="puml-box"><summary>PlantUML 源码 · dp-3-1.puml</summary><pre><code>@startuml
+autonumber
+participant "PaymentCore" as P
+participant "BankAdapter" as A
+participant "SOAPClient" as S
+participant "BankHost" as B
+
+P -&gt; A: transfer(req{amount=199.00, bank="ICBC"})
+A -&gt; A: map fields (yuan-&gt;fen, pad bankCode)
+A -&gt; A: sign(SHA1-RSA, privateKey)
+A -&gt; S: send(envelope, timeout=8s)
+S -&gt; B: HTTPS POST /bank/transfer
+alt 银行返回 1003
+  B --&gt; S: fault(1003)
+  S --&gt; A: fault
+  A --&gt; P: INSUFFICIENT_FUNDS
+else 成功
+  B --&gt; S: response(tradeNo)
+  A --&gt; P: TransferResult(tradeNo)
+end
+note over A: 支付核心从未出现 SOAP 字段
+@enduml</code></pre></details>
+    
+  </section>
   <div class="ch-nav" id="chNav"></div>
   </div>
 </div>

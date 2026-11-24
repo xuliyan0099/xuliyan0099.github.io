@@ -262,6 +262,49 @@ create("plane") -&gt; 没有对应工厂，返回 nullptr</pre>
     
     <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/factory-method" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>把工厂当万能</b>只有“创建逻辑会变、或需要统一入口”时才值得抽工厂；一个 <code>struct</code> 直接初始化更清楚。</li><li><b>返回内部静态对象还允许修改</b>多个调用方拿到同一份对象会互相污染；要可变就每次新建。</li><li><b>类型名拼错没有兜底</b>查表失败必须返回错误，不要默认造第一个产品。</li></ul></div>
   </section>
+
+  <section class="sec" id="s7">
+    <h2><span class="n">07</span>生产实例与 PlantUML</h2>
+    
+    
+    <p class="subh">生产实例：支付渠道工厂（Alipay / WeChat / Stripe）</p>
+    <div class="prose">
+      <p>支付网关不可能只接一家渠道。线上常见做法是<b>渠道注册表 + 工厂</b>：下单主流程只说 <code>channel="wechat"</code>，工厂按名字取出 provider，同时校验该渠道的开关、限额、密钥版本。新增 Stripe 只注册一个 provider，不改下单代码。</p>
+<ul><li><b>密钥轮换</b>：provider 构造时绑定密钥版本，旧版本在宽限期内仍可退款。</li>
+<li><b>渠道降级</b>：主渠道超时后由工厂返回备用 provider，但订单号与幂等键保持不变。</li>
+<li><b>可观测</b>：每次 create 记录 channel、keyVersion、耗时，便于按渠道看错误率。</li></ul>
+      <h3 class="mini-h">生产约束</h3>
+      <ul class="cons"><li>渠道名拼错必须显式失败，不能默认落到第一家</li><li>provider 无状态或只读，回调并发时不能共享可变字段</li><li>工厂不负责重试；重试策略放在上层，避免重复扣款</li></ul>
+    </div>
+    <div class="fig puml-fig">
+      <div class="fig-h"><b>PlantUML · sequence</b><span>plantuml.com 渲染</span></div>
+      <div class="puml-shot"><img src="../assets/puml/dp-2-1.svg" alt="生产实例：支付渠道工厂（Alipay / WeChat / Stripe） 的 PlantUML 图" decoding="async"></div>
+    </div>
+    <details class="puml-box"><summary>PlantUML 源码 · dp-2-1.puml</summary><pre><code>@startuml
+autonumber
+participant "OrderService" as O
+participant "PaymentFactory" as F
+participant "ProviderRegistry" as R
+participant "WeChatProvider" as W
+participant "AlipayProvider" as A
+
+O -&gt; F: create("wechat", merchant, keyVer=3)
+F -&gt; R: lookup("wechat")
+R --&gt; F: WeChatProvider
+F -&gt; W: new(merchant, keyVer)
+F --&gt; O: provider
+O -&gt; W: pay(orderNo, idemKey, 199.00)
+alt 渠道超时
+  O -&gt; F: create("alipay", merchant, keyVer=7)
+  F --&gt; O: AlipayProvider
+  O -&gt; A: pay(同一 idemKey)
+  note right of A: 幂等键不变，避免重复扣款
+else 成功
+  W --&gt; O: tradeNo + SUCCESS
+end
+@enduml</code></pre></details>
+    
+  </section>
   <div class="ch-nav" id="chNav"></div>
   </div>
 </div>

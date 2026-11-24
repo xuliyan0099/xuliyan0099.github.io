@@ -1,0 +1,22 @@
+@startuml
+autonumber
+participant "Thread-A" as A
+participant "Thread-B" as B
+participant "ConfigClient" as C
+participant "ConfigServer" as S
+
+A -> C: get()
+C -> C: lock(once)
+C -> S: connect + longPoll(version=0)
+S --> C: snapshot(v=41)
+C --> A: instance(v=41)
+B -> C: get()
+alt 初始化未完成
+  B -> B: wait(once)
+else 已完成
+  C --> B: 同一实例(v=41)
+end
+S -> C: push(v=42)
+C -> C: update cache, notify listeners
+note over A,B: 全进程只有一个长连接、一个版本号
+@enduml

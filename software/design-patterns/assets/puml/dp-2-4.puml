@@ -1,0 +1,21 @@
+@startuml
+autonumber
+participant "TenantService" as T
+participant "TemplateRegistry" as R
+participant "MonthlyTemplate" as M
+participant "TenantCopy" as C
+
+T -> R: clone("monthly", tenant=42)
+R -> M: deepCopy()
+M -> M: copy formula AST (immutable, shared)
+M -> M: copy style table (refcount++)
+M --> R: new template
+R -> R: validateRequiredColumns()
+alt 缺“税额”列
+  R --> T: InvalidTemplate
+else 通过
+  R --> T: TenantCopy(version=7)
+end
+T -> C: setTimezone("Asia/Shanghai")
+note right: 只改副本，原型仍为 UTC
+@enduml

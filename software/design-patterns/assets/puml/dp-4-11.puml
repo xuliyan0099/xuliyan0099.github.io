@@ -1,0 +1,25 @@
+@startuml
+abstract class SqlNode {
+  +accept(v: Visitor)
+}
+class Select
+class Join
+class TableRef
+class BinaryExpr
+SqlNode <|-- Select
+SqlNode <|-- Join
+SqlNode <|-- TableRef
+SqlNode <|-- BinaryExpr
+interface Visitor {
+  +visitSelect(n)
+  +visitJoin(n)
+  +visitTable(n)
+}
+class PermissionAudit
+class FullScanAudit
+Visitor <|-- PermissionAudit
+Visitor <|-- FullScanAudit
+Select --> Visitor : accept
+note right of PermissionAudit: 越权表 -> BLOCK
+note right of FullScanAudit: 无索引扫描 -> WARN
+@enduml

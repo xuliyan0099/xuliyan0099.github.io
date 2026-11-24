@@ -244,6 +244,53 @@ proxy_get(photo.jpg)：命中缓存，不碰磁盘
     
     <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/proxy" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>代理和真实对象接口不一致</b>一旦调用方要判断“是不是代理”，透明性就没了。</li><li><b>缓存没有失效策略</b>文件更新后仍返回旧像素；需要版本号或 mtime。</li><li><b>代理里塞权限/日志/重试全都上</b>一个代理只做一件事；需要多种横切能力就叠多个代理。</li></ul></div>
   </section>
+
+  <section class="sec" id="s7">
+    <h2><span class="n">07</span>生产实例与 PlantUML</h2>
+    
+    
+    <p class="subh">生产实例：商品目录远程服务代理（缓存 + 熔断）</p>
+    <div class="prose">
+      <p>商品目录是独立微服务，首页每秒几千次查询。直接调用会让下游抖动直接传到前端。代理站在真实客户端前面：<b>先查本地缓存，未命中再走远程；连续失败触发熔断，返回上一次的 stale 数据</b>。调用方仍然只调 <code>getSku()</code>。</p>
+<ul><li><b>缓存</b>：按 SKU 缓存 60s，热点 key 加随机抖动防雪崩。</li>
+<li><b>熔断</b>：10s 内错误率 > 50% 打开断路器，30s 后半开探测。</li>
+<li><b>降级</b>：断路器打开时返回 stale 并标记 <code>degraded=true</code>。</li></ul>
+      <h3 class="mini-h">生产约束</h3>
+      <ul class="cons"><li>代理和真实客户端接口必须一致，调用方不能感知降级</li><li>缓存要有失效与穿透保护，空值也要短缓存</li><li>熔断状态要可观测，不能悄悄一直返回旧数据</li></ul>
+    </div>
+    <div class="fig puml-fig">
+      <div class="fig-h"><b>PlantUML · sequence</b><span>plantuml.com 渲染</span></div>
+      <div class="puml-shot"><img src="../assets/puml/dp-3-7.svg" alt="生产实例：商品目录远程服务代理（缓存 + 熔断） 的 PlantUML 图" decoding="async"></div>
+    </div>
+    <details class="puml-box"><summary>PlantUML 源码 · dp-3-7.puml</summary><pre><code>@startuml
+autonumber
+participant "Web" as W
+participant "CatalogProxy" as P
+participant "LocalCache" as L
+participant "CatalogService" as S
+
+W -&gt; P: getSku("A100")
+P -&gt; L: get("A100")
+alt 命中
+  L --&gt; P: sku(version=7)
+  P --&gt; W: sku
+else 未命中且断路器关闭
+  P -&gt; S: GET /sku/A100 (timeout=300ms)
+  alt 成功
+    S --&gt; P: sku
+    P -&gt; L: put(ttl=60s + jitter)
+    P --&gt; W: sku
+  else 连续失败
+    S --&gt; P: 5xx
+    P -&gt; P: openCircuit(30s)
+    P --&gt; W: stale + degraded=true
+  end
+else 断路器打开
+  P --&gt; W: stale + degraded=true
+end
+@enduml</code></pre></details>
+    
+  </section>
   <div class="ch-nav" id="chNav"></div>
   </div>
 </div>

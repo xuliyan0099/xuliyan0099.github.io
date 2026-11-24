@@ -1,0 +1,24 @@
+@startuml
+autonumber
+participant "Deployer" as D
+participant "CloudFactory(AWS)" as F
+participant "EC2" as C
+participant "S3" as S
+participant "SQS" as Q
+
+D -> F: provision(region="ap-southeast-1")
+F -> C: createInstance(vpc, ami)
+C --> F: i-0abc
+F -> S: createBucket(region, kmsKey)
+S --> F: bucket-xyz
+F -> Q: createQueue(region)
+alt 队列创建失败
+  F -> S: deleteBucket(bucket-xyz)
+  F -> C: terminate(i-0abc)
+  F --> D: ProvisionFailed(rolledBack=true)
+else 成功
+  Q --> F: queue-url
+  F --> D: ResourceSet{compute, storage, queue}
+end
+note over D: 三件资源同云同区，账单按 costCenter 聚合
+@enduml
