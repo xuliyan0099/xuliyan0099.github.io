@@ -32,7 +32,7 @@
 
   <div class="ch-meta"><span class="lv">设计模式全书</span><span class="sep">/</span>四篇 25 章<span class="sep">/</span>C 与 C++ 双实现</div>
   <h1>设计模式：从一张函数表，到一个可替换的对象</h1>
-  <p class="lede">这套东西不背定义。每个模式都走同一条线：先看它在真实代码里长什么样（通常是坏的），再画清结构，然后给两份实现——一份 C 的（结构体首成员放函数表指针，手工虚表），一份 C++ 的（虚函数 + <code>unique_ptr</code>/<code>shared_ptr</code>）。两份代码用 gcc/g++ <code>-Wall -Wextra</code> 零警告编译，页面上的 RUN 输出就是实际跑出来的结果。场景全部来自车载与嵌入式：CAN 调度、ECU 状态机、报文过滤、驱动注册、传感器适配。</p>
+  <p class="lede">这套东西不背定义。每个模式都走同一条线：先看它在真实代码里长什么样（通常是坏的），再画清结构，然后给两份实现——一份 C 的（结构体首成员放函数表指针，手工虚表），一份 C++ 的（虚函数 + <code>unique_ptr</code>/<code>shared_ptr</code>）。两份代码用 gcc/g++ <code>-Wall -Wextra</code> 零警告编译，页面上的 RUN 输出就是实际跑出来的结果。例子全部取自网络上成熟的教程：Refactoring Guru 中文版的物流、GUI、文件系统、聊天室、订单等经典场景，解释器一章参考菜鸟教程。</p>
   <div class="chips"><span class="chip ok">四篇 25 章</span><span class="chip">23 个 GoF 模式全实现</span><span class="chip">每章 6 节</span></div>
 
   <section class="sec" id="s0">

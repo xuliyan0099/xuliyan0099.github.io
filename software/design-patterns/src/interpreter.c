@@ -1,47 +1,35 @@
-/* 解释器：把 "TEMP>90 AND RPM<800" 变成小语法树，换环境就能重算 */
+/* 解释器 · 算术表达式 (2 + 3) * 4
+ * gcc -std=c11 -Wall -Wextra interpreter.c -o interpreter
+ */
 #include <stdio.h>
 
-typedef struct ctx { int temp; int rpm; } ctx_t;
-
 typedef struct expr expr_t;
-typedef enum { E_CMP, E_AND, E_OR } kind_t;
-
 struct expr {
-    kind_t kind;
-    int var;        /* 0=temp 1=rpm，仅 CMP 用 */
-    int op;         /* 0='>' 1='<' */
+    int kind;          /* 0=数字 1=加法 2=乘法 */
     int value;
-    const expr_t *l;
-    const expr_t *r;
+    expr_t *l, *r;
 };
 
-static int eval(const expr_t *e, const ctx_t *c)
+static int eval(const expr_t *e)
 {
     switch (e->kind) {
-        case E_CMP: {
-            int v = e->var == 0 ? c->temp : c->rpm;
-            return e->op == 0 ? v > e->value : v < e->value;
-        }
-        case E_AND: return eval(e->l, c) && eval(e->r, c);
-        case E_OR:  return eval(e->l, c) || eval(e->r, c);
+    case 0: return e->value;
+    case 1: return eval(e->l) + eval(e->r);
+    case 2: return eval(e->l) * eval(e->r);
     }
     return 0;
 }
 
 int main(void)
 {
-    /* 等价于 TEMP>90 AND RPM<800 */
-    const expr_t t90  = { .kind = E_CMP, .var = 0, .op = 0, .value = 90 };
-    const expr_t r800 = { .kind = E_CMP, .var = 1, .op = 1, .value = 800 };
-    const expr_t all  = { .kind = E_AND, .l = &t90, .r = &r800 };
+    expr_t n2 = { 0, 2, NULL, NULL };
+    expr_t n3 = { 0, 3, NULL, NULL };
+    expr_t n4 = { 0, 4, NULL, NULL };
+    expr_t add = { 1, 0, &n2, &n3 };
+    expr_t mul = { 2, 0, &add, &n4 };
 
-    ctx_t hot  = { 105, 700 };   /* 超温且转速没上来 */
-    ctx_t idle = { 88,  650 };
-    ctx_t fast = { 95,  900 };
-
-    printf("hot  temp=%d rpm=%d -> %s\n", hot.temp, hot.rpm, eval(&all, &hot) ? "报警" : "正常");
-    printf("idle temp=%d rpm=%d -> %s\n", idle.temp, idle.rpm, eval(&all, &idle) ? "报警" : "正常");
-    printf("fast temp=%d rpm=%d -> %s\n", fast.temp, fast.rpm, eval(&all, &fast) ? "报警" : "正常");
-    printf("同一棵树，三组输入，不需要重新解析\n");
+    printf("表达式： (2 + 3) * 4\n");
+    printf("求值 = %d\n", eval(&mul));
+    printf("换成 (2 + 3) * 5 只需换一个叶子，树结构不变\n");
     return 0;
 }

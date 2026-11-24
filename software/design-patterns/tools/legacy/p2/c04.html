@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2.4 命令模式 Command · C 与 C++ 双实现</title>
+<meta name="description" content="诊断参数写入队列：C 用结构体基类 + 函数指针表，C++ 用虚函数与 unique_ptr；演示排队、执行、撤销与历史栈。">
+<meta name="theme-color" content="#08090c">
+<link rel="stylesheet" href="../assets/pd.css">
+<style>
+.qrow{display:flex;flex-wrap:wrap;gap:6px;min-height:26px;margin:6px 0 12px}
+.q{font:11px/1 var(--mono);padding:6px 9px;border-radius:6px;border:1px solid rgba(124,156,255,.35);background:rgba(124,156,255,.08);color:#b8c8f5}
+.q.h{color:#9fe8c8;border-color:rgba(67,214,168,.35);background:rgba(67,214,168,.07)}
+.q.lab{color:#7d8798;border-color:var(--line);background:none;padding:6px 0}
+.dev{display:flex;gap:8px;margin:4px 0 12px}
+.dev div{flex:1;border:1px solid var(--line);border-radius:8px;background:#0d1220;padding:8px 10px}
+.dev span{display:block;font:600 10px/1.4 var(--mono);letter-spacing:.08em;color:#8494ad}
+.dev b{font:700 18px/1.3 var(--mono);color:#8ff5d6}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <label for="navChk" class="nav-toggle">☰ 目录</label>
+    <a class="brand" href="../index.html"><i></i>设计模式<small>C / C++ 双实现</small></a>
+    <span class="tb-sp"></span>
+    <a class="tb" href="../p1/c01.html">导读</a>
+    <a class="tb" href="../../../index.html">知识库</a>
+    <a class="tb" href="../index.html">目录</a>
+  </div>
+</header>
+
+<input type="checkbox" id="navChk" class="nav-chk" hidden>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">篇二 · 行为型<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
+    <ol id="sideList"></ol>
+    <div class="vol-nav" id="volNav"></div>
+  </aside>
+
+  <div class="wrap">
+  <div class="ch-meta"><span class="lv">篇二 · 行为型</span><span class="sep">/</span>第 4 章<span class="sep">/</span>约 30 分钟</div>
+  <h1>命令模式<span class="en">COMMAND</span></h1>
+  <p class="lede">把“要做什么”变成一个可传递、可排队、可回滚的对象。调用者只捏着命令指针，不知道它改的是增益还是模式；撤销也不是“反向再算一遍”，而是命令在 <code>exec</code> 时记下旧值，<code>undo</code> 时照着还原。</p>
+  <div class="chips">
+    <span class="chip ok">排队与撤销解耦</span>
+    <span class="chip">旧值在 exec 时记录</span>
+    <span class="chip">C++ 版由历史栈持有所有权</span>
+  </div>
+<section class="sec" id="s1">
+    <h2><span class="n">01</span>问题：直接调用，就没有“以后”和“回退”</h2>
+    <div class="prose">
+      <p>最省事的写法是直接 <code>dev.gain = 20;</code>。它有三个躲不开的后果：</p>
+      <ul>
+        <li><b>没有队列。</b>想等总线空闲再写、想合并同一参数的多次设置，都得在调用点外面另建一堆临时变量；</li>
+        <li><b>没有撤销。</b>想回退，要么在改之前自己存旧值（到处存），要么写一段“反向操作”，而反向操作一旦算错就是新 bug（增益不是加减，模式不是取反）；</li>
+        <li><b>调用者知道太多。</b>谁发起的就得知道 <code>device</code> 长什么样、字段叫什么，日后想统一加审计日志，得改每一个调用点。</li>
+      </ul>
+      <p>命令模式的做法很直白：把一次操作连同它的参数、它的接收者、它执行前的旧值，一起封进一个对象。调用者只管 <code>post</code> 和 <code>run</code>；撤销由命令自己负责，因为只有它知道刚才把哪个字段从几改成了几。</p>
+    </div>
+  </section>
+
+  <section class="sec" id="s2">
+    <h2><span class="n">02</span>结构：调用者、命令、接收者</h2>
+    <p class="subh">三个角色各管一段：调用者管“什么时候执行”，命令管“怎么执行、怎么回退”，接收者只管“被改”。点方框看边界。</p>
+
+    <div class="fig">
+      <div class="fig-h"><b>命令对象与历史栈</b><span>command + undo</span></div>
+      <div class="diagram">
+        <svg viewBox="0 0 880 350" role="img" aria-label="命令模式结构图">
+          <defs>
+            <marker id="ar5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/>
+            </marker>
+            <marker id="ar5d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M0 0 L10 5 L0 10 z" fill="#43d6a8"/>
+            </marker>
+          </defs>
+
+          <g class="node" data-role="inv" data-note="Invoker（invoker_t / Invoker）：只认命令接口。post 把指针塞进队列，run 逐条调用 exec 并转入历史，undoLast 从历史取最后一条调 undo。它不知道命令改的是哪个字段。">
+            <rect x="24" y="120" width="160" height="96" rx="10"/>
+            <text class="nm" x="38" y="144">Invoker</text>
+            <text class="ty" x="38" y="163">调用者</text>
+            <text class="mt" x="38" y="182">post / run</text>
+            <text class="mt" x="38" y="199">undoLast</text>
+          </g>
+
+          <g class="node" data-role="iface" data-note="ICommand（C 里是 cmd_ops_t 表 + cmd_t 基类）：只有 exec 与 undo 两个入口。接口里不出现 device，所以换一个设备也能复用同一套调用者。">
+            <rect x="250" y="120" width="180" height="96" rx="10" class="iface"/>
+            <text class="nm" x="264" y="144">ICommand</text>
+            <text class="ty" x="264" y="163">命令接口</text>
+            <text class="mt" x="264" y="182">exec()</text>
+            <text class="mt" x="264" y="199">undo()</text>
+          </g>
+
+          <g class="node" data-role="gain" data-note="SetGain：自带 device 指针、目标值和旧值。关键点是旧值必须在 exec 那一刻取，不能构造时取——否则排队的命令会还原成入队时的旧状态。">
+            <rect x="520" y="52" width="290" height="76" rx="10"/>
+            <text class="nm" x="534" y="76">SetGain</text>
+            <text class="ty" x="534" y="95">具体命令</text>
+            <text class="mt" x="534" y="114">dev · value · old</text>
+          </g>
+
+          <g class="node" data-role="mode" data-note="SetMode：与 SetGain 结构相同，语义不同。想再加一条“清除故障码”，只需再加一个命令类型，调用者和队列一行都不用改。">
+            <rect x="520" y="150" width="290" height="76" rx="10"/>
+            <text class="nm" x="534" y="174">SetMode</text>
+            <text class="ty" x="534" y="193">具体命令</text>
+            <text class="mt" x="534" y="212">dev · value · old</text>
+          </g>
+
+          <g class="node" data-role="dev" data-note="Receiver（device_t / Device）：真正被修改的对象，只有 gain 与 mode。它不参与排队，也不知道有撤销这回事——回退完全由命令负责。">
+            <rect x="520" y="268" width="290" height="72" rx="10" class="recv"/>
+            <text class="nm" x="534" y="292">device_t</text>
+            <text class="ty" x="534" y="311">接收者</text>
+            <text class="mt" x="534" y="330">gain · mode</text>
+          </g>
+
+          <g class="node" data-role="hist" data-note="queue[8] / history[8]：两个栈。待执行的留在 queue，执行过的进 history。撤销就是 history 尾部出栈并调 undo——顺序天然是“后进先出”。">
+            <rect x="24" y="268" width="160" height="72" rx="10" class="dep"/>
+            <text class="nm" x="38" y="292">queue / history</text>
+            <text class="ty" x="38" y="311">待执行 / 已执行</text>
+            <text class="mt" x="38" y="330">LIFO</text>
+          </g>
+
+          <path class="flow" marker-end="url(#ar5)" d="M184 158 L246 158"/>
+          <text class="lbl" x="176" y="150">cmd_t*</text>
+
+          <path class="flow" marker-end="url(#ar5)" d="M430 148 C 470 130, 480 100, 516 92"/>
+          <text class="lbl" x="446" y="112">具体实现</text>
+
+          <path class="flow" marker-end="url(#ar5)" d="M430 196 C 470 210, 480 200, 516 190"/>
+
+          <path class="flow" marker-end="url(#ar5)" d="M600 128 L600 264"/>
+          <text class="lbl" x="606" y="246">旧值 / 新值</text>
+
+          <path class="flow" marker-end="url(#ar5)" d="M712 226 L712 264"/>
+
+          <path class="flow" marker-end="url(#ar5)" d="M104 218 L104 264"/>
+          <text class="lbl" x="110" y="246">执行后入栈</text>
+
+          <path class="flow dep" marker-end="url(#ar5d)" d="M186 300 C 230 300, 240 230, 248 212"/>
+          <text class="lbl ok" x="196" y="318">undo 从这里取</text>
+        </svg>
+      </div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：调用者为什么不必知道 device，旧值为什么必须晚记。</span></div>
+    </div>
+  </section>
+
+  <section class="sec" id="s3">
+    <h2><span class="n">03</span>两份实现</h2>
+    <p class="subh">C 版靠“基类结构体放第一位 + <code>ops</code> 函数表”做多态，命令对象就是一段能强转的结构体内存；C++ 版靠虚函数，命令对象由 <code>unique_ptr</code> 在队列与历史之间搬家，所有权始终唯一。</p>
+
+    <div class="codes">
+      <div class="codecard">
+        <div class="ch"><span class="lang">C</span><span class="fn">command.c</span><button class="copy">复制</button></div>
+        <pre><code>/* 命令模式 · C 实现：诊断参数写入队列 + 撤销
+ * 编译：gcc -std=c11 -Wall -Wextra command.c -o command
+ */
+#include &lt;stdio.h&gt;
+
+typedef struct { int gain; int mode; } device_t;
+
+typedef struct cmd cmd_t;
+typedef struct {
+    void (*exec)(cmd_t *self);
+    void (*undo)(cmd_t *self);
+} cmd_ops_t;
+
+struct cmd { const cmd_ops_t *ops; };      /* 命令的「类型 + 状态」都在这里 */
+
+/* 具体命令 1：设置增益。exec 时自己记住旧值，undo 才能还原 */
+typedef struct {
+    cmd_t     base;      /* 必须放第一位：才能把 cmd_t* 安全还原成 set_gain_t* */
+    device_t *dev;
+    int       value;
+    int       old;
+} set_gain_t;
+
+static void gain_exec(cmd_t *self)
+{
+    set_gain_t *c = (set_gain_t *)self;
+    c-&gt;old = c-&gt;dev-&gt;gain;
+    c-&gt;dev-&gt;gain = c-&gt;value;
+    printf("  exec  SetGain(%d)，旧值 %d\n", c-&gt;value, c-&gt;old);
+}
+
+static void gain_undo(cmd_t *self)
+{
+    set_gain_t *c = (set_gain_t *)self;
+    c-&gt;dev-&gt;gain = c-&gt;old;
+    printf("  undo  SetGain(%d)，还原成 %d\n", c-&gt;value, c-&gt;old);
+}
+
+static const cmd_ops_t GAIN_OPS = { gain_exec, gain_undo };
+
+/* 具体命令 2：切换模式 */
+typedef struct {
+    cmd_t     base;
+    device_t *dev;
+    int       value;
+    int       old;
+} set_mode_t;
+
+static void mode_exec(cmd_t *self)
+{
+    set_mode_t *c = (set_mode_t *)self;
+    c-&gt;old = c-&gt;dev-&gt;mode;
+    c-&gt;dev-&gt;mode = c-&gt;value;
+    printf("  exec  SetMode(%d)，旧值 %d\n", c-&gt;value, c-&gt;old);
+}
+
+static void mode_undo(cmd_t *self)
+{
+    set_mode_t *c = (set_mode_t *)self;
+    c-&gt;dev-&gt;mode = c-&gt;old;
+    printf("  undo  SetMode(%d)，还原成 %d\n", c-&gt;value, c-&gt;old);
+}
+
+static const cmd_ops_t MODE_OPS = { mode_exec, mode_undo };
+
+/* 调用者：只认 cmd_t*，不知道命令具体做什么 */
+typedef struct {
+    cmd_t *queued[8];  int qn;
+    cmd_t *history[8]; int hn;
+} invoker_t;
+
+static void invoker_post(invoker_t *iv, cmd_t *c)
+{
+    if (iv-&gt;qn &lt; 8) iv-&gt;queued[iv-&gt;qn++] = c;
+    printf("  post  队列长度=%d\n", iv-&gt;qn);
+}
+
+static void invoker_run(invoker_t *iv)
+{
+    printf("--- 执行队列 ---\n");
+    for (int i = 0; i &lt; iv-&gt;qn; i++) {
+        iv-&gt;queued[i]-&gt;ops-&gt;exec(iv-&gt;queued[i]);
+        iv-&gt;history[iv-&gt;hn++] = iv-&gt;queued[i];
+    }
+    iv-&gt;qn = 0;
+}
+
+static void invoker_undo_last(invoker_t *iv)
+{
+    if (iv-&gt;hn == 0) { printf("  没有可撤销的命令\n"); return; }
+    cmd_t *c = iv-&gt;history[--iv-&gt;hn];
+    c-&gt;ops-&gt;undo(c);
+}
+
+int main(void)
+{
+    device_t dev = { 0, 0 };
+    set_gain_t c1 = { { &amp;GAIN_OPS }, &amp;dev, 12, 0 };
+    set_gain_t c2 = { { &amp;GAIN_OPS }, &amp;dev, 20, 0 };
+    set_mode_t c3 = { { &amp;MODE_OPS }, &amp;dev, 2, 0 };
+    invoker_t iv = { .qn = 0, .hn = 0 };
+
+    printf("初始 gain=%d mode=%d\n", dev.gain, dev.mode);
+    invoker_post(&amp;iv, (cmd_t *)&amp;c1);
+    invoker_post(&amp;iv, (cmd_t *)&amp;c2);
+    invoker_post(&amp;iv, (cmd_t *)&amp;c3);
+    invoker_run(&amp;iv);
+    printf("执行后 gain=%d mode=%d\n", dev.gain, dev.mode);
+
+    printf("--- 撤销两次 ---\n");
+    invoker_undo_last(&amp;iv);
+    invoker_undo_last(&amp;iv);
+    printf("撤销后 gain=%d mode=%d\n", dev.gain, dev.mode);
+    printf("历史剩余=%d\n", iv.hn);
+    return 0;
+}</code></pre>
+      </div>
+
+      <div class="codecard">
+        <div class="ch"><span class="lang">C++</span><span class="fn">command.cpp</span><button class="copy">复制</button></div>
+        <pre><code>// 命令模式 · C++ 实现：命令对象自带接收者引用，历史栈持有所有权
+// 编译：g++ -std=c++17 -Wall -Wextra command.cpp -o command_cpp
+#include &lt;cstdio&gt;
+#include &lt;deque&gt;
+#include &lt;memory&gt;
+
+class Device {
+public:
+    int gain() const { return gain_; }
+    int mode() const { return mode_; }
+    void setGain(int v) { gain_ = v; }
+    void setMode(int v) { mode_ = v; }
+private:
+    int gain_ = 0;
+    int mode_ = 0;
+};
+
+class ICommand {
+public:
+    virtual ~ICommand() = default;
+    virtual void exec() = 0;
+    virtual void undo() = 0;
+};
+
+class SetGain final : public ICommand {
+public:
+    SetGain(Device&amp; d, int v) : d_(d), v_(v) {}
+    void exec() override { old_ = d_.gain(); d_.setGain(v_); std::printf("  exec  SetGain(%d)，旧值 %d\n", v_, old_); }
+    void undo() override { d_.setGain(old_); std::printf("  undo  SetGain(%d)，还原成 %d\n", v_, old_); }
+private:
+    Device&amp; d_;
+    int v_;
+    int old_ = 0;
+};
+
+class SetMode final : public ICommand {
+public:
+    SetMode(Device&amp; d, int v) : d_(d), v_(v) {}
+    void exec() override { old_ = d_.mode(); d_.setMode(v_); std::printf("  exec  SetMode(%d)，旧值 %d\n", v_, old_); }
+    void undo() override { d_.setMode(old_); std::printf("  undo  SetMode(%d)，还原成 %d\n", v_, old_); }
+private:
+    Device&amp; d_;
+    int v_;
+    int old_ = 0;
+};
+
+// 调用者：只看到 ICommand
+class Invoker {
+public:
+    void post(std::unique_ptr&lt;ICommand&gt; cmd) {
+        queue_.push_back(std::move(cmd));
+        std::printf("  post  队列长度=%d\n", static_cast&lt;int&gt;(queue_.size()));
+    }
+    void run() {
+        std::printf("--- 执行队列 ---\n");
+        for (auto&amp; c : queue_) { c-&gt;exec(); history_.push_back(std::move(c)); }
+        queue_.clear();
+    }
+    void undoLast() {
+        if (history_.empty()) { std::printf("  没有可撤销的命令\n"); return; }
+        history_.back()-&gt;undo();
+        history_.pop_back();
+    }
+private:
+    std::deque&lt;std::unique_ptr&lt;ICommand&gt;&gt; queue_;
+    std::deque&lt;std::unique_ptr&lt;ICommand&gt;&gt; history_;
+};
+
+int main() {
+    Device dev;
+    Invoker iv;
+    std::printf("初始 gain=%d mode=%d\n", dev.gain(), dev.mode());
+
+    iv.post(std::make_unique&lt;SetGain&gt;(dev, 12));
+    iv.post(std::make_unique&lt;SetGain&gt;(dev, 20));
+    iv.post(std::make_unique&lt;SetMode&gt;(dev, 2));
+    iv.run();
+    std::printf("执行后 gain=%d mode=%d\n", dev.gain(), dev.mode());
+
+    std::printf("--- 撤销两次 ---\n");
+    iv.undoLast();
+    iv.undoLast();
+    std::printf("撤销后 gain=%d mode=%d\n", dev.gain(), dev.mode());
+    return 0;
+}</code></pre>
+      </div>
+    </div>
+
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>./command.exe</span></div>
+      <pre>初始 gain=0 mode=0
+  post  队列长度=1
+  post  队列长度=2
+  post  队列长度=3
+--- 执行队列 ---
+  exec  SetGain(12)，旧值 0
+  exec  SetGain(20)，旧值 12
+  exec  SetMode(2)，旧值 0
+执行后 gain=20 mode=2
+--- 撤销两次 ---
+  undo  SetMode(2)，还原成 0
+  undo  SetGain(20)，还原成 12
+撤销后 gain=12 mode=0
+历史剩余=1</pre>
+    </div>
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>./command_cpp.exe</span></div>
+      <pre>初始 gain=0 mode=0
+  post  队列长度=1
+  post  队列长度=2
+  post  队列长度=3
+--- 执行队列 ---
+  exec  SetGain(12)，旧值 0
+  exec  SetGain(20)，旧值 12
+  exec  SetMode(2)，旧值 0
+执行后 gain=20 mode=2
+--- 撤销两次 ---
+  undo  SetMode(2)，还原成 0
+  undo  SetGain(20)，还原成 12
+撤销后 gain=12 mode=0</pre>
+    </div>
+    <p class="hintline">注意第二条 <code>exec SetGain(20)</code> 的旧值是 12，不是 0：旧值是在执行那一刻取的，所以排队再久也能正确回退到上一条命令的结果。</p>
+  </section>
+  <section class="sec" id="s4">
+    <h2><span class="n">04</span>自己排一次队，再撤两次</h2>
+    <p class="subh">先按几个命令按钮入队（不会立刻生效），再点“执行队列”。执行过的命令进历史；撤销只从历史尾部取，所以顺序一定是反的。</p>
+
+    <div class="demo">
+      <div class="demo-h"><b>command queue</b><span>排队 → 执行 → 撤销</span></div>
+      <div class="stage">
+        <div class="dev">
+          <div><span>gain</span><b id="dGain">0</b></div>
+          <div><span>mode</span><b id="dMode">0</b></div>
+          <div><span>history</span><b id="dHist">0</b></div>
+        </div>
+        <div class="qrow" id="qRow"></div>
+        <div class="ctl" style="margin-bottom:10px">
+          <button class="btn" data-cmd="gain" data-val="12">SetGain(12)</button>
+          <button class="btn" data-cmd="gain" data-val="20">SetGain(20)</button>
+          <button class="btn" data-cmd="gain" data-val="35">SetGain(35)</button>
+          <button class="btn" data-cmd="mode" data-val="1">SetMode(1)</button>
+          <button class="btn" data-cmd="mode" data-val="2">SetMode(2)</button>
+        </div>
+        <div class="ctl">
+          <button class="btn on" id="btnRun">执行队列</button>
+          <button class="btn" id="btnUndo">撤销一步</button>
+          <button class="btn" id="btnReset">重置</button>
+        </div>
+        <div class="log" id="cLog"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="s5">
+    <h2><span class="n">05</span>C 与 C++：同一套队列，两种所有权</h2>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
+        <tbody>
+          <tr><td>命令接口</td><td><code>cmd_ops_t</code> 两个函数指针</td><td><code>ICommand</code> 两个纯虚函数</td><td>都是“一次虚调用”，C 的间接层是显式的函数表</td></tr>
+          <tr><td>命令对象</td><td><code>base</code> 必须放在结构体第一位</td><td>继承即可，编译器保证布局</td><td>漏放第一位就是 UB，C 版得靠约定和注释</td></tr>
+          <tr><td>还原类型</td><td><code>(set_gain_t *)self</code></td><td><code>static_cast</code> / 虚分派已到具体类</td><td>C 的强转没有任何检查，写错就是内存踩踏</td></tr>
+          <tr><td>创建</td><td>栈上静态初始化，无分配</td><td><code>make_unique</code>，一次堆分配</td><td>C 版适合固定上限的嵌入式队列</td></tr>
+          <tr><td>所有权</td><td>调用者自己保证命令活得够久</td><td>队列 → 历史，<code>move</code> 转移</td><td>C++ 版不会出现“撤销时命令已被释放”</td></tr>
+          <tr><td>撤销</td><td colspan="2">都在 <code>exec</code> 里记旧值，<code>undo</code> 里写回</td><td>两条实现共用同一条规则：旧值晚记、只记一次</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sec" id="s6">
+    <h2><span class="n">06</span>代价与坑</h2>
+    <div class="prose">
+      <ul>
+        <li><b>旧值不能在构造时记。</b>命令可能排队几秒才执行；构造时取值，撤销会把设备还原成“入队那一刻”的状态，中间别的写入就白做了。</li>
+        <li><b>同一字段连写两次的撤销顺序。</b>先 12 再 20，撤销一次回 12、再撤一次回 0——这依赖历史是严格的 LIFO。想支持“重做”，还得再存一份被撤销的命令。</li>
+        <li><b>C 版的结构体布局是隐式契约。</b><code>base</code> 放第一位这条规则，编译器不会检查；一旦有人为了“对齐”把它挪到后面，所有 <code>exec</code> 的强转都失效。用 <code>_Static_assert(offsetof(set_gain_t, base) == 0)</code> 把它变成编译期错误。</li>
+        <li><b>撤销不是“反操作”。</b>增益、模式这类赋值型操作，记旧值最稳；如果是“累加”“切换”型操作，反算会引入浮点误差或竞争窗口，同样建议记旧值。</li>
+        <li><b>命令里别存裸指针以外的东西。</b>存 <code>device_t*</code> 是必要的；但如果命令还存了“当前总线句柄”“临时缓冲区”，生命周期就会和队列绑在一起，容易泄漏或悬空。</li>
+        <li><b>队列满了怎么办。</b>C 版固定 8 格，第 9 条被 <code>if (qn &lt; 8)</code> 悄悄丢掉，但 <code>post</code> 仍打印长度——这是假成功。要么返回失败码，要么覆盖最旧的一条，必须选一个并写进日志。</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="ch-nav">
+      <a href="../p2/c03.html"><span>上一章</span><b>← 2.3 状态模式</b></a>
+      <a class="nx" href="../p2/c05.html"><span>下一章</span><b>2.5 职责链模式 →</b></a>
+    </div>
+
+  
+</div>
+
+</div>
+
+<script src="../assets/pd.js"></script>
+<script src="../assets/dp-data.js"></script>
+<script src="../assets/dp-nav.js"></script>
+<script>dpNav('p2');</script>
+<script>
+(function () {
+  var dev = { gain: 0, mode: 0 };
+  var queue = [];
+  var history = [];
+
+  var dGain = document.getElementById('dGain');
+  var dMode = document.getElementById('dMode');
+  var dHist = document.getElementById('dHist');
+  var qRow = document.getElementById('qRow');
+  var logEl = document.getElementById('cLog');
+
+  var NAME = { gain: 'SetGain', mode: 'SetMode' };
+
+  function sync() {
+    dGain.textContent = dev.gain;
+    dMode.textContent = dev.mode;
+    dHist.textContent = history.length;
+    qRow.innerHTML = '';
+    if (!queue.length) {
+      var s = document.createElement('span');
+      s.className = 'q lab';
+      s.textContent = '队列空';
+      qRow.appendChild(s);
+    }
+    queue.forEach(function (c) {
+      var s = document.createElement('span');
+      s.className = 'q';
+      s.textContent = NAME[c.kind] + '(' + c.val + ')';
+      qRow.appendChild(s);
+    });
+    history.forEach(function (c, i) {
+      var s = document.createElement('span');
+      s.className = 'q h';
+      s.textContent = (i + 1) + '. ' + NAME[c.kind] + '(' + c.val + ')';
+      qRow.appendChild(s);
+    });
+  }
+
+  document.querySelectorAll('[data-cmd]').forEach(function (b) {
+    b.onclick = function () {
+      var c = { kind: b.dataset.cmd, val: +b.dataset.val };
+      queue.push(c);
+      PD.log(logEl, 'post  ' + NAME[c.kind] + '(' + c.val + ')，队列长度=' + queue.length);
+      sync();
+    };
+  });
+
+  document.getElementById('btnRun').onclick = function () {
+    if (!queue.length) { PD.log(logEl, '队列为空，没有可执行的命令', 'warn'); return; }
+    PD.log(logEl, '--- 执行队列 ---');
+    queue.forEach(function (c) {
+      var old = dev[c.kind];
+      dev[c.kind] = c.val;
+      history.push({ kind: c.kind, val: c.val, old: old });
+      PD.log(logEl, 'exec  ' + NAME[c.kind] + '(' + c.val + ')，旧值 ' + old);
+    });
+    queue = [];
+    PD.log(logEl, '执行后 gain=' + dev.gain + ' mode=' + dev.mode);
+    sync();
+  };
+
+  document.getElementById('btnUndo').onclick = function () {
+    if (!history.length) { PD.log(logEl, '没有可撤销的命令', 'bad'); return; }
+    var c = history.pop();
+    dev[c.kind] = c.old;
+    PD.log(logEl, 'undo  ' + NAME[c.kind] + '(' + c.val + ')，还原成 ' + c.old);
+    PD.log(logEl, '撤销后 gain=' + dev.gain + ' mode=' + dev.mode);
+    sync();
+  };
+
+  document.getElementById('btnReset').onclick = function () {
+    dev = { gain: 0, mode: 0 };
+    queue = [];
+    history = [];
+    PD.clear(logEl);
+    PD.log(logEl, '已重置：gain=0 mode=0，队列与历史清空');
+    sync();
+  };
+
+  sync();
+  PD.log(logEl, '先入队，再执行。撤销只动历史尾部。', 'mute');
+})();
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+

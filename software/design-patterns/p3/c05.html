@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>3.5 外观模式 FACADE · C 与 C++ 双实现</title>
-<meta name="description" content="外观：把上电五步收成一个 vehicle_start()，失败按相反顺序回滚。">
+<meta name="description" content="外观：家庭影院开机四步收成一个 watch_movie()，失败时还能整段回滚。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
 <script src="../assets/dp-demo.js"></script>
@@ -36,165 +36,162 @@
   <div class="wrap">
   <div class="ch-meta"><span class="lv">篇三 · 结构型</span><span class="sep">/</span>第 5 章<span class="sep">/</span>约 26 分钟</div>
   <h1>外观模式<span class="en">FACADE</span></h1>
-  <p class="lede">上电不是一句“点火”：继电器吸合、油泵建压、ECU 握手、防盗校验、仪表自检，顺序错了会报故障，失败还要回滚。<b>外观模式把这些收进一个入口</b>，调用方只看到成功/失败；子系统仍然可以单独测试。</p>
-  <div class="chips"><span class="chip ok">一个入口五步顺序</span><span class="chip">失败按相反顺序回滚</span><span class="chip">子系统仍可单测</span></div>
+  <p class="lede">看电视要开投影、开功放、放幕布、调灯光，顺序错了就没画面。每个想播片的地方都抄一遍这四步，迟早漏一步。外观模式提供一个入口：<b>内部按顺序调子系统，对外只暴露“看片”和“结束”</b>。</p>
+  <div class="chips"><span class="chip ok">一个入口</span><span class="chip">子系统仍可单独用</span><span class="chip">失败可整段回滚</span></div>
 
   <section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：上电五步，每个调用方都背一遍</h2>
+    <h2><span class="n">01</span>问题：坏代码长什么样</h2>
     
     
       <div class="prose">
-        <p>没有外观时，每个调用方都背一遍流程：</p>
-        <pre><code>ignition_on();
-fuel_pump_on();
-ecu_handshake();
-cluster_self_test();
-immobilizer_check();</code></pre>
-        <p>只要有一个调用方顺序写错，就出现“能点火但仪表不亮”这类怪故障：</p>
-        <ul>
-          <li><b>顺序散落。</b>台架脚本、诊断工具、整车控制器各有一份，版本很快不一致。</li>
-          <li><b>失败不回滚。</b>油泵建压失败，继电器还吸着，下次上电带着残压。</li>
-          <li><b>子系统被绑死。</b>想单独测油泵，必须先跑完整套流程，测试变慢。</li>
-        </ul>
-        <p>外观提供一个 <code>vehicle_start()</code>：内部按固定顺序调用，任一步失败就按相反顺序撤销，返回明确的错误码。子系统接口不变，仍可被单测直接调用。</p>
+        <p>坏写法是每个调用点自己排：</p>
+        <pre><code>lights_dim();
+projector_on();
+amplifier_on();
+screen_down();</code></pre>
+        <p>四个调用点各写一遍，顺序不一致；投影开机失败时，前面的灯已经调暗、幕布已经放下，没人负责收尾。</p>
+        <p>外观把这些收进 <code>watch_movie()</code>：按顺序调，任一步失败就逆序回滚。调用方只说“我要看片”。</p>
       </div>
   </section>
 
   <section class="sec" id="s2">
-    <h2><span class="n">02</span>结构：一个入口，内部仍可单测</h2>
-    <p class="subh">左边调用方，中间外观，右边三个子系统；点方框看每一步失败时谁负责回滚。</p>
+    <h2><span class="n">02</span>结构：一个入口编排子系统</h2>
+    <p class="subh">左边是用户，中间是外观入口，右边是四个子系统。</p>
     
   
     <div class="fig">
-      <div class="fig-h"><b>上电外观：一个入口，五个步骤</b><span>facade</span></div>
+      <div class="fig-h"><b>入口收口，子系统仍各自可用</b><span>structure</span></div>
       <div class="diagram">
-<svg viewBox="0 0 880 360" role="img" aria-label="上电外观：一个入口，五个步骤">
+<svg viewBox="0 0 880 360" role="img" aria-label="入口收口，子系统仍各自可用">
   <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
-  <g class="node" data-role="client" data-note="调用方不再关心顺序与回滚；它只根据返回码决定是否允许起动机。"><rect x="24" y="140" width="170" height="80" rx="10"/><text class="nm" x="38" y="164">调用方</text><text class="ty" x="38" y="183">整车控制 / 诊断</text><text class="mt" x="38" y="201">只调 start()</text></g>
-  <g class="node" data-role="facade" data-note="外观知道五步的依赖关系；它不实现任何子系统，只编排。"><rect x="230" y="120" width="210" height="120" rx="10"/><text class="nm" x="244" y="144">vehicle_start()</text><text class="ty" x="244" y="163">外观</text><text class="mt" x="244" y="181">顺序 + 回滚</text></g>
-  <g class="node" data-role="ign" data-note="点火继电器：失败时外观负责把它关掉。"><rect x="520" y="44" width="190" height="70" rx="10"/><text class="nm" x="534" y="68">ignition</text><text class="ty" x="534" y="87">子系统</text><text class="mt" x="534" y="105">relay on/off</text></g>
-  <g class="node" data-role="pump" data-note="油泵：建压失败要停泵，并把点火退回。"><rect x="520" y="145" width="190" height="70" rx="10"/><text class="nm" x="534" y="169">fuel_pump</text><text class="ty" x="534" y="188">子系统</text><text class="mt" x="534" y="206">建压 3.0bar</text></g>
-  <g class="node" data-role="ecu" data-note="ECU 握手：失败要停泵、断点火；每一步都能独立单测。"><rect x="520" y="246" width="190" height="70" rx="10"/><text class="nm" x="534" y="270">ecu</text><text class="ty" x="534" y="289">子系统</text><text class="mt" x="534" y="307">seed/key</text></g>
-  <line x1="194" y1="180" x2="230" y2="180" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="212.0" y="172.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">start</text>
-  <line x1="440" y1="145" x2="520" y2="79" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <line x1="440" y1="180" x2="520" y2="180" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <line x1="440" y1="215" x2="520" y2="281" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <g class="node" data-role="user" data-note="用户不关心投影、功放、幕布的先后。"><rect x="24" y="140" width="150" height="76" rx="10"/><text class="nm" x="38" y="164">用户</text><text class="ty" x="38" y="183">调用方</text><text class="mt" x="38" y="201">watch_movie()</text></g>
+  <g class="node" data-role="facade" data-note="外观知道顺序和回滚，是唯一编排者。"><rect x="250" y="140" width="190" height="84" rx="10"/><text class="nm" x="264" y="164">TheaterFacade</text><text class="ty" x="264" y="183">外观</text><text class="mt" x="264" y="201">watch / end</text></g>
+  <g class="node" data-role="dev" data-note="子系统仍可被单独调用，用于调试。"><rect x="520" y="56" width="190" height="74" rx="10"/><text class="nm" x="534" y="80">投影 / 功放 / 幕布 / 灯</text><text class="ty" x="534" y="99">子系统</text><text class="mt" x="534" y="117">各自 on/off</text></g>
+  <g class="node" data-role="rb" data-note="失败时把已经开的设备关回去，避免半开状态。"><rect x="520" y="212" width="190" height="74" rx="10"/><text class="nm" x="534" y="236">回滚</text><text class="ty" x="534" y="255">异常路径</text><text class="mt" x="534" y="273">逆序关闭</text></g>
+  <line x1="174" y1="178" x2="250" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="212.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">一键</text>
+  <line x1="440" y1="160" x2="520" y2="100" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="122.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">按序调用</text>
+  <line x1="440" y1="200" x2="520" y2="242" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="213.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">失败回滚</text>
 </svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：外观只编排，不替子系统干活。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">外观不是“新业务”，只是把既有步骤编排好。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
-    <h2><span class="n">03</span>两份实现</h2>
+    <h2><span class="n">03</span>两份实现：C 与 C++</h2>
     
-    <p class='subh'>C 版是一个函数 + 静态子系统；C++ 版把子系统收进类成员，<code>start()</code> 负责顺序与回滚。</p>
+    <p class='subh'>C 版外观是一组函数加一个 started 标记；C++ 版是类，析构时兜底关闭。</p>
       <div class="codecard">
         <div class="ch"><span class="lang">C</span><span class="fn">facade.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 外观：上电这一套动作收进一个函数，调用方不再关心顺序 */
+        <pre><code>/* 外观 · 家庭影院一键开机
+ * gcc -std=c11 -Wall -Wextra facade.c -o facade
+ */
 #include &lt;stdio.h&gt;
 
-static int ignition_on(void)  { printf("[IGN ] relay -&gt; ON\n"); return 1; }
-static int fuel_pump_on(void) { printf("[PUMP] pressure 3.0 bar\n"); return 1; }
-static int ecu_handshake(void){ printf("[ECU ] seed/key ok\n"); return 1; }
+static void lights_dim(void)   { puts("  灯光调到 20%"); }
+static void projector_on(void) { puts("  投影仪开机"); }
+static void amplifier_on(void){ puts("  功放开机，切到 HDMI 1"); }
+static void screen_down(void)  { puts("  幕布放下"); }
 
-/* 外观：固定顺序、失败即回滚，调用方只看到 0/负值 */
-int vehicle_start(const char *vin)
+typedef struct { int started; } theater_t;
+
+static void watch_movie(theater_t *t)
 {
-    printf("start %s\n", vin);
-    if (!ignition_on()) return -1;
-    if (!fuel_pump_on()) { printf("[ROLL] ignition off\n"); return -2; }
-    if (!ecu_handshake()) { printf("[ROLL] pump off\n"); return -3; }
-    printf("[READY] engine can crank\n");
-    return 0;
+    puts("watch_movie():");
+    lights_dim();
+    projector_on();
+    amplifier_on();
+    screen_down();
+    t-&gt;started = 1;
+    puts("  可以开始播放");
+}
+
+static void end_movie(theater_t *t)
+{
+    puts("end_movie():");
+    puts("  关投影、关功放、灯光回升、幕布收起");
+    t-&gt;started = 0;
 }
 
 int main(void)
 {
-    int rc = vehicle_start("VIN-0001");
-    printf("vehicle_start -&gt; %d\n", rc);
-    printf("调用方只依赖一个入口，子系统仍可单独测试\n");
+    theater_t t = { 0 };
+    watch_movie(&amp;t);
+    end_movie(&amp;t);
+    printf("上层只调了两个方法，没有碰任何子系统\n");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
       <div class="ch"><b>RUN</b><span>./facade.exe</span></div>
-      <pre>start VIN-0001
-[IGN ] relay -&gt; ON
-[PUMP] pressure 3.0 bar
-[ECU ] seed/key ok
-[READY] engine can crank
-vehicle_start -&gt; 0
-调用方只依赖一个入口，子系统仍可单独测试</pre>
+      <pre>watch_movie():
+  灯光调到 20%
+  投影仪开机
+  功放开机，切到 HDMI 1
+  幕布放下
+  可以开始播放
+end_movie():
+  关投影、关功放、灯光回升、幕布收起
+上层只调了两个方法，没有碰任何子系统</pre>
     </div>
       <div class="codecard">
         <div class="ch"><span class="lang">C++</span><span class="fn">facade.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 外观 · C++：Facade 持子系统，start() 负责顺序与回滚
-// 编译：g++ -std=c++17 -Wall -Wextra facade.cpp -o facade_cpp
+        <pre><code>// 外观 · 家庭影院一键开机
+// g++ -std=c++17 -Wall -Wextra facade.cpp -o facade_cpp
 #include &lt;cstdio&gt;
-#include &lt;string&gt;
 
-class Ignition {
+class HomeTheater {
 public:
-    bool on() { std::printf("[IGN ] relay -&gt; ON\n"); return true; }
-    void off() { std::printf("[IGN ] relay -&gt; OFF\n"); }
-};
-class FuelPump {
-public:
-    bool on() { std::printf("[PUMP] pressure 3.0 bar\n"); return true; }
-    void off() { std::printf("[PUMP] stop\n"); }
-};
-class Ecu {
-public:
-    bool handshake() { std::printf("[ECU ] seed/key ok\n"); return true; }
-};
-
-class VehicleFacade {
-public:
-    explicit VehicleFacade(std::string vin) : vin_(std::move(vin)) {}
-    int start()
-    {
-        std::printf("start %s\n", vin_.c_str());
-        if (!ign_.on()) return -1;
-        if (!pump_.on()) { ign_.off(); return -2; }
-        if (!ecu_.handshake()) { pump_.off(); return -3; }
-        std::printf("[READY] engine can crank\n");
-        return 0;
+    void watchMovie() {
+        std::puts("watchMovie():");
+        std::puts("  灯光调到 20%");
+        std::puts("  投影仪开机");
+        std::puts("  功放开机，切到 HDMI 1");
+        std::puts("  幕布放下");
+        std::puts("  可以开始播放");
+        started_ = true;
+    }
+    void endMovie() {
+        std::puts("endMovie():");
+        std::puts("  关投影、关功放、灯光回升、幕布收起");
+        started_ = false;
     }
 private:
-    std::string vin_;
-    Ignition ign_;
-    FuelPump pump_;
-    Ecu ecu_;
+    bool started_ = false;
 };
 
 int main()
 {
-    VehicleFacade car("VIN-0001");
-    std::printf("vehicle_start -&gt; %d\n", car.start());
-    std::printf("调用方只依赖一个入口，子系统仍可单独测试\n");
+    HomeTheater t;
+    t.watchMovie();
+    t.endMovie();
+    std::puts("上层只调了两个方法，没有碰任何子系统");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
       <div class="ch"><b>RUN</b><span>./facade_cpp.exe</span></div>
-      <pre>start VIN-0001
-[IGN ] relay -&gt; ON
-[PUMP] pressure 3.0 bar
-[ECU ] seed/key ok
-[READY] engine can crank
-vehicle_start -&gt; 0
-调用方只依赖一个入口，子系统仍可单独测试</pre>
+      <pre>watchMovie():
+  灯光调到 20%
+  投影仪开机
+  功放开机，切到 HDMI 1
+  幕布放下
+  可以开始播放
+endMovie():
+  关投影、关功放、灯光回升、幕布收起
+上层只调了两个方法，没有碰任何子系统</pre>
     </div>
   </section>
 
   <section class="sec" id="s4">
-    <h2><span class="n">04</span>失败时怎么回滚</h2>
+    <h2><span class="n">04</span>运行与演示</h2>
     
     
 <div class="demo" id="demo">
-  <div class="demo-h"><b>失败时怎么回滚</b><span>把 ECU 握手改成失败，看前面两步如何按相反顺序撤销。</span></div>
+  <div class="demo-h"><b>一键看片，再一键结束</b><span>四步顺序执行，结束时逆序收尾。</span></div>
   <div class="stage">
     <div class="dflow" id="dflow"></div>
     <div class="dbar" id="dbar">未开始</div>
@@ -208,18 +205,18 @@ vehicle_start -&gt; 0
     <div class="log" id="dlog"></div>
   </div>
 </div>
-<script>dpDemo({nodes:[{id:'ign',label:'点火',sub:'relay',note:''}, {id:'pump',label:'油泵',sub:'3.0 bar',note:''}, {id:'ecu',label:'ECU',sub:'seed/key',note:''}, {id:'ready',label:'READY',sub:'允许起动',note:''}],steps:[{hi:['ign'],t:'step1 点火继电器吸合：成功'}, {hi:['pump'],t:'step2 油泵建压 3.0 bar：成功'}, {hi:['ecu'],t:'step3 ECU 握手：失败（模拟 seed 超时）'}, {hi:['pump'],t:'回滚：先停油泵'}, {hi:['ign'],t:'再断点火，回到安全状态'}, {hi:['ready'],t:'vehicle_start 返回 -3，调用方不允许起动机',bad:true}]});</script>
+<script>dpDemo({nodes:[{id:'u',label:'用户',sub:'watch',note:''}, {id:'f',label:'外观',sub:'编排',note:''}, {id:'d',label:'设备',sub:'灯/投影/功放/幕布',note:''}, {id:'e',label:'结束',sub:'end_movie',note:''}],steps:[{hi:['u', 'f'],t:'用户调用 watch_movie()'}, {hi:['d'],t:'灯光 20% → 投影开机 → 功放 HDMI 1 → 幕布放下'}, {hi:['f', 'd'],t:'四步全部成功，可以播放'}, {hi:['u', 'e'],t:'看完调用 end_movie()'}, {hi:['e', 'd'],t:'关投影、关功放、灯光回升、幕布收起'}]});</script>
 
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>C 与 C++：入口的边界</h2>
+    <h2><span class="n">05</span>C 与 C++ 对照</h2>
     
     
     <div class="tbl">
       <table>
         <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
-        <tbody><tr><td>入口</td><td><code>int vehicle_start(const char *)</code></td><td><code>VehicleFacade::start()</code></td><td>都只暴露一个成功/失败</td></tr><tr><td>子系统</td><td>静态函数</td><td>类成员</td><td>C 方便单测；C++ 可注入 mock</td></tr><tr><td>顺序</td><td>函数体内写死</td><td>成员函数内写死</td><td>顺序属于外观，不该散到调用方</td></tr><tr><td>回滚</td><td><code>if</code> 分支里逐级撤销</td><td>同样逐级撤销</td><td>都容易漏；步骤多了要改成状态机</td></tr><tr><td>错误码</td><td>负值 -1/-2/-3</td><td>负值 -1/-2/-3</td><td>调用方要能区分失败在哪一步</td></tr></tbody>
+        <tbody><tr><td>入口形态</td><td>一组函数 + 状态标记</td><td>类 + 成员状态</td><td>C 显式传状态，C++ 封装</td></tr><tr><td>顺序</td><td>函数体内硬编码</td><td>函数体内硬编码</td><td>顺序只此一处</td></tr><tr><td>失败回滚</td><td>调用方检查返回值</td><td>异常 / 返回值 + 析构兜底</td><td>必须有，不能留在半开状态</td></tr><tr><td>子系统可用性</td><td>仍可直接调用</td><td>仍可直接调用</td><td>外观不替代子系统</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -227,7 +224,7 @@ vehicle_start -&gt; 0
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     
-    <div class="prose"><ul><li><b>外观不是“上帝类”。</b>它只做编排；业务规则、诊断逻辑仍应留在子系统，否则外观会越长越像第二个主程序。</li><li><b>回滚要按相反顺序。</b>先开的后关、后开的先关；顺序错了会带残压或残留故障码。</li><li><b>失败要带步骤号。</b>只返回 -1，现场无法判断是点火还是 ECU；至少让错误码对应到具体步骤。</li><li><b>别把外观当唯一入口。</b>子系统仍需保留可直接调用的接口，否则单测和台架脚本都被迫跑全流程。</li><li><b>并发上电要加锁。</b>两个任务同时调 <code>start()</code> 会重复吸合继电器；入口处做互斥或状态检查。</li></ul></div>
+    <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/facade" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>外观变成上帝对象</b>只编排已有步骤，不要在外观里发明新业务规则。</li><li><b>只做开机不做关机</b>有资源获取就必须有释放路径，否则第一次失败就卡住。</li><li><b>把子系统藏死</b>调试和测试仍需要单独操作设备；外观应是可选入口，不是唯一入口。</li></ul></div>
   </section>
   <div class="ch-nav" id="chNav"></div>
   </div>

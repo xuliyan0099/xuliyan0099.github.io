@@ -1,9 +1,5 @@
--- UDS over CAN --
-[CAN ] UDS 0x22F190 -> CAN
--- UDS over LIN --
-[LIN ] UDS 0x22F190 -> LIN
--- OBD over CAN --
-[CAN ] OBD 0x22F190 -> CAN
--- OBD over LIN --
-[LIN ] OBD 0x22F190 -> LIN
-协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧
+[矢量] Circle size=5 -> 矢量圆 r=5
+[矢量] Square size=5 -> 矢量方 w=5
+[位图] Circle size=5 -> 位图圆 半径 5px
+[位图] Square size=5 -> 位图方 边长 5px
+2 种形状 × 2 种渲染器 = 4 种组合，没有 4 个子类

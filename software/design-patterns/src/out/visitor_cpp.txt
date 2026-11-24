@@ -1,6 +1,5 @@
-visit ECU      engine_ecu
-visit SENSOR   o2_sensor
-visit ACTUATOR injector
-visit ECU      abs_ecu
-合计 ECU=2 SENSOR=1 ACTUATOR=1
-新增一种统计，只写新的 visitor，不改节点
+  文件 a.c (120 字节)
+  文件 b.c (80 字节)
+  进入目录 src
+统计：2 个文件，200 字节
+节点只负责 accept，统计逻辑在 visitor 里

@@ -1,69 +1,51 @@
-// 代理 · C++：Proxy 持 RealNvram 与缓存，接口对调用方完全一致
-// 编译：g++ -std=c++17 -Wall -Wextra proxy.cpp -o proxy_cpp
+// 代理 · 图片懒加载
+// g++ -std=c++17 -Wall -Wextra proxy.cpp -o proxy_cpp
 #include <cstdio>
-#include <array>
-#include <memory>
+#include <string>
 
-class Nvram {
+class Image {
 public:
-    virtual ~Nvram() = default;
-    virtual int read(int addr) = 0;
-    virtual void write(int addr, int value) = 0;
-};
-
-class RealNvram : public Nvram {
-public:
-    int read(int addr) override
-    {
-        std::printf("[NVRAM] read  [%d] = %d\n", addr, mem_[static_cast<size_t>(addr)]);
-        return mem_[static_cast<size_t>(addr)];
-    }
-    void write(int addr, int value) override
-    {
-        mem_[static_cast<size_t>(addr)] = value;
-        std::printf("[NVRAM] write [%d] = %d\n", addr, value);
-    }
-private:
-    std::array<int, 16> mem_{};
-};
-
-class Proxy : public Nvram {
-public:
-    explicit Proxy(Nvram &real) : real_(real) {}
-    int read(int addr) override
-    {
-        auto i = static_cast<size_t>(addr);
-        if (!valid_[i]) {
-            cache_[i] = real_.read(addr);
-            valid_[i] = true;
-            std::printf("[PROXY] cache miss [%d]\n", addr);
-        } else {
-            std::printf("[PROXY] cache hit  [%d] = %d\n", addr, cache_[i]);
+    virtual ~Image() = default;
+    virtual const std::string& name() const { return name_; }
+    virtual int pixels() {
+        if (!loaded_) {
+            loaded_ = true;
+            std::printf("  真正读取磁盘：%s\n", name_.c_str());
         }
-        return cache_[i];
+        return 1920 * 1080;
     }
-    void write(int addr, int value) override
-    {
-        real_.write(addr, value);
-        cache_[static_cast<size_t>(addr)] = value;
-        valid_[static_cast<size_t>(addr)] = true;
-        std::printf("[PROXY] write-through [%d]\n", addr);
+protected:
+    explicit Image(std::string name) : name_(std::move(name)) {}
+    std::string name_;
+    bool loaded_ = false;
+};
+
+class RealImage final : public Image {
+public:
+    explicit RealImage(std::string name) : Image(std::move(name)) {}
+};
+
+class ImageProxy {
+public:
+    explicit ImageProxy(std::string name) : real_(std::move(name)) {}
+    int pixels() {
+        std::printf("proxy_get(%s)：", real_.name().c_str());
+        if (hasCache_) { std::puts("命中缓存，不碰磁盘"); return cached_; }
+        std::puts("未命中，转给真实对象");
+        cached_ = real_.pixels();
+        hasCache_ = true;
+        return cached_;
     }
 private:
-    Nvram &real_;
-    std::array<int, 16> cache_{};
-    std::array<bool, 16> valid_{};
+    RealImage real_;
+    int cached_ = 0;
+    bool hasCache_ = false;
 };
 
 int main()
 {
-    RealNvram real;
-    Proxy proxy(real);
-    real.write(3, 11);
-    std::printf("read1 = %d\n", proxy.read(3));
-    std::printf("read2 = %d\n", proxy.read(3));
-    proxy.write(3, 25);
-    std::printf("read3 = %d\n", proxy.read(3));
-    std::printf("真实存储 [3] = %d\n", real.read(3));
+    ImageProxy p("photo.jpg");
+    p.pixels(); p.pixels(); p.pixels();
+    std::puts("三次读取，只加载了一次");
     return 0;
 }

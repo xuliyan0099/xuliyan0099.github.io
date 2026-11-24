@@ -1,43 +1,39 @@
-/* 备忘录：改标定之前先存一份，出事能原样退回 */
+/* 备忘录 · 撤销快照
+ * gcc -std=c11 -Wall -Wextra memento.c -o memento
+ */
 #include <stdio.h>
+#include <string.h>
 
-typedef struct {
-    int gain;
-    int offset;
-    int mode;
-} calib_t;
+typedef struct { char text[64]; int cursor; } editor_t;
+typedef struct { char text[64]; int cursor; } memento_t;
 
-typedef struct { calib_t snap; } memento_t;
-
-static memento_t save(const calib_t *c)
+static memento_t save(const editor_t *e)
 {
-    memento_t m = { *c };
+    memento_t m;
+    strcpy(m.text, e->text);
+    m.cursor = e->cursor;
     return m;
 }
-static void restore(calib_t *c, const memento_t *m)
-{
-    *c = m->snap;
-}
 
-static void dump(const char *tag, const calib_t *c)
+static void restore(editor_t *e, const memento_t *m)
 {
-    printf("%-9s gain=%d offset=%d mode=%d\n", tag, c->gain, c->offset, c->mode);
+    strcpy(e->text, m->text);
+    e->cursor = m->cursor;
 }
 
 int main(void)
 {
-    calib_t ecu = { 12, 0, 1 };
-    dump("before", &ecu);
+    editor_t e = { "hello", 5 };
+    printf("初始：\"%s\" cursor=%d\n", e.text, e.cursor);
 
-    memento_t m = save(&ecu);
+    memento_t snap = save(&e);
 
-    ecu.gain = 30;          /* 现场调参，调坏了 */
-    ecu.offset = -8;
-    ecu.mode = 3;
-    dump("tuned", &ecu);
+    strcpy(e.text, "hello world");
+    e.cursor = 11;
+    printf("编辑后：\"%s\" cursor=%d\n", e.text, e.cursor);
 
-    restore(&ecu, &m);
-    dump("restored", &ecu);
-    printf("快照是值拷贝：之后改 ecu 不会污染 memento\n");
+    restore(&e, &snap);
+    printf("恢复后：\"%s\" cursor=%d\n", e.text, e.cursor);
+    printf("快照是值拷贝，编辑过程不会污染它\n");
     return 0;
 }

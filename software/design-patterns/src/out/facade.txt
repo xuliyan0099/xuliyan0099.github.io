@@ -1,7 +1,9 @@
-start VIN-0001
-[IGN ] relay -> ON
-[PUMP] pressure 3.0 bar
-[ECU ] seed/key ok
-[READY] engine can crank
-vehicle_start -> 0
-调用方只依赖一个入口，子系统仍可单独测试
+watch_movie():
+  灯光调到 20%
+  投影仪开机
+  功放开机，切到 HDMI 1
+  幕布放下
+  可以开始播放
+end_movie():
+  关投影、关功放、灯光回升、幕布收起
+上层只调了两个方法，没有碰任何子系统

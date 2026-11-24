@@ -1,47 +1,38 @@
-// 迭代器 · C++：自定义 begin/end，range-for 直接遍历有效故障
-// 编译：g++ -std=c++17 -Wall -Wextra iterator.cpp -o iterator_cpp
+// 迭代器 · 遍历数组集合
+// g++ -std=c++17 -Wall -Wextra iterator.cpp -o iterator_cpp
 #include <cstdio>
 #include <vector>
 
-struct Fault {
-    int code;
-    const char *name;
-};
-
-class FaultList {
+class Range {
 public:
-    void add(int code, const char *name) { items_.push_back(Fault{code, name}); }
+    explicit Range(std::vector<int> v) : v_(std::move(v)) {}
 
     class Iter {
     public:
-        Iter(const FaultList *list, std::size_t pos) : list_(list), pos_(pos) { skip(); }
-        const Fault &operator*() const { return list_->items_[pos_]; }
-        Iter &operator++() { ++pos_; skip(); return *this; }
-        bool operator!=(const Iter &o) const { return pos_ != o.pos_; }
+        explicit Iter(const int* p) : p_(p) {}
+        bool operator!=(const Iter& o) const { return p_ != o.p_; }
+        void operator++() { ++p_; }
+        int operator*() const { return *p_; }
     private:
-        void skip() { while (pos_ < list_->items_.size() && list_->items_[pos_].code == 0) ++pos_; }
-        const FaultList *list_;
-        std::size_t pos_;
+        const int* p_;
     };
 
-    Iter begin() const { return Iter(this, 0); }
-    Iter end() const { return Iter(this, items_.size()); }
+    Iter begin() const { return Iter(v_.data()); }
+    Iter end() const { return Iter(v_.data() + v_.size()); }
+
 private:
-    std::vector<Fault> items_;
+    std::vector<int> v_;
 };
 
 int main()
 {
-    FaultList list;
-    list.add(0, "none");
-    list.add(17, "O2 heater");
-    list.add(0, "none");
-    list.add(42, "misfire");
-    list.add(91, "CAN bus off");
-
-    int count = 0;
-    for (const Fault &f : list)
-        std::printf("fault #%d code=%d %s\n", ++count, f.code, f.name);
-    std::printf("有效故障 %d 条，全部遍历完\n", count);
+    Range r({ 10, 20, 30, 40, 50 });
+    int sum = 0;
+    for (int x : r) {
+        std::printf("  取到 %d\n", x);
+        sum += x;
+    }
+    std::printf("总和 = %d\n", sum);
+    std::puts("range-for 背后就是 begin/end 迭代器");
     return 0;
 }

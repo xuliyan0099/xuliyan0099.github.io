@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3.3 单例模式 Singleton · C 与 C++ 双实现</title>
+<meta name="description" content="全局配置只初始化一次：C 用静态结构 + ready 标志，C++ 用局部静态 Meyers singleton；含初始化次数与测试污染演示。">
+<meta name="theme-color" content="#08090c">
+<link rel="stylesheet" href="../assets/pd.css">
+<style>
+.stat{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+.stat div{flex:1;min-width:110px;border:1px solid var(--line);border-radius:8px;background:#0d1220;padding:8px 10px}
+.stat span{display:block;font:600 10px/1.5 var(--mono);letter-spacing:.08em;color:#8494ad}
+.stat b{font:700 20px/1.3 var(--mono);color:#8ff5d6}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <label for="navChk" class="nav-toggle">☰ 目录</label>
+    <a class="brand" href="../index.html"><i></i>设计模式<small>C / C++ 双实现</small></a>
+    <span class="tb-sp"></span>
+    <a class="tb" href="../p1/c01.html">导读</a>
+    <a class="tb" href="../../../index.html">知识库</a>
+    <a class="tb" href="../index.html">目录</a>
+  </div>
+</header>
+
+<input type="checkbox" id="navChk" class="nav-chk" hidden>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">篇三 · 结构型与创建型<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
+    <ol id="sideList"></ol>
+    <div class="vol-nav" id="volNav"></div>
+  </aside>
+
+  <div class="wrap">
+  <div class="ch-meta"><span class="lv">篇三 · 结构型与创建型</span><span class="sep">/</span>第 3 章<span class="sep">/</span>约 28 分钟</div>
+  <h1>单例模式<span class="en">SINGLETON</span></h1>
+  <p class="lede">配置、日志、诊断会话这类东西，一个进程里只能有一份。单例解决的是“唯一”和“第一次访问才构造”，不是“全局变量很方便”。它同时也是最难测的模式——因为所有测试共享同一份状态。</p>
+  <div class="chips">
+    <span class="chip ok">三次访问 · 一次初始化</span>
+    <span class="chip">C++ 局部静态天然线程安全</span>
+    <span class="chip warn">测试之间会互相污染</span>
+  </div>
+<section class="sec" id="s1">
+    <h2><span class="n">01</span>问题：要么到处传，要么到处复制</h2>
+    <div class="prose">
+      <p>假设有一份运行配置：超时 500 ms、日志级别 2。不做单例，通常只有两种下场：</p>
+      <ul>
+        <li><b>一路往下传。</b>从 <code>main</code> 传到业务、再传到驱动，每个函数多一个 <code>config_t*</code> 参数；中间某个模块为了省事，自己抄了一份副本，从此两份配置各自演化。</li>
+        <li><b>到处放全局变量。</b><code>extern config_t g_cfg;</code> 写进头文件，任何文件都能改；初始化顺序没人管，某处读到的是全零。</li>
+      </ul>
+      <p>单例把这两件事合起来解决：入口只有一个 <code>instance()</code>，第一次调用时完成初始化，之后都返回同一个地址。它没有消灭全局状态，只是把全局状态<b>收进一个可被追踪的入口</b>——这一点很重要，因为单例的代价几乎都来自“它是全局的”。</p>
+    </div>
+  </section>
+
+  <section class="sec" id="s2">
+    <h2><span class="n">02</span>结构：一个入口，一个对象</h2>
+    <p class="subh">三个调用点（a / b / c）走同一扇门，门后只有一个对象；拷贝构造被删掉，所以“再造一个”在编译期就不成立。点方框看各自边界。</p>
+
+    <div class="fig">
+      <div class="fig-h"><b>Meyers singleton</b><span>instance() + 局部静态</span></div>
+      <div class="diagram">
+        <svg viewBox="0 0 880 320" role="img" aria-label="单例结构图">
+          <defs>
+            <marker id="ar9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/>
+            </marker>
+            <marker id="ar9r" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0 0 L10 5 L0 10 z" fill="#c97a7a"/>
+            </marker>
+          </defs>
+
+          <g class="node" data-role="c1" data-note="调用点 a / b / c：可以是配置读取、日志、诊断会话。它们都只调 instance()，拿到的都是同一个引用——所以 a 改了 timeout，b 立刻看到。">
+            <rect x="24" y="54" width="160" height="56" rx="9"/>
+            <text class="nm" x="38" y="78">a / b / c</text>
+            <text class="ty" x="38" y="97">调用点</text>
+          </g>
+
+          <g class="node" data-role="inst" data-note="instance()：静态成员函数，唯一入口。C 版用 ready 标志判断是否已初始化；C++ 版把对象放在函数内 static，首次调用构造，之后直接返回引用。">
+            <rect x="24" y="160" width="160" height="86" rx="9"/>
+            <text class="nm" x="38" y="184">instance()</text>
+            <text class="ty" x="38" y="203">唯一入口</text>
+            <text class="mt" x="38" y="222">首次：构造</text>
+            <text class="mt" x="38" y="239">之后：返回同一对象</text>
+          </g>
+
+          <g class="node" data-role="obj" data-note="唯一对象（g_cfg / static Config c）：存在静态存储区。构造时机由第一次 instance() 决定，析构在 main 之后——此时日志、堆可能已经不可用。">
+            <rect x="270" y="140" width="220" height="118" rx="10"/>
+            <text class="nm" x="284" y="164">唯一实例</text>
+            <text class="ty" x="284" y="183">静态存储</text>
+            <text class="mt" x="284" y="204">timeout_ms = 500</text>
+            <text class="mt" x="284" y="223">log_level = 2</text>
+            <text class="mt" x="284" y="242">地址全程不变</text>
+          </g>
+
+          <g class="node" data-role="del" data-note="拷贝构造 / 赋值被 delete：`Config copy = a;` 在编译期就报错。这是 C++ 版比 C 版强的地方——C 结构体随时可以被 memcpy 出第二份。">
+            <rect x="566" y="140" width="276" height="118" rx="10"/>
+            <text class="nm" x="580" y="164">禁止复制</text>
+            <text class="ty" x="580" y="183">delete copy ctor</text>
+            <text class="mt" x="580" y="204">Config(const Config&amp;) = delete</text>
+            <text class="mt" x="580" y="223">operator= = delete</text>
+            <text class="mt" x="580" y="242">编译器直接拒绝</text>
+          </g>
+
+          <path class="flow" marker-end="url(#ar9)" d="M104 112 L104 156"/>
+          <path class="flow" marker-end="url(#ar9)" d="M184 200 L266 200"/>
+          <text class="lbl" x="190" y="192">返回引用 / 指针</text>
+          <path class="flow" marker-end="url(#ar9r)" d="M492 200 L562 200"/>
+          <text class="lbl" x="492" y="192">copy ✗</text>
+
+          <text class="lbl" x="24" y="290">C 版：static + ready 标志，只保证“唯一”，不保证线程安全；C++ 版：局部静态，C++11 起初始化线程安全</text>
+          <text class="lbl" x="24" y="310">两者共同的代价：状态在整个进程生命周期内存在，测试之间不会自动清零</text>
+        </svg>
+      </div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：唯一性由谁保证，析构为什么容易出问题。</span></div>
+    </div>
+  </section>
+
+  <section class="sec" id="s3">
+    <h2><span class="n">03</span>两份实现</h2>
+    <p class="subh">C 版是“静态结构 + ready 标志”，写法最省但完全没有并发保护；C++ 版是函数内局部静态，构造与访问同一处完成，且拷贝构造被显式删除。</p>
+
+    <div class="codes">
+      <div class="codecard">
+        <div class="ch"><span class="lang">C</span><span class="fn">singleton.c</span><button class="copy">复制</button></div>
+        <pre><code>/* 单例模式 · C 实现：进程内唯一的配置对象
+ * 编译：gcc -std=c11 -Wall -Wextra singleton.c -o singleton
+ * 注意：这段只保证「唯一」，不保证「多线程安全」，线程版见页面说明。
+ */
+#include &lt;stdio.h&gt;
+
+typedef struct { int timeout_ms; int log_level; } config_t;
+
+static config_t g_cfg;
+static int      g_ready = 0;
+static unsigned g_calls = 0;
+static unsigned g_inits = 0;
+
+config_t *config_instance(void)
+{
+    g_calls++;
+    if (!g_ready) {
+        g_cfg.timeout_ms = 500;
+        g_cfg.log_level  = 2;
+        g_ready = 1;
+        g_inits++;
+    }
+    return &amp;g_cfg;
+}
+
+void config_reset_for_test(void)
+{
+    g_ready = 0;
+    printf("  reset：下次访问会重新初始化\n");
+}
+
+unsigned config_calls(void) { return g_calls; }
+unsigned config_inits(void) { return g_inits; }
+
+int main(void)
+{
+    config_t *a = config_instance();
+    config_t *b = config_instance();
+    config_t *c = config_instance();
+
+    printf("三次取实例是同一个对象：%s\n", (a == b &amp;&amp; b == c) ? "是" : "否");
+    printf("访问 %u 次，只初始化 %u 次\n", config_calls(), config_inits());
+
+    a-&gt;timeout_ms = 800;
+    printf("通过 a 改，通过 b 读：timeout=%d\n", b-&gt;timeout_ms);
+
+    config_reset_for_test();
+    printf("reset 后 timeout=%d（测试用例之间互相污染）\n", config_instance()-&gt;timeout_ms);
+    printf("reset 后初始化次数=%u\n", config_inits());
+    return 0;
+}</code></pre>
+      </div>
+
+      <div class="codecard">
+        <div class="ch"><span class="lang">C++</span><span class="fn">singleton.cpp</span><button class="copy">复制</button></div>
+        <pre><code>// 单例模式 · C++ 实现：Meyers singleton（C++11 起初始化线程安全）
+// 编译：g++ -std=c++17 -Wall -Wextra singleton.cpp -o singleton_cpp
+#include &lt;cstdio&gt;
+
+class Config {
+public:
+    static Config&amp; instance() {
+        static Config c;          // 局部静态：首次调用时构造，C++11 保证线程安全
+        return c;
+    }
+
+    int timeout_ms = 500;
+    int log_level  = 2;
+
+private:
+    Config() = default;
+    Config(const Config&amp;) = delete;
+    Config&amp; operator=(const Config&amp;) = delete;
+};
+
+int main() {
+    Config&amp; a = Config::instance();
+    Config&amp; b = Config::instance();
+    Config&amp; c = Config::instance();
+
+    std::printf("三次取实例是同一个对象：%s\n", (&amp;a == &amp;b &amp;&amp; &amp;b == &amp;c) ? "是" : "否");
+
+    a.timeout_ms = 800;
+    std::printf("通过 a 改，通过 b 读：timeout=%d\n", b.timeout_ms);
+    std::printf("a 与 b 是同一块内存：%s\n", (&amp;a == &amp;b) ? "是" : "否");
+    // 拷贝构造已 delete：写 `Config copy = a;` 会在编译期失败，而不是运行时多一个实例
+    return 0;
+}</code></pre>
+      </div>
+    </div>
+
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>./singleton.exe</span></div>
+      <pre>三次取实例是同一个对象：是
+访问 3 次，只初始化 1 次
+通过 a 改，通过 b 读：timeout=800
+  reset：下次访问会重新初始化
+reset 后 timeout=500（测试用例之间互相污染）
+reset 后初始化次数=2</pre>
+    </div>
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>./singleton_cpp.exe</span></div>
+      <pre>三次取实例是同一个对象：是
+通过 a 改，通过 b 读：timeout=800
+a 与 b 是同一块内存：是</pre>
+    </div>
+    <p class="hintline">C 版多了“访问次数 / 初始化次数”两个计数器，是因为它需要证明“只初始化一次”；C++ 版由局部静态的语义直接保证，静态构造函数只跑一次，不需要额外标志位。</p>
+  </section>
+  <section class="sec" id="s4">
+    <h2><span class="n">04</span>点三次“取实例”，看初始化次数</h2>
+    <p class="subh">取实例、改超时、再取——观察“初始化次数”是不是只在第一次增加。最后那个“reset”模拟测试框架在用例之间重置，它留下的污染在日志里。</p>
+
+    <div class="demo">
+      <div class="demo-h"><b>config singleton</b><span>唯一 + 懒初始化</span></div>
+      <div class="stage">
+        <div class="stat">
+          <div><span>访问次数</span><b id="sCalls">0</b></div>
+          <div><span>初始化次数</span><b id="sInits">0</b></div>
+          <div><span>timeout</span><b id="sTimeout">—</b></div>
+        </div>
+        <div class="ctl" style="margin-bottom:10px">
+          <button class="btn on" id="btnTake">取实例</button>
+          <button class="btn" id="btnSet">timeout = 800</button>
+          <button class="btn" id="btnReset">reset（模拟测试）</button>
+          <button class="btn" id="btnClear">清日志</button>
+        </div>
+        <div class="log" id="sgLog"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="s5">
+    <h2><span class="n">05</span>C 与 C++：同一份唯一，两种保证</h2>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
+        <tbody>
+          <tr><td>唯一存储</td><td>文件级 <code>static config_t g_cfg</code></td><td>函数内 <code>static Config c</code></td><td>都在静态存储区，地址全程不变</td></tr>
+          <tr><td>初始化时机</td><td>首次调用 + <code>ready</code> 标志</td><td>首次调用时构造</td><td>C 版必须自己维护“是否已初始化”</td></tr>
+          <tr><td>并发</td><td>无保护，可能双初始化</td><td>C++11 起局部静态初始化线程安全</td><td>C 版要补 <code>pthread_once</code> / 原子 CAS</td></tr>
+          <tr><td>禁止复制</td><td>做不到，<code>memcpy</code> 随时能造第二份</td><td><code>delete</code> 拷贝构造与赋值</td><td>这是 C++ 版真正的结构优势</td></tr>
+          <tr><td>析构</td><td>进程结束时随静态区回收</td><td><code>main</code> 返回后析构，顺序不确定</td><td>析构里若打日志，日志系统可能已经没了</td></tr>
+          <tr><td>测试重置</td><td><code>ready = 0</code> 即可</td><td>没有官方办法，得自己写 <code>resetForTest()</code></td><td>两者都在“为测试开后门”</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sec" id="s6">
+    <h2><span class="n">06</span>代价与坑</h2>
+    <div class="prose">
+      <ul>
+        <li><b>单例是带门脸的全局变量。</b>它没消除耦合，只把耦合藏进 <code>instance()</code> 调用里。结果是：依赖关系在签名上看不出来，测试只能靠 reset 硬掰。</li>
+        <li><b>C 版并不线程安全。</b>两个线程同时看到 <code>!ready</code>，会各自初始化一次，后写的覆盖先写的。要真线程安全，用 <code>pthread_once</code>、原子 CAS，或干脆把初始化挪到启动单线程阶段。</li>
+        <li><b>双检锁不是随手能写的。</b>先判空、再加锁、再判空，如果没有原子变量与内存序，编译器/CPU 重排会让你拿到“指针已赋值但对象还没构造完”的实例。别手写，用局部静态或 <code>std::call_once</code>。</li>
+        <li><b>析构顺序是隐雷。</b>静态对象在 <code>main</code> 返回之后才析构，此时其他静态对象（日志、内存池）可能已经销毁。工程上常见的做法是“故意不析构”（指针 new 出来永不 delete），换确定性。</li>
+        <li><b>跨模块就不是单例了。</b>每个 <code>.so</code> / <code>.dll</code> 若各自编译进一份静态实例，进程里就有多份。要跨模块唯一，得把实例放到主程序并通过接口传出去。</li>
+        <li><b>头文件里别定义变量。</b><code>config_t g_cfg;</code> 写在头文件、被两个 .c include，就是重复定义（C 里链接期报错，C++ 里 ODR 违规）。头文件只放 <code>extern</code> 声明与函数原型。</li>
+        <li><b>reset 要清干净。</b>演示里 reset 只把 <code>ready</code> 归零，下次访问重新赋初值，看起来“干净”；真实项目里若 reset 漏清某个字段，测试就会带着上个用例的残留跑，而且只在特定顺序下失败。</li>
+        <li><b>能注入就别单例。</b>把配置作为构造参数传进模块，测试时可以随手造两份不同的配置并发跑。单例留给真正进程级唯一的东西：日志、诊断会话、硬件管理器。</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="ch-nav">
+      <a href="../p3/c02.html"><span>上一章</span><b>← 3.2 工厂模式</b></a>
+      <a class="nx" href="../index.html"><span>END</span><b>读完 · 回到全书目录</b></a>
+    </div>
+
+  
+</div>
+
+</div>
+
+<script src="../assets/pd.js"></script>
+<script src="../assets/dp-data.js"></script>
+<script src="../assets/dp-nav.js"></script>
+<script>dpNav('p3');</script>
+<script>
+(function () {
+  var calls = 0, inits = 0, timeout = null, ready = false;
+  var sCalls = document.getElementById('sCalls');
+  var sInits = document.getElementById('sInits');
+  var sTimeout = document.getElementById('sTimeout');
+  var logEl = document.getElementById('sgLog');
+
+  function sync() {
+    sCalls.textContent = calls;
+    sInits.textContent = inits;
+    sTimeout.textContent = (timeout === null ? '—' : timeout);
+  }
+
+  function take() {
+    calls++;
+    if (!ready) {
+      timeout = 500;
+      ready = true;
+      inits++;
+      PD.log(logEl, '首次访问：构造实例，timeout=500 log_level=2');
+    } else {
+      PD.log(logEl, '再次访问：同一实例，timeout=' + timeout);
+    }
+    sync();
+  }
+
+  document.getElementById('btnTake').onclick = take;
+
+  document.getElementById('btnSet').onclick = function () {
+    if (!ready) take();
+    timeout = 800;
+    PD.log(logEl, '通过 a 改 timeout=800；任何持有实例的地方读到的都是 800');
+    sync();
+  };
+
+  document.getElementById('btnReset').onclick = function () {
+    if (!ready && timeout === null) { PD.log(logEl, '还没有实例，无需 reset', 'warn'); return; }
+    ready = false;
+    PD.log(logEl, 'reset：ready=0，下次访问会重新初始化', 'warn');
+    PD.log(logEl, '注意：reset 之前写进去的 timeout=800 会被下一次初始化覆盖回 500');
+  };
+
+  document.getElementById('btnClear').onclick = function () { PD.clear(logEl); };
+
+  sync();
+  PD.log(logEl, '点“取实例”开始。初始化只应发生一次。');
+})();
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

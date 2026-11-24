@@ -1,8 +1,7 @@
-[BUS] ENGINE -> BRAKE
-      DASH handles BRAKE
-      BRAKE handles BRAKE
-[BUS] ENGINE -> TEMP
-      DASH handles TEMP
-[BUS] BRAKE -> WHEEL_SPEED
-      DASH handles WHEEL_SPEED
-发送方只认识 bus，不认识另外两个节点
+Alice: 晚上好
+  -> Bob 收到
+  -> Carol 收到
+Bob: 在的
+  -> Alice 收到
+  -> Carol 收到
+三个用户互不知道对方地址，只认识 room

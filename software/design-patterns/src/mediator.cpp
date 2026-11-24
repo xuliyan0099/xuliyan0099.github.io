@@ -1,54 +1,48 @@
-// 中介者 · C++：Colleague 只持 Mediator&，路由规则集中在一处
-// 编译：g++ -std=c++17 -Wall -Wextra mediator.cpp -o mediator_cpp
+// 中介者 · 聊天室转发
+// g++ -std=c++17 -Wall -Wextra mediator.cpp -o mediator_cpp
 #include <cstdio>
 #include <string>
 #include <vector>
 
-class Mediator;
+class ChatRoom;
 
-class Colleague {
+class User {
 public:
-    explicit Colleague(std::string name) : name_(std::move(name)) {}
-    virtual ~Colleague() = default;
-    const std::string &name() const { return name_; }
-    void join(Mediator *m) { bus_ = m; }
-    void publish(const std::string &topic);   /* 定义放在 Mediator 之后 */
-protected:
-    Mediator *bus_ = nullptr;
+    User(std::string name) : name_(std::move(name)) {}
+    void join(ChatRoom* room);
+    void send(const std::string& msg);
+    const std::string& name() const { return name_; }
 private:
     std::string name_;
+    ChatRoom* room_ = nullptr;
 };
 
-class Mediator {
+class ChatRoom {
 public:
-    void add(Colleague *c) { nodes_.push_back(c); c->join(this); }
-    void route(Colleague *from, const std::string &topic)
-    {
-        std::printf("[BUS] %s -> %s\n", from->name().c_str(), topic.c_str());
-        for (auto *to : nodes_) {
-            if (to == from) continue;
-            bool want = topic == "BRAKE" || to->name() == "DASH";
-            if (want) std::printf("      %s handles %s\n", to->name().c_str(), topic.c_str());
-        }
+    void add(User* u) { users_.push_back(u); }
+    void broadcast(User* from, const std::string& msg) {
+        std::printf("%s: %s\n", from->name().c_str(), msg.c_str());
+        for (auto u : users_)
+            if (u != from) std::printf("  -> %s 收到\n", u->name().c_str());
     }
 private:
-    std::vector<Colleague *> nodes_;
+    std::vector<User*> users_;
 };
 
-inline void Colleague::publish(const std::string &topic)
-{
-    if (bus_) bus_->route(this, topic);
+void User::join(ChatRoom* room) { room_ = room; room->add(this); }
+
+void User::send(const std::string& msg) {
+    if (room_) room_->broadcast(this, msg);
 }
 
 int main()
 {
-    Mediator bus;
-    Colleague engine("ENGINE"), dash("DASH"), brake("BRAKE");
-    bus.add(&engine); bus.add(&dash); bus.add(&brake);
+    ChatRoom room;
+    User alice("Alice"), bob("Bob"), carol("Carol");
+    alice.join(&room); bob.join(&room); carol.join(&room);
 
-    engine.publish("BRAKE");
-    engine.publish("TEMP");
-    brake.publish("WHEEL_SPEED");
-    std::printf("发送方只认识 bus，不认识另外两个节点\n");
+    alice.send("晚上好");
+    bob.send("在的");
+    std::puts("三个用户互不知道对方地址，只认识 room");
     return 0;
 }

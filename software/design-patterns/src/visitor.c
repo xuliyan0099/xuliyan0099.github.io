@@ -1,45 +1,56 @@
-/* 访问者：节点只负责 accept，统计逻辑放在 visitor 里 */
+/* 访问者 · 文件统计
+ * gcc -std=c11 -Wall -Wextra visitor.c -o visitor
+ */
 #include <stdio.h>
 
 typedef struct visitor visitor_t;
 typedef struct node node_t;
 
 struct node {
-    const char *name;
-    int kind;              /* 0=ECU 1=SENSOR 2=ACTUATOR */
-    void (*accept)(node_t *self, visitor_t *v);
+    char name[16];
+    int is_dir;
+    int size;
+    node_t *kids[3];
+    int nkids;
+    void (*accept)(node_t *, visitor_t *);
 };
 
 struct visitor {
-    int ecus, sensors, actuators;
-    void (*visit)(visitor_t *self, node_t *n);
+    int files;
+    int total;
+    void (*visit_file)(visitor_t *, const node_t *);
+    void (*visit_dir)(visitor_t *, const node_t *);
 };
 
-static void visit_node(visitor_t *self, node_t *n)
-{
-    static const char *KIND[] = { "ECU", "SENSOR", "ACTUATOR" };
-    printf("visit %-8s %s\n", KIND[n->kind], n->name);
-    if (n->kind == 0) self->ecus++;
-    else if (n->kind == 1) self->sensors++;
-    else self->actuators++;
-}
+static void file_accept(node_t *n, visitor_t *v) { v->visit_file(v, n); }
+static void dir_accept(node_t *n, visitor_t *v)  { v->visit_dir(v, n); }
 
-static void accept_node(node_t *self, visitor_t *v) { v->visit(v, self); }
+static void count_file(visitor_t *v, const node_t *n)
+{
+    v->files++; v->total += n->size;
+    printf("  文件 %s (%d 字节)\n", n->name, n->size);
+}
+static void enter_dir(visitor_t *v, const node_t *n)
+{
+    printf("  进入目录 %s\n", n->name);
+    (void)v;
+}
 
 int main(void)
 {
-    node_t nodes[] = {
-        { "engine_ecu", 0, accept_node },
-        { "o2_sensor",  1, accept_node },
-        { "injector",   2, accept_node },
-        { "abs_ecu",    0, accept_node },
-    };
-    visitor_t v = { 0, 0, 0, visit_node };
+    node_t a = { "a.c", 0, 120, { 0 }, 0, file_accept };
+    node_t b = { "b.c", 0, 80,  { 0 }, 0, file_accept };
+    node_t d = { "src", 1, 0, { &a, &b, NULL }, 2, dir_accept };
+    node_t r = { "root", 1, 0, { &d, NULL, NULL }, 1, dir_accept };
 
-    for (size_t i = 0; i < sizeof nodes / sizeof nodes[0]; i++)
-        nodes[i].accept(&nodes[i], &v);
+    visitor_t v = { 0, 0, count_file, enter_dir };
 
-    printf("合计 ECU=%d SENSOR=%d ACTUATOR=%d\n", v.ecus, v.sensors, v.actuators);
-    printf("新增一种统计，只写新的 visitor，不改节点\n");
+    r.accept(&r, &v);
+    d.accept(&d, &v);
+    a.accept(&a, &v);
+    b.accept(&b, &v);
+
+    printf("统计：%d 个文件，%d 字节\n", v.files, v.total);
+    printf("节点只负责 accept，统计逻辑在 visitor 里\n");
     return 0;
 }

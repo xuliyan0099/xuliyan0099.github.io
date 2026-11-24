@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>4.2 命令模式 COMMAND · C 与 C++ 双实现</title>
-<meta name="description" content="命令模式：C 与 C++ 双实现，含结构图、运行输出与可点演示。">
+<meta name="description" content="命令：编辑器的追加与撤销，动作被封装成可排队、可回退的对象。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
 <script src="../assets/dp-demo.js"></script>
@@ -35,188 +35,187 @@
 
   <div class="wrap">
   <div class="ch-meta"><span class="lv">篇四 · 行为型</span><span class="sep">/</span>第 2 章<span class="sep">/</span>约 30 分钟</div>
-  <h1>原型模式<span class="en">PROTOTYPE</span></h1>
-  <p class="lede">诊断配置有十几项：超时、重试、波特率、过滤表。每次初始化都从头赋值，代码重复还容易漏项。<b>原型模式先把一份“标准配置”登记成原型，用的时候按名字克隆</b>，再在副本上改；原型永远不被业务代码碰到。</p>
-  <div class="chips"><span class="chip ok">原型只读</span><span class="chip">克隆即得完整配置</span><span class="chip">改副本不污染原型</span></div>
+  <h1>命令模式<span class="en">COMMAND</span></h1>
+  <p class="lede">编辑器要支持撤销。如果每次输入都直接改字符串，撤销时根本不知道该退到哪。命令模式把“一次编辑”封装成对象：<b>执行和撤销成对出现，历史栈自然可回放</b>。</p>
+  <div class="chips"><span class="chip ok">执行/撤销成对</span><span class="chip">历史栈可回放</span><span class="chip">C 用命令数组 · C++ 用多态命令</span></div>
 
   <section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：配置对象到处复制，改一份污染一片</h2>
+    <h2><span class="n">01</span>问题：坏代码长什么样</h2>
     
     
       <div class="prose">
-        <p>坏写法通常长这样：</p>
-        <pre><code>config_t cfg = { "default", 500, 3 };
-/* 另一个模块又抄一遍，改了两个字段 */</code></pre>
-        <p>重复初始化带来三个后果：</p>
-        <ul>
-          <li><b>字段漏填。</b>新增一个 <code>bus_off_recovery</code>，三处初始化只改了两处，第三处默默用 0。</li>
-          <li><b>共享同一份。</b>为了省事把指针传出去，A 模块改超时，B 模块的重试也跟着变。</li>
-          <li><b>默认值散落。</b>“快速模式”的 120ms 只写在某个注释里，没人知道它和“默认模式”差在哪。</li>
-        </ul>
-        <p>原型把“标准长什么样”收进注册表，克隆负责复制。<b>原型是只读的模板，副本是调用方自己的</b>，两者从类型上就该分开。</p>
+        <p>坏写法是直接改：</p>
+        <pre><code>text[len++] = 'H';
+text[len++] = 'i';     /* 想撤销？已经改完了 */</code></pre>
+        <p>没有记录“改之前是什么”，也没有“反向操作”，撤销只能靠整份快照，代价大且粒度粗。</p>
+        <p>命令把每次编辑变成 <code>{kind, ch}</code>：执行时改文本，撤销时做反向。历史栈里存命令，不存整份文本。</p>
       </div>
   </section>
 
   <section class="sec" id="s2">
-    <h2><span class="n">02</span>结构：原型登记，用时克隆</h2>
-    <p class="subh">注册表按名字找原型，克隆产出独立副本；原型始终不动。</p>
+    <h2><span class="n">02</span>结构：调用者、命令、接收者</h2>
+    <p class="subh">左边是调用者，中间是命令历史，右边是编辑器。</p>
     
   
     <div class="fig">
-      <div class="fig-h"><b>登记原型，按名字克隆</b><span>prototype</span></div>
+      <div class="fig-h"><b>调用者不直接改文本，只发命令</b><span>structure</span></div>
       <div class="diagram">
-<svg viewBox="0 0 880 360" role="img" aria-label="登记原型，按名字克隆">
+<svg viewBox="0 0 880 360" role="img" aria-label="调用者不直接改文本，只发命令">
   <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
-  <g class="node" data-role="reg" data-note="注册表只存“原型对象”，不存业务状态；查找按名字，找不到就明确报 miss。"><rect x="24" y="130" width="190" height="100" rx="10"/><text class="nm" x="38" y="154">原型注册表</text><text class="ty" x="38" y="173">PROTOS / map</text><text class="mt" x="38" y="191">default / fast</text></g>
-  <g class="node" data-role="proto" data-note="原型是默认值的唯一出处；任何业务代码都不应直接修改它。"><rect x="270" y="130" width="190" height="100" rx="10"/><text class="nm" x="284" y="154">原型 config_t</text><text class="ty" x="284" y="173">只读模板</text><text class="mt" x="284" y="191">timeout=120 retry=1</text></g>
-  <g class="node" data-role="a" data-note="克隆得到完整字段，改 A 的超时不会影响 B，也不会影响原型。"><rect x="530" y="62" width="180" height="76" rx="10"/><text class="nm" x="544" y="86">副本 A</text><text class="ty" x="544" y="105">clone</text><text class="mt" x="544" y="123">可独立修改</text></g>
-  <g class="node" data-role="b" data-note="两个副本互不影响；生命周期归各自调用方。"><rect x="530" y="200" width="180" height="76" rx="10"/><text class="nm" x="544" y="224">副本 B</text><text class="ty" x="544" y="243">clone</text><text class="mt" x="544" y="261">可独立修改</text></g>
-  <line x1="214" y1="180" x2="270" y2="180" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="242.0" y="172.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">按名字</text>
-  <line x1="460" y1="160" x2="530" y2="110" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="495.0" y="127.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">clone</text>
-  <line x1="460" y1="200" x2="530" y2="232" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="495.0" y="208.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">clone</text>
+  <g class="node" data-role="inv" data-note="调用者只负责执行和回退，不知道命令内部。"><rect x="24" y="140" width="150" height="76" rx="10"/><text class="nm" x="38" y="164">Invoker</text><text class="ty" x="38" y="183">调用者</text><text class="mt" x="38" y="201">run / undo</text></g>
+  <g class="node" data-role="cmd" data-note="每个命令自带正反两个操作。"><rect x="250" y="140" width="190" height="84" rx="10"/><text class="nm" x="264" y="164">Command</text><text class="ty" x="264" y="183">命令</text><text class="mt" x="264" y="201">execute + undo</text></g>
+  <g class="node" data-role="hist" data-note="按顺序压栈，撤销时弹栈。"><rect x="520" y="56" width="190" height="74" rx="10"/><text class="nm" x="534" y="80">History</text><text class="ty" x="534" y="99">历史栈</text><text class="mt" x="534" y="117">Hi! → Hi → H</text></g>
+  <g class="node" data-role="ed" data-note="文本状态只在接收者里，命令通过它改。"><rect x="520" y="212" width="190" height="74" rx="10"/><text class="nm" x="534" y="236">Editor</text><text class="ty" x="534" y="255">接收者</text><text class="mt" x="534" y="273">text/len</text></g>
+  <line x1="174" y1="178" x2="250" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="212.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">run</text>
+  <line x1="440" y1="160" x2="520" y2="100" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="122.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">压栈</text>
+  <line x1="440" y1="200" x2="520" y2="242" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="213.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">改文本</text>
 </svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：原型只读，副本才有写权限。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">命令是“意图的对象化”；接收者才是状态的唯一持有者。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
-    <h2><span class="n">03</span>两份实现</h2>
+    <h2><span class="n">03</span>两份实现：C 与 C++</h2>
     
-    <p class='subh'>C 版的克隆是结构体整体赋值；C++ 版由 <code>clone()</code> 返回 <code>unique_ptr</code>，注册表只持有原型。</p>
+    <p class='subh'>C 版命令是 <code>{kind, ch}</code> 的小结构，历史用数组；C++ 版每个命令是对象，历史用 <code>vector&lt;unique_ptr&gt;</code>。</p>
       <div class="codecard">
-        <div class="ch"><span class="lang">C</span><span class="fn">prototype.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 原型：配置先登记，用的时候按名字复制一份，改副本不动原版 */
+        <div class="ch"><span class="lang">C</span><span class="fn">command.c</span><button class="copy">复制</button></div>
+        <pre><code>/* 命令 · 编辑器撤销
+ * gcc -std=c11 -Wall -Wextra command.c -o command
+ */
 #include &lt;stdio.h&gt;
 #include &lt;string.h&gt;
-#include &lt;stddef.h&gt;
 
-typedef struct {
-    char name[16];
-    int timeout_ms;
-    int retry;
-} config_t;
+typedef struct { char text[64]; int len; } editor_t;
 
-typedef struct {
-    const char *key;
-    config_t proto;
-} proto_t;
+typedef struct { int kind; char ch; } cmd_t;   /* 0=追加 1=删除 */
 
-static proto_t PROTOS[] = {
-    { "default", { "default", 500, 3 } },
-    { "fast",    { "fast",    120, 1 } },
-};
-
-static const proto_t *find_proto(const char *key)
+static void apply(editor_t *e, cmd_t c)
 {
-    for (size_t i = 0; i &lt; sizeof PROTOS / sizeof PROTOS[0]; i++)
-        if (strcmp(PROTOS[i].key, key) == 0) return &amp;PROTOS[i];
-    return NULL;
+    if (c.kind == 0 &amp;&amp; e-&gt;len &lt; 63) e-&gt;text[e-&gt;len++] = c.ch, e-&gt;text[e-&gt;len] = 0;
+    else if (c.kind == 1 &amp;&amp; e-&gt;len &gt; 0) e-&gt;text[--e-&gt;len] = 0;
 }
 
-static config_t clone(const proto_t *p)
+static void undo(editor_t *e, cmd_t c)
 {
-    config_t c = p-&gt;proto;          /* 结构体整体复制 = 深拷贝（这里没有指针成员） */
-    return c;
-}
-
-static void dump(const char *tag, const config_t *c)
-{
-    printf("%-8s name=%-8s timeout=%d retry=%d\n", tag, c-&gt;name, c-&gt;timeout_ms, c-&gt;retry);
+    if (c.kind == 0) { if (e-&gt;len &gt; 0) e-&gt;text[--e-&gt;len] = 0; }
+    else             { if (e-&gt;len &lt; 63) e-&gt;text[e-&gt;len++] = c.ch, e-&gt;text[e-&gt;len] = 0; }
 }
 
 int main(void)
 {
-    const proto_t *p = find_proto("fast");
-    if (!p) { printf("no prototype\n"); return 1; }
+    editor_t e = { "", 0 };
+    cmd_t history[16];
+    int n = 0;
 
-    config_t a = clone(p);
-    config_t b = clone(p);
-    dump("original", &amp;p-&gt;proto);
+    cmd_t a = { 0, 'H' }, b = { 0, 'i' }, c = { 0, '!' };
+    apply(&amp;e, history[n++] = a);
+    apply(&amp;e, history[n++] = b);
+    apply(&amp;e, history[n++] = c);
+    printf("输入三个命令后：\"%s\"（len=%d）\n", e.text, e.len);
 
-    b.timeout_ms = 90;              /* 只改副本 */
-    strcpy(b.name, "fast-tuned");
-    dump("clone-a", &amp;a);
-    dump("clone-b", &amp;b);
-    dump("original", &amp;p-&gt;proto);
-
-    const proto_t *miss = find_proto("slow");
-    printf("lookup slow: %s\n", miss ? "found" : "miss");
-    printf("克隆 2 份，原型仍 timeout=%d\n", p-&gt;proto.timeout_ms);
+    for (int i = 0; i &lt; 2; i++) {
+        undo(&amp;e, history[--n]);
+        printf("撤销一步：\"%s\"\n", e.text);
+    }
     return 0;
 }</code></pre>
       </div>
     <div class="run">
-      <div class="ch"><b>RUN</b><span>./prototype.exe</span></div>
-      <pre>original name=fast     timeout=120 retry=1
-clone-a  name=fast     timeout=120 retry=1
-clone-b  name=fast-tuned timeout=90 retry=1
-original name=fast     timeout=120 retry=1
-lookup slow: miss
-克隆 2 份，原型仍 timeout=120</pre>
+      <div class="ch"><b>RUN</b><span>./command.exe</span></div>
+      <pre>输入三个命令后："Hi!"（len=3）
+撤销一步："Hi"
+撤销一步："H"</pre>
     </div>
       <div class="codecard">
-        <div class="ch"><span class="lang">C++</span><span class="fn">prototype.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 原型 · C++：clone() 返回 unique_ptr，注册表只读，副本归调用方
-// 编译：g++ -std=c++17 -Wall -Wextra prototype.cpp -o prototype_cpp
+        <div class="ch"><span class="lang">C++</span><span class="fn">command.cpp</span><button class="copy">复制</button></div>
+        <pre><code>// 命令 · 编辑器撤销
+// g++ -std=c++17 -Wall -Wextra command.cpp -o command_cpp
 #include &lt;cstdio&gt;
-#include &lt;map&gt;
 #include &lt;memory&gt;
 #include &lt;string&gt;
+#include &lt;vector&gt;
 
-struct Config {
-    std::string name;
-    int timeout_ms;
-    int retry;
-    virtual ~Config() = default;
-    virtual std::unique_ptr&lt;Config&gt; clone() const = 0;
+class Editor {
+public:
+    std::string text;
 };
 
-struct FastConfig : Config {
-    std::unique_ptr&lt;Config&gt; clone() const override
-    {
-        return std::make_unique&lt;FastConfig&gt;(*this);
+class Command {
+public:
+    virtual ~Command() = default;
+    virtual void execute(Editor&amp; e) = 0;
+    virtual void undo(Editor&amp; e) = 0;
+};
+
+class Append final : public Command {
+public:
+    explicit Append(char c) : c_(c) {}
+    void execute(Editor&amp; e) override { e.text.push_back(c_); }
+    void undo(Editor&amp; e) override { if (!e.text.empty()) e.text.pop_back(); }
+private:
+    char c_;
+};
+
+class Delete final : public Command {
+public:
+    void execute(Editor&amp; e) override {
+        if (!e.text.empty()) { last_ = e.text.back(); e.text.pop_back(); }
     }
+    void undo(Editor&amp; e) override { e.text.push_back(last_); }
+private:
+    char last_ = 0;
+};
+
+class Invoker {
+public:
+    void run(std::unique_ptr&lt;Command&gt; c, Editor&amp; e) {
+        c-&gt;execute(e);
+        history_.push_back(std::move(c));
+    }
+    void undo(Editor&amp; e) {
+        if (history_.empty()) return;
+        history_.back()-&gt;undo(e);
+        history_.pop_back();
+    }
+private:
+    std::vector&lt;std::unique_ptr&lt;Command&gt;&gt; history_;
 };
 
 int main()
 {
-    std::map&lt;std::string, std::unique_ptr&lt;Config&gt;&gt; protos;
-    protos["fast"] = std::make_unique&lt;FastConfig&gt;();
-    protos["fast"]-&gt;name = "fast";
-    protos["fast"]-&gt;timeout_ms = 120;
-    protos["fast"]-&gt;retry = 1;
+    Editor e;
+    Invoker inv;
+    inv.run(std::make_unique&lt;Append&gt;('H'), e);
+    inv.run(std::make_unique&lt;Append&gt;('i'), e);
+    inv.run(std::make_unique&lt;Append&gt;('!'), e);
+    std::printf("输入三个命令后：\"%s\"\n", e.text.c_str());
 
-    auto a = protos["fast"]-&gt;clone();
-    auto b = protos["fast"]-&gt;clone();
-    b-&gt;timeout_ms = 90;
-    b-&gt;name = "fast-tuned";
-
-    std::printf("original name=%-8s timeout=%d\n", protos["fast"]-&gt;name.c_str(), protos["fast"]-&gt;timeout_ms);
-    std::printf("clone-a  name=%-8s timeout=%d\n", a-&gt;name.c_str(), a-&gt;timeout_ms);
-    std::printf("clone-b  name=%-8s timeout=%d\n", b-&gt;name.c_str(), b-&gt;timeout_ms);
-    std::printf("原型未变：timeout=%d\n", protos["fast"]-&gt;timeout_ms);
+    inv.undo(e);
+    std::printf("撤销一步：\"%s\"\n", e.text.c_str());
+    inv.undo(e);
+    std::printf("撤销两步：\"%s\"\n", e.text.c_str());
     return 0;
 }</code></pre>
       </div>
     <div class="run">
-      <div class="ch"><b>RUN</b><span>./prototype_cpp.exe</span></div>
-      <pre>original name=fast     timeout=120
-clone-a  name=fast     timeout=120
-clone-b  name=fast-tuned timeout=90
-原型未变：timeout=120</pre>
+      <div class="ch"><b>RUN</b><span>./command_cpp.exe</span></div>
+      <pre>输入三个命令后："Hi!"
+撤销一步："Hi"
+撤销两步："H"</pre>
     </div>
   </section>
 
   <section class="sec" id="s4">
-    <h2><span class="n">04</span>克隆两份，只改其中一份</h2>
+    <h2><span class="n">04</span>运行与演示</h2>
     
     
 <div class="demo" id="demo">
-  <div class="demo-h"><b>克隆两份，只改其中一份</b><span>看 timeout 在原型、副本 A、副本 B 之间是否互相影响。</span></div>
+  <div class="demo-h"><b>输入三个字符，再撤两次</b><span>Hi! → 撤销 → Hi → 撤销 → H。</span></div>
   <div class="stage">
     <div class="dflow" id="dflow"></div>
     <div class="dbar" id="dbar">未开始</div>
@@ -230,18 +229,18 @@ clone-b  name=fast-tuned timeout=90
     <div class="log" id="dlog"></div>
   </div>
 </div>
-<script>dpDemo({nodes:[{id:'proto',label:'原型 fast',sub:'timeout=120',note:''}, {id:'a',label:'副本 A',sub:'timeout=120',note:''}, {id:'b',label:'副本 B',sub:'timeout=120',note:''}, {id:'check',label:'回读原型',sub:'应仍为 120',note:''}],steps:[{hi:['proto'],t:'注册原型 fast：timeout=120、retry=1'}, {hi:['a'],t:'clone → 副本 A，字段完整复制'}, {hi:['b'],t:'再 clone → 副本 B，与 A 互不共享'}, {hi:['b'],t:'改 B：timeout=90、name=fast-tuned'}, {hi:['a'],t:'副本 A 仍是 120；改 B 没有波及 A'}, {hi:['check'],t:'回读原型：timeout 仍是 120，原型未被写'}, {hi:['proto'],t:'查一个不存在的名字 slow：明确返回 miss，而不是造一份默认配置'}]});</script>
+<script>dpDemo({nodes:[{id:'inv',label:'调用者',sub:'run/undo',note:''}, {id:'cmd',label:'命令',sub:'Append',note:''}, {id:'h',label:'历史',sub:'栈',note:''}, {id:'ed',label:'编辑器',sub:'text',note:''}],steps:[{hi:['inv', 'cmd', 'h'],t:'执行 Append(\'H\')，命令入栈'}, {hi:['inv', 'cmd', 'h', 'ed'],t:'执行 Append(\'i\')、Append(\'!\')：文本 Hi!'}, {hi:['inv', 'h', 'ed'],t:'撤销一次：弹栈，Append(\'!\') 反向删除 → Hi'}, {hi:['inv', 'h', 'ed'],t:'再撤销：→ H'}, {hi:['cmd'],t:'历史栈里剩下的命令仍可继续撤销'}]});</script>
 
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>C 与 C++：深拷贝归谁</h2>
+    <h2><span class="n">05</span>C 与 C++ 对照</h2>
     
     
     <div class="tbl">
       <table>
         <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
-        <tbody><tr><td>原型存放</td><td><code>proto_t PROTOS[]</code> 静态数组</td><td><code>map&lt;string, unique_ptr&lt;Config&gt;&gt;</code></td><td>C 固定上限；C++ 可动态增删</td></tr><tr><td>克隆动作</td><td>结构体整体赋值</td><td><code>clone()</code> 返回 <code>unique_ptr</code></td><td>C 的深拷贝靠“没有指针成员”；C++ 要在 clone 里写清楚</td></tr><tr><td>副本所有权</td><td>调用方栈/静态对象</td><td><code>unique_ptr</code> 独占</td><td>C 要自己保证生命周期；C++ 由所有权类型表达</td></tr><tr><td>找不到原型</td><td>返回 <code>NULL</code></td><td>返回空指针 / 抛异常</td><td>都要显式处理，别偷偷造默认对象</td></tr><tr><td>新增原型</td><td>加一条表项</td><td>注册表插入一项</td><td>两边都不改调用方</td></tr></tbody>
+        <tbody><tr><td>命令形态</td><td><code>{kind, ch}</code> 结构</td><td>多态 <code>Command</code> 对象</td><td>C 用数据描述，C++ 用类型</td></tr><tr><td>历史容器</td><td>固定数组 + 计数</td><td><code>vector&lt;unique_ptr&gt;</code></td><td>C 版容量固定，真实实现要动态</td></tr><tr><td>撤销</td><td><code>undo()</code> 反向操作</td><td><code>undo()</code> 虚函数</td><td>必须与 execute 严格配对</td></tr><tr><td>谁改状态</td><td>接收者 <code>editor_t</code></td><td>接收者 <code>Editor</code></td><td>命令本身不存业务状态</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -249,7 +248,7 @@ clone-b  name=fast-tuned timeout=90
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     
-    <div class="prose"><ul><li><b>浅拷贝是最常见的坑。</b>结构体里一旦有指针或字符串指针，整体赋值只复制地址；C 版要么禁止指针成员，要么写显式 deep_clone。</li><li><b>原型必须只读。</b>把原型指针直接交给业务代码，等于把“模板”变成“共享全局变量”；接口上只暴露 clone。</li><li><b>克隆不是免费。</b>配置很大时，克隆比“读一份只读视图”更贵；如果业务只读，考虑返回 <code>const</code> 引用。</li><li><b>注册表要防并发。</b>启动阶段登记、运行期只读最安全；运行期动态注册要加锁。</li><li><b>C++ 版注意切片。</b><code>clone()</code> 必须是虚函数并返回 <code>unique_ptr</code>，否则通过基类指针克隆会得到基类副本。</li></ul></div>
+    <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/command" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>execute 和 undo 不对称</b>执行改了三个字段，撤销只回滚两个，历史立刻错位。</li><li><b>命令里存业务状态</b>状态应集中在接收者；命令只存“做了什么”。</li><li><b>撤销栈无限增长</b>长会话要限制深度或合并同类命令，否则内存持续上涨。</li></ul></div>
   </section>
   <div class="ch-nav" id="chNav"></div>
   </div>

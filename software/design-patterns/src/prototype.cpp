@@ -1,41 +1,49 @@
-// 原型 · C++：clone() 返回 unique_ptr，注册表只读，副本归调用方
-// 编译：g++ -std=c++17 -Wall -Wextra prototype.cpp -o prototype_cpp
+// 原型 · 克隆图形
+// g++ -std=c++17 -Wall -Wextra prototype.cpp -o prototype_cpp
 #include <cstdio>
-#include <map>
 #include <memory>
 #include <string>
 
-struct Config {
-    std::string name;
-    int timeout_ms;
-    int retry;
-    virtual ~Config() = default;
-    virtual std::unique_ptr<Config> clone() const = 0;
+class Shape {
+public:
+    explicit Shape(std::string kind, int size) : kind_(std::move(kind)), size_(size) {}
+    virtual ~Shape() = default;
+    virtual std::unique_ptr<Shape> clone() const = 0;
+
+    std::string kind() const { return kind_; }
+    int size() const { return size_; }
+    void setSize(int s) { size_ = s; }
+
+private:
+    std::string kind_;
+    int size_;
 };
 
-struct FastConfig : Config {
-    std::unique_ptr<Config> clone() const override
-    {
-        return std::make_unique<FastConfig>(*this);
+class Circle final : public Shape {
+public:
+    Circle() : Shape("圆", 10) {}
+    std::unique_ptr<Shape> clone() const override {
+        return std::make_unique<Circle>(*this);
+    }
+};
+
+class Square final : public Shape {
+public:
+    Square() : Shape("方", 10) {}
+    std::unique_ptr<Shape> clone() const override {
+        return std::make_unique<Square>(*this);
     }
 };
 
 int main()
 {
-    std::map<std::string, std::unique_ptr<Config>> protos;
-    protos["fast"] = std::make_unique<FastConfig>();
-    protos["fast"]->name = "fast";
-    protos["fast"]->timeout_ms = 120;
-    protos["fast"]->retry = 1;
+    Circle proto;
+    auto a = proto.clone();
+    auto b = proto.clone();
+    std::printf("克隆两份圆：a.size=%d  b.size=%d\n", a->size(), b->size());
 
-    auto a = protos["fast"]->clone();
-    auto b = protos["fast"]->clone();
-    b->timeout_ms = 90;
-    b->name = "fast-tuned";
-
-    std::printf("original name=%-8s timeout=%d\n", protos["fast"]->name.c_str(), protos["fast"]->timeout_ms);
-    std::printf("clone-a  name=%-8s timeout=%d\n", a->name.c_str(), a->timeout_ms);
-    std::printf("clone-b  name=%-8s timeout=%d\n", b->name.c_str(), b->timeout_ms);
-    std::printf("原型未变：timeout=%d\n", protos["fast"]->timeout_ms);
+    b->setSize(25);
+    std::printf("改 b 之后：a.size=%d  b.size=%d（互不影响）\n", a->size(), b->size());
+    std::printf("原型仍是 size=%d\n", proto.size());
     return 0;
 }

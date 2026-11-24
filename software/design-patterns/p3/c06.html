@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>3.6 享元模式 FLYWEIGHT · C 与 C++ 双实现</title>
-<meta name="description" content="享元：1000 个 CAN 信号共用 8 份单位/缩放描述，只存指针或 shared_ptr。">
+<meta name="description" content="享元：一千棵树共享两份树型描述，每棵树只多存坐标。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
 <script src="../assets/dp-demo.js"></script>
@@ -36,176 +36,176 @@
   <div class="wrap">
   <div class="ch-meta"><span class="lv">篇三 · 结构型</span><span class="sep">/</span>第 6 章<span class="sep">/</span>约 30 分钟</div>
   <h1>享元模式<span class="en">FLYWEIGHT</span></h1>
-  <p class="lede">整车上千个信号，每个都要带单位、缩放、偏移。若每个信号各存一份字符串和系数，光描述就占掉可观内存，缓存命中也会变差。<b>享元把“不随信号变化的部分”抽出来共享</b>，每个信号只留一个指向描述的句柄。</p>
-  <div class="chips"><span class="chip ok">1000 个信号 8 份描述</span><span class="chip">内部状态共享</span><span class="chip">外部状态随信号走</span></div>
+  <p class="lede">一片森林要画一千棵树。每棵树如果都存名字、叶色、纹理，内存很快见底。但这些字段大多数树是一样的。享元把<b>可共享的内部状态抽出来共用，只把坐标这类外部状态留在每棵树上</b>。</p>
+  <div class="chips"><span class="chip ok">内部状态共享</span><span class="chip">外部状态随行</span><span class="chip">C 用静态表 · C++ 用工厂缓存</span></div>
 
   <section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：一千个信号，一千份单位描述</h2>
+    <h2><span class="n">01</span>问题：坏代码长什么样</h2>
     
     
       <div class="prose">
-        <p>坏写法是每个信号自带一份描述：</p>
-        <pre><code>typedef struct {
-    char unit[8];      /* "kPa" 重复一千次 */
-    double scale;
-    int raw;           /* 这个才是变的 */
-} signal_t;</code></pre>
-        <p>问题不在“能不能跑”，而在放大之后：</p>
-        <ul>
-          <li><b>内存翻倍。</b>8 字节单位 × 1000 个信号，加上对齐填充，描述比数据还大。</li>
-          <li><b>改一处要改一千处。</b>单位从 kPa 改成 bar，所有信号的副本都要遍历修改。</li>
-          <li><b>比较变慢。</b>判断“两个信号同单位”要逐字符比较，而不是比较一个指针。</li>
-        </ul>
-        <p>享元把描述拆成“内部状态”（单位、缩放，可共享）与“外部状态”（raw 值，随信号走）。内部状态进池，外部状态留在信号对象里。</p>
+        <p>坏写法是每棵树复制一份描述：</p>
+        <pre><code>typedef struct { char name[16]; int color; int x, y; } tree_t;
+/* 1000 棵树 → 1000 份 name 和 color */</code></pre>
+        <p>名字和颜色只有两种，却存了一千遍；真正每棵不同的是坐标。</p>
+        <p>享元把 <code>tree_type_t</code> 抽出来，按名字查表共享；<code>tree_t</code> 只留一个类型指针和 x/y。一千棵树 → 两份描述 + 一千组坐标。</p>
       </div>
   </section>
 
   <section class="sec" id="s2">
-    <h2><span class="n">02</span>结构：内部状态共享，外部状态随行</h2>
-    <p class="subh">左边是信号句柄，中间是工厂，右边是共享描述池；一千个句柄只指向八份描述。</p>
+    <h2><span class="n">02</span>结构：共享内部状态，外部状态随行</h2>
+    <p class="subh">左边是森林，中间是共享类型表，右边是每棵树的外部状态。</p>
     
   
     <div class="fig">
-      <div class="fig-h"><b>信号句柄与共享描述</b><span>flyweight</span></div>
+      <div class="fig-h"><b>共享不变的部分，随行变化的部分</b><span>structure</span></div>
       <div class="diagram">
-<svg viewBox="0 0 880 360" role="img" aria-label="信号句柄与共享描述">
+<svg viewBox="0 0 880 360" role="img" aria-label="共享不变的部分，随行变化的部分">
   <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
-  <g class="node" data-role="sig" data-note="每个信号只存“指向描述的指针 + 当前 raw 值”；raw 是外部状态，绝不进池。"><rect x="24" y="130" width="180" height="90" rx="10"/><text class="nm" x="38" y="154">signal[]</text><text class="ty" x="38" y="173">一千个句柄</text><text class="mt" x="38" y="191">指针 + raw</text></g>
-  <g class="node" data-role="factory" data-note="工厂负责“有就复用、没有才新建”；它是共享的唯一入口。"><rect x="250" y="130" width="190" height="90" rx="10"/><text class="nm" x="264" y="154">intern()</text><text class="ty" x="264" y="173">工厂</text><text class="mt" x="264" y="191">按 unit 查重</text></g>
-  <g class="node" data-role="pool" data-note="池里是单位与缩放，一经创建不再修改；改单位等于换一份描述。"><rect x="500" y="62" width="210" height="90" rx="10"/><text class="nm" x="514" y="86">描述池</text><text class="ty" x="514" y="105">内部状态</text><text class="mt" x="514" y="123">8 份</text></g>
-  <g class="node" data-role="raw" data-note="raw 不进池：同一单位的两个信号，raw 可以完全不同。"><rect x="500" y="218" width="210" height="90" rx="10"/><text class="nm" x="514" y="242">raw 值</text><text class="ty" x="514" y="261">外部状态</text><text class="mt" x="514" y="279">随信号变化</text></g>
-  <line x1="204" y1="160" x2="250" y2="160" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="227.0" y="152.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">intern</text>
-  <line x1="440" y1="160" x2="500" y2="107" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="470.0" y="125.5" fill="#8fa3c4" font-size="10.5" text-anchor="middle">取描述</text>
-  <line x1="440" y1="190" x2="500" y2="250" stroke="#5876a4" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/>
-  <text x="470.0" y="212.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">带 raw</text>
+  <g class="node" data-role="forest" data-note="森林只负责摆位置，不复制树型。"><rect x="24" y="140" width="150" height="76" rx="10"/><text class="nm" x="38" y="164">Forest</text><text class="ty" x="38" y="183">调用方</text><text class="mt" x="38" y="201">plant(x, y, type)</text></g>
+  <g class="node" data-role="pool" data-note="同一名字只创建一次，之后都返回同一份。"><rect x="250" y="140" width="190" height="84" rx="10"/><text class="nm" x="264" y="164">TypePool</text><text class="ty" x="264" y="183">享元工厂</text><text class="mt" x="264" y="201">get_type(name)</text></g>
+  <g class="node" data-role="type" data-note="可共享：名字、叶色、纹理。"><rect x="520" y="56" width="190" height="74" rx="10"/><text class="nm" x="534" y="80">TreeType</text><text class="ty" x="534" y="99">内部状态</text><text class="mt" x="534" y="117">name + color</text></g>
+  <g class="node" data-role="inst" data-note="不可共享：每棵树自己的坐标。"><rect x="520" y="212" width="190" height="74" rx="10"/><text class="nm" x="534" y="236">Tree</text><text class="ty" x="534" y="255">外部状态</text><text class="mt" x="534" y="273">type* + x/y</text></g>
+  <line x1="174" y1="178" x2="250" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="212.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">要类型</text>
+  <line x1="440" y1="160" x2="520" y2="100" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="122.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">查/建</text>
+  <line x1="440" y1="200" x2="520" y2="242" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="213.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">组合</text>
 </svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：共享的是描述，不是数值。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">享元省的是“重复的相同数据”，不是“对象本身”。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
-    <h2><span class="n">03</span>两份实现</h2>
+    <h2><span class="n">03</span>两份实现：C 与 C++</h2>
     
-    <p class='subh'>C 版用静态池 + 指针数组；C++ 版用 <code>shared_ptr</code>，引用计数就是“还有多少信号在用”。</p>
+    <p class='subh'>C 版类型池是静态数组，按名字线性查；C++ 版用 <code>map</code> 缓存 <code>shared_ptr</code>。</p>
       <div class="codecard">
         <div class="ch"><span class="lang">C</span><span class="fn">flyweight.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 享元：1000 个信号共用 8 份单位描述，只存指针 */
+        <pre><code>/* 享元 · 森林共享树型
+ * gcc -std=c11 -Wall -Wextra flyweight.c -o flyweight
+ */
 #include &lt;stdio.h&gt;
 #include &lt;string.h&gt;
-#include &lt;stddef.h&gt;
 
 typedef struct {
-    const char *unit;
-    double scale;
-} sig_t;
+    char name[16];
+    int  leaf_color;
+} tree_type_t;
 
 typedef struct {
-    sig_t pool[8];
-    int n;
-} registry_t;
+    const tree_type_t *type;   /* 共享内部状态 */
+    int x, y;                  /* 外部状态 */
+} tree_t;
 
-static const sig_t *intern(registry_t *r, const char *unit, double scale)
+static tree_type_t TYPES[2] = {
+    { "橡树", 0x2E7D32 },
+    { "松树", 0x1B5E20 },
+};
+
+static const tree_type_t *get_type(const char *name)
 {
-    for (int i = 0; i &lt; r-&gt;n; i++)
-        if (strcmp(r-&gt;pool[i].unit, unit) == 0) return &amp;r-&gt;pool[i];
-    if (r-&gt;n &gt;= 8) return NULL;
-    r-&gt;pool[r-&gt;n].unit = unit;
-    r-&gt;pool[r-&gt;n].scale = scale;
-    return &amp;r-&gt;pool[r-&gt;n++];
+    for (unsigned i = 0; i &lt; 2; i++)
+        if (strcmp(TYPES[i].name, name) == 0) return &amp;TYPES[i];
+    return NULL;
 }
 
 int main(void)
 {
-    static const char *UNITS[] = { "C", "kPa", "rpm", "%", "V", "A", "km/h", "deg" };
-    registry_t reg = { .n = 0 };
-    const sig_t *signals[1000];
+    tree_t forest[1000];
+    int n = 0;
+    for (int i = 0; i &lt; 1000; i++) {
+        forest[n].type = get_type(i % 2 ? "松树" : "橡树");
+        forest[n].x = i * 3;
+        forest[n].y = i * 5;
+        n++;
+    }
 
-    size_t nu = sizeof UNITS / sizeof UNITS[0];
-    for (size_t i = 0; i &lt; 1000; i++)
-        signals[i] = intern(&amp;reg, UNITS[i % nu], 1.0 + (double)(i % nu) / 10.0);
-
-    printf("信号 1000 个，描述池 %d 份\n", reg.n);
-    printf("sig[0]   unit=%-4s scale=%.1f\n", signals[0]-&gt;unit, signals[0]-&gt;scale);
-    printf("sig[7]   unit=%-4s scale=%.1f\n", signals[7]-&gt;unit, signals[7]-&gt;scale);
-    printf("sig[999] unit=%-4s scale=%.1f\n", signals[999]-&gt;unit, signals[999]-&gt;scale);
-    printf("指针相同：sig[0]==sig[8] -&gt; %s\n", signals[0] == signals[8] ? "yes" : "no");
+    printf("1000 棵树，共享 %d 份树型描述\n", 2);
+    printf("%s x=%d y=%d color=0x%06X\n",
+           forest[0].type-&gt;name, forest[0].x, forest[0].y, forest[0].type-&gt;leaf_color);
+    printf("%s x=%d y=%d color=0x%06X\n",
+           forest[999].type-&gt;name, forest[999].x, forest[999].y, forest[999].type-&gt;leaf_color);
+    printf("每棵树只多存 2 个坐标，不复制颜色和名字\n");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
       <div class="ch"><b>RUN</b><span>./flyweight.exe</span></div>
-      <pre>信号 1000 个，描述池 8 份
-sig[0]   unit=C    scale=1.0
-sig[7]   unit=deg  scale=1.7
-sig[999] unit=deg  scale=1.7
-指针相同：sig[0]==sig[8] -&gt; yes</pre>
+      <pre>1000 棵树，共享 2 份树型描述
+橡树 x=0 y=0 color=0x2E7D32
+松树 x=2997 y=4995 color=0x1B5E20
+每棵树只多存 2 个坐标，不复制颜色和名字</pre>
     </div>
       <div class="codecard">
         <div class="ch"><span class="lang">C++</span><span class="fn">flyweight.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 享元 · C++：工厂缓存 shared_ptr，1000 个句柄只留 8 份对象
-// 编译：g++ -std=c++17 -Wall -Wextra flyweight.cpp -o flyweight_cpp
+        <pre><code>// 享元 · 森林共享树型
+// g++ -std=c++17 -Wall -Wextra flyweight.cpp -o flyweight_cpp
 #include &lt;cstdio&gt;
-#include &lt;map&gt;
 #include &lt;memory&gt;
 #include &lt;string&gt;
+#include &lt;unordered_map&gt;
 #include &lt;vector&gt;
 
-struct Signal {
-    std::string unit;
-    double scale;
+struct TreeType {
+    std::string name;
+    int leafColor;
 };
 
-class SignalFactory {
+class TreeFactory {
 public:
-    std::shared_ptr&lt;const Signal&gt; intern(const std::string &amp;unit, double scale)
-    {
-        auto it = pool_.find(unit);
-        if (it != pool_.end()) return it-&gt;second;
-        auto s = std::make_shared&lt;const Signal&gt;(Signal{ unit, scale });
-        pool_.emplace(unit, s);
-        return s;
+    const TreeType&amp; get(const std::string&amp; name, int color) {
+        auto it = pool_.find(name);
+        if (it == pool_.end())
+            it = pool_.emplace(name, TreeType{name, color}).first;
+        return it-&gt;second;
     }
-    std::size_t size() const { return pool_.size(); }
 private:
-    std::map&lt;std::string, std::shared_ptr&lt;const Signal&gt;&gt; pool_;
+    std::unordered_map&lt;std::string, TreeType&gt; pool_;
+};
+
+struct Tree {
+    const TreeType* type;
+    int x, y;
 };
 
 int main()
 {
-    const std::string units[] = { "C", "kPa", "rpm", "%", "V", "A", "km/h", "deg" };
-    SignalFactory f;
-    std::vector&lt;std::shared_ptr&lt;const Signal&gt;&gt; signals;
-    signals.reserve(1000);
-    for (int i = 0; i &lt; 1000; i++)
-        signals.push_back(f.intern(units[static_cast&lt;size_t&gt;(i) % 8], 1.0 + (i % 8) / 10.0));
+    TreeFactory factory;
+    std::vector&lt;Tree&gt; forest;
+    forest.reserve(1000);
+    for (int i = 0; i &lt; 1000; i++) {
+        const auto&amp; type = i % 2 ? factory.get("松树", 0x1B5E20)
+                                 : factory.get("橡树", 0x2E7D32);
+        forest.push_back(Tree{&amp;type, i * 3, i * 5});
+    }
 
-    std::printf("信号 1000 个，描述池 %zu 份\n", f.size());
-    std::printf("sig[0]   unit=%-4s scale=%.1f use_count=%ld\n",
-                signals[0]-&gt;unit.c_str(), signals[0]-&gt;scale, signals[0].use_count());
-    std::printf("sig[999] unit=%-4s scale=%.1f\n",
-                signals[999]-&gt;unit.c_str(), signals[999]-&gt;scale);
-    std::printf("指针相同：sig[0]==sig[8] -&gt; %s\n", signals[0] == signals[8] ? "yes" : "no");
+    std::printf("1000 棵树，共享 2 份树型描述\n");
+    std::printf("%s x=%d y=%d color=0x%06X\n",
+                forest[0].type-&gt;name.c_str(), forest[0].x, forest[0].y, forest[0].type-&gt;leafColor);
+    std::printf("%s x=%d y=%d color=0x%06X\n",
+                forest[999].type-&gt;name.c_str(), forest[999].x, forest[999].y, forest[999].type-&gt;leafColor);
+    std::puts("每棵树只多存 2 个坐标，不复制颜色和名字");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
       <div class="ch"><b>RUN</b><span>./flyweight_cpp.exe</span></div>
-      <pre>信号 1000 个，描述池 8 份
-sig[0]   unit=C    scale=1.0 use_count=126
-sig[999] unit=deg  scale=1.7
-指针相同：sig[0]==sig[8] -&gt; yes</pre>
+      <pre>1000 棵树，共享 2 份树型描述
+橡树 x=0 y=0 color=0x2E7D32
+松树 x=2997 y=4995 color=0x1B5E20
+每棵树只多存 2 个坐标，不复制颜色和名字</pre>
     </div>
   </section>
 
   <section class="sec" id="s4">
-    <h2><span class="n">04</span>一千个句柄，八份对象</h2>
+    <h2><span class="n">04</span>运行与演示</h2>
     
     
 <div class="demo" id="demo">
-  <div class="demo-h"><b>一千个句柄，八份对象</b><span>看信号数、池大小与指针是否相同。</span></div>
+  <div class="demo-h"><b>一千棵树，只有两份树型</b><span>橡树和松树各共享一份描述变量。</span></div>
   <div class="stage">
     <div class="dflow" id="dflow"></div>
     <div class="dbar" id="dbar">未开始</div>
@@ -219,18 +219,18 @@ sig[999] unit=deg  scale=1.7
     <div class="log" id="dlog"></div>
   </div>
 </div>
-<script>dpDemo({nodes:[{id:'s0',label:'sig[0]',sub:'unit=C',note:''}, {id:'s8',label:'sig[8]',sub:'unit=C',note:''}, {id:'pool',label:'描述池',sub:'8 份',note:''}, {id:'mem',label:'内存',sub:'描述只一份',note:''}],steps:[{hi:['pool'],t:'注册 8 个单位：C、kPa、rpm、%、V、A、km/h、deg'}, {hi:['s0'],t:'sig[0] 取 C：池里没有，新建一份描述'}, {hi:['s8'],t:'sig[8] 也取 C：命中已有描述，不再新建'}, {hi:['s0', 's8'],t:'两个句柄指向同一份描述：指针比较为真'}, {hi:['pool'],t:'继续注册到 1000 个信号：池仍是 8 份'}, {hi:['mem'],t:'描述内存不随信号数增长；只有 raw 值按信号数增长'}]});</script>
+<script>dpDemo({nodes:[{id:'f',label:'森林',sub:'1000 棵',note:''}, {id:'p',label:'类型池',sub:'2 份',note:''}, {id:'t1',label:'橡树',sub:'color',note:''}, {id:'t2',label:'松树',sub:'color',note:''}],steps:[{hi:['f', 'p'],t:'森林要种 1000 棵树'}, {hi:['p', 't1'],t:'第一棵橡树：创建橡树类型，存入池'}, {hi:['p', 't1'],t:'后续橡树：直接复用同一份类型'}, {hi:['p', 't2'],t:'松树同理，只创建一份'}, {hi:['f'],t:'结果：1000 棵树，共享 2 份描述，每棵只多存 x/y'}]});</script>
 
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>C 与 C++：共享的寿命</h2>
+    <h2><span class="n">05</span>C 与 C++ 对照</h2>
     
     
     <div class="tbl">
       <table>
         <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
-        <tbody><tr><td>共享对象</td><td>静态 <code>sig_t pool[8]</code></td><td><code>shared_ptr&lt;const Signal&gt;</code></td><td>C 固定上限；C++ 可扩容且自动释放</td></tr><tr><td>查重</td><td><code>strcmp</code> 线性扫描</td><td><code>map</code> 查找</td><td>池小的时候线性也够；大了换哈希</td></tr><tr><td>句柄</td><td><code>const sig_t *</code></td><td><code>shared_ptr</code> 拷贝</td><td>C 要保证池不重排；C++ 引用计数托管</td></tr><tr><td>外部状态</td><td>信号结构里的 <code>raw</code></td><td>调用时传入的 <code>raw</code></td><td>两者都不能塞进共享对象</td></tr><tr><td>释放</td><td>进程生命周期</td><td>最后一个句柄释放时</td><td>C 版通常不释放；C++ 版可能提前回收</td></tr></tbody>
+        <tbody><tr><td>共享池</td><td>静态数组 + 线性查名</td><td><code>map&lt;string, shared_ptr&gt;</code></td><td>C 版简单，C++ 版查找更快</td></tr><tr><td>内部状态</td><td><code>tree_type_t</code> 值</td><td><code>TreeType</code> 共享对象</td><td>必须不可变</td></tr><tr><td>外部状态</td><td>每棵树的 x/y</td><td>每棵树的 x/y</td><td>随实例走，不进池</td></tr><tr><td>省了多少</td><td>1000 份描述 → 2 份</td><td>同左</td><td>省的是重复数据，不是全部内存</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -238,7 +238,7 @@ sig[999] unit=deg  scale=1.7
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     
-    <div class="prose"><ul><li><b>不要把 raw 放进享元。</b>一旦把当前值塞进共享描述，两个信号就互相串数据；共享对象必须不可变。</li><li><b>池不能边用边扩容重排。</b>C 版用数组存池，扩容后旧指针全部失效；要么预分配上限，要么存索引不存指针。</li><li><b>字符串比较不是免费的。</b>一千个信号逐个 <code>strcmp</code> 也会慢；单位数量固定时，先做一次映射再按 id 取。</li><li><b>共享对象的生命周期。</b>C++ 的 <code>shared_ptr</code> 会让描述活得比预期久；确认没有长生命周期句柄时再指望回收。</li><li><b>别为省内存牺牲可读性。</b>只有描述确实重复且量大时才值得；十个信号用享元，收益不如直接写清楚。</li></ul></div>
+    <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/flyweight" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>共享对象被修改</b>内部状态一旦可变，所有树一起变；共享对象必须只读。</li><li><b>池无上限</b>按用户输入无限建类型会泄漏；类型集合应是有限、可枚举的。</li><li><b>把外部状态也塞进共享对象</b>坐标、时间戳这类每实例不同的字段不能进池。</li></ul></div>
   </section>
   <div class="ch-nav" id="chNav"></div>
   </div>

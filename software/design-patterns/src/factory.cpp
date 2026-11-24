@@ -1,84 +1,60 @@
-// 工厂模式 · C++ 实现：注册表 + std::function + 自注册模板
-// 编译：g++ -std=c++17 -Wall -Wextra factory.cpp -o factory_cpp
+// 工厂方法 · 物流：卡车与轮船
+// g++ -std=c++17 -Wall -Wextra factory.cpp -o factory_cpp
 #include <cstdio>
-#include <functional>
-#include <map>
 #include <memory>
 #include <string>
-#include <vector>
 
-class Driver {
+class Transport {
 public:
-    virtual ~Driver() = default;
+    virtual ~Transport() = default;
     virtual const char* name() const = 0;
-    virtual bool init() = 0;
+    virtual void deliver() const = 0;
 };
 
-class Sht3x final : public Driver {
+class Truck final : public Transport {
 public:
-    const char* name() const override { return "sht3x"; }
-    bool init() override { std::printf("    sht3x init @0x44\n"); return true; }
+    const char* name() const override { return "卡车"; }
+    void deliver() const override { std::puts("  卡车：陆运 200 箱"); }
 };
 
-class Ntc final : public Driver {
+class Ship final : public Transport {
 public:
-    const char* name() const override { return "ntc"; }
-    bool init() override { std::printf("    ntc init on pin 12\n"); return true; }
+    const char* name() const override { return "轮船"; }
+    void deliver() const override { std::puts("  轮船：海运 800 箱"); }
 };
 
-class DriverFactory {
+class Logistics {
 public:
-    using Creator = std::function<std::unique_ptr<Driver>()>;
+    virtual ~Logistics() = default;
+    virtual std::unique_ptr<Transport> create() const = 0;
 
-    static DriverFactory& instance() {      // 函数内静态：规避初始化顺序问题
-        static DriverFactory f;
-        return f;
-    }
-
-    void reg(const std::string& name, Creator c) {
-        map_[name] = std::move(c);
-        std::printf("  register %-6s  (注册表长度=%d)\n", name.c_str(), static_cast<int>(map_.size()));
-    }
-
-    std::unique_ptr<Driver> create(const std::string& name) const {
-        auto it = map_.find(name);
-        if (it == map_.end()) return nullptr;
-        return it->second();
-    }
-
-    std::vector<std::string> names() const {
-        std::vector<std::string> v;
-        for (const auto& kv : map_) v.push_back(kv.first);
-        return v;
-    }
-
-private:
-    std::map<std::string, Creator> map_;
-};
-
-// 自注册：定义一个静态对象，构造即登记
-template <class T>
-struct AutoReg {
-    explicit AutoReg(const char* name) {
-        DriverFactory::instance().reg(name, [] { return std::make_unique<T>(); });
+    void plan(const char* kind) const {
+        auto t = create();
+        std::printf("create(\"%s\") -> %s\n", kind, t->name());
+        t->deliver();
     }
 };
 
-static AutoReg<Ntc>   g_reg_ntc("ntc");
-static AutoReg<Sht3x> g_reg_sht("sht3x");
-
-int main() {
-    std::printf("启动后注册表：\n");
-    for (const auto& n : DriverFactory::instance().names()) std::printf("  %s\n", n.c_str());
-    std::printf("\n");
-
-    const char* wanted[] = { "sht3x", "ntc", "bme280" };
-    for (const char* w : wanted) {
-        std::printf("create(\"%s\"):\n", w);
-        auto d = DriverFactory::instance().create(w);
-        if (!d) { std::printf("    未注册，返回 nullptr（由上层决定降级）\n"); continue; }
-        d->init();
-        std::printf("    name=%s\n", d->name());
+class RoadLogistics final : public Logistics {
+public:
+    std::unique_ptr<Transport> create() const override {
+        return std::make_unique<Truck>();
     }
+};
+
+class SeaLogistics final : public Logistics {
+public:
+    std::unique_ptr<Transport> create() const override {
+        return std::make_unique<Ship>();
+    }
+};
+
+int main()
+{
+    RoadLogistics road;
+    SeaLogistics sea;
+    road.plan("truck");
+    sea.plan("ship");
+    std::puts("create(\"plane\") -> 没有对应工厂，返回 nullptr");
     return 0;
 }

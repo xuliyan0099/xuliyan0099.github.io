@@ -1,66 +1,56 @@
-// 抽象工厂 · C++：家族返回 unique_ptr，生命周期跟着走
-// 编译：g++ -std=c++17 -Wall -Wextra abstract_factory.cpp -o abstract_factory_cpp
+// 抽象工厂 · GUI：浅色/深色两套控件
+// g++ -std=c++17 -Wall -Wextra abstract_factory.cpp -o abstract_factory_cpp
 #include <cstdio>
 #include <memory>
+#include <string>
 
-struct Can {
-    virtual ~Can() = default;
-    virtual void send(const char *msg) = 0;
-};
-struct Nvram {
-    virtual ~Nvram() = default;
-    virtual void save(int value) = 0;
-};
+class Button { public: virtual ~Button() = default; virtual std::string label() const = 0; };
+class Checkbox { public: virtual ~Checkbox() = default; virtual std::string label() const = 0; };
 
-class BoschCan : public Can {
-public:
-    void send(const char *m) override { std::printf("[CAN/BOSCH] %s\n", m); }
+class LightButton final : public Button {
+public: std::string label() const override { return "[ 浅色按钮 ]"; }
 };
-class BoschNvram : public Nvram {
-public:
-    void save(int v) override { std::printf("[NVRAM/BOSCH] save %d\n", v); }
-};
-class ContiCan : public Can {
-public:
-    void send(const char *m) override { std::printf("[CAN/CONTI] %s\n", m); }
-};
-class ContiNvram : public Nvram {
-public:
-    void save(int v) override { std::printf("[NVRAM/CONTI] save %d\n", v); }
+class LightCheckbox final : public Checkbox {
+public: std::string label() const override { return "[ ] 浅色复选框"; }
 };
 
-struct Family {
-    virtual ~Family() = default;
-    virtual const char *name() const = 0;
-    virtual std::unique_ptr<Can> makeCan() const = 0;
-    virtual std::unique_ptr<Nvram> makeNvram() const = 0;
+class DarkButton final : public Button {
+public: std::string label() const override { return "[ 深色按钮 ]"; }
+};
+class DarkCheckbox final : public Checkbox {
+public: std::string label() const override { return "[x] 深色复选框"; }
 };
 
-class BoschFamily : public Family {
+class GuiFactory {
 public:
-    const char *name() const override { return "BOSCH"; }
-    std::unique_ptr<Can> makeCan() const override { return std::make_unique<BoschCan>(); }
-    std::unique_ptr<Nvram> makeNvram() const override { return std::make_unique<BoschNvram>(); }
+    virtual ~GuiFactory() = default;
+    virtual std::unique_ptr<Button>   button() const = 0;
+    virtual std::unique_ptr<Checkbox> checkbox() const = 0;
+
+    void render(const char* theme) const {
+        auto b = button();
+        auto c = checkbox();
+        std::printf("%s 界面：%s  %s\n", theme, b->label().c_str(), c->label().c_str());
+    }
 };
-class ContiFamily : public Family {
+
+class LightFactory final : public GuiFactory {
 public:
-    const char *name() const override { return "CONTI"; }
-    std::unique_ptr<Can> makeCan() const override { return std::make_unique<ContiCan>(); }
-    std::unique_ptr<Nvram> makeNvram() const override { return std::make_unique<ContiNvram>(); }
+    std::unique_ptr<Button> button() const override { return std::make_unique<LightButton>(); }
+    std::unique_ptr<Checkbox> checkbox() const override { return std::make_unique<LightCheckbox>(); }
+};
+
+class DarkFactory final : public GuiFactory {
+public:
+    std::unique_ptr<Button> button() const override { return std::make_unique<DarkButton>(); }
+    std::unique_ptr<Checkbox> checkbox() const override { return std::make_unique<DarkCheckbox>(); }
 };
 
 int main()
 {
-    std::unique_ptr<Family> fams[] = {
-        std::make_unique<BoschFamily>(), std::make_unique<ContiFamily>()
-    };
-    for (auto &f : fams) {
-        std::printf("-- family %s --\n", f->name());
-        auto can = f->makeCan();
-        auto nv = f->makeNvram();
-        can->send("0x18FF50E5");
-        nv->save(7);
-    }
-    std::printf("family 数 2，零件组合 2 种\n");
+    LightFactory light;
+    DarkFactory dark;
+    light.render("浅色");
+    dark.render("深色");
     return 0;
 }

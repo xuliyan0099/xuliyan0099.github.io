@@ -1,4 +1,7 @@
-fault #1 code=17 O2 heater
-fault #2 code=42 misfire
-fault #3 code=91 CAN bus off
-有效故障 3 条，全部遍历完
+  取到 10
+  取到 20
+  取到 30
+  取到 40
+  取到 50
+总和 = 150
+调用方没有用到下标，换链表也不用改这里

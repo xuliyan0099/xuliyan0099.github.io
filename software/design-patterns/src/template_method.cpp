@@ -1,61 +1,46 @@
-// 模板方法 · C++：run() 非虚，步骤虚函数，子类只覆写细节
-// 编译：g++ -std=c++17 -Wall -Wextra template_method.cpp -o template_method_cpp
+// 模板方法 · 生成 CSV / HTML 报告
+// g++ -std=c++17 -Wall -Wextra template_method.cpp -o template_method_cpp
 #include <cstdio>
 #include <string>
 
-class SelfTest {
+class Report {
 public:
-    explicit SelfTest(std::string name) : name_(std::move(name)) {}
-    virtual ~SelfTest() = default;
-
-    // 模板：不打算被覆写
-    bool run() const
-    {
-        std::printf("== %s ==\n", name_.c_str());
-        std::printf("step1 power  ... ");
-        if (!power())  { std::printf("FAIL\n"); return false; }
-        std::printf("OK\n");
-        std::printf("step2 comm   ... ");
-        if (!comm())   { std::printf("FAIL\n"); return false; }
-        std::printf("OK\n");
-        std::printf("step3 sensor ... ");
-        if (!sensor()) { std::printf("FAIL\n"); return false; }
-        std::printf("OK\n");
-        std::printf("result PASS\n");
-        return true;
+    void run() {
+        std::printf("== %s ==\n", name().c_str());
+        header();
+        for (int i = 1; i <= 3; i++) row(i);
+        footer();
     }
+    virtual ~Report() = default;
 protected:
-    virtual bool power() const = 0;
-    virtual bool comm() const = 0;
-    virtual bool sensor() const = 0;
-private:
-    std::string name_;
+    virtual std::string name() const = 0;
+    virtual void header() const = 0;
+    virtual void row(int i) const = 0;
+    virtual void footer() const = 0;
 };
 
-class BenchTest : public SelfTest {
-public:
-    BenchTest() : SelfTest("bench") {}
+class CsvReport final : public Report {
 protected:
-    bool power() const override { return true; }
-    bool comm() const override { return true; }
-    bool sensor() const override { return true; }
+    std::string name() const override { return "CSV"; }
+    void header() const override { std::puts("id,qty"); }
+    void row(int i) const override { std::printf("%d,%d\n", i, i * 10); }
+    void footer() const override { std::puts("--"); }
 };
 
-class FieldTest : public SelfTest {
-public:
-    FieldTest() : SelfTest("field") {}
+class HtmlReport final : public Report {
 protected:
-    bool power() const override { return true; }
-    bool comm() const override { return true; }
-    bool sensor() const override { return false; }
+    std::string name() const override { return "HTML"; }
+    void header() const override { std::puts("<table>"); }
+    void row(int i) const override { std::printf("<tr><td>%d</td><td>%d</td></tr>\n", i, i * 10); }
+    void footer() const override { std::puts("</table>"); }
 };
 
 int main()
 {
-    BenchTest b;
-    FieldTest f;
-    b.run();
-    f.run();
-    std::printf("两个变体共用同一套顺序与日志\n");
+    CsvReport csv;
+    HtmlReport html;
+    csv.run();
+    html.run();
+    std::puts("顺序、循环次数都在 run() 里，两个格式只换三步实现");
     return 0;
 }

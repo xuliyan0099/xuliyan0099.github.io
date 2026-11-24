@@ -1,36 +1,35 @@
-/* 中介者：三个 ECU 不互相认识，所有转发走同一条总线 */
+/* 中介者 · 聊天室转发
+ * gcc -std=c11 -Wall -Wextra mediator.c -o mediator
+ */
 #include <stdio.h>
 #include <string.h>
 
-typedef struct mediator mediator_t;
-typedef struct ecu ecu_t;
+typedef struct chat chat_t;
+typedef struct { const char *name; chat_t *room; } user_t;
 
-struct ecu { const char *name; mediator_t *bus; };
-struct mediator { ecu_t *nodes[3]; int n; };
+struct chat { user_t *users[4]; int n; };
 
-static void bus_publish(mediator_t *m, ecu_t *from, const char *topic)
+static void join(chat_t *c, user_t *u) { u->room = c; c->users[c->n++] = u; }
+
+static void send(user_t *from, const char *msg)
 {
-    printf("[BUS] %s -> %s\n", from->name, topic);
-    for (int i = 0; i < m->n; i++) {
-        ecu_t *to = m->nodes[i];
-        if (to == from) continue;
-        int want = strcmp(topic, "BRAKE") == 0 || strcmp(to->name, "DASH") == 0;
-        if (want) printf("      %s handles %s\n", to->name, topic);
+    printf("%s: %s\n", from->name, msg);
+    for (int i = 0; i < from->room->n; i++) {
+        user_t *u = from->room->users[i];
+        if (u != from) printf("  -> %s 收到\n", u->name);
     }
 }
 
 int main(void)
 {
-    ecu_t engine = { "ENGINE", NULL };
-    ecu_t dash   = { "DASH",   NULL };
-    ecu_t brake  = { "BRAKE",  NULL };
-    mediator_t bus = { .nodes = { &engine, &dash, &brake }, .n = 3 };
+    chat_t room = { { 0 }, 0 };
+    user_t alice = { "Alice", NULL };
+    user_t bob   = { "Bob", NULL };
+    user_t carol = { "Carol", NULL };
+    join(&room, &alice); join(&room, &bob); join(&room, &carol);
 
-    engine.bus = &bus; dash.bus = &bus; brake.bus = &bus;
-
-    bus_publish(&bus, &engine, "BRAKE");
-    bus_publish(&bus, &engine, "TEMP");
-    bus_publish(&bus, &brake,  "WHEEL_SPEED");
-    printf("发送方只认识 bus，不认识另外两个节点\n");
+    send(&alice, "晚上好");
+    send(&bob, "在的");
+    printf("三个用户互不知道对方地址，只认识 room\n");
     return 0;
 }

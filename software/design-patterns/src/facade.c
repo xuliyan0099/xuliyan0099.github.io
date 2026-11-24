@@ -1,25 +1,38 @@
-/* 外观：上电这一套动作收进一个函数，调用方不再关心顺序 */
+/* 外观 · 家庭影院一键开机
+ * gcc -std=c11 -Wall -Wextra facade.c -o facade
+ */
 #include <stdio.h>
 
-static int ignition_on(void)  { printf("[IGN ] relay -> ON\n"); return 1; }
-static int fuel_pump_on(void) { printf("[PUMP] pressure 3.0 bar\n"); return 1; }
-static int ecu_handshake(void){ printf("[ECU ] seed/key ok\n"); return 1; }
+static void lights_dim(void)   { puts("  灯光调到 20%"); }
+static void projector_on(void) { puts("  投影仪开机"); }
+static void amplifier_on(void){ puts("  功放开机，切到 HDMI 1"); }
+static void screen_down(void)  { puts("  幕布放下"); }
 
-/* 外观：固定顺序、失败即回滚，调用方只看到 0/负值 */
-int vehicle_start(const char *vin)
+typedef struct { int started; } theater_t;
+
+static void watch_movie(theater_t *t)
 {
-    printf("start %s\n", vin);
-    if (!ignition_on()) return -1;
-    if (!fuel_pump_on()) { printf("[ROLL] ignition off\n"); return -2; }
-    if (!ecu_handshake()) { printf("[ROLL] pump off\n"); return -3; }
-    printf("[READY] engine can crank\n");
-    return 0;
+    puts("watch_movie():");
+    lights_dim();
+    projector_on();
+    amplifier_on();
+    screen_down();
+    t->started = 1;
+    puts("  可以开始播放");
+}
+
+static void end_movie(theater_t *t)
+{
+    puts("end_movie():");
+    puts("  关投影、关功放、灯光回升、幕布收起");
+    t->started = 0;
 }
 
 int main(void)
 {
-    int rc = vehicle_start("VIN-0001");
-    printf("vehicle_start -> %d\n", rc);
-    printf("调用方只依赖一个入口，子系统仍可单独测试\n");
+    theater_t t = { 0 };
+    watch_movie(&t);
+    end_movie(&t);
+    printf("上层只调了两个方法，没有碰任何子系统\n");
     return 0;
 }

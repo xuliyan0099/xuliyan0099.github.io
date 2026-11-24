@@ -1,46 +1,32 @@
-// 外观 · C++：Facade 持子系统，start() 负责顺序与回滚
-// 编译：g++ -std=c++17 -Wall -Wextra facade.cpp -o facade_cpp
+// 外观 · 家庭影院一键开机
+// g++ -std=c++17 -Wall -Wextra facade.cpp -o facade_cpp
 #include <cstdio>
-#include <string>
 
-class Ignition {
+class HomeTheater {
 public:
-    bool on() { std::printf("[IGN ] relay -> ON\n"); return true; }
-    void off() { std::printf("[IGN ] relay -> OFF\n"); }
-};
-class FuelPump {
-public:
-    bool on() { std::printf("[PUMP] pressure 3.0 bar\n"); return true; }
-    void off() { std::printf("[PUMP] stop\n"); }
-};
-class Ecu {
-public:
-    bool handshake() { std::printf("[ECU ] seed/key ok\n"); return true; }
-};
-
-class VehicleFacade {
-public:
-    explicit VehicleFacade(std::string vin) : vin_(std::move(vin)) {}
-    int start()
-    {
-        std::printf("start %s\n", vin_.c_str());
-        if (!ign_.on()) return -1;
-        if (!pump_.on()) { ign_.off(); return -2; }
-        if (!ecu_.handshake()) { pump_.off(); return -3; }
-        std::printf("[READY] engine can crank\n");
-        return 0;
+    void watchMovie() {
+        std::puts("watchMovie():");
+        std::puts("  灯光调到 20%");
+        std::puts("  投影仪开机");
+        std::puts("  功放开机，切到 HDMI 1");
+        std::puts("  幕布放下");
+        std::puts("  可以开始播放");
+        started_ = true;
+    }
+    void endMovie() {
+        std::puts("endMovie():");
+        std::puts("  关投影、关功放、灯光回升、幕布收起");
+        started_ = false;
     }
 private:
-    std::string vin_;
-    Ignition ign_;
-    FuelPump pump_;
-    Ecu ecu_;
+    bool started_ = false;
 };
 
 int main()
 {
-    VehicleFacade car("VIN-0001");
-    std::printf("vehicle_start -> %d\n", car.start());
-    std::printf("调用方只依赖一个入口，子系统仍可单独测试\n");
+    HomeTheater t;
+    t.watchMovie();
+    t.endMovie();
+    std::puts("上层只调了两个方法，没有碰任何子系统");
     return 0;
 }

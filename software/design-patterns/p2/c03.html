@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>2.3 建造者模式 BUILDER · C 与 C++ 双实现</title>
-<meta name="description" content="建造者：把 CAN 帧的 id、数据、CRC 拆成可检查的步骤，最后一次性交付。">
+<meta name="description" content="建造者：把盖房子拆成砌墙、装门、装窗、封顶，最后统一校验交付。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
 <script src="../assets/dp-demo.js"></script>
@@ -36,197 +36,171 @@
   <div class="wrap">
   <div class="ch-meta"><span class="lv">篇二 · 创建型</span><span class="sep">/</span>第 3 章<span class="sep">/</span>约 28 分钟</div>
   <h1>建造者模式<span class="en">BUILDER</span></h1>
-  <p class="lede">拼一帧 CAN 报文有七八个字段，顺序错了不一定报错，可能只是 CRC 不对、DLC 不对。<b>建造者把“拼装”变成一条有步骤的流水线</b>：每一步只改一个字段，最后 <code>build()</code> 才交出成品；中途可以校验、可以复用，也可以随时丢弃重来。</p>
-  <div class="chips"><span class="chip ok">步骤可查</span><span class="chip">成品只交付一次</span><span class="chip">复用 builder 不残留上一帧</span></div>
+  <p class="lede">盖房子不是一次 <code>malloc</code> 就能完事：墙、门、窗、屋顶有先后，少一步就是半成品。建造者把“怎么一步步拼”收进流程，<b>每一步都可检查，最后只交付一次成品</b>。</p>
+  <div class="chips"><span class="chip ok">步骤显式</span><span class="chip">交付前校验</span><span class="chip">C 用函数参数 · C++ 用链式调用</span></div>
 
   <section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：一帧报文七八个字段，顺序全靠记</h2>
+    <h2><span class="n">01</span>问题：坏代码长什么样</h2>
     
     
       <div class="prose">
-        <p>常见写法是一个大初始化：</p>
-        <pre><code>frame_t f = { id, dlc, {b0,b1,b2}, crc };</p></code></pre>
-        <p>字段一多就出三类问题：</p>
-        <ul>
-          <li><b>顺序靠记。</b>CRC 必须在数据之后算；有人先算 CRC 再填数据，台架上偶尔能过，因为数据恰好没变。</li>
-          <li><b>复用会串味。</b>同一个栈上的 <code>frame_t</code> 反复用，上一帧的 <code>data[3..7]</code> 没清，DLC 又写成 8，发出去就是脏数据。</li>
-          <li><b>中途失败没法收场。</b>拼到一半发现 id 非法，只能 <code>return</code>，已写进去的半成品留在对象里。</li>
-        </ul>
-        <p>建造者把每个字段的写入变成一个显式步骤，并提供 <code>start()</code> 清底、<code>build()</code> 交付。调用方看到的是“开始 → 填 id → 填数据 → 算 CRC → 交付”，而不是一堆裸赋值。</p>
+        <p>坏写法是一个巨大的初始化函数，参数排成一串：</p>
+        <pre><code>house_t h = { 4, 1, 2, 1 };  /* 墙、门、窗、屋顶？顺序错了也编译过 */</code></pre>
+        <p>位置参数没有名字，调用方靠记忆；漏一个字段就是“能住但漏雨”的半成品，而且没有任何地方能拦住。</p>
+        <p>建造者把每个步骤变成一次具名调用，最后 <code>build()</code> 统一校验。顺序、缺项、成品完整度都摆在代码里。</p>
       </div>
   </section>
 
   <section class="sec" id="s2">
-    <h2><span class="n">02</span>结构：步骤可查、成品只交付一次</h2>
-    <p class="subh">四个角色排成一条线：调用方发起，builder 累积，成品交付给发送层。</p>
+    <h2><span class="n">02</span>结构：步骤显式、交付前校验</h2>
+    <p class="subh">左边是施工队，中间是建造者，右边是成品房子。</p>
     
   
     <div class="fig">
-      <div class="fig-h"><b>一帧报文的建造流水线</b><span>builder</span></div>
+      <div class="fig-h"><b>四步施工，最后校验一次</b><span>structure</span></div>
       <div class="diagram">
-<svg viewBox="0 0 880 360" role="img" aria-label="一帧报文的建造流水线">
+<svg viewBox="0 0 880 360" role="img" aria-label="四步施工，最后校验一次">
   <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
-  <g class="node" data-role="client" data-note="调用方只按步骤调用，不直接碰 frame_t 的内部字段，也就不会漏清上一帧。"><rect x="24" y="140" width="150" height="76" rx="10"/><text class="nm" x="38" y="164">调用方</text><text class="ty" x="38" y="183">诊断 / 周期任务</text><text class="mt" x="38" y="201">start → 填字段</text></g>
-  <g class="node" data-role="builder" data-note="builder 持有半成品；每一步只改一个字段，可以在任意一步插入校验。"><rect x="230" y="140" width="200" height="80" rx="10"/><text class="nm" x="244" y="164">builder_t / Builder</text><text class="ty" x="244" y="183">累积状态</text><text class="mt" x="244" y="201">id / data / crc</text></g>
-  <g class="node" data-role="frame" data-note="build() 返回一份完整帧；之后 builder 再 start 不会影响已经交出去的副本。"><rect x="480" y="140" width="170" height="76" rx="10"/><text class="nm" x="494" y="164">frame_t / Frame</text><text class="ty" x="494" y="183">成品</text><text class="mt" x="494" y="201">只读交付</text></g>
-  <g class="node" data-role="tx" data-note="发送层只接收成品，不关心中间步骤；失败可以在交付前拦下。"><rect x="700" y="140" width="150" height="76" rx="10"/><text class="nm" x="714" y="164">CAN 发送</text><text class="ty" x="714" y="183">下游</text><text class="mt" x="714" y="201">send(frame)</text></g>
-  <line x1="174" y1="178" x2="230" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="202.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">步骤</text>
-  <line x1="430" y1="178" x2="480" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="455.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">build</text>
-  <line x1="650" y1="178" x2="700" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="675.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">交付</text>
+  <g class="node" data-role="client" data-note="按步骤调用，不再拼位置参数。"><rect x="24" y="140" width="150" height="76" rx="10"/><text class="nm" x="38" y="164">施工队</text><text class="ty" x="38" y="183">调用方</text><text class="mt" x="38" y="201">walls/doors/windows/roof</text></g>
+  <g class="node" data-role="builder" data-note="建造者保存中间状态，build 时检查是否齐全。"><rect x="250" y="140" width="190" height="84" rx="10"/><text class="nm" x="264" y="164">HouseBuilder</text><text class="ty" x="264" y="183">建造者</text><text class="mt" x="264" y="201">add_* + build()</text></g>
+  <g class="node" data-role="check" data-note="缺墙、缺门、缺屋顶都会被拒绝，不会交付半成品。"><rect x="520" y="56" width="190" height="74" rx="10"/><text class="nm" x="534" y="80">校验</text><text class="ty" x="534" y="99">完整性</text><text class="mt" x="534" y="117">walls&gt;=4 ...</text></g>
+  <g class="node" data-role="house" data-note="成品只在 build 成功后出现，之后不再改。"><rect x="520" y="212" width="190" height="74" rx="10"/><text class="nm" x="534" y="236">House</text><text class="ty" x="534" y="255">成品</text><text class="mt" x="534" y="273">交付一次</text></g>
+  <line x1="174" y1="178" x2="250" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="212.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">逐步施工</text>
+  <line x1="440" y1="160" x2="520" y2="100" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="122.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">校验</text>
+  <line x1="440" y1="200" x2="520" y2="242" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="213.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">交付</text>
 </svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：builder 负责累积，frame 只负责被交付。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">建造者持有“正在盖的房子”；校验通过才允许拿走。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
-    <h2><span class="n">03</span>两份实现</h2>
+    <h2><span class="n">03</span>两份实现：C 与 C++</h2>
     
-    <p class='subh'>C 版是一组 <code>b_*</code> 函数 + 结构体；C++ 版把每个步骤做成返回 <code>Builder&amp;</code> 的链式方法。</p>
+    <p class='subh'>C 版每一步都是 <code>house_t*</code> 上的函数，最后由 <code>build</code> 返回成败；C++ 版用引用串联步骤，<code>build()</code> 返回值对象。</p>
       <div class="codecard">
         <div class="ch"><span class="lang">C</span><span class="fn">builder.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 建造者：把“拼一帧”拆成可检查的步骤，最后一次性交付 */
+        <pre><code>/* 建造者 · 一步步盖房子
+ * gcc -std=c11 -Wall -Wextra builder.c -o builder
+ */
 #include &lt;stdio.h&gt;
-#include &lt;stddef.h&gt;
 
 typedef struct {
-    unsigned id;
-    int dlc;
-    unsigned char data[8];
-    unsigned crc;
-} frame_t;
+    int walls, doors, windows;
+    int has_roof;
+} house_t;
 
-typedef struct { frame_t f; } builder_t;
+static void add_walls(house_t *h, int n)   { h-&gt;walls = n;   printf("  砌 %d 面墙\n", n); }
+static void add_doors(house_t *h, int n)   { h-&gt;doors = n;   printf("  装 %d 扇门\n", n); }
+static void add_windows(house_t *h, int n) { h-&gt;windows = n; printf("  装 %d 扇窗\n", n); }
+static void add_roof(house_t *h)           { h-&gt;has_roof = 1; printf("  封顶\n"); }
 
-static void b_start(builder_t *b)          { b-&gt;f.id = 0; b-&gt;f.dlc = 0; b-&gt;f.crc = 0; }
-static void b_id(builder_t *b, unsigned v) { b-&gt;f.id = v; }
-static void b_data(builder_t *b, const unsigned char *d, int n)
+static int build(const house_t *h)
 {
-    if (n &gt; 8) n = 8;
-    b-&gt;f.dlc = n;
-    for (int i = 0; i &lt; n; i++) b-&gt;f.data[i] = d[i];
-}
-static void b_crc(builder_t *b)
-{
-    unsigned sum = b-&gt;f.id;
-    for (int i = 0; i &lt; b-&gt;f.dlc; i++) sum += b-&gt;f.data[i];
-    b-&gt;f.crc = sum &amp; 0xFFu;
-}
-static frame_t b_build(const builder_t *b) { return b-&gt;f; }
-
-static void dump(const frame_t *f)
-{
-    printf("id=0x%X dlc=%d data=[", f-&gt;id, f-&gt;dlc);
-    for (int i = 0; i &lt; f-&gt;dlc; i++) printf("%s%02X", i ? " " : "", f-&gt;data[i]);
-    printf("] crc=0x%02X\n", f-&gt;crc);
+    if (h-&gt;walls &lt; 4 || h-&gt;doors &lt; 1 || h-&gt;windows &lt; 1 || !h-&gt;has_roof) {
+        printf("  校验失败：房子还不完整\n");
+        return -1;
+    }
+    printf("  交付：%d 墙 / %d 门 / %d 窗 / 有屋顶\n",
+           h-&gt;walls, h-&gt;doors, h-&gt;windows);
+    return 0;
 }
 
 int main(void)
 {
-    builder_t b;
-    unsigned char payload[8] = { 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80 };
+    house_t h = { 0, 0, 0, 0 };
+    printf("普通小屋：\n");
+    add_walls(&amp;h, 4); add_doors(&amp;h, 1); add_windows(&amp;h, 2); add_roof(&amp;h);
+    build(&amp;h);
 
-    b_start(&amp;b);
-    b_id(&amp;b, 0x18FF50E5u);
-    b_data(&amp;b, payload, 3);
-    b_crc(&amp;b);
-    frame_t f1 = b_build(&amp;b);
-    printf("frame1 ");
-    dump(&amp;f1);
-
-    b_start(&amp;b);                 /* 复用同一个 builder，不残留上一帧 */
-    b_id(&amp;b, 0x7DFu);
-    b_data(&amp;b, payload, 8);      /* 超长被截到 8 字节 */
-    b_crc(&amp;b);
-    frame_t f2 = b_build(&amp;b);
-    printf("frame2 ");
-    dump(&amp;f2);
-    printf("两次建造独立：frame1 dlc=%d, frame2 dlc=%d\n", f1.dlc, f2.dlc);
+    house_t v = { 0, 0, 0, 0 };
+    printf("缺步骤的房子：\n");
+    add_walls(&amp;v, 4); add_doors(&amp;v, 1);
+    build(&amp;v);
     return 0;
 }</code></pre>
       </div>
     <div class="run">
       <div class="ch"><b>RUN</b><span>./builder.exe</span></div>
-      <pre>frame1 id=0x18FF50E5 dlc=3 data=[10 20 30] crc=0x45
-frame2 id=0x7DF dlc=8 data=[10 20 30 40 50 60 70 80] crc=0x1F
-两次建造独立：frame1 dlc=3, frame2 dlc=8</pre>
+      <pre>普通小屋：
+  砌 4 面墙
+  装 1 扇门
+  装 2 扇窗
+  封顶
+  交付：4 墙 / 1 门 / 2 窗 / 有屋顶
+缺步骤的房子：
+  砌 4 面墙
+  装 1 扇门
+  校验失败：房子还不完整</pre>
     </div>
       <div class="codecard">
         <div class="ch"><span class="lang">C++</span><span class="fn">builder.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 建造者 · C++：链式调用，build() 只交付一次
-// 编译：g++ -std=c++17 -Wall -Wextra builder.cpp -o builder_cpp
+        <pre><code>// 建造者 · 一步步盖房子
+// g++ -std=c++17 -Wall -Wextra builder.cpp -o builder_cpp
 #include &lt;cstdio&gt;
-#include &lt;array&gt;
+#include &lt;string&gt;
 
-struct Frame {
-    unsigned id = 0;
-    int dlc = 0;
-    std::array&lt;unsigned char, 8&gt; data{};
-    unsigned crc = 0;
-};
-
-class Builder {
+class House {
 public:
-    Builder &amp;start() { f_ = Frame{}; return *this; }
-    Builder &amp;id(unsigned v) { f_.id = v; return *this; }
-    Builder &amp;data(const unsigned char *d, int n)
-    {
-        if (n &gt; 8) n = 8;
-        f_.dlc = n;
-        for (int i = 0; i &lt; n; i++) f_.data[static_cast&lt;size_t&gt;(i)] = d[i];
-        return *this;
-    }
-    Builder &amp;crc()
-    {
-        unsigned sum = f_.id;
-        for (int i = 0; i &lt; f_.dlc; i++) sum += f_.data[static_cast&lt;size_t&gt;(i)];
-        f_.crc = sum &amp; 0xFFu;
-        return *this;
-    }
-    Frame build() const { return f_; }
-private:
-    Frame f_;
+    std::string walls, doors, windows;
+    bool roof = false;
 };
 
-static void dump(const Frame &amp;f)
-{
-    std::printf("id=0x%X dlc=%d data=[", f.id, f.dlc);
-    for (int i = 0; i &lt; f.dlc; i++) std::printf("%s%02X", i ? " " : "", f.data[static_cast&lt;size_t&gt;(i)]);
-    std::printf("] crc=0x%02X\n", f.crc);
-}
+class HouseBuilder {
+public:
+    HouseBuilder&amp; addWalls(int n)   { h_.walls   = std::to_string(n) + " 面墙"; std::printf("  砌 %d 面墙\n", n); return *this; }
+    HouseBuilder&amp; addDoors(int n)   { h_.doors   = std::to_string(n) + " 扇门"; std::printf("  装 %d 扇门\n", n); return *this; }
+    HouseBuilder&amp; addWindows(int n) { h_.windows = std::to_string(n) + " 扇窗"; std::printf("  装 %d 扇窗\n", n); return *this; }
+    HouseBuilder&amp; addRoof()         { h_.roof = true; std::puts("  封顶"); return *this; }
+
+    bool build() const {
+        if (h_.walls.empty() || h_.doors.empty() || h_.windows.empty() || !h_.roof) {
+            std::puts("  校验失败：房子还不完整");
+            return false;
+        }
+        std::printf("  交付：%s / %s / %s / 有屋顶\n",
+                    h_.walls.c_str(), h_.doors.c_str(), h_.windows.c_str());
+        return true;
+    }
+
+private:
+    House h_;
+};
 
 int main()
 {
-    unsigned char payload[8] = { 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80 };
-    Builder b;
-    Frame f1 = b.start().id(0x18FF50E5u).data(payload, 3).crc().build();
-    std::printf("frame1 ");
-    dump(f1);
+    std::puts("普通小屋：");
+    HouseBuilder{}.addWalls(4).addDoors(1).addWindows(2).addRoof().build();
 
-    Frame f2 = b.start().id(0x7DFu).data(payload, 8).crc().build();
-    std::printf("frame2 ");
-    dump(f2);
-    std::printf("两次建造独立：frame1 dlc=%d, frame2 dlc=%d\n", f1.dlc, f2.dlc);
+    std::puts("缺步骤的房子：");
+    HouseBuilder{}.addWalls(4).addDoors(1).build();
     return 0;
 }</code></pre>
       </div>
     <div class="run">
       <div class="ch"><b>RUN</b><span>./builder_cpp.exe</span></div>
-      <pre>frame1 id=0x18FF50E5 dlc=3 data=[10 20 30] crc=0x45
-frame2 id=0x7DF dlc=8 data=[10 20 30 40 50 60 70 80] crc=0x1F
-两次建造独立：frame1 dlc=3, frame2 dlc=8</pre>
+      <pre>普通小屋：
+  砌 4 面墙
+  装 1 扇门
+  装 2 扇窗
+  封顶
+  交付：4 面墙 / 1 扇门 / 2 扇窗 / 有屋顶
+缺步骤的房子：
+  砌 4 面墙
+  装 1 扇门
+  校验失败：房子还不完整</pre>
     </div>
   </section>
 
   <section class="sec" id="s4">
-    <h2><span class="n">04</span>一步一步拼一帧</h2>
+    <h2><span class="n">04</span>运行与演示</h2>
     
     
 <div class="demo" id="demo">
-  <div class="demo-h"><b>一步一步拼一帧</b><span>点“单步”：看每个字段何时写入、CRC 何时才能算。</span></div>
+  <div class="demo-h"><b>盖一次完整的房子，再漏一步试试</b><span>同一套建造者，分别走完整流程和缺屋顶流程。</span></div>
   <div class="stage">
     <div class="dflow" id="dflow"></div>
     <div class="dbar" id="dbar">未开始</div>
@@ -240,18 +214,18 @@ frame2 id=0x7DF dlc=8 data=[10 20 30 40 50 60 70 80] crc=0x1F
     <div class="log" id="dlog"></div>
   </div>
 </div>
-<script>dpDemo({nodes:[{id:'id',label:'ID',sub:'0x18FF50E5',note:''}, {id:'data',label:'DATA',sub:'3 字节',note:''}, {id:'crc',label:'CRC',sub:'最后算',note:''}, {id:'build',label:'BUILD',sub:'交付成品',note:''}, {id:'send',label:'SEND',sub:'发送层',note:''}],steps:[{hi:['id'],t:'start() 清底：id=0、dlc=0、crc=0，上一帧不残留'}, {hi:['id'],t:'填 id = 0x18FF50E5'}, {hi:['data'],t:'填数据 10 20 30，dlc 跟着变成 3'}, {hi:['crc'],t:'数据到齐后才算 CRC：sum(id + data) & 0xFF = 0x45'}, {hi:['build'],t:'build() 交付 frame1；builder 之后可以重新 start'}, {hi:['data', 'build'],t:'第二帧复用同一个 builder：dlc 从 3 变 8，没有串上一帧的残留'}, {hi:['send'],t:'两帧分别交给发送层，成品互不影响'}]});</script>
+<script>dpDemo({nodes:[{id:'team',label:'施工队',sub:'调用步骤',note:''}, {id:'b',label:'建造者',sub:'保存状态',note:''}, {id:'chk',label:'校验',sub:'build()',note:''}, {id:'house',label:'房子',sub:'成品',note:''}],steps:[{hi:['team', 'b'],t:'砌 4 面墙、装 1 扇门、装 2 扇窗'}, {hi:['b'],t:'封顶：has_roof = 1'}, {hi:['chk'],t:'build() 校验：4 墙 / 1 门 / 2 窗 / 有屋顶'}, {hi:['house'],t:'校验通过，交付房子'}, {hi:['chk'],t:'第二个建造者漏了封顶：校验失败，拒绝交付',bad:true}]});</script>
 
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>C 与 C++：两种链式</h2>
+    <h2><span class="n">05</span>C 与 C++ 对照</h2>
     
     
     <div class="tbl">
       <table>
         <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
-        <tbody><tr><td>半成品放哪</td><td><code>builder_t.f</code> 内嵌</td><td><code>Builder::f_</code> 私有成员</td><td>都在 builder 里，调用方拿不到半成品</td></tr><tr><td>步骤接口</td><td><code>b_id()</code> / <code>b_data()</code> / <code>b_crc()</code></td><td>链式 <code>id().data().crc()</code></td><td>C 靠命名约束顺序，C++ 靠返回值把顺序写进表达式</td></tr><tr><td>重置</td><td><code>b_start()</code> 显式清</td><td><code>start()</code> 重新赋值 <code>Frame{}</code></td><td>C 要记得清每个字段；C++ 赋值一次全清</td></tr><tr><td>交付</td><td>按值返回 <code>frame_t</code></td><td>按值返回 <code>Frame</code></td><td>都是副本，交付后改 builder 不影响成品</td></tr><tr><td>超长数据</td><td><code>b_data()</code> 里截到 8 字节</td><td>同样截到 8 字节</td><td>规则一致，但都要在文档里写明，别让调用方猜</td></tr></tbody>
+        <tbody><tr><td>步骤怎么表达</td><td>具名函数 <code>add_walls(h, 4)</code></td><td>链式 <code>w(4).d(1).win(2).roof()</code></td><td>C 显式传对象，C++ 可连写</td></tr><tr><td>中间状态放哪</td><td>调用方栈上的 <code>house_t</code></td><td>建造者对象内部</td><td>C 版无隐藏状态，C++ 版封装更好</td></tr><tr><td>校验时机</td><td><code>build()</code> 返回 -1</td><td><code>build()</code> 返回 optional/抛错</td><td>都必须在交付前</td></tr><tr><td>成品归属</td><td>值拷贝或指针</td><td>值返回，移动语义</td><td>C 版注意别把栈地址带出去</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -259,7 +233,7 @@ frame2 id=0x7DF dlc=8 data=[10 20 30 40 50 60 70 80] crc=0x1F
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     
-    <div class="prose"><ul><li><b>CRC 必须在数据之后。</b>链式调用看起来自由，但 <code>crc()</code> 依赖 <code>dlc</code> 与数据；把它写在最前，算出来一定是错的。</li><li><b>build() 之后别再改成品。</b>按值返回意味着成品是副本；如果后续要改，重新 start 再建一帧，不要绕过 builder 直接改字段。</li><li><b>数据截断要报错。</b>超过 8 字节静默截断，调用方以为全发出去了；至少要返回状态或日志，不能只截不说。</li><li><b>builder 不是线程安全的。</b>一个 builder 只给一个任务用；多线程共用要加锁，或者每个线程各建一个。</li><li><b>步骤别无限膨胀。</b>字段超过十几个、还带条件分支时，考虑把“帧描述”做成表驱动，而不是继续加方法。</li></ul></div>
+    <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/builder" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>步骤可以任意跳过</b>建造者要能表达“缺项”，并在 build 时拒绝；不要默认补全。</li><li><b>build 之后还能改</b>成品交付后应视为不可变；否则校验结果立刻失效。</li><li><b>把所有业务都塞进建造者</b>建造者只管拼装与完整性，不要在里面发网络请求、写数据库。</li></ul></div>
   </section>
   <div class="ch-nav" id="chNav"></div>
   </div>

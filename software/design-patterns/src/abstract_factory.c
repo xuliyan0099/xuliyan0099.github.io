@@ -1,42 +1,42 @@
-/* 抽象工厂：一次取到“同一代”的两个零件，而不是各取各的 */
+/* 抽象工厂 · GUI：浅色/深色两套控件
+ * gcc -std=c11 -Wall -Wextra abstract_factory.c -o abstract_factory
+ */
 #include <stdio.h>
-#include <stddef.h>
 
-typedef struct { void (*send)(const char *msg); } can_t;
-typedef struct { void (*save)(int value); } nvram_t;
+typedef struct { const char *(*label)(void); } button_t;
+typedef struct { const char *(*label)(void); } checkbox_t;
 
 typedef struct {
-    const char *name;
-    can_t   (*make_can)(void);
-    nvram_t (*make_nvram)(void);
-} family_t;
+    button_t   *(*button)(void);
+    checkbox_t *(*checkbox)(void);
+} gui_factory_t;
 
-static void bosch_can_send(const char *m)   { printf("[CAN/BOSCH] %s\n", m); }
-static void bosch_nv_save(int v)            { printf("[NVRAM/BOSCH] save %d\n", v); }
-static void conti_can_send(const char *m)   { printf("[CAN/CONTI] %s\n", m); }
-static void conti_nv_save(int v)            { printf("[NVRAM/CONTI] save %d\n", v); }
+static const char *light_btn_label(void) { return "[ 浅色按钮 ]"; }
+static button_t light_btn = { light_btn_label };
+static button_t *light_button(void) { return &light_btn; }
+static const char *light_box_label(void) { return "[ ] 浅色复选框"; }
+static checkbox_t light_box = { light_box_label };
+static checkbox_t *light_checkbox(void) { return &light_box; }
+static gui_factory_t LIGHT = { light_button, light_checkbox };
 
-static can_t   bosch_can(void)   { can_t c = { bosch_can_send };   return c; }
-static nvram_t bosch_nvram(void) { nvram_t n = { bosch_nv_save }; return n; }
-static can_t   conti_can(void)   { can_t c = { conti_can_send };   return c; }
-static nvram_t conti_nvram(void) { nvram_t n = { conti_nv_save }; return n; }
+static const char *dark_btn_label(void) { return "[ 深色按钮 ]"; }
+static button_t dark_btn = { dark_btn_label };
+static button_t *dark_button(void) { return &dark_btn; }
+static const char *dark_box_label(void) { return "[x] 深色复选框"; }
+static checkbox_t dark_box = { dark_box_label };
+static checkbox_t *dark_checkbox(void) { return &dark_box; }
+static gui_factory_t DARK = { dark_button, dark_checkbox };
 
-static const family_t FAMILIES[] = {
-    { "BOSCH", bosch_can, bosch_nvram },
-    { "CONTI", conti_can, conti_nvram },
-};
+static void render(const char *theme, gui_factory_t *f)
+{
+    button_t   *b = f->button();
+    checkbox_t *c = f->checkbox();
+    printf("%s 界面：%s  %s\n", theme, b->label(), c->label());
+}
 
 int main(void)
 {
-    const size_t nfam = sizeof FAMILIES / sizeof FAMILIES[0];
-    for (size_t i = 0; i < nfam; i++) {
-        const family_t *f = &FAMILIES[i];
-        can_t   c = f->make_can();     /* 同一家族：语言一致、时序一致 */
-        nvram_t v = f->make_nvram();
-        printf("-- family %s --\n", f->name);
-        c.send("0x18FF50E5");
-        v.save(7);
-    }
-    printf("family 数 %zu，零件组合 2 种\n", nfam);
+    render("浅色", &LIGHT);
+    render("深色", &DARK);
     return 0;
 }

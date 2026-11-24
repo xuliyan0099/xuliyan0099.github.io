@@ -1,42 +1,47 @@
-/* 享元：1000 个信号共用 8 份单位描述，只存指针 */
+/* 享元 · 森林共享树型
+ * gcc -std=c11 -Wall -Wextra flyweight.c -o flyweight
+ */
 #include <stdio.h>
 #include <string.h>
-#include <stddef.h>
 
 typedef struct {
-    const char *unit;
-    double scale;
-} sig_t;
+    char name[16];
+    int  leaf_color;
+} tree_type_t;
 
 typedef struct {
-    sig_t pool[8];
-    int n;
-} registry_t;
+    const tree_type_t *type;   /* 共享内部状态 */
+    int x, y;                  /* 外部状态 */
+} tree_t;
 
-static const sig_t *intern(registry_t *r, const char *unit, double scale)
+static tree_type_t TYPES[2] = {
+    { "橡树", 0x2E7D32 },
+    { "松树", 0x1B5E20 },
+};
+
+static const tree_type_t *get_type(const char *name)
 {
-    for (int i = 0; i < r->n; i++)
-        if (strcmp(r->pool[i].unit, unit) == 0) return &r->pool[i];
-    if (r->n >= 8) return NULL;
-    r->pool[r->n].unit = unit;
-    r->pool[r->n].scale = scale;
-    return &r->pool[r->n++];
+    for (unsigned i = 0; i < 2; i++)
+        if (strcmp(TYPES[i].name, name) == 0) return &TYPES[i];
+    return NULL;
 }
 
 int main(void)
 {
-    static const char *UNITS[] = { "C", "kPa", "rpm", "%", "V", "A", "km/h", "deg" };
-    registry_t reg = { .n = 0 };
-    const sig_t *signals[1000];
+    tree_t forest[1000];
+    int n = 0;
+    for (int i = 0; i < 1000; i++) {
+        forest[n].type = get_type(i % 2 ? "松树" : "橡树");
+        forest[n].x = i * 3;
+        forest[n].y = i * 5;
+        n++;
+    }
 
-    size_t nu = sizeof UNITS / sizeof UNITS[0];
-    for (size_t i = 0; i < 1000; i++)
-        signals[i] = intern(&reg, UNITS[i % nu], 1.0 + (double)(i % nu) / 10.0);
-
-    printf("信号 1000 个，描述池 %d 份\n", reg.n);
-    printf("sig[0]   unit=%-4s scale=%.1f\n", signals[0]->unit, signals[0]->scale);
-    printf("sig[7]   unit=%-4s scale=%.1f\n", signals[7]->unit, signals[7]->scale);
-    printf("sig[999] unit=%-4s scale=%.1f\n", signals[999]->unit, signals[999]->scale);
-    printf("指针相同：sig[0]==sig[8] -> %s\n", signals[0] == signals[8] ? "yes" : "no");
+    printf("1000 棵树，共享 %d 份树型描述\n", 2);
+    printf("%s x=%d y=%d color=0x%06X\n",
+           forest[0].type->name, forest[0].x, forest[0].y, forest[0].type->leaf_color);
+    printf("%s x=%d y=%d color=0x%06X\n",
+           forest[999].type->name, forest[999].x, forest[999].y, forest[999].type->leaf_color);
+    printf("每棵树只多存 2 个坐标，不复制颜色和名字\n");
     return 0;
 }

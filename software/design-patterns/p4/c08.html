@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>4.8 状态模式 STATE · C 与 C++ 双实现</title>
-<meta name="description" content="状态模式：C 与 C++ 双实现，含结构图、运行输出与可点演示。">
+<meta name="description" content="状态：订单从新建到支付、发货、完成，非法事件被明确拒绝。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
 <script src="../assets/dp-demo.js"></script>
@@ -35,198 +35,179 @@
 
   <div class="wrap">
   <div class="ch-meta"><span class="lv">篇四 · 行为型</span><span class="sep">/</span>第 8 章<span class="sep">/</span>约 30 分钟</div>
-  <h1>建造者模式<span class="en">BUILDER</span></h1>
-  <p class="lede">拼一帧 CAN 报文有七八个字段，顺序错了不一定报错，可能只是 CRC 不对、DLC 不对。<b>建造者把“拼装”变成一条有步骤的流水线</b>：每一步只改一个字段，最后 <code>build()</code> 才交出成品；中途可以校验、可以复用，也可以随时丢弃重来。</p>
-  <div class="chips"><span class="chip ok">步骤可查</span><span class="chip">成品只交付一次</span><span class="chip">复用 builder 不残留上一帧</span></div>
+  <h1>状态模式<span class="en">STATE</span></h1>
+  <p class="lede">订单有四个状态：新建、已支付、已发货、已完成。不是每个事件都能在任意状态发生：没付钱不能发货，付过钱不能再付。状态模式把<b>“当前状态 + 收到事件 → 下一个状态”</b>变成一张明确的转移表。</p>
+  <div class="chips"><span class="chip ok">状态与转移显式</span><span class="chip">非法事件被拒</span><span class="chip">C 用枚举+函数 · C++ 用状态类</span></div>
 
   <section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：一帧报文七八个字段，顺序全靠记</h2>
+    <h2><span class="n">01</span>问题：坏代码长什么样</h2>
     
     
       <div class="prose">
-        <p>常见写法是一个大初始化：</p>
-        <pre><code>frame_t f = { id, dlc, {b0,b1,b2}, crc };</p></code></pre>
-        <p>字段一多就出三类问题：</p>
-        <ul>
-          <li><b>顺序靠记。</b>CRC 必须在数据之后算；有人先算 CRC 再填数据，台架上偶尔能过，因为数据恰好没变。</li>
-          <li><b>复用会串味。</b>同一个栈上的 <code>frame_t</code> 反复用，上一帧的 <code>data[3..7]</code> 没清，DLC 又写成 8，发出去就是脏数据。</li>
-          <li><b>中途失败没法收场。</b>拼到一半发现 id 非法，只能 <code>return</code>，已写进去的半成品留在对象里。</li>
-        </ul>
-        <p>建造者把每个字段的写入变成一个显式步骤，并提供 <code>start()</code> 清底、<code>build()</code> 交付。调用方看到的是“开始 → 填 id → 填数据 → 算 CRC → 交付”，而不是一堆裸赋值。</p>
+        <p>坏写法是 <code>switch</code> 里再套 <code>if</code>：</p>
+        <pre><code>switch (st) {
+case NEW: if (e == PAY) st = PAID; break;
+case PAID: if (e == SHIP) st = SHIPPED; break;
+}</code></pre>
+        <p>分支会随状态和事件相乘；某个组合忘了写，就默默保持原状态，调用方还以为成功了。</p>
+        <p>状态模式把每个状态的合法事件写清楚：能转就返回新状态，不能转就明确拒绝。非法组合不再“静默通过”。</p>
       </div>
   </section>
 
   <section class="sec" id="s2">
-    <h2><span class="n">02</span>结构：步骤可查、成品只交付一次</h2>
-    <p class="subh">四个角色排成一条线：调用方发起，builder 累积，成品交付给发送层。</p>
+    <h2><span class="n">02</span>结构：状态决定合法转移</h2>
+    <p class="subh">左边是订单，中间是当前状态，右边是下一个状态。</p>
     
   
     <div class="fig">
-      <div class="fig-h"><b>一帧报文的建造流水线</b><span>builder</span></div>
+      <div class="fig-h"><b>合法才转移，非法就拒绝</b><span>structure</span></div>
       <div class="diagram">
-<svg viewBox="0 0 880 360" role="img" aria-label="一帧报文的建造流水线">
+<svg viewBox="0 0 880 360" role="img" aria-label="合法才转移，非法就拒绝">
   <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
-  <g class="node" data-role="client" data-note="调用方只按步骤调用，不直接碰 frame_t 的内部字段，也就不会漏清上一帧。"><rect x="24" y="140" width="150" height="76" rx="10"/><text class="nm" x="38" y="164">调用方</text><text class="ty" x="38" y="183">诊断 / 周期任务</text><text class="mt" x="38" y="201">start → 填字段</text></g>
-  <g class="node" data-role="builder" data-note="builder 持有半成品；每一步只改一个字段，可以在任意一步插入校验。"><rect x="230" y="140" width="200" height="80" rx="10"/><text class="nm" x="244" y="164">builder_t / Builder</text><text class="ty" x="244" y="183">累积状态</text><text class="mt" x="244" y="201">id / data / crc</text></g>
-  <g class="node" data-role="frame" data-note="build() 返回一份完整帧；之后 builder 再 start 不会影响已经交出去的副本。"><rect x="480" y="140" width="170" height="76" rx="10"/><text class="nm" x="494" y="164">frame_t / Frame</text><text class="ty" x="494" y="183">成品</text><text class="mt" x="494" y="201">只读交付</text></g>
-  <g class="node" data-role="tx" data-note="发送层只接收成品，不关心中间步骤；失败可以在交付前拦下。"><rect x="700" y="140" width="150" height="76" rx="10"/><text class="nm" x="714" y="164">CAN 发送</text><text class="ty" x="714" y="183">下游</text><text class="mt" x="714" y="201">send(frame)</text></g>
-  <line x1="174" y1="178" x2="230" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="202.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">步骤</text>
-  <line x1="430" y1="178" x2="480" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="455.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">build</text>
-  <line x1="650" y1="178" x2="700" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="675.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">交付</text>
+  <g class="node" data-role="order" data-note="订单只持有当前状态，不自己判断规则。"><rect x="24" y="140" width="150" height="76" rx="10"/><text class="nm" x="38" y="164">Order</text><text class="ty" x="38" y="183">上下文</text><text class="mt" x="38" y="201">handle(event)</text></g>
+  <g class="node" data-role="cur" data-note="每个状态知道自己的合法事件。"><rect x="250" y="140" width="190" height="84" rx="10"/><text class="nm" x="264" y="164">New</text><text class="ty" x="264" y="183">当前状态</text><text class="mt" x="264" y="201">pay → Paid</text></g>
+  <g class="node" data-role="next" data-note="转移由当前状态决定，不由调用方指定。"><rect x="520" y="56" width="190" height="74" rx="10"/><text class="nm" x="534" y="80">Paid</text><text class="ty" x="534" y="99">下一状态</text><text class="mt" x="534" y="117">ship → Shipped</text></g>
+  <g class="node" data-role="bad" data-note="已支付再支付：保持原状态并报错。"><rect x="520" y="212" width="190" height="74" rx="10"/><text class="nm" x="534" y="236">拒绝</text><text class="ty" x="534" y="255">非法事件</text><text class="mt" x="534" y="273">pay again</text></g>
+  <line x1="174" y1="178" x2="250" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="212.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">事件</text>
+  <line x1="440" y1="160" x2="520" y2="100" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="122.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">pay</text>
+  <line x1="440" y1="200" x2="520" y2="242" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="213.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">非法</text>
 </svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：builder 负责累积，frame 只负责被交付。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">状态对象负责“我能接受什么”，上下文只负责转发。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
-    <h2><span class="n">03</span>两份实现</h2>
+    <h2><span class="n">03</span>两份实现：C 与 C++</h2>
     
-    <p class='subh'>C 版是一组 <code>b_*</code> 函数 + 结构体；C++ 版把每个步骤做成返回 <code>Builder&amp;</code> 的链式方法。</p>
+    <p class='subh'>C 版状态是枚举，转移函数集中判断；C++ 版每个状态一个类，<code>next()</code> 返回下一个状态。</p>
       <div class="codecard">
-        <div class="ch"><span class="lang">C</span><span class="fn">builder.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 建造者：把“拼一帧”拆成可检查的步骤，最后一次性交付 */
+        <div class="ch"><span class="lang">C</span><span class="fn">state.c</span><button class="copy">复制</button></div>
+        <pre><code>/* 状态 · 订单状态流转
+ * gcc -std=c11 -Wall -Wextra state.c -o state
+ */
 #include &lt;stdio.h&gt;
-#include &lt;stddef.h&gt;
 
-typedef struct {
-    unsigned id;
-    int dlc;
-    unsigned char data[8];
-    unsigned crc;
-} frame_t;
+typedef enum { NEW, PAID, SHIPPED, DONE } state_t;
 
-typedef struct { frame_t f; } builder_t;
-
-static void b_start(builder_t *b)          { b-&gt;f.id = 0; b-&gt;f.dlc = 0; b-&gt;f.crc = 0; }
-static void b_id(builder_t *b, unsigned v) { b-&gt;f.id = v; }
-static void b_data(builder_t *b, const unsigned char *d, int n)
+static const char *name(state_t s)
 {
-    if (n &gt; 8) n = 8;
-    b-&gt;f.dlc = n;
-    for (int i = 0; i &lt; n; i++) b-&gt;f.data[i] = d[i];
+    static const char *N[] = { "新建", "已支付", "已发货", "已完成" };
+    return N[s];
 }
-static void b_crc(builder_t *b)
-{
-    unsigned sum = b-&gt;f.id;
-    for (int i = 0; i &lt; b-&gt;f.dlc; i++) sum += b-&gt;f.data[i];
-    b-&gt;f.crc = sum &amp; 0xFFu;
-}
-static frame_t b_build(const builder_t *b) { return b-&gt;f; }
 
-static void dump(const frame_t *f)
+static state_t next(state_t s, const char *event, int *ok)
 {
-    printf("id=0x%X dlc=%d data=[", f-&gt;id, f-&gt;dlc);
-    for (int i = 0; i &lt; f-&gt;dlc; i++) printf("%s%02X", i ? " " : "", f-&gt;data[i]);
-    printf("] crc=0x%02X\n", f-&gt;crc);
+    *ok = 1;
+    if (s == NEW     &amp;&amp; event[0] == 'p') return PAID;
+    if (s == PAID    &amp;&amp; event[0] == 's') return SHIPPED;
+    if (s == SHIPPED &amp;&amp; event[0] == 'd') return DONE;
+    *ok = 0;
+    return s;
 }
 
 int main(void)
 {
-    builder_t b;
-    unsigned char payload[8] = { 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80 };
-
-    b_start(&amp;b);
-    b_id(&amp;b, 0x18FF50E5u);
-    b_data(&amp;b, payload, 3);
-    b_crc(&amp;b);
-    frame_t f1 = b_build(&amp;b);
-    printf("frame1 ");
-    dump(&amp;f1);
-
-    b_start(&amp;b);                 /* 复用同一个 builder，不残留上一帧 */
-    b_id(&amp;b, 0x7DFu);
-    b_data(&amp;b, payload, 8);      /* 超长被截到 8 字节 */
-    b_crc(&amp;b);
-    frame_t f2 = b_build(&amp;b);
-    printf("frame2 ");
-    dump(&amp;f2);
-    printf("两次建造独立：frame1 dlc=%d, frame2 dlc=%d\n", f1.dlc, f2.dlc);
+    state_t s = NEW;
+    const char *events[] = { "pay", "pay", "ship", "done" };
+    for (unsigned i = 0; i &lt; 4; i++) {
+        int ok;
+        state_t n = next(s, events[i], &amp;ok);
+        if (!ok) printf("%s 状态下 %s 被拒绝\n", name(s), events[i]);
+        else     printf("%s -&gt; %s（%s）\n", name(s), name(n), events[i]);
+        s = n;
+    }
     return 0;
 }</code></pre>
       </div>
     <div class="run">
-      <div class="ch"><b>RUN</b><span>./builder.exe</span></div>
-      <pre>frame1 id=0x18FF50E5 dlc=3 data=[10 20 30] crc=0x45
-frame2 id=0x7DF dlc=8 data=[10 20 30 40 50 60 70 80] crc=0x1F
-两次建造独立：frame1 dlc=3, frame2 dlc=8</pre>
+      <div class="ch"><b>RUN</b><span>./state.exe</span></div>
+      <pre>新建 -&gt; 已支付（pay）
+已支付 状态下 pay 被拒绝
+已支付 -&gt; 已发货（ship）
+已发货 -&gt; 已完成（done）</pre>
     </div>
       <div class="codecard">
-        <div class="ch"><span class="lang">C++</span><span class="fn">builder.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 建造者 · C++：链式调用，build() 只交付一次
-// 编译：g++ -std=c++17 -Wall -Wextra builder.cpp -o builder_cpp
+        <div class="ch"><span class="lang">C++</span><span class="fn">state.cpp</span><button class="copy">复制</button></div>
+        <pre><code>// 状态 · 订单状态流转
+// g++ -std=c++17 -Wall -Wextra state.cpp -o state_cpp
 #include &lt;cstdio&gt;
-#include &lt;array&gt;
+#include &lt;memory&gt;
+#include &lt;string&gt;
 
-struct Frame {
-    unsigned id = 0;
-    int dlc = 0;
-    std::array&lt;unsigned char, 8&gt; data{};
-    unsigned crc = 0;
-};
+class Order;
 
-class Builder {
+class State {
 public:
-    Builder &amp;start() { f_ = Frame{}; return *this; }
-    Builder &amp;id(unsigned v) { f_.id = v; return *this; }
-    Builder &amp;data(const unsigned char *d, int n)
-    {
-        if (n &gt; 8) n = 8;
-        f_.dlc = n;
-        for (int i = 0; i &lt; n; i++) f_.data[static_cast&lt;size_t&gt;(i)] = d[i];
-        return *this;
-    }
-    Builder &amp;crc()
-    {
-        unsigned sum = f_.id;
-        for (int i = 0; i &lt; f_.dlc; i++) sum += f_.data[static_cast&lt;size_t&gt;(i)];
-        f_.crc = sum &amp; 0xFFu;
-        return *this;
-    }
-    Frame build() const { return f_; }
-private:
-    Frame f_;
+    virtual ~State() = default;
+    virtual const char* name() const = 0;
+    virtual State* next(const std::string&amp; event) = 0;
 };
 
-static void dump(const Frame &amp;f)
-{
-    std::printf("id=0x%X dlc=%d data=[", f.id, f.dlc);
-    for (int i = 0; i &lt; f.dlc; i++) std::printf("%s%02X", i ? " " : "", f.data[static_cast&lt;size_t&gt;(i)]);
-    std::printf("] crc=0x%02X\n", f.crc);
-}
+class New final : public State {
+public:
+    const char* name() const override { return "新建"; }
+    State* next(const std::string&amp; e) override;
+};
+class Paid final : public State {
+public:
+    const char* name() const override { return "已支付"; }
+    State* next(const std::string&amp; e) override;
+};
+class Shipped final : public State {
+public:
+    const char* name() const override { return "已发货"; }
+    State* next(const std::string&amp; e) override;
+};
+class Done final : public State {
+public:
+    const char* name() const override { return "已完成"; }
+    State* next(const std::string&amp;) override { return this; }
+};
+
+static New S_NEW; static Paid S_PAID; static Shipped S_SHIPPED; static Done S_DONE;
+
+State* New::next(const std::string&amp; e) { return e == "pay" ? static_cast&lt;State*&gt;(&amp;S_PAID) : this; }
+State* Paid::next(const std::string&amp; e) { return e == "ship" ? static_cast&lt;State*&gt;(&amp;S_SHIPPED) : this; }
+State* Shipped::next(const std::string&amp; e) { return e == "done" ? static_cast&lt;State*&gt;(&amp;S_DONE) : this; }
+
+class Order {
+public:
+    explicit Order(State* s) : s_(s) {}
+    void handle(const std::string&amp; e) {
+        State* n = s_-&gt;next(e);
+        if (n == s_) std::printf("%s 状态下 %s 被拒绝\n", s_-&gt;name(), e.c_str());
+        else { std::printf("%s -&gt; %s（%s）\n", s_-&gt;name(), n-&gt;name(), e.c_str()); s_ = n; }
+    }
+private:
+    State* s_;
+};
 
 int main()
 {
-    unsigned char payload[8] = { 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80 };
-    Builder b;
-    Frame f1 = b.start().id(0x18FF50E5u).data(payload, 3).crc().build();
-    std::printf("frame1 ");
-    dump(f1);
-
-    Frame f2 = b.start().id(0x7DFu).data(payload, 8).crc().build();
-    std::printf("frame2 ");
-    dump(f2);
-    std::printf("两次建造独立：frame1 dlc=%d, frame2 dlc=%d\n", f1.dlc, f2.dlc);
+    Order o(&amp;S_NEW);
+    o.handle("pay"); o.handle("pay"); o.handle("ship"); o.handle("done");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
-      <div class="ch"><b>RUN</b><span>./builder_cpp.exe</span></div>
-      <pre>frame1 id=0x18FF50E5 dlc=3 data=[10 20 30] crc=0x45
-frame2 id=0x7DF dlc=8 data=[10 20 30 40 50 60 70 80] crc=0x1F
-两次建造独立：frame1 dlc=3, frame2 dlc=8</pre>
+      <div class="ch"><b>RUN</b><span>./state_cpp.exe</span></div>
+      <pre>新建 -&gt; 已支付（pay）
+已支付 状态下 pay 被拒绝
+已支付 -&gt; 已发货（ship）
+已发货 -&gt; 已完成（done）</pre>
     </div>
   </section>
 
   <section class="sec" id="s4">
-    <h2><span class="n">04</span>一步一步拼一帧</h2>
+    <h2><span class="n">04</span>运行与演示</h2>
     
     
 <div class="demo" id="demo">
-  <div class="demo-h"><b>一步一步拼一帧</b><span>点“单步”：看每个字段何时写入、CRC 何时才能算。</span></div>
+  <div class="demo-h"><b>四个事件，看哪一步被拒</b><span>pay → pay → ship → done。</span></div>
   <div class="stage">
     <div class="dflow" id="dflow"></div>
     <div class="dbar" id="dbar">未开始</div>
@@ -240,18 +221,18 @@ frame2 id=0x7DF dlc=8 data=[10 20 30 40 50 60 70 80] crc=0x1F
     <div class="log" id="dlog"></div>
   </div>
 </div>
-<script>dpDemo({nodes:[{id:'id',label:'ID',sub:'0x18FF50E5',note:''}, {id:'data',label:'DATA',sub:'3 字节',note:''}, {id:'crc',label:'CRC',sub:'最后算',note:''}, {id:'build',label:'BUILD',sub:'交付成品',note:''}, {id:'send',label:'SEND',sub:'发送层',note:''}],steps:[{hi:['id'],t:'start() 清底：id=0、dlc=0、crc=0，上一帧不残留'}, {hi:['id'],t:'填 id = 0x18FF50E5'}, {hi:['data'],t:'填数据 10 20 30，dlc 跟着变成 3'}, {hi:['crc'],t:'数据到齐后才算 CRC：sum(id + data) & 0xFF = 0x45'}, {hi:['build'],t:'build() 交付 frame1；builder 之后可以重新 start'}, {hi:['data', 'build'],t:'第二帧复用同一个 builder：dlc 从 3 变 8，没有串上一帧的残留'}, {hi:['send'],t:'两帧分别交给发送层，成品互不影响'}]});</script>
+<script>dpDemo({nodes:[{id:'o',label:'Order',sub:'新建',note:''}, {id:'p',label:'已支付',sub:'Paid',note:''}, {id:'s',label:'已发货',sub:'Shipped',note:''}, {id:'d',label:'已完成',sub:'Done',note:''}],steps:[{hi:['o', 'p'],t:'新建 + pay → 已支付'}, {hi:['p'],t:'已支付 + pay：非法，拒绝',bad:true}, {hi:['p', 's'],t:'已支付 + ship → 已发货'}, {hi:['s', 'd'],t:'已发货 + done → 已完成'}, {hi:['d'],t:'已完成后再来事件：保持原状态'}]});</script>
 
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>C 与 C++：两种链式</h2>
+    <h2><span class="n">05</span>C 与 C++ 对照</h2>
     
     
     <div class="tbl">
       <table>
         <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
-        <tbody><tr><td>半成品放哪</td><td><code>builder_t.f</code> 内嵌</td><td><code>Builder::f_</code> 私有成员</td><td>都在 builder 里，调用方拿不到半成品</td></tr><tr><td>步骤接口</td><td><code>b_id()</code> / <code>b_data()</code> / <code>b_crc()</code></td><td>链式 <code>id().data().crc()</code></td><td>C 靠命名约束顺序，C++ 靠返回值把顺序写进表达式</td></tr><tr><td>重置</td><td><code>b_start()</code> 显式清</td><td><code>start()</code> 重新赋值 <code>Frame{}</code></td><td>C 要记得清每个字段；C++ 赋值一次全清</td></tr><tr><td>交付</td><td>按值返回 <code>frame_t</code></td><td>按值返回 <code>Frame</code></td><td>都是副本，交付后改 builder 不影响成品</td></tr><tr><td>超长数据</td><td><code>b_data()</code> 里截到 8 字节</td><td>同样截到 8 字节</td><td>规则一致，但都要在文档里写明，别让调用方猜</td></tr></tbody>
+        <tbody><tr><td>状态表示</td><td><code>enum state_t</code></td><td>状态类</td><td>C 用枚举，C++ 用对象</td></tr><tr><td>转移规则</td><td><code>next()</code> 集中判断</td><td>每个状态类自己实现</td><td>都只在一处</td></tr><tr><td>非法事件</td><td>返回原状态 + <code>ok=0</code></td><td>返回 <code>this</code>，上下文报错</td><td>必须显式拒绝</td></tr><tr><td>扩展状态</td><td>加枚举 + 改转移函数</td><td>加一个状态类 + 接线</td><td>C 要改中心函数，C++ 更分散</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -259,7 +240,7 @@ frame2 id=0x7DF dlc=8 data=[10 20 30 40 50 60 70 80] crc=0x1F
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     
-    <div class="prose"><ul><li><b>CRC 必须在数据之后。</b>链式调用看起来自由，但 <code>crc()</code> 依赖 <code>dlc</code> 与数据；把它写在最前，算出来一定是错的。</li><li><b>build() 之后别再改成品。</b>按值返回意味着成品是副本；如果后续要改，重新 start 再建一帧，不要绕过 builder 直接改字段。</li><li><b>数据截断要报错。</b>超过 8 字节静默截断，调用方以为全发出去了；至少要返回状态或日志，不能只截不说。</li><li><b>builder 不是线程安全的。</b>一个 builder 只给一个任务用；多线程共用要加锁，或者每个线程各建一个。</li><li><b>步骤别无限膨胀。</b>字段超过十几个、还带条件分支时，考虑把“帧描述”做成表驱动，而不是继续加方法。</li></ul></div>
+    <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/state" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>非法事件静默通过</b>调用方以为成功，订单却停在原地；必须返回明确的拒绝。</li><li><b>状态里做业务</b>状态只决定“能不能转”，不要在里面扣库存、发短信。</li><li><b>状态对象可变</b>C++ 状态类通常无状态、可共享；把每单数据放进上下文。</li></ul></div>
   </section>
   <div class="ch-nav" id="chNav"></div>
   </div>

@@ -1,42 +1,44 @@
-// 备忘录 · C++：Memento 只暴露给 Originator，外部拿不到内部字段
-// 编译：g++ -std=c++17 -Wall -Wextra memento.cpp -o memento_cpp
+// 备忘录 · 撤销快照
+// g++ -std=c++17 -Wall -Wextra memento.cpp -o memento_cpp
 #include <cstdio>
-
-struct Calib { int gain; int offset; int mode; };
+#include <string>
 
 class Memento {
 public:
-    explicit Memento(const Calib &c) : c_(c) {}
+    Memento(std::string text, int cursor) : text_(std::move(text)), cursor_(cursor) {}
 private:
-    friend class Ecu;
-    Calib c_;
+    friend class Editor;
+    std::string text_;
+    int cursor_;
 };
 
-class Ecu {
+class Editor {
 public:
-    void set(int g, int o, int m) { c_ = Calib{g, o, m}; }
-    Memento save() const { return Memento(c_); }
-    void restore(const Memento &m) { c_ = m.c_; }
-    void dump(const char *tag) const
-    {
-        std::printf("%-9s gain=%d offset=%d mode=%d\n", tag, c_.gain, c_.offset, c_.mode);
-    }
+    void setText(std::string t, int cursor) { text_ = std::move(t); cursor_ = cursor; }
+    const std::string& text() const { return text_; }
+    int cursor() const { return cursor_; }
+
+    Memento save() const { return Memento(text_, cursor_); }
+    void restore(const Memento& m) { text_ = m.text_; cursor_ = m.cursor_; }
+
 private:
-    Calib c_{};
+    std::string text_;
+    int cursor_ = 0;
 };
 
 int main()
 {
-    Ecu ecu;
-    ecu.set(12, 0, 1);
-    ecu.dump("before");
-    Memento m = ecu.save();
+    Editor e;
+    e.setText("hello", 5);
+    std::printf("初始：\"%s\" cursor=%d\n", e.text().c_str(), e.cursor());
 
-    ecu.set(30, -8, 3);
-    ecu.dump("tuned");
+    auto snap = e.save();
 
-    ecu.restore(m);
-    ecu.dump("restored");
-    std::printf("快照是值拷贝：之后改 ecu 不会污染 memento\n");
+    e.setText("hello world", 11);
+    std::printf("编辑后：\"%s\" cursor=%d\n", e.text().c_str(), e.cursor());
+
+    e.restore(snap);
+    std::printf("恢复后：\"%s\" cursor=%d\n", e.text().c_str(), e.cursor());
+    std::puts("快照是值拷贝，编辑过程不会污染它");
     return 0;
 }

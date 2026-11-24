@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3.1 适配器模式 Adapter · C 与 C++ 双实现</title>
+<meta name="description" content="SHT3x 与 NTC 两种传感器接同一接口：C 用 ops 表 + 强转，C++ 用对象适配器包住旧驱动；含单位换算与能力缺失演示。">
+<meta name="theme-color" content="#08090c">
+<link rel="stylesheet" href="../assets/pd.css">
+<style>
+input[type=range]{width:100%;accent-color:#43d6a8;margin:6px 0 2px}
+.row{display:flex;align-items:center;gap:10px;margin:8px 0}
+.row span{flex:0 0 84px;font:600 11px/1.5 var(--mono);color:#8494ad;letter-spacing:.04em}
+.row b{flex:0 0 74px;text-align:right;font:700 12.5px/1.5 var(--mono);color:#8ff5d6}
+.out{font:600 13px/1.9 var(--mono);padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#0d1220;color:#cfe0ff;margin-top:10px}
+.out em{color:#7d8798;font-style:normal}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <label for="navChk" class="nav-toggle">☰ 目录</label>
+    <a class="brand" href="../index.html"><i></i>设计模式<small>C / C++ 双实现</small></a>
+    <span class="tb-sp"></span>
+    <a class="tb" href="../p1/c01.html">导读</a>
+    <a class="tb" href="../../../index.html">知识库</a>
+    <a class="tb" href="../index.html">目录</a>
+  </div>
+</header>
+
+<input type="checkbox" id="navChk" class="nav-chk" hidden>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">篇三 · 结构型与创建型<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
+    <ol id="sideList"></ol>
+    <div class="vol-nav" id="volNav"></div>
+  </aside>
+
+  <div class="wrap">
+  <div class="ch-meta"><span class="lv">篇三 · 结构型与创建型</span><span class="sep">/</span>第 1 章<span class="sep">/</span>约 28 分钟</div>
+  <h1>适配器模式<span class="en">ADAPTER</span></h1>
+  <p class="lede">新代码只想要一件事：<code>read()</code> 给我温度，单位是摄氏度。可手上的两个旧驱动一个返回 ×100 的整数还要求先 <code>init()</code>，另一个只给 ADC 计数、根本没有湿度。适配器就是那个“翻译层”：把两边的差异吸收在自己身上，业务代码一行都不用改。</p>
+  <div class="chips">
+    <span class="chip ok">两个旧驱动 · 一个接口</span>
+    <span class="chip">单位换算在适配器</span>
+    <span class="chip">能力缺失要如实报</span>
+  </div>
+<section class="sec" id="s1">
+    <h2><span class="n">01</span>问题：差异会一路渗到业务层</h2>
+    <div class="prose">
+      <p>两个传感器的驱动 API 完全不一样：</p>
+      <ul>
+        <li>SHT3x 的库返回 <code>int t_x100</code>，还要求先调 <code>init()</code> 打开器件；</li>
+        <li>NTC 只有一个 ADC 计数，温度得自己按分压表算，湿度则压根没有这个量。</li>
+      </ul>
+      <p>如果让业务直接调这两个驱动，业务代码里就会出现“if 是 SHT3x 就除以 100，if 是 NTC 就套公式”的分支。每多一个型号、每换一次单位，都要改业务；同时业务也被迫知道“谁需要 init、谁没有湿度”。</p>
+      <p>适配器把这段差异收进一个类：对外仍然是“读温度、读湿度”，对内负责换算、补协议、把“不支持”翻译成明确错误码。业务只依赖目标接口，换传感器等于换一个适配器对象。</p>
+    </div>
+  </section>
+
+  <section class="sec" id="s2">
+    <h2><span class="n">02</span>结构：目标接口在前，适配器在中间</h2>
+    <p class="subh">上层只看 <code>ISensor</code>；两个适配器各自包住一个旧驱动，把它的返回值翻译成统一读数。点方框看每一层负责什么。</p>
+
+    <div class="fig">
+      <div class="fig-h"><b>对象适配器（包住旧驱动）</b><span>target / adapter / adaptee</span></div>
+      <div class="diagram">
+        <svg viewBox="0 0 880 330" role="img" aria-label="适配器结构图">
+          <defs>
+            <marker id="ar7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/>
+            </marker>
+            <marker id="ar7d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M0 0 L10 5 L0 10 z" fill="#43d6a8"/>
+            </marker>
+          </defs>
+
+          <g class="node" data-role="cli" data-note="Client（report()）：只调用 read_temp / read_hum，不关心背后是 I2C 还是 ADC。它连“这个传感器有没有湿度”都不需要提前知道——读一下就知道。">
+            <rect x="24" y="120" width="150" height="90" rx="10"/>
+            <text class="nm" x="38" y="144">Client</text>
+            <text class="ty" x="38" y="163">业务代码</text>
+            <text class="mt" x="38" y="182">report(tag, s)</text>
+            <text class="mt" x="38" y="199">只认接口</text>
+          </g>
+
+          <g class="node" data-role="iface" data-note="Target（ISensor / sensor_ops_t）：两个方法，read_temp 与 read_hum，都返回 int 状态码并写回 float。湿度不支持也要走这个方法，用错误码表达。">
+            <rect x="215" y="120" width="165" height="90" rx="10"/>
+            <text class="nm" x="229" y="144">ISensor</text>
+            <text class="ty" x="229" y="163">目标接口</text>
+            <text class="mt" x="229" y="182">read_temp()</text>
+            <text class="mt" x="229" y="199">read_hum()</text>
+          </g>
+
+          <g class="node" data-role="sa" data-note="Sht3xAdapter：包住 SHT3x 驱动。构造时补上 init()，读取时把 ×100 的整数除以 100，返回摄氏度。它只做翻译，不做滤波、不做标定。">
+            <rect x="432" y="48" width="180" height="78" rx="10"/>
+            <text class="nm" x="446" y="72">Sht3xAdapter</text>
+            <text class="ty" x="446" y="91">适配器 A</text>
+            <text class="mt" x="446" y="110">int×100 → float℃</text>
+          </g>
+
+          <g class="node" data-role="na" data-note="NtcAdapter：包住 ADC。温度用分压表线性近似算出来，湿度恒返回 -2（能力缺失），而不是返回 0.0 假装有读数。">
+            <rect x="432" y="172" width="180" height="78" rx="10"/>
+            <text class="nm" x="446" y="196">NtcAdapter</text>
+            <text class="ty" x="446" y="215">适配器 B</text>
+            <text class="mt" x="446" y="234">ADC → ℃，湿度 -2</text>
+          </g>
+
+          <g class="node" data-role="sht" data-note="Sht3xDriver（被适配者）：厂商库，要求 init 后才能读，返回 ×100 整数。它不会为你改 API，也不该被改——升级库版本时适配器才需要跟着动。">
+            <rect x="672" y="48" width="184" height="78" rx="10"/>
+            <text class="nm" x="686" y="72">Sht3xDriver</text>
+            <text class="ty" x="686" y="91">被适配者</text>
+            <text class="mt" x="686" y="110">init / readRaw</text>
+          </g>
+
+          <g class="node" data-role="ntc" data-note="NtcAdc（被适配者）：只有一个 rawCount()。原厂只会给你 ADC 计数，把计数变成温度是上层的事，适配器就是承担这件事的地方。">
+            <rect x="672" y="172" width="184" height="78" rx="10"/>
+            <text class="nm" x="686" y="196">NtcAdc</text>
+            <text class="ty" x="686" y="215">被适配者</text>
+            <text class="mt" x="686" y="234">rawCount()</text>
+          </g>
+
+          <path class="flow" marker-end="url(#ar7)" d="M174 165 L211 165"/>
+          <text class="lbl" x="168" y="157">调用</text>
+
+          <path class="flow dep" marker-end="url(#ar7d)" d="M330 132 C 380 110, 390 90, 428 86"/>
+          <text class="lbl" x="348" y="104">实现</text>
+
+          <path class="flow dep" marker-end="url(#ar7d)" d="M330 198 C 380 220, 390 220, 428 210"/>
+
+          <path class="flow" marker-end="url(#ar7)" d="M612 87 L668 87"/>
+          <text class="lbl" x="614" y="79">包住</text>
+
+          <path class="flow" marker-end="url(#ar7)" d="M612 211 L668 211"/>
+
+          <text class="lbl" x="24" y="286">适配器做三件事：单位换算（×100 → 浮点）、协议补齐（先 init）、能力缺失如实报错（-2，而不是 0）</text>
+          <text class="lbl" x="24" y="306">它不做的事：滤波、标定、缓存 —— 那些属于传感器本身或上层，塞进适配器会让“翻译层”变成第二个业务层</text>
+        </svg>
+      </div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：为什么“不支持湿度”也要走接口，而不是业务里写 if。</span></div>
+    </div>
+  </section>
+
+  <section class="sec" id="s3">
+    <h2><span class="n">03</span>两份实现</h2>
+    <p class="subh">C 版的目标是“一个 ops 表 + 一个 impl 指针”，适配器结构体把 <code>sensor_t base</code> 放在第一位再强转回来；C++ 版是标准的对象适配器：适配器内部持有一个旧驱动对象，对外实现 <code>read()</code>。</p>
+
+    <div class="codes">
+      <div class="codecard">
+        <div class="ch"><span class="lang">C</span><span class="fn">adapter.c</span><button class="copy">复制</button></div>
+        <pre><code>/* 适配器模式 · C 实现：两种温湿度传感器，上层只认一套接口
+ * 编译：gcc -std=c11 -Wall -Wextra adapter.c -o adapter
+ */
+#include &lt;stdio.h&gt;
+
+/* ---------- 目标接口：上层代码只认这三个成员 ---------- */
+typedef struct sensor sensor_t;
+typedef struct {
+    int (*read_temp)(sensor_t *self, float *out);
+    int (*read_hum)(sensor_t *self, float *out);
+} sensor_ops_t;
+
+struct sensor { const sensor_ops_t *ops; void *impl; };
+
+/* ---------- 被适配者 A：SHT3x 厂商库，返回 ×100 的整数 ---------- */
+typedef struct { int t_x100; int h_x100; } sht3x_t;
+
+static int sht3x_legacy_read(sht3x_t *d, int *t_x100, int *h_x100)
+{
+    if (!d) return -1;
+    *t_x100 = d-&gt;t_x100;
+    *h_x100 = d-&gt;h_x100;
+    return 0;
+}
+
+typedef struct { sensor_t base; sht3x_t hw; } sht_adapter_t;
+
+static int sht_read_temp(sensor_t *self, float *out)
+{
+    sht_adapter_t *a = (sht_adapter_t *)self;     /* 适配器知道两边 */
+    int t, h;
+    if (sht3x_legacy_read(&amp;a-&gt;hw, &amp;t, &amp;h) != 0) return -1;
+    *out = t / 100.0f;
+    return 0;
+}
+
+static int sht_read_hum(sensor_t *self, float *out)
+{
+    sht_adapter_t *a = (sht_adapter_t *)self;
+    int t, h;
+    if (sht3x_legacy_read(&amp;a-&gt;hw, &amp;t, &amp;h) != 0) return -1;
+    *out = h / 100.0f;
+    return 0;
+}
+
+static const sensor_ops_t SHT_OPS = { sht_read_temp, sht_read_hum };
+
+/* ---------- 被适配者 B：NTC + ADC，只能测温，湿度不支持 ---------- */
+typedef struct { int adc; } ntc_hw_t;
+
+static int ntc_read_adc(ntc_hw_t *d) { return d-&gt;adc; }
+
+typedef struct { sensor_t base; ntc_hw_t hw; } ntc_adapter_t;
+
+static int ntc_read_temp(sensor_t *self, float *out)
+{
+    ntc_adapter_t *a = (ntc_adapter_t *)self;
+    int adc = ntc_read_adc(&amp;a-&gt;hw);
+    *out = 25.0f + (adc - 2048) * 0.05f;          /* 分压表的线性近似 */
+    return 0;
+}
+
+static int ntc_read_hum(sensor_t *self, float *out)
+{
+    (void)self; (void)out;
+    return -2;                                   /* 能力缺失要如实报错 */
+}
+
+static const sensor_ops_t NTC_OPS = { ntc_read_temp, ntc_read_hum };
+
+/* ---------- 上层：同一段代码，两个实现 ---------- */
+static void report(const char *tag, sensor_t *s)
+{
+    float t = 0, h = 0;
+    printf("%s: ", tag);
+    if (s-&gt;ops-&gt;read_temp(s, &amp;t) == 0) printf("temp=%.1fC ", t);
+    else                               printf("temp=&lt;err&gt; ");
+    int rc = s-&gt;ops-&gt;read_hum(s, &amp;h);
+    if (rc == 0)      printf("hum=%.1f%%\n", h);
+    else if (rc == -2) printf("hum=&lt;不支持&gt;\n");
+    else               printf("hum=&lt;err&gt;\n");
+}
+
+int main(void)
+{
+    sht_adapter_t a = { { &amp;SHT_OPS, NULL }, { 2360, 4850 } };
+    ntc_adapter_t b = { { &amp;NTC_OPS, NULL }, { 2100 } };
+    a.base.impl = &amp;a.hw;
+    b.base.impl = &amp;b.hw;
+
+    report("SHT3x", &amp;a.base);
+    report("NTC  ", &amp;b.base);
+    return 0;
+}</code></pre>
+      </div>
+
+      <div class="codecard">
+        <div class="ch"><span class="lang">C++</span><span class="fn">adapter.cpp</span><button class="copy">复制</button></div>
+        <pre><code>// 适配器模式 · C++ 实现：对象适配器（包住旧驱动）与接口统一
+// 编译：g++ -std=c++17 -Wall -Wextra adapter.cpp -o adapter_cpp
+#include &lt;cstdio&gt;
+
+// 目标接口：新代码只依赖它
+struct Reading { bool ok; float temp_c; float hum_pct; };
+
+class ISensor {
+public:
+    virtual ~ISensor() = default;
+    virtual Reading read() = 0;
+};
+
+// 被适配者 A：厂商库，整数 + 缩放，且要求先 init
+class Sht3xDriver {
+public:
+    bool init() { ready_ = true; return true; }
+    bool readRaw(int&amp; t_x100, int&amp; h_x100) {
+        if (!ready_) return false;
+        t_x100 = 2360;
+        h_x100 = 4850;
+        return true;
+    }
+private:
+    bool ready_ = false;
+};
+
+class Sht3xAdapter final : public ISensor {
+public:
+    Sht3xAdapter() { drv_.init(); }
+    Reading read() override {
+        int t = 0, h = 0;
+        if (!drv_.readRaw(t, h)) return {};
+        return { true, t / 100.0f, h / 100.0f };
+    }
+private:
+    Sht3xDriver drv_;
+};
+
+// 被适配者 B：ADC 原始计数，只能测温
+class NtcAdc {
+public:
+    int rawCount() const { return 2100; }
+};
+
+class NtcAdapter final : public ISensor {
+public:
+    Reading read() override {
+        float t = 25.0f + (adc_.rawCount() - 2048) * 0.05f;
+        return { true, t, -1.0f };     // -1 表示湿度不可用
+    }
+private:
+    NtcAdc adc_;
+};
+
+void report(const char* tag, ISensor&amp; s) {
+    Reading r = s.read();
+    std::printf("%s: ", tag);
+    if (r.ok) std::printf("temp=%.1fC ", r.temp_c);
+    else      std::printf("temp=&lt;err&gt; ");
+    if (r.ok &amp;&amp; r.hum_pct &gt;= 0) std::printf("hum=%.1f%%\n", r.hum_pct);
+    else                        std::printf("hum=&lt;不支持&gt;\n");
+}
+
+int main() {
+    Sht3xAdapter a;
+    NtcAdapter b;
+    report("SHT3x", a);
+    report("NTC  ", b);
+    return 0;
+}</code></pre>
+      </div>
+    </div>
+
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>./adapter.exe</span></div>
+      <pre>SHT3x: temp=23.6C hum=48.5%
+NTC  : temp=27.6C hum=&lt;不支持&gt;</pre>
+    </div>
+    <div class="run">
+      <div class="ch"><b>RUN</b><span>./adapter_cpp.exe</span></div>
+      <pre>SHT3x: temp=23.6C hum=48.5%
+NTC  : temp=27.6C hum=&lt;不支持&gt;</pre>
+    </div>
+    <p class="hintline">两行完全一致。NTC 的 27.6 来自 <code>25 + (2100-2048)×0.05</code>；湿度那一格没有变成 0.0，而是明确写“不支持”——这是适配器最容易被写错的地方。</p>
+  </section>
+  <section class="sec" id="s4">
+    <h2><span class="n">04</span>改原始值，看适配器怎么翻译</h2>
+    <p class="subh">拖动滑块改变驱动吐出的原始值。SHT3x 走 ×100 换算，NTC 走分压表近似；NTC 的湿度永远走“不支持”这条分支，而不是编一个数出来。</p>
+
+    <div class="demo">
+      <div class="demo-h"><b>sensor adapter</b><span>同一段 report()，两个适配器</span></div>
+      <div class="stage">
+        <div class="ctl" style="margin-bottom:10px">
+          <button class="btn on" data-s="sht">SHT3x</button>
+          <button class="btn" data-s="ntc">NTC</button>
+        </div>
+
+        <div id="shtBox">
+          <div class="row"><span>TEMP ×100</span><input type="range" id="tRaw" min="0" max="5000" step="10" value="2360"><b id="tVal">2360</b></div>
+          <div class="row"><span>HUM ×100</span><input type="range" id="hRaw" min="0" max="10000" step="50" value="4850"><b id="hVal">4850</b></div>
+        </div>
+
+        <div id="ntcBox" style="display:none">
+          <div class="row"><span>ADC</span><input type="range" id="adc" min="0" max="4095" step="1" value="2100"><b id="adcVal">2100</b></div>
+        </div>
+
+        <div class="out" id="out"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="s5">
+    <h2><span class="n">05</span>C 与 C++：同一层翻译，两种代价</h2>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
+        <tbody>
+          <tr><td>目标接口</td><td><code>sensor_ops_t</code> 两个函数指针</td><td><code>ISensor::read()</code></td><td>C 接口是数据，能被拷贝、能被替换</td></tr>
+          <tr><td>适配器</td><td><code>sensor_t base</code> + <code>hw</code></td><td>类内持有 <code>Sht3xDriver</code></td><td>都是“包住”，C 的包法靠内存布局</td></tr>
+          <tr><td>还原具体类型</td><td><code>(sht_adapter_t *)self</code></td><td>虚分派直达具体类</td><td>C 版强转无检查，布局错就是 UB</td></tr>
+          <tr><td>只读一次拿两个值</td><td>两个方法各调一次 <code>legacy_read</code></td><td>一次 <code>read()</code> 返回 <code>Reading</code></td><td>C 版多读一次 I2C；C++ 版一次读完</td></tr>
+          <tr><td>错误表达</td><td><code>-1</code> 失败、<code>-2</code> 不支持</td><td><code>ok=false</code>、<code>hum_pct=-1</code></td><td>用“魔法负数”区分两种错误，得写清注释</td></tr>
+          <tr><td>开销</td><td>无分配</td><td>无堆分配（驱动内嵌）</td><td>两种都适合资源紧张的板子</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sec" id="s6">
+    <h2><span class="n">06</span>代价与坑</h2>
+    <div class="prose">
+      <ul>
+        <li><b>能力缺失不能编数。</b>NTC 没有湿度，返回 <code>0.0</code> 会被上层当成“湿度 0%”，触发加湿器满功率。必须用独立错误码，并且上层要能区分“不支持”和“读失败”。</li>
+        <li><b>适配器里不要加业务。</b>滤波、标定、单位转换之外的逻辑（比如“温度超 60 就报警”）不属于翻译层。塞进去之后，第二个适配器也得抄一遍，差异又回来了。</li>
+        <li><b>C 版布局是隐式契约。</b><code>base</code> 必须在结构体第一位；用 <code>_Static_assert(offsetof(sht_adapter_t, base) == 0)</code> 把它钉死。否则某次“优化对齐”就会让所有强转失效。</li>
+        <li><b>状态不能放静态变量。</b>两个 SHT3x 实例共用一个 ops 表是正常的，但如果适配器把 <code>t_x100</code> 存在文件级静态变量里，第二个传感器会把第一个的数据覆盖。状态永远跟着实例走。</li>
+        <li><b>init 失败要能上报。</b>C++ 版构造函数里 <code>drv_.init()</code> 的返回值被丢掉了；工程上要么在构造后单独 <code>begin()</code>，要么把失败状态存起来让第一次 <code>read()</code> 返回 <code>ok=false</code>。</li>
+        <li><b>适配器是单向的。</b>它让旧驱动满足新接口，不会反过来让新代码去迁就旧 API。两代 API 并存时，通常各配一个适配器，而不是做一个“万能转换”。</li>
+        <li><b>整数除法。</b>C 版 <code>t / 100.0f</code> 是对的，写成 <code>t / 100</code> 会把 23.6 变成 23 甚至 0（负数截断方向还不同）。这类错误在编译期没有任何提示。</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="ch-nav">
+      <a href="../index.html"><span>返回</span><b>← 全书目录</b></a>
+      <a class="nx" href="../p3/c02.html"><span>下一章</span><b>3.2 工厂模式 →</b></a>
+    </div>
+
+  
+</div>
+
+</div>
+
+<script src="../assets/pd.js"></script>
+<script src="../assets/dp-data.js"></script>
+<script src="../assets/dp-nav.js"></script>
+<script>dpNav('p3');</script>
+<script>
+(function () {
+  var mode = 'sht';
+  var tRaw = document.getElementById('tRaw');
+  var hRaw = document.getElementById('hRaw');
+  var adc = document.getElementById('adc');
+  var tVal = document.getElementById('tVal');
+  var hVal = document.getElementById('hVal');
+  var adcVal = document.getElementById('adcVal');
+  var out = document.getElementById('out');
+  var shtBox = document.getElementById('shtBox');
+  var ntcBox = document.getElementById('ntcBox');
+
+  function render() {
+    tVal.textContent = tRaw.value;
+    hVal.textContent = hRaw.value;
+    adcVal.textContent = adc.value;
+
+    if (mode === 'sht') {
+      var t = (+tRaw.value) / 100;
+      var h = (+hRaw.value) / 100;
+      out.innerHTML = 'SHT3x: temp=' + t.toFixed(1) + 'C hum=' + h.toFixed(1) + '%'
+        + '<br><em>read_temp / read_hum 各调一次 legacy_read，内部把 int 除 100</em>';
+    } else {
+      var temp = 25 + ((+adc.value) - 2048) * 0.05;
+      out.innerHTML = 'NTC  : temp=' + temp.toFixed(1) + 'C hum=&lt;不支持&gt;'
+        + '<br><em>read_hum 直接返回 -2：没有这个量，就不假装有</em>';
+    }
+  }
+
+  document.querySelectorAll('[data-s]').forEach(function (b) {
+    b.onclick = function () {
+      mode = b.dataset.s;
+      document.querySelectorAll('[data-s]').forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      shtBox.style.display = mode === 'sht' ? '' : 'none';
+      ntcBox.style.display = mode === 'ntc' ? '' : 'none';
+      render();
+    };
+  });
+
+  [tRaw, hRaw, adc].forEach(function (el) { el.oninput = render; });
+  render();
+})();
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+

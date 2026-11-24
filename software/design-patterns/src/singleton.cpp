@@ -1,33 +1,37 @@
-// 单例模式 · C++ 实现：Meyers singleton（C++11 起初始化线程安全）
-// 编译：g++ -std=c++17 -Wall -Wextra singleton.cpp -o singleton_cpp
+// 单例 · 全局配置
+// g++ -std=c++17 -Wall -Wextra singleton.cpp -o singleton_cpp
 #include <cstdio>
+#include <string>
 
 class Config {
 public:
     static Config& instance() {
-        static Config c;          // 局部静态：首次调用时构造，C++11 保证线程安全
-        return c;
+        static Config cfg;
+        return cfg;
     }
 
-    int timeout_ms = 500;
-    int log_level  = 2;
+    std::string theme = "light";
+    int font_size = 12;
 
-private:
-    Config() = default;
     Config(const Config&) = delete;
     Config& operator=(const Config&) = delete;
+
+private:
+    Config() { std::puts("  初始化配置（只发生一次）"); }
 };
 
-int main() {
+int main()
+{
     Config& a = Config::instance();
     Config& b = Config::instance();
     Config& c = Config::instance();
 
-    std::printf("三次取实例是同一个对象：%s\n", (&a == &b && &b == &c) ? "是" : "否");
+    std::printf("取三次实例：%p %p %p（同一个地址）\n",
+                static_cast<void*>(&a), static_cast<void*>(&b), static_cast<void*>(&c));
 
-    a.timeout_ms = 800;
-    std::printf("通过 a 改，通过 b 读：timeout=%d\n", b.timeout_ms);
-    std::printf("a 与 b 是同一块内存：%s\n", (&a == &b) ? "是" : "否");
-    // 拷贝构造已 delete：写 `Config copy = a;` 会在编译期失败，而不是运行时多一个实例
+    a.theme = "dark";
+    a.font_size = 16;
+    std::printf("通过 a 改成 %s/%d，通过 c 读：%s/%d\n",
+                a.theme.c_str(), a.font_size, c.theme.c_str(), c.font_size);
     return 0;
 }

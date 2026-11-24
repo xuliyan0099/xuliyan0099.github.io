@@ -1,7 +1,6 @@
-+ vehicle
-  + powertrain
-    - engine     PASS
-    - gearbox    FAIL
-  + chassis
-    - abs        PASS
-整车自检：FAIL
+[D] root
+  [D] src
+        a.c
+        b.c
+      README
+总大小 = 210 字节

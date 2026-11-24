@@ -1,5 +1,4 @@
-信号 1000 个，描述池 8 份
-sig[0]   unit=C    scale=1.0
-sig[7]   unit=deg  scale=1.7
-sig[999] unit=deg  scale=1.7
-指针相同：sig[0]==sig[8] -> yes
+1000 棵树，共享 2 份树型描述
+橡树 x=0 y=0 color=0x2E7D32
+松树 x=2997 y=4995 color=0x1B5E20
+每棵树只多存 2 个坐标，不复制颜色和名字

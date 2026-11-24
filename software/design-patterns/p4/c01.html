@@ -4,9 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>4.1 职责链模式 CHAIN OF RESPONSIBILITY · C 与 C++ 双实现</title>
-<meta name="description" content="职责链模式：C 与 C++ 双实现，含结构图、运行输出与可点演示。">
+<meta name="description" content="职责链：客服 FAQ → 技术支持 → 工程师，工单逐级升级。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
+<script src="../assets/dp-demo.js"></script>
 </head>
 <body>
 <div class="bg" aria-hidden="true"></div>
@@ -34,197 +35,220 @@
 
   <div class="wrap">
   <div class="ch-meta"><span class="lv">篇四 · 行为型</span><span class="sep">/</span>第 1 章<span class="sep">/</span>约 28 分钟</div>
-  <h1>组合模式<span class="en">COMPOSITE</span></h1>
-  <p class="lede">整车自检要遍历“整车 → 总成 → 零件”。如果枝和叶用两套接口，遍历代码就要在每一层判断“这是组还是零件”。<b>组合模式让枝和叶实现同一个接口</b>：组自己递归孩子，叶只报结果，调用方从根调一次就够。</p>
-  <div class="chips"><span class="chip ok">枝与叶同一接口</span><span class="chip">遍历只写一遍</span><span class="chip">增删子树不改调用方</span></div>
+  <h1>职责链模式<span class="en">CHAIN OF RESPONSIBILITY</span></h1>
+  <p class="lede">用户工单难度不同：改密码 FAQ 就能答，连不上要找技术支持，服务器 500 得工程师上。如果写成层层嵌套的 <code>if</code>，每加一级就再缩进一层。职责链把每一级串起来：<b>能处理就处理，处理不了就交给下一级</b>。</p>
+  <div class="chips"><span class="chip ok">逐级升级</span><span class="chip">链的顺序可配</span><span class="chip">C 用 next 指针 · C++ 用 unique_ptr 链</span></div>
 
   <section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：树形结构，遍历代码越写越像</h2>
+    <h2><span class="n">01</span>问题：坏代码长什么样</h2>
     
     
       <div class="prose">
-        <p>坏写法通常是两套结构 + 手写递归：</p>
-        <pre><code>if (node-&gt;is_group) {
-    for (child in node-&gt;children) run_group(child);
-} else {
-    run_leaf(node);
-}</code></pre>
-        <p>这行代码会在每个层级复制一遍，问题随之而来：</p>
-        <ul>
-          <li><b>层级一深就漏。</b>“总成里还有子总成”时，<code>run_group</code> 忘了递归，孙子节点永远不跑。</li>
-          <li><b>统计口径不一。</b>有的分支只算叶子，有的把组也算一项，最后总数对不上。</li>
-          <li><b>新增节点类型要改遍历。</b>加一个“虚拟节点”或“占位节点”，所有遍历函数都要动。</li>
-        </ul>
-        <p>组合把“遍历孩子”收进组自己：组的 <code>run()</code> 负责递归，叶的 <code>run()</code> 只报自己的结果。调用方只看到 <code>run(root)</code>。</p>
+        <p>坏写法是嵌套判断：</p>
+        <pre><code>if (level == 1) faq();
+else if (level == 2) tech();
+else if (level == 3) engineer();
+else printf("没人处理");</code></pre>
+        <p>每加一级就改这段；某一级想“先看情况再决定转不转”，<code>else if</code> 根本表达不了。</p>
+        <p>职责链把“判断”分散到各级：每级只回答“这事我管不管”，不管就 <code>next</code>。顺序改了只改接线。</p>
       </div>
   </section>
 
   <section class="sec" id="s2">
-    <h2><span class="n">02</span>结构：枝和叶同一接口</h2>
-    <p class="subh">三层树：整车是根，动力/底盘是枝，发动机、变速箱、ABS 是叶；点方框看每层职责。</p>
+    <h2><span class="n">02</span>结构：一条单向链，逐级升级</h2>
+    <p class="subh">左边是工单，中间三级处理者，右边是兜底工程师。</p>
     
   
     <div class="fig">
-      <div class="fig-h"><b>整车自检树：枝和叶同一接口</b><span>composite</span></div>
+      <div class="fig-h"><b>一条单向链，谁接谁负责</b><span>structure</span></div>
       <div class="diagram">
-<svg viewBox="0 0 880 360" role="img" aria-label="整车自检树：枝和叶同一接口">
+<svg viewBox="0 0 880 360" role="img" aria-label="一条单向链，谁接谁负责">
   <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
-  <g class="node" data-role="root" data-note="根只做一件事：把 depth 传给孩子，收集每个孩子的结果；它自己不判断零件好坏。"><rect x="350" y="34" width="180" height="72" rx="10"/><text class="nm" x="364" y="58">vehicle</text><text class="ty" x="364" y="77">组（根）</text><text class="mt" x="364" y="95">run(depth=0)</text></g>
-  <g class="node" data-role="power" data-note="总成是“组”：它递归两个孩子，任一失败就把失败往上抛。"><rect x="180" y="150" width="180" height="72" rx="10"/><text class="nm" x="194" y="174">powertrain</text><text class="ty" x="194" y="193">组</text><text class="mt" x="194" y="211">engine + gearbox</text></g>
-  <g class="node" data-role="chassis" data-note="同样是组，但只有一个孩子；组合不要求孩子数量一致。"><rect x="520" y="150" width="180" height="72" rx="10"/><text class="nm" x="534" y="174">chassis</text><text class="ty" x="534" y="193">组</text><text class="mt" x="534" y="211">abs</text></g>
-  <g class="node" data-role="eng" data-note="叶不递归，只返回自己的通过/失败；它不知道自己在树的第几层。"><rect x="60" y="268" width="150" height="64" rx="10"/><text class="nm" x="74" y="292">engine</text><text class="ty" x="74" y="311">叶</text><text class="mt" x="74" y="329">PASS</text></g>
-  <g class="node" data-role="gear" data-note="一个叶失败，整棵树的最终结果就是 FAIL；失败原因由调用方按路径定位。"><rect x="230" y="268" width="150" height="64" rx="10"/><text class="nm" x="244" y="292">gearbox</text><text class="ty" x="244" y="311">叶</text><text class="mt" x="244" y="329">FAIL</text></g>
-  <g class="node" data-role="abs" data-note="叶的接口与组完全一致，所以遍历代码不需要类型判断。"><rect x="520" y="268" width="150" height="64" rx="10"/><text class="nm" x="534" y="292">abs</text><text class="ty" x="534" y="311">叶</text><text class="mt" x="534" y="329">PASS</text></g>
-  <line x1="420" y1="106" x2="300" y2="150" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <line x1="470" y1="106" x2="580" y2="150" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <line x1="250" y1="222" x2="170" y2="268" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <line x1="310" y1="222" x2="310" y2="268" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <line x1="610" y1="222" x2="595" y2="268" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <g class="node" data-role="ticket" data-note="请求只带等级和描述，不指定处理人。"><rect x="24" y="140" width="150" height="76" rx="10"/><text class="nm" x="38" y="164">工单</text><text class="ty" x="38" y="183">请求</text><text class="mt" x="38" y="201">L1/L2/L3</text></g>
+  <g class="node" data-role="faq" data-note="FAQ 只处理最简单的；其余转下一级。"><rect x="250" y="56" width="190" height="74" rx="10"/><text class="nm" x="264" y="80">FAQ</text><text class="ty" x="264" y="99">第 1 级</text><text class="mt" x="264" y="117">level&lt;=1</text></g>
+  <g class="node" data-role="tech" data-note="技术支持接住 L2，再接不住就继续转。"><rect x="250" y="150" width="190" height="74" rx="10"/><text class="nm" x="264" y="174">技术支持</text><text class="ty" x="264" y="193">第 2 级</text><text class="mt" x="264" y="211">level&lt;=2</text></g>
+  <g class="node" data-role="eng" data-note="最后一级不再转，保证请求不会悬空。"><rect x="250" y="244" width="190" height="74" rx="10"/><text class="nm" x="264" y="268">工程师</text><text class="ty" x="264" y="287">兜底</text><text class="mt" x="264" y="305">全部都接</text></g>
+  <line x1="174" y1="178" x2="250" y2="93" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="440" y1="93" x2="250" y2="187" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="345.0" y="132.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">转</text>
+  <line x1="440" y1="187" x2="250" y2="281" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="345.0" y="226.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">转</text>
 </svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：组负责递归，叶负责报结果。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">每级只判断“我能不能”，不判断“后面还有谁”。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
-    <h2><span class="n">03</span>两份实现</h2>
+    <h2><span class="n">03</span>两份实现：C 与 C++</h2>
     
-    <p class='subh'>C 版用孩子数组 + 统一 <code>run_node()</code>；C++ 版用 <code>unique_ptr</code> 容器，析构自动递归。</p>
+    <p class='subh'>C 版处理者是结构体 + <code>next</code> 指针；C++ 版用 <code>unique_ptr</code> 串链，父节点持有子节点。</p>
       <div class="codecard">
-        <div class="ch"><span class="lang">C</span><span class="fn">composite.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 组合：一棵诊断树，叶子是零件，枝是分组，遍历代码只写一遍 */
+        <div class="ch"><span class="lang">C</span><span class="fn">chain.c</span><button class="copy">复制</button></div>
+        <pre><code>/* 职责链 · 客服逐级升级
+ * gcc -std=c11 -Wall -Wextra chain.c -o chain
+ */
 #include &lt;stdio.h&gt;
-#include &lt;stddef.h&gt;
 
-typedef struct node node_t;
-struct node {
+typedef struct handler handler_t;
+typedef int (*handle_fn)(int level, const char *msg);
+
+struct handler {
     const char *name;
-    int is_leaf;
-    int pass;
-    node_t *kids[4];
-    int nkids;
+    int max_level;
+    handle_fn fn;
+    handler_t *next;
 };
 
-static int run_node(const node_t *nd, int depth)
+static int faq(int level, const char *msg) {
+    if (level &lt;= 1) { printf("  FAQ：%s\n", msg); return 1; }
+    return 0;
+}
+static int tech(int level, const char *msg) {
+    if (level &lt;= 2) { printf("  技术支持：%s\n", msg); return 1; }
+    return 0;
+}
+static int engineer(int level, const char *msg) {
+    printf("  工程师：%s\n", msg); return 1; (void)level;
+}
+
+static void dispatch(handler_t *h, int level, const char *msg)
 {
-    for (int i = 0; i &lt; depth; i++) printf("  ");
-    if (nd-&gt;is_leaf) {
-        printf("- %-10s %s\n", nd-&gt;name, nd-&gt;pass ? "PASS" : "FAIL");
-        return nd-&gt;pass;
-    }
-    printf("+ %s\n", nd-&gt;name);
-    int ok = 1;
-    for (int i = 0; i &lt; nd-&gt;nkids; i++)
-        if (!run_node(nd-&gt;kids[i], depth + 1)) ok = 0;
-    return ok;
+    printf("工单 L%d「%s」\n", level, msg);
+    for (; h; h = h-&gt;next)
+        if (h-&gt;fn(level, msg)) { printf("  -&gt; %s 接手\n", h-&gt;name); return; }
+    printf("  没人处理\n");
 }
 
 int main(void)
 {
-    node_t eng  = { .name = "engine",  .is_leaf = 1, .pass = 1, .kids = {0}, .nkids = 0 };
-    node_t gear = { .name = "gearbox", .is_leaf = 1, .pass = 0, .kids = {0}, .nkids = 0 };
-    node_t abs  = { .name = "abs",     .is_leaf = 1, .pass = 1, .kids = {0}, .nkids = 0 };
-    node_t power = { .name = "powertrain", .is_leaf = 0, .pass = 0, .kids = { &amp;eng, &amp;gear }, .nkids = 2 };
-    node_t chassis = { .name = "chassis", .is_leaf = 0, .pass = 0, .kids = { &amp;abs }, .nkids = 1 };
-    node_t root = { .name = "vehicle", .is_leaf = 0, .pass = 0, .kids = { &amp;power, &amp;chassis }, .nkids = 2 };
+    handler_t eng  = { "工程师", 9, engineer, NULL };
+    handler_t techh= { "技术支持", 2, tech, &amp;eng };
+    handler_t faqh = { "FAQ", 1, faq, &amp;techh };
 
-    int ok = run_node(&amp;root, 0);
-    printf("整车自检：%s\n", ok ? "PASS" : "FAIL");
+    dispatch(&amp;faqh, 1, "怎么改密码");
+    dispatch(&amp;faqh, 2, "客户端连不上");
+    dispatch(&amp;faqh, 3, "服务器 500");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
-      <div class="ch"><b>RUN</b><span>./composite.exe</span></div>
-      <pre>+ vehicle
-  + powertrain
-    - engine     PASS
-    - gearbox    FAIL
-  + chassis
-    - abs        PASS
-整车自检：FAIL</pre>
+      <div class="ch"><b>RUN</b><span>./chain.exe</span></div>
+      <pre>工单 L1「怎么改密码」
+  FAQ：怎么改密码
+  -&gt; FAQ 接手
+工单 L2「客户端连不上」
+  技术支持：客户端连不上
+  -&gt; 技术支持 接手
+工单 L3「服务器 500」
+  工程师：服务器 500
+  -&gt; 工程师 接手</pre>
     </div>
       <div class="codecard">
-        <div class="ch"><span class="lang">C++</span><span class="fn">composite.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 组合 · C++：Group 持有 unique_ptr，析构自动递归
-// 编译：g++ -std=c++17 -Wall -Wextra composite.cpp -o composite_cpp
+        <div class="ch"><span class="lang">C++</span><span class="fn">chain.cpp</span><button class="copy">复制</button></div>
+        <pre><code>// 职责链 · 客服逐级升级
+// g++ -std=c++17 -Wall -Wextra chain.cpp -o chain_cpp
 #include &lt;cstdio&gt;
 #include &lt;memory&gt;
 #include &lt;string&gt;
-#include &lt;vector&gt;
 
-class Component {
+class Handler {
 public:
-    explicit Component(std::string name) : name_(std::move(name)) {}
-    virtual ~Component() = default;
-    virtual bool run(int depth) const = 0;
+    explicit Handler(std::string name, int maxLevel)
+        : name_(std::move(name)), maxLevel_(maxLevel) {}
+    virtual ~Handler() = default;
+
+    Handler&amp; setNext(std::unique_ptr&lt;Handler&gt; next) {
+        next_ = std::move(next);
+        return *next_;
+    }
+
+    void dispatch(int level, const std::string&amp; msg) {
+        std::printf("工单 L%d「%s」\n", level, msg.c_str());
+        Handler* h = this;
+        while (h) {
+            if (h-&gt;canHandle(level, msg)) {
+                std::printf("  -&gt; %s 接手\n", h-&gt;name_.c_str());
+                return;
+            }
+            h = h-&gt;next_.get();
+        }
+        std::puts("  没人处理");
+    }
+
 protected:
+    virtual bool canHandle(int level, const std::string&amp; msg) = 0;
     std::string name_;
+
+private:
+    int maxLevel_;
+    std::unique_ptr&lt;Handler&gt; next_;
 };
 
-class Leaf : public Component {
+class Faq final : public Handler {
 public:
-    Leaf(std::string n, bool pass) : Component(std::move(n)), pass_(pass) {}
-    bool run(int depth) const override
-    {
-        for (int i = 0; i &lt; depth; i++) std::printf("  ");
-        std::printf("- %-10s %s\n", name_.c_str(), pass_ ? "PASS" : "FAIL");
-        return pass_;
+    Faq() : Handler("FAQ", 1) {}
+protected:
+    bool canHandle(int level, const std::string&amp; msg) override {
+        if (level &lt;= 1) { std::printf("  FAQ：%s\n", msg.c_str()); return true; }
+        return false;
     }
-private:
-    bool pass_;
 };
 
-class Group : public Component {
+class Tech final : public Handler {
 public:
-    explicit Group(std::string n) : Component(std::move(n)) {}
-    Group &amp;add(std::unique_ptr&lt;Component&gt; c) { kids_.push_back(std::move(c)); return *this; }
-    bool run(int depth) const override
-    {
-        for (int i = 0; i &lt; depth; i++) std::printf("  ");
-        std::printf("+ %s\n", name_.c_str());
-        bool ok = true;
-        for (const auto &amp;c : kids_)
-            if (!c-&gt;run(depth + 1)) ok = false;
-        return ok;
+    Tech() : Handler("技术支持", 2) {}
+protected:
+    bool canHandle(int level, const std::string&amp; msg) override {
+        if (level &lt;= 2) { std::printf("  技术支持：%s\n", msg.c_str()); return true; }
+        return false;
     }
-private:
-    std::vector&lt;std::unique_ptr&lt;Component&gt;&gt; kids_;
+};
+
+class Engineer final : public Handler {
+public:
+    Engineer() : Handler("工程师", 9) {}
+protected:
+    bool canHandle(int level, const std::string&amp; msg) override {
+        (void)level;
+        std::printf("  工程师：%s\n", msg.c_str());
+        return true;
+    }
 };
 
 int main()
 {
-    auto root = std::make_unique&lt;Group&gt;("vehicle");
-    auto power = std::make_unique&lt;Group&gt;("powertrain");
-    power-&gt;add(std::make_unique&lt;Leaf&gt;("engine", true));
-    power-&gt;add(std::make_unique&lt;Leaf&gt;("gearbox", false));
-    root-&gt;add(std::move(power));
-    auto chassis = std::make_unique&lt;Group&gt;("chassis");
-    chassis-&gt;add(std::make_unique&lt;Leaf&gt;("abs", true));
-    root-&gt;add(std::move(chassis));
+    auto faq = std::make_unique&lt;Faq&gt;();
+    auto tech = std::make_unique&lt;Tech&gt;();
+    auto eng = std::make_unique&lt;Engineer&gt;();
+    faq-&gt;setNext(std::move(tech)).setNext(std::move(eng));
 
-    bool ok = root-&gt;run(0);
-    std::printf("整车自检：%s\n", ok ? "PASS" : "FAIL");
+    faq-&gt;dispatch(1, "怎么改密码");
+    faq-&gt;dispatch(2, "客户端连不上");
+    faq-&gt;dispatch(3, "服务器 500");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
-      <div class="ch"><b>RUN</b><span>./composite_cpp.exe</span></div>
-      <pre>+ vehicle
-  + powertrain
-    - engine     PASS
-    - gearbox    FAIL
-  + chassis
-    - abs        PASS
-整车自检：FAIL</pre>
+      <div class="ch"><b>RUN</b><span>./chain_cpp.exe</span></div>
+      <pre>工单 L1「怎么改密码」
+  FAQ：怎么改密码
+  -&gt; FAQ 接手
+工单 L2「客户端连不上」
+  技术支持：客户端连不上
+  -&gt; 技术支持 接手
+工单 L3「服务器 500」
+  工程师：服务器 500
+  -&gt; 工程师 接手</pre>
     </div>
   </section>
 
   <section class="sec" id="s4">
-    <h2><span class="n">04</span>自检树从根跑到叶</h2>
+    <h2><span class="n">04</span>运行与演示</h2>
     
     
 <div class="demo" id="demo">
-  <div class="demo-h"><b>自检树从根跑到叶</b><span>单步看递归顺序：先整车，再动力，最后到底盘。</span></div>
+  <div class="demo-h"><b>三张工单，看它停在哪一级</b><span>L1 改密码、L2 连不上、L3 服务器 500。</span></div>
   <div class="stage">
     <div class="dflow" id="dflow"></div>
     <div class="dbar" id="dbar">未开始</div>
@@ -238,18 +262,18 @@ int main()
     <div class="log" id="dlog"></div>
   </div>
 </div>
-<script>dpDemo({nodes:[{id:'root',label:'vehicle',sub:'组',note:''}, {id:'power',label:'powertrain',sub:'组',note:''}, {id:'eng',label:'engine',sub:'叶 PASS',note:''}, {id:'gear',label:'gearbox',sub:'叶 FAIL',note:''}, {id:'chassis',label:'chassis',sub:'组',note:''}, {id:'abs',label:'abs',sub:'叶 PASS',note:''}],steps:[{hi:['root'],t:'vehicle.run(0)：打印根，开始遍历孩子'}, {hi:['power'],t:'进入 powertrain：它是组，继续递归'}, {hi:['eng'],t:'engine 是叶：报 PASS，返回到 powertrain'}, {hi:['gear'],t:'gearbox 是叶：报 FAIL，powertrain 记为失败'}, {hi:['chassis'],t:'powertrain 返回后，进入 chassis'}, {hi:['abs'],t:'abs 是叶：报 PASS'}, {hi:['root', 'power'],t:'整车汇总：任一孩子失败 → FAIL，路径可定位到 gearbox'}]});</script>
+<script>dpDemo({nodes:[{id:'t',label:'工单',sub:'L1/L2/L3',note:''}, {id:'f',label:'FAQ',sub:'≤1',note:''}, {id:'tech',label:'技术支持',sub:'≤2',note:''}, {id:'eng',label:'工程师',sub:'兜底',note:''}],steps:[{hi:['t', 'f'],t:'L1「怎么改密码」→ FAQ 接住'}, {hi:['t', 'f', 'tech'],t:'L2「客户端连不上」→ FAQ 不管，转技术支持'}, {hi:['tech'],t:'技术支持接住 L2'}, {hi:['t', 'f', 'tech', 'eng'],t:'L3「服务器 500」→ 一路转下来'}, {hi:['eng'],t:'工程师兜底处理 L3'}]});</script>
 
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>C 与 C++：谁管孩子</h2>
+    <h2><span class="n">05</span>C 与 C++ 对照</h2>
     
     
     <div class="tbl">
       <table>
         <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
-        <tbody><tr><td>孩子容器</td><td><code>node_t *kids[4]</code></td><td><code>vector&lt;unique_ptr&lt;Component&gt;&gt;</code></td><td>C 固定上限；C++ 动态扩容且自动释放</td></tr><tr><td>统一接口</td><td>函数指针 <code>run_node</code></td><td>纯虚 <code>run()</code></td><td>都让枝和叶长得一样</td></tr><tr><td>遍历</td><td>组内部递归</td><td>组内部递归</td><td>调用方只调一次根</td></tr><tr><td>失败传播</td><td>返回 int，逐层与</td><td>返回 bool，逐层与</td><td>口径要统一，别有的层吞掉失败</td></tr><tr><td>增删子树</td><td>改数组 + nkids</td><td>push_back / erase</td><td>C 要手维护计数，C++ 容器代劳</td></tr></tbody>
+        <tbody><tr><td>链怎么接</td><td><code>handler.next</code> 指针</td><td><code>unique_ptr&lt;Handler&gt;</code></td><td>C 手动接，C++ 所有权随链</td></tr><tr><td>判断在哪</td><td>每级的 <code>handle_fn</code></td><td>每级的 <code>canHandle</code></td><td>都分散到各级</td></tr><tr><td>兜底</td><td>最后一级无条件处理</td><td>最后一级无条件处理</td><td>没有兜底就会丢请求</td></tr><tr><td>顺序调整</td><td>改 next 指向</td><td>改 setNext 调用</td><td>都不改各级实现</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -257,7 +281,7 @@ int main()
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     
-    <div class="prose"><ul><li><b>别在叶里访问父节点。</b>叶一旦反向依赖父节点，树就变成图，递归容易成环；需要上下文就通过参数往下传。</li><li><b>递归深度要设上限。</b>诊断树通常不深，但配置错误可能造出自引用；入口处限制 depth 或检测环。</li><li><b>组也可以是空组。</b>空组应明确返回“通过”还是“未配置”，别让 0 个孩子默默算 PASS 掩盖配置缺失。</li><li><b>C 版孩子数组要初始化。</b><code>kids</code> 未清零、<code>nkids</code> 又写大了，会读到野指针；统一用指定初始化器。</li><li><b>统计不要混层。</b>“通过率”按叶算还是按组算要写死；否则同一棵树两个报表两个数。</li></ul></div>
+    <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/chain-of-responsibility" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>链没有兜底</b>请求一路传到空指针还没人接，必须有一级无条件处理。</li><li><b>每级都处理又都转</b>同一请求被处理两次；要么处理后返回，要么只转不处理。</li><li><b>链成环</b>A→B→A 会死循环；构造时保证单向。</li></ul></div>
   </section>
   <div class="ch-nav" id="chNav"></div>
   </div>
@@ -266,7 +290,6 @@ int main()
 <script src="../assets/pd.js"></script>
 <script src="../assets/dp-data.js"></script>
 <script src="../assets/dp-nav.js"></script>
-<script src="../assets/dp-demo.js"></script>
 <script>dpNav('p4');</script>
 </body>
 </html>

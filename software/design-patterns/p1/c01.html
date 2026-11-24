@@ -18,6 +18,7 @@
   color:#8ff5d6;text-decoration:none;padding:7px 10px;border:1px solid rgba(67,214,168,.4);border-radius:8px;background:rgba(67,214,168,.08)}
 .rec-link:hover{background:rgba(67,214,168,.14)}
 </style>
+<script src="../assets/dp-demo.js"></script>
 </head>
 <body>
 <div class="bg" aria-hidden="true"></div>
@@ -90,7 +91,7 @@
     <h2><span class="n">03</span>经典出处与本节的取舍</h2>
     <div class="prose">
       <p>目录结构和“意图 / 问题 / 结构 / 代价”的讲法，沿用 <a href="https://refactoring.guru/design-patterns">Refactoring.Guru</a> 的设计模式目录；C++ 全 23 个模式的可运行示例在 GitHub：<a href="https://github.com/RefactoringGuru/design-patterns-cpp">RefactoringGuru/design-patterns-cpp</a>（每个模式都有 Conceptual 与 RealWorld 两套）。C 侧“用结构体 + 函数指针表实现封装、继承、多态”的原典是 Axel-Tobias Schreiner 的《Object-Oriented Programming with ANSI-C》，有 <a href="https://gitee.com/jiahelinyula/ooc">中文社区译本</a>。</p>
-      <p><b>本节的代码没有抄这些示例</b>：场景换成了车载/嵌入式语境（CAN 调度、ECU 状态机、报文过滤、驱动注册），每份源码都保留在 <code>src/</code> 目录，页面里的“运行结果”是实际跑出来的输出。C 版统一用静态存储 + 函数指针表，避免在示例里引入堆分配；C++ 版统一用 <code>unique_ptr</code> / <code>shared_ptr</code> 表达所有权。</p>
+      <p><b>本节的代码没有抄这些示例</b>：例子取自 Refactoring Guru 中文版与菜鸟教程的经典场景（物流、GUI、文件、聊天室、订单等），每份源码都保留在 <code>src/</code> 目录，页面里的“运行结果”是实际跑出来的输出。C 版统一用静态存储 + 函数指针表，避免在示例里引入堆分配；C++ 版统一用 <code>unique_ptr</code> / <code>shared_ptr</code> 表达所有权。</p>
       <p>一点提醒：模式是<b>事后命名</b>，不是事前套用。先写出能跑的直白版本，等第二、第三个调用方出现、结构开始重复时，再回来找名字。</p>
     </div>
   </section>
@@ -107,7 +108,6 @@
 <script src="../assets/pd.js"></script>
 <script src="../assets/dp-data.js"></script>
 <script src="../assets/dp-nav.js"></script>
-<script src="../assets/dp-demo.js"></script>
 <script>dpNav('p1');</script>
 <script>
 (function () {
@@ -171,6 +171,7 @@
 </script>
 </body>
 </html>
+
 
 
 

@@ -1,45 +1,49 @@
-// 享元 · C++：工厂缓存 shared_ptr，1000 个句柄只留 8 份对象
-// 编译：g++ -std=c++17 -Wall -Wextra flyweight.cpp -o flyweight_cpp
+// 享元 · 森林共享树型
+// g++ -std=c++17 -Wall -Wextra flyweight.cpp -o flyweight_cpp
 #include <cstdio>
-#include <map>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
-struct Signal {
-    std::string unit;
-    double scale;
+struct TreeType {
+    std::string name;
+    int leafColor;
 };
 
-class SignalFactory {
+class TreeFactory {
 public:
-    std::shared_ptr<const Signal> intern(const std::string &unit, double scale)
-    {
-        auto it = pool_.find(unit);
-        if (it != pool_.end()) return it->second;
-        auto s = std::make_shared<const Signal>(Signal{ unit, scale });
-        pool_.emplace(unit, s);
-        return s;
+    const TreeType& get(const std::string& name, int color) {
+        auto it = pool_.find(name);
+        if (it == pool_.end())
+            it = pool_.emplace(name, TreeType{name, color}).first;
+        return it->second;
     }
-    std::size_t size() const { return pool_.size(); }
 private:
-    std::map<std::string, std::shared_ptr<const Signal>> pool_;
+    std::unordered_map<std::string, TreeType> pool_;
+};
+
+struct Tree {
+    const TreeType* type;
+    int x, y;
 };
 
 int main()
 {
-    const std::string units[] = { "C", "kPa", "rpm", "%", "V", "A", "km/h", "deg" };
-    SignalFactory f;
-    std::vector<std::shared_ptr<const Signal>> signals;
-    signals.reserve(1000);
-    for (int i = 0; i < 1000; i++)
-        signals.push_back(f.intern(units[static_cast<size_t>(i) % 8], 1.0 + (i % 8) / 10.0));
+    TreeFactory factory;
+    std::vector<Tree> forest;
+    forest.reserve(1000);
+    for (int i = 0; i < 1000; i++) {
+        const auto& type = i % 2 ? factory.get("松树", 0x1B5E20)
+                                 : factory.get("橡树", 0x2E7D32);
+        forest.push_back(Tree{&type, i * 3, i * 5});
+    }
 
-    std::printf("信号 1000 个，描述池 %zu 份\n", f.size());
-    std::printf("sig[0]   unit=%-4s scale=%.1f use_count=%ld\n",
-                signals[0]->unit.c_str(), signals[0]->scale, signals[0].use_count());
-    std::printf("sig[999] unit=%-4s scale=%.1f\n",
-                signals[999]->unit.c_str(), signals[999]->scale);
-    std::printf("指针相同：sig[0]==sig[8] -> %s\n", signals[0] == signals[8] ? "yes" : "no");
+    std::printf("1000 棵树，共享 2 份树型描述\n");
+    std::printf("%s x=%d y=%d color=0x%06X\n",
+                forest[0].type->name.c_str(), forest[0].x, forest[0].y, forest[0].type->leafColor);
+    std::printf("%s x=%d y=%d color=0x%06X\n",
+                forest[999].type->name.c_str(), forest[999].x, forest[999].y, forest[999].type->leafColor);
+    std::puts("每棵树只多存 2 个坐标，不复制颜色和名字");
     return 0;
 }

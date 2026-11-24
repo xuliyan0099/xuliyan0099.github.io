@@ -1,7 +1,2 @@
--- family BOSCH --
-[CAN/BOSCH] 0x18FF50E5
-[NVRAM/BOSCH] save 7
--- family CONTI --
-[CAN/CONTI] 0x18FF50E5
-[NVRAM/CONTI] save 7
-family 数 2，零件组合 2 种
+浅色 界面：[ 浅色按钮 ]  [ ] 浅色复选框
+深色 界面：[ 深色按钮 ]  [x] 深色复选框

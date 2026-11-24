@@ -1,0 +1,5 @@
+create("truck") -> 卡车
+  卡车：陆运 200 箱
+create("ship") -> 轮船
+  轮船：海运 800 箱
+create("plane") -> 未知类型，返回 NULL

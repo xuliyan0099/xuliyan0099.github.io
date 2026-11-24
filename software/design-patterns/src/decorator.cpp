@@ -1,57 +1,46 @@
-// 装饰 · C++：unique_ptr 串起流水线，析构自动拆链
-// 编译：g++ -std=c++17 -Wall -Wextra decorator.cpp -o decorator_cpp
+// 装饰器 · 给文本加粗、加斜体
+// g++ -std=c++17 -Wall -Wextra decorator.cpp -o decorator_cpp
 #include <cstdio>
 #include <memory>
+#include <string>
 
-class Sensor {
+class Text {
 public:
-    virtual ~Sensor() = default;
-    virtual int read(int raw) const = 0;
+    virtual ~Text() = default;
+    virtual std::string render() const = 0;
 };
 
-class Raw : public Sensor {
+class Plain final : public Text {
 public:
-    int read(int raw) const override { return raw; }
-};
-
-class Offset : public Sensor {
-public:
-    Offset(std::unique_ptr<Sensor> in, int off) : in_(std::move(in)), off_(off) {}
-    int read(int raw) const override { return in_->read(raw) + off_; }
+    explicit Plain(std::string s) : s_(std::move(s)) {}
+    std::string render() const override { return s_; }
 private:
-    std::unique_ptr<Sensor> in_;
-    int off_;
+    std::string s_;
 };
 
-class Clamp : public Sensor {
+class Bold final : public Text {
 public:
-    Clamp(std::unique_ptr<Sensor> in, int hi) : in_(std::move(in)), hi_(hi) {}
-    int read(int raw) const override
-    {
-        int v = in_->read(raw);
-        if (v < 0) v = 0;
-        if (v > hi_) v = hi_;
-        return v;
-    }
+    explicit Bold(std::unique_ptr<Text> inner) : inner_(std::move(inner)) {}
+    std::string render() const override { return "<b>" + inner_->render() + "</b>"; }
 private:
-    std::unique_ptr<Sensor> in_;
-    int hi_;
+    std::unique_ptr<Text> inner_;
+};
+
+class Italic final : public Text {
+public:
+    explicit Italic(std::unique_ptr<Text> inner) : inner_(std::move(inner)) {}
+    std::string render() const override { return "<i>" + inner_->render() + "</i>"; }
+private:
+    std::unique_ptr<Text> inner_;
 };
 
 int main()
 {
-    auto raw = std::make_unique<Raw>();
-    auto off = std::make_unique<Offset>(std::make_unique<Raw>(), 5);
-    auto clamp = std::make_unique<Clamp>(
-        std::make_unique<Offset>(std::make_unique<Raw>(), 5), 40);
-
-    std::printf("raw       = %d\n", raw->read(42));
-    std::printf("+offset5  = %d\n", off->read(42));
-    std::printf("+clamp40  = %d\n", clamp->read(42));
-
-    auto neg = std::make_unique<Clamp>(
-        std::make_unique<Offset>(std::make_unique<Raw>(), -60), 40);
-    std::printf("负值路径  = %d\n", neg->read(42));
-    std::printf("三层顺序：raw -> offset -> clamp，换顺序结果会变\n");
+    std::printf("原始：%s\n", Plain("hello").render().c_str());
+    std::printf("加粗：%s\n", Bold(std::make_unique<Plain>("hello")).render().c_str());
+    std::printf("加粗+斜体：%s\n",
+                Italic(std::make_unique<Bold>(std::make_unique<Plain>("hello"))).render().c_str());
+    std::printf("顺序反过来：%s\n",
+                Bold(std::make_unique<Italic>(std::make_unique<Plain>("hello"))).render().c_str());
     return 0;
 }

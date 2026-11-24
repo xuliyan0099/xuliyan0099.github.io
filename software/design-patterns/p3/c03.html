@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>3.3 组合模式 COMPOSITE · C 与 C++ 双实现</title>
-<meta name="description" content="组合：整车、总成、零件组成一棵树，同一套 run() 从根遍历到叶。">
+<meta name="description" content="组合：文件与文件夹共用一套接口，目录树可以整棵遍历、整棵统计。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
 <script src="../assets/dp-demo.js"></script>
@@ -36,196 +36,183 @@
   <div class="wrap">
   <div class="ch-meta"><span class="lv">篇三 · 结构型</span><span class="sep">/</span>第 3 章<span class="sep">/</span>约 28 分钟</div>
   <h1>组合模式<span class="en">COMPOSITE</span></h1>
-  <p class="lede">整车自检要遍历“整车 → 总成 → 零件”。如果枝和叶用两套接口，遍历代码就要在每一层判断“这是组还是零件”。<b>组合模式让枝和叶实现同一个接口</b>：组自己递归孩子，叶只报结果，调用方从根调一次就够。</p>
-  <div class="chips"><span class="chip ok">枝与叶同一接口</span><span class="chip">遍历只写一遍</span><span class="chip">增删子树不改调用方</span></div>
+  <p class="lede">资源管理器里，文件夹可以装文件，也可以装文件夹。如果“遍历”只认文件夹、“统计”只认文件，调用方就得一路判断类型。组合模式让<b>枝和叶实现同一个接口</b>：对整棵树调用一次，内部自己递归。</p>
+  <div class="chips"><span class="chip ok">枝与叶同接口</span><span class="chip">递归收敛在一处</span><span class="chip">C 用 is_dir 标记 · C++ 用虚函数</span></div>
 
   <section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：树形结构，遍历代码越写越像</h2>
+    <h2><span class="n">01</span>问题：坏代码长什么样</h2>
     
     
       <div class="prose">
-        <p>坏写法通常是两套结构 + 手写递归：</p>
-        <pre><code>if (node-&gt;is_group) {
-    for (child in node-&gt;children) run_group(child);
-} else {
-    run_leaf(node);
-}</code></pre>
-        <p>这行代码会在每个层级复制一遍，问题随之而来：</p>
-        <ul>
-          <li><b>层级一深就漏。</b>“总成里还有子总成”时，<code>run_group</code> 忘了递归，孙子节点永远不跑。</li>
-          <li><b>统计口径不一。</b>有的分支只算叶子，有的把组也算一项，最后总数对不上。</li>
-          <li><b>新增节点类型要改遍历。</b>加一个“虚拟节点”或“占位节点”，所有遍历函数都要动。</li>
-        </ul>
-        <p>组合把“遍历孩子”收进组自己：组的 <code>run()</code> 负责递归，叶的 <code>run()</code> 只报自己的结果。调用方只看到 <code>run(root)</code>。</p>
+        <p>坏写法是调用方自己分类型递归：</p>
+        <pre><code>if (node-&gt;is_dir)
+    for (each kid) total(kid);
+else
+    sum += node-&gt;size;</code></pre>
+        <p>这段逻辑会在“统计大小”“查找文件”“生成树形图”里各抄一遍，而且每处都要记得处理空目录。</p>
+        <p>组合把 <code>total()</code> 放到节点自己身上：目录的 <code>total</code> 累加孩子，文件的 <code>total</code> 返回自身大小。调用方只写 <code>total(root)</code>。</p>
       </div>
   </section>
 
   <section class="sec" id="s2">
-    <h2><span class="n">02</span>结构：枝和叶同一接口</h2>
-    <p class="subh">三层树：整车是根，动力/底盘是枝，发动机、变速箱、ABS 是叶；点方框看每层职责。</p>
+    <h2><span class="n">02</span>结构：枝递归、叶终止</h2>
+    <p class="subh">左边是调用方，中间是目录节点，右边是文件叶子。</p>
     
   
     <div class="fig">
-      <div class="fig-h"><b>整车自检树：枝和叶同一接口</b><span>composite</span></div>
+      <div class="fig-h"><b>目录递归孩子，文件返回自身</b><span>structure</span></div>
       <div class="diagram">
-<svg viewBox="0 0 880 360" role="img" aria-label="整车自检树：枝和叶同一接口">
+<svg viewBox="0 0 880 360" role="img" aria-label="目录递归孩子，文件返回自身">
   <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
-  <g class="node" data-role="root" data-note="根只做一件事：把 depth 传给孩子，收集每个孩子的结果；它自己不判断零件好坏。"><rect x="350" y="34" width="180" height="72" rx="10"/><text class="nm" x="364" y="58">vehicle</text><text class="ty" x="364" y="77">组（根）</text><text class="mt" x="364" y="95">run(depth=0)</text></g>
-  <g class="node" data-role="power" data-note="总成是“组”：它递归两个孩子，任一失败就把失败往上抛。"><rect x="180" y="150" width="180" height="72" rx="10"/><text class="nm" x="194" y="174">powertrain</text><text class="ty" x="194" y="193">组</text><text class="mt" x="194" y="211">engine + gearbox</text></g>
-  <g class="node" data-role="chassis" data-note="同样是组，但只有一个孩子；组合不要求孩子数量一致。"><rect x="520" y="150" width="180" height="72" rx="10"/><text class="nm" x="534" y="174">chassis</text><text class="ty" x="534" y="193">组</text><text class="mt" x="534" y="211">abs</text></g>
-  <g class="node" data-role="eng" data-note="叶不递归，只返回自己的通过/失败；它不知道自己在树的第几层。"><rect x="60" y="268" width="150" height="64" rx="10"/><text class="nm" x="74" y="292">engine</text><text class="ty" x="74" y="311">叶</text><text class="mt" x="74" y="329">PASS</text></g>
-  <g class="node" data-role="gear" data-note="一个叶失败，整棵树的最终结果就是 FAIL；失败原因由调用方按路径定位。"><rect x="230" y="268" width="150" height="64" rx="10"/><text class="nm" x="244" y="292">gearbox</text><text class="ty" x="244" y="311">叶</text><text class="mt" x="244" y="329">FAIL</text></g>
-  <g class="node" data-role="abs" data-note="叶的接口与组完全一致，所以遍历代码不需要类型判断。"><rect x="520" y="268" width="150" height="64" rx="10"/><text class="nm" x="534" y="292">abs</text><text class="ty" x="534" y="311">叶</text><text class="mt" x="534" y="329">PASS</text></g>
-  <line x1="420" y1="106" x2="300" y2="150" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <line x1="470" y1="106" x2="580" y2="150" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <line x1="250" y1="222" x2="170" y2="268" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <line x1="310" y1="222" x2="310" y2="268" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <line x1="610" y1="222" x2="595" y2="268" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <g class="node" data-role="client" data-note="调用方只拿根节点，不再判断类型。"><rect x="24" y="140" width="150" height="76" rx="10"/><text class="nm" x="38" y="164">调用方</text><text class="ty" x="38" y="183">统计 / 查找</text><text class="mt" x="38" y="201">total(root)</text></g>
+  <g class="node" data-role="dir" data-note="目录负责递归孩子；空目录返回 0。"><rect x="250" y="140" width="190" height="84" rx="10"/><text class="nm" x="264" y="164">Dir</text><text class="ty" x="264" y="183">枝节点</text><text class="mt" x="264" y="201">total() = Σ kids</text></g>
+  <g class="node" data-role="file" data-note="文件没有孩子，直接返回自己的大小。"><rect x="520" y="56" width="190" height="74" rx="10"/><text class="nm" x="534" y="80">File</text><text class="ty" x="534" y="99">叶节点</text><text class="mt" x="534" y="117">total() = size</text></g>
+  <g class="node" data-role="tree" data-note="同一接口可以套在任意深度上。"><rect x="520" y="212" width="190" height="74" rx="10"/><text class="nm" x="534" y="236">root/src/a.c</text><text class="ty" x="534" y="255">实际树</text><text class="mt" x="534" y="273">210 字节</text></g>
+  <line x1="174" y1="178" x2="250" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="212.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">调用</text>
+  <line x1="440" y1="160" x2="520" y2="100" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="122.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">递归到文件</text>
+  <line x1="440" y1="200" x2="520" y2="242" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="213.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">向上汇总</text>
 </svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：组负责递归，叶负责报结果。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">枝负责“继续往下”，叶负责“到此为止”。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
-    <h2><span class="n">03</span>两份实现</h2>
+    <h2><span class="n">03</span>两份实现：C 与 C++</h2>
     
-    <p class='subh'>C 版用孩子数组 + 统一 <code>run_node()</code>；C++ 版用 <code>unique_ptr</code> 容器，析构自动递归。</p>
+    <p class='subh'>C 版用 <code>is_dir</code> 标记区分枝与叶，孩子数组固定容量；C++ 版用虚函数和多态容器。</p>
       <div class="codecard">
         <div class="ch"><span class="lang">C</span><span class="fn">composite.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 组合：一棵诊断树，叶子是零件，枝是分组，遍历代码只写一遍 */
+        <pre><code>/* 组合 · 文件与文件夹
+ * gcc -std=c11 -Wall -Wextra composite.c -o composite
+ */
 #include &lt;stdio.h&gt;
-#include &lt;stddef.h&gt;
+#include &lt;string.h&gt;
 
 typedef struct node node_t;
 struct node {
-    const char *name;
-    int is_leaf;
-    int pass;
+    char name[16];
+    int  is_dir;
+    int  size;                 /* 文件大小；目录忽略 */
     node_t *kids[4];
-    int nkids;
+    int  nkids;
 };
 
-static int run_node(const node_t *nd, int depth)
+static node_t *add(node_t *dir, node_t *kid)
+{
+    if (dir-&gt;nkids &lt; 4) dir-&gt;kids[dir-&gt;nkids++] = kid;
+    return dir;
+}
+
+static int total(const node_t *n)
+{
+    if (!n-&gt;is_dir) return n-&gt;size;
+    int sum = 0;
+    for (int i = 0; i &lt; n-&gt;nkids; i++) sum += total(n-&gt;kids[i]);
+    return sum;
+}
+
+static void list(const node_t *n, int depth)
 {
     for (int i = 0; i &lt; depth; i++) printf("  ");
-    if (nd-&gt;is_leaf) {
-        printf("- %-10s %s\n", nd-&gt;name, nd-&gt;pass ? "PASS" : "FAIL");
-        return nd-&gt;pass;
-    }
-    printf("+ %s\n", nd-&gt;name);
-    int ok = 1;
-    for (int i = 0; i &lt; nd-&gt;nkids; i++)
-        if (!run_node(nd-&gt;kids[i], depth + 1)) ok = 0;
-    return ok;
+    printf("%s%s\n", n-&gt;is_dir ? "[D] " : "    ", n-&gt;name);
+    if (n-&gt;is_dir)
+        for (int i = 0; i &lt; n-&gt;nkids; i++) list(n-&gt;kids[i], depth + 1);
 }
 
 int main(void)
 {
-    node_t eng  = { .name = "engine",  .is_leaf = 1, .pass = 1, .kids = {0}, .nkids = 0 };
-    node_t gear = { .name = "gearbox", .is_leaf = 1, .pass = 0, .kids = {0}, .nkids = 0 };
-    node_t abs  = { .name = "abs",     .is_leaf = 1, .pass = 1, .kids = {0}, .nkids = 0 };
-    node_t power = { .name = "powertrain", .is_leaf = 0, .pass = 0, .kids = { &amp;eng, &amp;gear }, .nkids = 2 };
-    node_t chassis = { .name = "chassis", .is_leaf = 0, .pass = 0, .kids = { &amp;abs }, .nkids = 1 };
-    node_t root = { .name = "vehicle", .is_leaf = 0, .pass = 0, .kids = { &amp;power, &amp;chassis }, .nkids = 2 };
+    node_t root = { "root", 1, 0, { 0 }, 0 };
+    node_t src  = { "src",  1, 0, { 0 }, 0 };
+    node_t a    = { "a.c",  0, 120, { 0 }, 0 };
+    node_t b    = { "b.c",  0, 80,  { 0 }, 0 };
+    node_t read = { "README", 0, 10, { 0 }, 0 };
 
-    int ok = run_node(&amp;root, 0);
-    printf("整车自检：%s\n", ok ? "PASS" : "FAIL");
+    add(&amp;src, &amp;a); add(&amp;src, &amp;b);
+    add(&amp;root, &amp;src); add(&amp;root, &amp;read);
+
+    list(&amp;root, 0);
+    printf("总大小 = %d 字节\n", total(&amp;root));
     return 0;
 }</code></pre>
       </div>
     <div class="run">
       <div class="ch"><b>RUN</b><span>./composite.exe</span></div>
-      <pre>+ vehicle
-  + powertrain
-    - engine     PASS
-    - gearbox    FAIL
-  + chassis
-    - abs        PASS
-整车自检：FAIL</pre>
+      <pre>[D] root
+  [D] src
+        a.c
+        b.c
+      README
+总大小 = 210 字节</pre>
     </div>
       <div class="codecard">
         <div class="ch"><span class="lang">C++</span><span class="fn">composite.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 组合 · C++：Group 持有 unique_ptr，析构自动递归
-// 编译：g++ -std=c++17 -Wall -Wextra composite.cpp -o composite_cpp
+        <pre><code>// 组合 · 文件与文件夹
+// g++ -std=c++17 -Wall -Wextra composite.cpp -o composite_cpp
 #include &lt;cstdio&gt;
 #include &lt;memory&gt;
 #include &lt;string&gt;
 #include &lt;vector&gt;
 
-class Component {
+class Node {
 public:
-    explicit Component(std::string name) : name_(std::move(name)) {}
-    virtual ~Component() = default;
-    virtual bool run(int depth) const = 0;
-protected:
+    Node(std::string name, bool dir, int size = 0)
+        : name_(std::move(name)), dir_(dir), size_(size) {}
+    virtual ~Node() = default;
+
+    void add(std::unique_ptr&lt;Node&gt; kid) { kids_.push_back(std::move(kid)); }
+    int total() const {
+        if (!dir_) return size_;
+        int sum = 0;
+        for (const auto&amp; k : kids_) sum += k-&gt;total();
+        return sum;
+    }
+    void list(int depth = 0) const {
+        for (int i = 0; i &lt; depth; i++) std::printf("  ");
+        std::printf("%s%s\n", dir_ ? "[D] " : "    ", name_.c_str());
+        for (const auto&amp; k : kids_) k-&gt;list(depth + 1);
+    }
+private:
     std::string name_;
-};
-
-class Leaf : public Component {
-public:
-    Leaf(std::string n, bool pass) : Component(std::move(n)), pass_(pass) {}
-    bool run(int depth) const override
-    {
-        for (int i = 0; i &lt; depth; i++) std::printf("  ");
-        std::printf("- %-10s %s\n", name_.c_str(), pass_ ? "PASS" : "FAIL");
-        return pass_;
-    }
-private:
-    bool pass_;
-};
-
-class Group : public Component {
-public:
-    explicit Group(std::string n) : Component(std::move(n)) {}
-    Group &amp;add(std::unique_ptr&lt;Component&gt; c) { kids_.push_back(std::move(c)); return *this; }
-    bool run(int depth) const override
-    {
-        for (int i = 0; i &lt; depth; i++) std::printf("  ");
-        std::printf("+ %s\n", name_.c_str());
-        bool ok = true;
-        for (const auto &amp;c : kids_)
-            if (!c-&gt;run(depth + 1)) ok = false;
-        return ok;
-    }
-private:
-    std::vector&lt;std::unique_ptr&lt;Component&gt;&gt; kids_;
+    bool dir_;
+    int size_;
+    std::vector&lt;std::unique_ptr&lt;Node&gt;&gt; kids_;
 };
 
 int main()
 {
-    auto root = std::make_unique&lt;Group&gt;("vehicle");
-    auto power = std::make_unique&lt;Group&gt;("powertrain");
-    power-&gt;add(std::make_unique&lt;Leaf&gt;("engine", true));
-    power-&gt;add(std::make_unique&lt;Leaf&gt;("gearbox", false));
-    root-&gt;add(std::move(power));
-    auto chassis = std::make_unique&lt;Group&gt;("chassis");
-    chassis-&gt;add(std::make_unique&lt;Leaf&gt;("abs", true));
-    root-&gt;add(std::move(chassis));
+    auto root = std::make_unique&lt;Node&gt;("root", true);
+    auto src = std::make_unique&lt;Node&gt;("src", true);
+    src-&gt;add(std::make_unique&lt;Node&gt;("a.c", false, 120));
+    src-&gt;add(std::make_unique&lt;Node&gt;("b.c", false, 80));
+    root-&gt;add(std::move(src));
+    root-&gt;add(std::make_unique&lt;Node&gt;("README", false, 10));
 
-    bool ok = root-&gt;run(0);
-    std::printf("整车自检：%s\n", ok ? "PASS" : "FAIL");
+    root-&gt;list();
+    std::printf("总大小 = %d 字节\n", root-&gt;total());
     return 0;
 }</code></pre>
       </div>
     <div class="run">
       <div class="ch"><b>RUN</b><span>./composite_cpp.exe</span></div>
-      <pre>+ vehicle
-  + powertrain
-    - engine     PASS
-    - gearbox    FAIL
-  + chassis
-    - abs        PASS
-整车自检：FAIL</pre>
+      <pre>[D] root
+  [D] src
+        a.c
+        b.c
+      README
+总大小 = 210 字节</pre>
     </div>
   </section>
 
   <section class="sec" id="s4">
-    <h2><span class="n">04</span>自检树从根跑到叶</h2>
+    <h2><span class="n">04</span>运行与演示</h2>
     
     
 <div class="demo" id="demo">
-  <div class="demo-h"><b>自检树从根跑到叶</b><span>单步看递归顺序：先整车，再动力，最后到底盘。</span></div>
+  <div class="demo-h"><b>从 root 跑到叶子，再汇总回来</b><span>root 下有 src 目录和 README，src 下有 a.c、b.c。</span></div>
   <div class="stage">
     <div class="dflow" id="dflow"></div>
     <div class="dbar" id="dbar">未开始</div>
@@ -239,18 +226,18 @@ int main()
     <div class="log" id="dlog"></div>
   </div>
 </div>
-<script>dpDemo({nodes:[{id:'root',label:'vehicle',sub:'组',note:''}, {id:'power',label:'powertrain',sub:'组',note:''}, {id:'eng',label:'engine',sub:'叶 PASS',note:''}, {id:'gear',label:'gearbox',sub:'叶 FAIL',note:''}, {id:'chassis',label:'chassis',sub:'组',note:''}, {id:'abs',label:'abs',sub:'叶 PASS',note:''}],steps:[{hi:['root'],t:'vehicle.run(0)：打印根，开始遍历孩子'}, {hi:['power'],t:'进入 powertrain：它是组，继续递归'}, {hi:['eng'],t:'engine 是叶：报 PASS，返回到 powertrain'}, {hi:['gear'],t:'gearbox 是叶：报 FAIL，powertrain 记为失败'}, {hi:['chassis'],t:'powertrain 返回后，进入 chassis'}, {hi:['abs'],t:'abs 是叶：报 PASS'}, {hi:['root', 'power'],t:'整车汇总：任一孩子失败 → FAIL，路径可定位到 gearbox'}]});</script>
+<script>dpDemo({nodes:[{id:'root',label:'root',sub:'目录',note:''}, {id:'src',label:'src',sub:'目录',note:''}, {id:'a',label:'a.c',sub:'120B',note:''}, {id:'b',label:'b.c',sub:'80B',note:''}, {id:'r',label:'README',sub:'10B',note:''}],steps:[{hi:['root', 'src'],t:'root.total 进入 src'}, {hi:['src', 'a'],t:'src 累加 a.c：120'}, {hi:['src', 'b'],t:'src 累加 b.c：200'}, {hi:['root', 'r'],t:'回到 root，累加 README：210'}, {hi:['root'],t:'root.total 返回 210 字节'}]});</script>
 
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>C 与 C++：谁管孩子</h2>
+    <h2><span class="n">05</span>C 与 C++ 对照</h2>
     
     
     <div class="tbl">
       <table>
         <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
-        <tbody><tr><td>孩子容器</td><td><code>node_t *kids[4]</code></td><td><code>vector&lt;unique_ptr&lt;Component&gt;&gt;</code></td><td>C 固定上限；C++ 动态扩容且自动释放</td></tr><tr><td>统一接口</td><td>函数指针 <code>run_node</code></td><td>纯虚 <code>run()</code></td><td>都让枝和叶长得一样</td></tr><tr><td>遍历</td><td>组内部递归</td><td>组内部递归</td><td>调用方只调一次根</td></tr><tr><td>失败传播</td><td>返回 int，逐层与</td><td>返回 bool，逐层与</td><td>口径要统一，别有的层吞掉失败</td></tr><tr><td>增删子树</td><td>改数组 + nkids</td><td>push_back / erase</td><td>C 要手维护计数，C++ 容器代劳</td></tr></tbody>
+        <tbody><tr><td>枝与叶怎么分</td><td><code>is_dir</code> 字段</td><td>不同子类 + 虚函数</td><td>C 靠标记，C++ 靠类型</td></tr><tr><td>递归在哪</td><td>节点的 <code>total()</code> 里</td><td>节点的 <code>total()</code> 里</td><td>都不在调用方</td></tr><tr><td>孩子容量</td><td>固定数组 4 个</td><td><code>vector&lt;unique_ptr&gt;</code></td><td>C 版示例简化，真实实现要动态</td></tr><tr><td>空目录</td><td>返回 0</td><td>返回 0</td><td>必须显式处理，别返回未初始化值</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -258,7 +245,7 @@ int main()
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     
-    <div class="prose"><ul><li><b>别在叶里访问父节点。</b>叶一旦反向依赖父节点，树就变成图，递归容易成环；需要上下文就通过参数往下传。</li><li><b>递归深度要设上限。</b>诊断树通常不深，但配置错误可能造出自引用；入口处限制 depth 或检测环。</li><li><b>组也可以是空组。</b>空组应明确返回“通过”还是“未配置”，别让 0 个孩子默默算 PASS 掩盖配置缺失。</li><li><b>C 版孩子数组要初始化。</b><code>kids</code> 未清零、<code>nkids</code> 又写大了，会读到野指针；统一用指定初始化器。</li><li><b>统计不要混层。</b>“通过率”按叶算还是按组算要写死；否则同一棵树两个报表两个数。</li></ul></div>
+    <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/composite" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>枝和叶接口不一致</b>一旦调用方要 <code>if (is_dir)</code>，组合就失效了。</li><li><b>递归没有终止条件</b>叶节点必须明确“没有孩子”，否则空指针递归。</li><li><b>父节点持有孩子又共享所有权</b>C++ 用 <code>unique_ptr</code> 明确父子；需要共享时再谈引用计数。</li></ul></div>
   </section>
   <div class="ch-nav" id="chNav"></div>
   </div>

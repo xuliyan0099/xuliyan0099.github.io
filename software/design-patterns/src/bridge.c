@@ -1,50 +1,45 @@
-/* 桥接：协议和物理层各管各的，四种组合靠两张表拼出来 */
+/* 桥接 · 形状 × 渲染器
+ * gcc -std=c11 -Wall -Wextra bridge.c -o bridge
+ */
 #include <stdio.h>
-#include <string.h>
 
-typedef struct { const char *name; void (*send)(const char *frame); } link_t;
-
-static void can_send(const char *f) { printf("[CAN ] %s\n", f); }
-static void lin_send(const char *f) { printf("[LIN ] %s\n", f); }
-
-static const link_t LINKS[] = {
-    { "CAN", can_send },
-    { "LIN", lin_send },
-};
-
-typedef struct proto proto_t;
-struct proto {
+typedef struct renderer renderer_t;
+struct renderer {
     const char *name;
-    const link_t *link;
-    void (*request)(const proto_t *self, const char *svc);
+    void (*circle)(renderer_t *, int);
+    void (*square)(renderer_t *, int);
 };
 
-static void uds_request(const proto_t *self, const char *svc)
+typedef struct {
+    const char *name;
+    int size;
+    const renderer_t *r;
+} shape_t;
+
+static void shape_draw(const shape_t *s)
 {
-    char buf[64];
-    snprintf(buf, sizeof buf, "UDS %s -> %s", svc, self->link->name);
-    self->link->send(buf);
+    printf("[%s] %s size=%d -> ", s->r->name, s->name, s->size);
+    if (s->name[0] == 'C') s->r->circle((renderer_t *)s->r, s->size);
+    else                   s->r->square((renderer_t *)s->r, s->size);
 }
-static void obd_request(const proto_t *self, const char *svc)
-{
-    char buf[64];
-    snprintf(buf, sizeof buf, "OBD %s -> %s", svc, self->link->name);
-    self->link->send(buf);
-}
+
+static void vector_circle(renderer_t *r, int s) { (void)r; printf("矢量圆 r=%d\n", s); }
+static void vector_square(renderer_t *r, int s) { (void)r; printf("矢量方 w=%d\n", s); }
+static renderer_t VECTOR = { "矢量", vector_circle, vector_square };
+
+static void raster_circle(renderer_t *r, int s) { (void)r; printf("位图圆 半径 %dpx\n", s); }
+static void raster_square(renderer_t *r, int s) { (void)r; printf("位图方 边长 %dpx\n", s); }
+static renderer_t RASTER = { "位图", raster_circle, raster_square };
 
 int main(void)
 {
-    proto_t uds = { "UDS", &LINKS[0], uds_request };
-    proto_t obd = { "OBD", &LINKS[1], obd_request };
-
-    const proto_t *protos[] = { &uds, &obd };
-    for (size_t i = 0; i < sizeof protos / sizeof protos[0]; i++)
-        for (size_t k = 0; k < sizeof LINKS / sizeof LINKS[0]; k++) {
-            proto_t p = *protos[i];
-            p.link = &LINKS[k];
-            printf("-- %s over %s --\n", p.name, p.link->name);
-            p.request(&p, "0x22F190");
-        }
-    printf("协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧\n");
+    shape_t shapes[] = {
+        { "Circle", 5, &VECTOR },
+        { "Square", 5, &VECTOR },
+        { "Circle", 5, &RASTER },
+        { "Square", 5, &RASTER },
+    };
+    for (unsigned i = 0; i < 4; i++) shape_draw(&shapes[i]);
+    printf("2 种形状 × 2 种渲染器 = 4 种组合，没有 4 个子类\n");
     return 0;
 }

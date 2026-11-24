@@ -91,6 +91,27 @@ PARTS = [
     },
 ]
 
+from content_a import C as _CA
+from content_b import C as _CB
+from content_c import C as _CC
+CONTENT = {}
+CONTENT.update(_CA); CONTENT.update(_CB); CONTENT.update(_CC)
+
+_SUB = {
+ "2.1": "工厂按名字造产品", "2.2": "一族控件成套交付", "2.3": "四步施工再校验", "2.4": "克隆出独立副本", "2.5": "一个入口一份配置",
+ "3.1": "方钉塞进圆孔", "3.2": "形状与渲染器解耦", "3.3": "枝与叶同一接口", "3.4": "一层只加一件事", "3.5": "一键开关家庭影院", "3.6": "一千棵树两份树型", "3.7": "缓存挡在磁盘前",
+ "4.1": "客服逐级升级", "4.2": "编辑与撤销成对", "4.3": "表达式变成树", "4.4": "只暴露 next", "4.5": "消息经房间转发", "4.6": "改坏了退回快照", "4.7": "气温发布与订阅", "4.8": "非法状态转移被拒", "4.9": "排序算法即参数", "4.10": "骨架固定三步可换", "4.11": "统计搬出节点",
+}
+_SEC2 = {
+ "2.1": "结构：客户端、工厂、两个产品", "2.2": "结构：一次交付整族控件", "2.3": "结构：步骤显式、交付前校验", "2.4": "结构：原型登记，用时克隆", "2.5": "结构：唯一入口与唯一实例",
+ "3.1": "结构：旧接口、适配器、新零件", "3.2": "结构：两维各自抽象，一条引用", "3.3": "结构：枝递归、叶终止", "3.4": "结构：一层只包一对标签", "3.5": "结构：一个入口编排子系统", "3.6": "结构：共享内部状态，外部状态随行", "3.7": "结构：代理挡在真实对象前",
+ "4.1": "结构：一条单向链，逐级升级", "4.2": "结构：调用者、命令、接收者", "4.3": "结构：运算符是节点，数字是叶子", "4.4": "结构：游标 + next", "4.5": "结构：所有消息穿过房间", "4.6": "结构：快照与恢复分离", "4.7": "结构：发布者只发事件", "4.8": "结构：状态决定合法转移", "4.9": "结构：上下文只持有策略", "4.10": "结构：骨架固定，三步可换", "4.11": "结构：accept 与 visit 双向分派",
+}
+for _p, _c in [(p, c) for p in PARTS for c in p["chapters"]]:
+    if _c["n"] in _SUB:
+        _c["s"] = _SUB[_c["n"]]
+        _c["sec"] = ["问题：坏代码长什么样", _SEC2[_c["n"]], "两份实现：C 与 C++", "运行与演示", "C 与 C++ 对照", "代价与坑"]
+
 ALL = [(p, c) for p in PARTS for c in p["chapters"]]
 TOTAL_MIN = sum(c["min"] for _, c in ALL)
 
@@ -524,7 +545,9 @@ def build_new(part, ch, c):
     </div>"""
     secs.append(section_shell(5, ch["sec"][4], table))
     pits = "".join(f"<li><b>{p[0]}</b>{p[1]}</li>" for p in c["pitfalls"])
-    secs.append(section_shell(6, ch["sec"][5], f'<div class="prose"><ul>{pits}</ul></div>'))
+    ref = c.get("ref")
+    ref_html = f'<p class="subh">参考教程：<a href="{ref}" target="_blank" rel="noopener">{ref.split("/")[2]}</a></p>' if ref else ""
+    secs.append(section_shell(6, ch["sec"][5], f'<div class="prose">{ref_html}<ul>{pits}</ul></div>'))
 
     chips = "".join(f'<span class="chip{" ok" if i == 0 else ""}">{x}</span>' for i, x in enumerate(c["chips"]))
     page = page_shell(part, ch, ch["t"], c["desc"], "\n".join(secs), chips, c["lede"])
@@ -534,9 +557,9 @@ def build_new(part, ch, c):
 # ---------------- 旧页迁移 ----------------
 
 def migrate_old(part, ch):
-    old = ROOT / ch["old"]
+    old = ROOT / "tools" / "legacy" / ch["old"]
     if not old.exists():
-        return  # 已迁移过，源文件已删除
+        raise SystemExit("missing legacy " + ch["old"])
     text = read(old)
     pn = part["no"]
 
@@ -550,8 +573,9 @@ def migrate_old(part, ch):
     text = re.sub(r'<div class="vol-h">.*?</div>', f'<div class="vol-h" id="sideHead">设计模式全书 · 25 章<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>', text, count=1, flags=re.S)
     text = re.sub(r'<div class="ch-nav">.*?</div>', '<div class="ch-nav" id="chNav"></div>', text, count=1, flags=re.S)
     text = text.replace("dpNav('p1')", f"dpNav('{part['id']}')").replace("dpNav('p2')", f"dpNav('{part['id']}')").replace("dpNav('p3')", f"dpNav('{part['id']}')")
-    if '<script src="../assets/dp-demo.js"></script>' not in text:
-        text = text.replace('<script src="../assets/dp-nav.js"></script>', '<script src="../assets/dp-nav.js"></script>\n<script src="../assets/dp-demo.js"></script>')
+    text = text.replace('<script src="../assets/dp-demo.js"></script>', '')
+    if '</head>' in text:
+        text = text.replace('</head>', '<script src="../assets/dp-demo.js"></script>\n</head>', 1)
     # 旧页面里的静态“第 X 章”或旧章号链接由 chNav 统一接管
     write(ROOT / part["id"] / ch["f"], text)
 
@@ -563,7 +587,7 @@ def build_index():
     body = f"""
   <div class="ch-meta"><span class="lv">设计模式全书</span><span class="sep">/</span>四篇 25 章<span class="sep">/</span>C 与 C++ 双实现</div>
   <h1>设计模式：从一张函数表，到一个可替换的对象</h1>
-  <p class="lede">这套东西不背定义。每个模式都走同一条线：先看它在真实代码里长什么样（通常是坏的），再画清结构，然后给两份实现——一份 C 的（结构体首成员放函数表指针，手工虚表），一份 C++ 的（虚函数 + <code>unique_ptr</code>/<code>shared_ptr</code>）。两份代码用 gcc/g++ <code>-Wall -Wextra</code> 零警告编译，页面上的 RUN 输出就是实际跑出来的结果。场景全部来自车载与嵌入式：CAN 调度、ECU 状态机、报文过滤、驱动注册、传感器适配。</p>
+  <p class="lede">这套东西不背定义。每个模式都走同一条线：先看它在真实代码里长什么样（通常是坏的），再画清结构，然后给两份实现——一份 C 的（结构体首成员放函数表指针，手工虚表），一份 C++ 的（虚函数 + <code>unique_ptr</code>/<code>shared_ptr</code>）。两份代码用 gcc/g++ <code>-Wall -Wextra</code> 零警告编译，页面上的 RUN 输出就是实际跑出来的结果。例子全部取自网络上成熟的教程：Refactoring Guru 中文版的物流、GUI、文件系统、聊天室、订单等经典场景，解释器一章参考菜鸟教程。</p>
   <div class="chips"><span class="chip ok">四篇 25 章</span><span class="chip">23 个 GoF 模式全实现</span><span class="chip">每章 6 节</span></div>
 
   <section class="sec" id="s0">
@@ -639,10 +663,9 @@ def main():
     dump_nav()
     dump_demo()
     for p, c in ALL:
-        if c.get("old"):
+        if c["n"] in ("1.1", "1.2"):
             migrate_old(p, c)
         else:
-            from content_new import CONTENT
             build_new(p, c, CONTENT[c["n"]])
     build_index()
     # 删掉迁移前的旧文件（新文件已写到目标路径；若旧路径本身也是新章节路径则保留）
@@ -658,5 +681,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
 
 

@@ -1,67 +1,67 @@
-// 桥接 · C++：Link 与 Protocol 各自抽象，组合时只传引用
-// 编译：g++ -std=c++17 -Wall -Wextra bridge.cpp -o bridge_cpp
+// 桥接 · 形状 × 渲染器
+// g++ -std=c++17 -Wall -Wextra bridge.cpp -o bridge_cpp
 #include <cstdio>
 #include <memory>
 #include <string>
 
-class Link {
+class Renderer {
 public:
-    virtual ~Link() = default;
-    virtual const char *name() const = 0;
-    virtual void send(const std::string &frame) const = 0;
-};
-class CanLink : public Link {
-public:
-    const char *name() const override { return "CAN"; }
-    void send(const std::string &f) const override { std::printf("[CAN ] %s\n", f.c_str()); }
-};
-class LinLink : public Link {
-public:
-    const char *name() const override { return "LIN"; }
-    void send(const std::string &f) const override { std::printf("[LIN ] %s\n", f.c_str()); }
+    virtual ~Renderer() = default;
+    virtual std::string name() const = 0;
+    virtual void circle(int size) const = 0;
+    virtual void square(int size) const = 0;
 };
 
-class Protocol {
+class VectorRenderer final : public Renderer {
 public:
-    explicit Protocol(const Link &l) : link_(l) {}
-    virtual ~Protocol() = default;
-    virtual const char *name() const = 0;
-    virtual void request(const std::string &svc) const = 0;
-    const char *linkName() const { return link_.name(); }
+    std::string name() const override { return "矢量"; }
+    void circle(int s) const override { std::printf("矢量圆 r=%d\n", s); }
+    void square(int s) const override { std::printf("矢量方 w=%d\n", s); }
+};
+
+class RasterRenderer final : public Renderer {
+public:
+    std::string name() const override { return "位图"; }
+    void circle(int s) const override { std::printf("位图圆 半径 %dpx\n", s); }
+    void square(int s) const override { std::printf("位图方 边长 %dpx\n", s); }
+};
+
+class Shape {
+public:
+    Shape(std::unique_ptr<Renderer> r, int size) : r_(std::move(r)), size_(size) {}
+    virtual ~Shape() = default;
+    virtual std::string name() const = 0;
+    void draw() const {
+        std::printf("[%s] %s size=%d -> ", r_->name().c_str(), name().c_str(), size_);
+        if (name() == "Circle") r_->circle(size_);
+        else                    r_->square(size_);
+    }
 protected:
-    const Link &link_;
+    const Renderer& renderer() const { return *r_; }
+    int size() const { return size_; }
+private:
+    std::unique_ptr<Renderer> r_;
+    int size_;
 };
-class Uds : public Protocol {
+
+class Circle final : public Shape {
 public:
-    using Protocol::Protocol;
-    const char *name() const override { return "UDS"; }
-    void request(const std::string &svc) const override
-    {
-        link_.send("UDS " + svc + " -> " + link_.name());
-    }
+    Circle(std::unique_ptr<Renderer> r, int s) : Shape(std::move(r), s) {}
+    std::string name() const override { return "Circle"; }
 };
-class Obd : public Protocol {
+
+class Square final : public Shape {
 public:
-    using Protocol::Protocol;
-    const char *name() const override { return "OBD"; }
-    void request(const std::string &svc) const override
-    {
-        link_.send("OBD " + svc + " -> " + link_.name());
-    }
+    Square(std::unique_ptr<Renderer> r, int s) : Shape(std::move(r), s) {}
+    std::string name() const override { return "Square"; }
 };
 
 int main()
 {
-    CanLink can;
-    LinLink lin;
-    Uds udsCan(can), udsLin(lin);
-    Obd obdCan(can), obdLin(lin);
-
-    const Protocol *protos[] = { &udsCan, &udsLin, &obdCan, &obdLin };
-    for (const Protocol *p : protos) {
-        std::printf("-- %s over %s --\n", p->name(), p->linkName());
-        p->request("0x22F190");
-    }
-    std::printf("协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧\n");
+    Circle v1(std::make_unique<VectorRenderer>(), 5); v1.draw();
+    Square v2(std::make_unique<VectorRenderer>(), 5); v2.draw();
+    Circle r1(std::make_unique<RasterRenderer>(), 5); r1.draw();
+    Square r2(std::make_unique<RasterRenderer>(), 5); r2.draw();
+    std::puts("2 种形状 × 2 种渲染器 = 4 种组合，没有 4 个子类");
     return 0;
 }

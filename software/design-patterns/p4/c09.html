@@ -4,9 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>4.9 策略模式 STRATEGY · C 与 C++ 双实现</title>
-<meta name="description" content="策略模式：C 与 C++ 双实现，含结构图、运行输出与可点演示。">
+<meta name="description" content="策略：同一组数据，分别用冒泡和插入排序，调用方代码不变。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
+<script src="../assets/dp-demo.js"></script>
 </head>
 <body>
 <div class="bg" aria-hidden="true"></div>
@@ -34,217 +35,177 @@
 
   <div class="wrap">
   <div class="ch-meta"><span class="lv">篇四 · 行为型</span><span class="sep">/</span>第 9 章<span class="sep">/</span>约 30 分钟</div>
-  <h1>桥接模式<span class="en">BRIDGE</span></h1>
-  <p class="lede">诊断协议有 UDS 和 OBD，物理层有 CAN 和 LIN。若按“协议 + 物理层”各写一个类，就是 2×2 四份几乎重复的代码；再加一种物理层，要新增四份。<b>桥接把两维各自抽象，中间只留一条引用</b>，组合在运行时决定，新增一侧只改一侧。</p>
-  <div class="chips"><span class="chip ok">2×2 组合不写 4 份</span><span class="chip">协议不关心物理层</span><span class="chip">物理层不关心服务</span></div>
+  <h1>策略模式<span class="en">STRATEGY</span></h1>
+  <p class="lede">排序算法有好几种，选哪种取决于数据规模和是否近乎有序。如果把算法名写死在调用处，换算法就要改调用方。策略模式把算法变成参数：<b>上下文只持有一个“会排序”的函数/对象</b>。</p>
+  <div class="chips"><span class="chip ok">算法即参数</span><span class="chip">调用方不选分支</span><span class="chip">C 用函数指针 · C++ 用策略对象</span></div>
 
   <section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：协议 × 物理层，组合爆炸</h2>
+    <h2><span class="n">01</span>问题：坏代码长什么样</h2>
     
     
       <div class="prose">
-        <p>坏写法是把两维焊在一起：</p>
-        <pre><code>void uds_over_can(const char *svc);
-void uds_over_lin(const char *svc);
-void obd_over_can(const char *svc);
-void obd_over_lin(const char *svc);</code></pre>
-        <p>四种组合只是“拼字符串”的差别，却要维护四份函数。真正的问题在后面：</p>
-        <ul>
-          <li><b>加一个物理层就乘二。</b>再来一个 FlexRay，就要补 UDS/FlexRay、OBD/FlexRay 两份；漏一份就是运行时 404。</li>
-          <li><b>协议细节散落。</b>UDS 的会话保持、OBD 的 PID 编码，被复制到每条物理层分支里，改一处要改四遍。</li>
-          <li><b>测试矩阵爆炸。</b>2 个协议 × 3 个物理层 = 6 条路径，每条都要单独写用例。</li>
-        </ul>
-        <p>桥接让协议只依赖“能发一帧”的抽象，物理层只负责“怎么发”。组合放在调用方，两边都能独立扩展。</p>
+        <p>坏写法是一个函数里堆所有算法：</p>
+        <pre><code>if (mode == BUBBLE) bubble(a, n);
+else if (mode == INSERT) insertion(a, n);
+else if (mode == QUICK) quick(a, n);</code></pre>
+        <p>算法越多分支越长；每个调用方都要知道 <code>mode</code> 的取值，测试也要覆盖所有分支。</p>
+        <p>策略把算法抽成可传递的依赖：<code>sort(a, n, bubble)</code>。调用方只提供数据，选哪个算法由上层决定。</p>
       </div>
   </section>
 
   <section class="sec" id="s2">
-    <h2><span class="n">02</span>结构：两维各自抽象，中间只连一条线</h2>
-    <p class="subh">左边是协议，右边是物理层，四条线是四种组合；虚线表示同一协议可以换物理层。</p>
+    <h2><span class="n">02</span>结构：上下文只持有策略</h2>
+    <p class="subh">左边是调用方，中间是策略参数，右边是两种排序实现。</p>
     
   
     <div class="fig">
-      <div class="fig-h"><b>协议 × 物理层：两维各自抽象</b><span>bridge</span></div>
+      <div class="fig-h"><b>同一份数据，换一个排序函数</b><span>structure</span></div>
       <div class="diagram">
-<svg viewBox="0 0 880 360" role="img" aria-label="协议 × 物理层：两维各自抽象">
+<svg viewBox="0 0 880 360" role="img" aria-label="同一份数据，换一个排序函数">
   <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
-  <g class="node" data-role="uds" data-note="UDS 只管服务语义：会话、安全访问、DID 编码；它不知道帧最后走在 CAN 还是 LIN。"><rect x="40" y="70" width="190" height="80" rx="10"/><text class="nm" x="54" y="94">UDS</text><text class="ty" x="54" y="113">诊断协议</text><text class="mt" x="54" y="131">0x22 读数据</text></g>
-  <g class="node" data-role="obd" data-note="OBD 的 PID 编码与 UDS 不同，但同样只依赖“发一帧”的抽象。"><rect x="40" y="220" width="190" height="80" rx="10"/><text class="nm" x="54" y="244">OBD</text><text class="ty" x="54" y="263">排放协议</text><text class="mt" x="54" y="281">PID 0x0C</text></g>
-  <g class="node" data-role="can" data-note="CAN 只负责把字符串变成帧发出去；它不解析 UDS 服务，也不认识 OBD 的 PID。"><rect x="470" y="70" width="190" height="80" rx="10"/><text class="nm" x="484" y="94">CAN</text><text class="ty" x="484" y="113">物理层</text><text class="mt" x="484" y="131">500kbps / 11bit</text></g>
-  <g class="node" data-role="lin" data-note="LIN 的调度表、主从角色都在这一层；换物理层不需要改协议代码。"><rect x="470" y="220" width="190" height="80" rx="10"/><text class="nm" x="484" y="244">LIN</text><text class="ty" x="484" y="263">物理层</text><text class="mt" x="484" y="281">19.2kbps / 主从</text></g>
-  <line x1="230" y1="110" x2="470" y2="110" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="350.0" y="102.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">UDS over CAN</text>
-  <line x1="230" y1="118" x2="470" y2="250" stroke="#5876a4" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/>
-  <text x="350.0" y="176.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">UDS over LIN</text>
-  <line x1="230" y1="250" x2="470" y2="118" stroke="#5876a4" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/>
-  <text x="350.0" y="176.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">OBD over CAN</text>
-  <line x1="230" y1="262" x2="470" y2="262" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="350.0" y="254.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">OBD over LIN</text>
+  <g class="node" data-role="ctx" data-note="上下文只调用策略，不判断算法名。"><rect x="24" y="140" width="150" height="76" rx="10"/><text class="nm" x="38" y="164">Sorter</text><text class="ty" x="38" y="183">上下文</text><text class="mt" x="38" y="201">sort(data, strategy)</text></g>
+  <g class="node" data-role="st" data-note="接口只描述“把数组排好”。"><rect x="250" y="140" width="190" height="84" rx="10"/><text class="nm" x="264" y="164">SortStrategy</text><text class="ty" x="264" y="183">策略接口</text><text class="mt" x="264" y="201">sort(a, n)</text></g>
+  <g class="node" data-role="b" data-note="冒泡按相邻交换，简单但慢。"><rect x="520" y="56" width="190" height="74" rx="10"/><text class="nm" x="534" y="80">Bubble</text><text class="ty" x="534" y="99">实现 A</text><text class="mt" x="534" y="117">冒泡</text></g>
+  <g class="node" data-role="i" data-note="插入对近乎有序的数据更快。"><rect x="520" y="212" width="190" height="74" rx="10"/><text class="nm" x="534" y="236">Insertion</text><text class="ty" x="534" y="255">实现 B</text><text class="mt" x="534" y="273">插入</text></g>
+  <line x1="174" y1="178" x2="250" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="212.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">传入</text>
+  <line x1="440" y1="160" x2="520" y2="100" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="122.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">调用</text>
+  <line x1="440" y1="200" x2="520" y2="242" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="213.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">调用</text>
 </svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：协议与物理层各自只守一边，组合由调用方拼。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">上下文不认识具体算法；算法也不认识业务。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
-    <h2><span class="n">03</span>两份实现</h2>
+    <h2><span class="n">03</span>两份实现：C 与 C++</h2>
     
-    <p class='subh'>C 版用两张表（link_t、proto_t）在运行时拼；C++ 版用两个抽象基类，组合时只传引用。</p>
+    <p class='subh'>C 版策略是函数指针，直接传函数名；C++ 版策略是对象，用 <code>unique_ptr</code> 注入。</p>
       <div class="codecard">
-        <div class="ch"><span class="lang">C</span><span class="fn">bridge.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 桥接：协议和物理层各管各的，四种组合靠两张表拼出来 */
+        <div class="ch"><span class="lang">C</span><span class="fn">strategy.c</span><button class="copy">复制</button></div>
+        <pre><code>/* 策略 · 排序策略
+ * gcc -std=c11 -Wall -Wextra strategy.c -o strategy
+ */
 #include &lt;stdio.h&gt;
-#include &lt;string.h&gt;
 
-typedef struct { const char *name; void (*send)(const char *frame); } link_t;
+typedef void (*sort_fn)(int *, int);
 
-static void can_send(const char *f) { printf("[CAN ] %s\n", f); }
-static void lin_send(const char *f) { printf("[LIN ] %s\n", f); }
-
-static const link_t LINKS[] = {
-    { "CAN", can_send },
-    { "LIN", lin_send },
-};
-
-typedef struct proto proto_t;
-struct proto {
-    const char *name;
-    const link_t *link;
-    void (*request)(const proto_t *self, const char *svc);
-};
-
-static void uds_request(const proto_t *self, const char *svc)
+static void bubble(int *a, int n)
 {
-    char buf[64];
-    snprintf(buf, sizeof buf, "UDS %s -&gt; %s", svc, self-&gt;link-&gt;name);
-    self-&gt;link-&gt;send(buf);
+    for (int i = 0; i &lt; n; i++)
+        for (int j = 0; j + 1 &lt; n - i; j++)
+            if (a[j] &gt; a[j + 1]) { int t = a[j]; a[j] = a[j + 1]; a[j + 1] = t; }
 }
-static void obd_request(const proto_t *self, const char *svc)
+
+static void insertion(int *a, int n)
 {
-    char buf[64];
-    snprintf(buf, sizeof buf, "OBD %s -&gt; %s", svc, self-&gt;link-&gt;name);
-    self-&gt;link-&gt;send(buf);
+    for (int i = 1; i &lt; n; i++) {
+        int key = a[i], j = i - 1;
+        while (j &gt;= 0 &amp;&amp; a[j] &gt; key) { a[j + 1] = a[j]; j--; }
+        a[j + 1] = key;
+    }
+}
+
+static void run(const char *name, sort_fn fn, int *src, int n)
+{
+    int a[8];
+    for (int i = 0; i &lt; n; i++) a[i] = src[i];
+    fn(a, n);
+    printf("%s：", name);
+    for (int i = 0; i &lt; n; i++) printf(" %d", a[i]);
+    printf("\n");
 }
 
 int main(void)
 {
-    proto_t uds = { "UDS", &amp;LINKS[0], uds_request };
-    proto_t obd = { "OBD", &amp;LINKS[1], obd_request };
-
-    const proto_t *protos[] = { &amp;uds, &amp;obd };
-    for (size_t i = 0; i &lt; sizeof protos / sizeof protos[0]; i++)
-        for (size_t k = 0; k &lt; sizeof LINKS / sizeof LINKS[0]; k++) {
-            proto_t p = *protos[i];
-            p.link = &amp;LINKS[k];
-            printf("-- %s over %s --\n", p.name, p.link-&gt;name);
-            p.request(&amp;p, "0x22F190");
-        }
-    printf("协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧\n");
+    int src[] = { 5, 1, 4, 2, 3 };
+    run("冒泡", bubble, src, 5);
+    run("插入", insertion, src, 5);
+    printf("排序函数是参数，换策略不改调用方\n");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
-      <div class="ch"><b>RUN</b><span>./bridge.exe</span></div>
-      <pre>-- UDS over CAN --
-[CAN ] UDS 0x22F190 -&gt; CAN
--- UDS over LIN --
-[LIN ] UDS 0x22F190 -&gt; LIN
--- OBD over CAN --
-[CAN ] OBD 0x22F190 -&gt; CAN
--- OBD over LIN --
-[LIN ] OBD 0x22F190 -&gt; LIN
-协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧</pre>
+      <div class="ch"><b>RUN</b><span>./strategy.exe</span></div>
+      <pre>冒泡： 1 2 3 4 5
+插入： 1 2 3 4 5
+排序函数是参数，换策略不改调用方</pre>
     </div>
       <div class="codecard">
-        <div class="ch"><span class="lang">C++</span><span class="fn">bridge.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 桥接 · C++：Link 与 Protocol 各自抽象，组合时只传引用
-// 编译：g++ -std=c++17 -Wall -Wextra bridge.cpp -o bridge_cpp
+        <div class="ch"><span class="lang">C++</span><span class="fn">strategy.cpp</span><button class="copy">复制</button></div>
+        <pre><code>// 策略 · 排序策略
+// g++ -std=c++17 -Wall -Wextra strategy.cpp -o strategy_cpp
 #include &lt;cstdio&gt;
 #include &lt;memory&gt;
-#include &lt;string&gt;
+#include &lt;vector&gt;
 
-class Link {
+class SortStrategy {
 public:
-    virtual ~Link() = default;
-    virtual const char *name() const = 0;
-    virtual void send(const std::string &amp;frame) const = 0;
-};
-class CanLink : public Link {
-public:
-    const char *name() const override { return "CAN"; }
-    void send(const std::string &amp;f) const override { std::printf("[CAN ] %s\n", f.c_str()); }
-};
-class LinLink : public Link {
-public:
-    const char *name() const override { return "LIN"; }
-    void send(const std::string &amp;f) const override { std::printf("[LIN ] %s\n", f.c_str()); }
+    virtual ~SortStrategy() = default;
+    virtual const char* name() const = 0;
+    virtual void sort(std::vector&lt;int&gt;&amp; v) const = 0;
 };
 
-class Protocol {
+class Bubble final : public SortStrategy {
 public:
-    explicit Protocol(const Link &amp;l) : link_(l) {}
-    virtual ~Protocol() = default;
-    virtual const char *name() const = 0;
-    virtual void request(const std::string &amp;svc) const = 0;
-    const char *linkName() const { return link_.name(); }
-protected:
-    const Link &amp;link_;
-};
-class Uds : public Protocol {
-public:
-    using Protocol::Protocol;
-    const char *name() const override { return "UDS"; }
-    void request(const std::string &amp;svc) const override
-    {
-        link_.send("UDS " + svc + " -&gt; " + link_.name());
+    const char* name() const override { return "冒泡"; }
+    void sort(std::vector&lt;int&gt;&amp; v) const override {
+        for (size_t i = 0; i &lt; v.size(); i++)
+            for (size_t j = 0; j + 1 &lt; v.size() - i; j++)
+                if (v[j] &gt; v[j + 1]) std::swap(v[j], v[j + 1]);
     }
 };
-class Obd : public Protocol {
+
+class Insertion final : public SortStrategy {
 public:
-    using Protocol::Protocol;
-    const char *name() const override { return "OBD"; }
-    void request(const std::string &amp;svc) const override
-    {
-        link_.send("OBD " + svc + " -&gt; " + link_.name());
+    const char* name() const override { return "插入"; }
+    void sort(std::vector&lt;int&gt;&amp; v) const override {
+        for (size_t i = 1; i &lt; v.size(); i++) {
+            int key = v[i], j = static_cast&lt;int&gt;(i) - 1;
+            while (j &gt;= 0 &amp;&amp; v[j] &gt; key) { v[j + 1] = v[j]; j--; }
+            v[j + 1] = key;
+        }
     }
+};
+
+class Sorter {
+public:
+    explicit Sorter(std::unique_ptr&lt;SortStrategy&gt; s) : s_(std::move(s)) {}
+    void run(std::vector&lt;int&gt; v) {
+        s_-&gt;sort(v);
+        std::printf("%s：", s_-&gt;name());
+        for (int x : v) std::printf(" %d", x);
+        std::printf("\n");
+    }
+private:
+    std::unique_ptr&lt;SortStrategy&gt; s_;
 };
 
 int main()
 {
-    CanLink can;
-    LinLink lin;
-    Uds udsCan(can), udsLin(lin);
-    Obd obdCan(can), obdLin(lin);
-
-    const Protocol *protos[] = { &amp;udsCan, &amp;udsLin, &amp;obdCan, &amp;obdLin };
-    for (const Protocol *p : protos) {
-        std::printf("-- %s over %s --\n", p-&gt;name(), p-&gt;linkName());
-        p-&gt;request("0x22F190");
-    }
-    std::printf("协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧\n");
+    std::vector&lt;int&gt; src = { 5, 1, 4, 2, 3 };
+    Sorter(std::make_unique&lt;Bubble&gt;()).run(src);
+    Sorter(std::make_unique&lt;Insertion&gt;()).run(src);
+    std::puts("排序函数是参数，换策略不改调用方");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
-      <div class="ch"><b>RUN</b><span>./bridge_cpp.exe</span></div>
-      <pre>-- UDS over CAN --
-[CAN ] UDS 0x22F190 -&gt; CAN
--- UDS over LIN --
-[LIN ] UDS 0x22F190 -&gt; LIN
--- OBD over CAN --
-[CAN ] OBD 0x22F190 -&gt; CAN
--- OBD over LIN --
-[LIN ] OBD 0x22F190 -&gt; LIN
-协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧</pre>
+      <div class="ch"><b>RUN</b><span>./strategy_cpp.exe</span></div>
+      <pre>冒泡： 1 2 3 4 5
+插入： 1 2 3 4 5
+排序函数是参数，换策略不改调用方</pre>
     </div>
   </section>
 
   <section class="sec" id="s4">
-    <h2><span class="n">04</span>四种组合，只换一侧</h2>
+    <h2><span class="n">04</span>运行与演示</h2>
     
     
 <div class="demo" id="demo">
-  <div class="demo-h"><b>四种组合，只换一侧</b><span>同一句服务请求，依次走 UDS/OBD 与 CAN/LIN 的组合。</span></div>
+  <div class="demo-h"><b>同一组数，两种策略各排一次</b><span>5 1 4 2 3 → 1 2 3 4 5。</span></div>
   <div class="stage">
     <div class="dflow" id="dflow"></div>
     <div class="dbar" id="dbar">未开始</div>
@@ -258,18 +219,18 @@ int main()
     <div class="log" id="dlog"></div>
   </div>
 </div>
-<script>dpDemo({nodes:[{id:'uds',label:'UDS',sub:'服务语义',note:''}, {id:'obd',label:'OBD',sub:'PID 语义',note:''}, {id:'can',label:'CAN',sub:'物理层',note:''}, {id:'lin',label:'LIN',sub:'物理层',note:''}],steps:[{hi:['uds', 'can'],t:'UDS over CAN：协议拼好服务串，交给 CAN 发'}, {hi:['uds', 'lin'],t:'同一份 UDS，只把物理层换成 LIN，协议代码没动'}, {hi:['obd', 'can'],t:'换成 OBD：只换协议侧，CAN 仍然只负责发帧'}, {hi:['obd', 'lin'],t:'OBD over LIN：两侧都换，仍然没有第四份实现'}, {hi:['uds', 'obd', 'can', 'lin'],t:'四种组合共用两条抽象；新增 FlexRay 只需加一个物理层'}]});</script>
+<script>dpDemo({nodes:[{id:'c',label:'Sorter',sub:'同一段代码',note:''}, {id:'s',label:'策略',sub:'bubble/insert',note:''}, {id:'b',label:'冒泡',sub:'O(n²)',note:''}, {id:'i',label:'插入',sub:'O(n²)',note:''}],steps:[{hi:['c', 's', 'b'],t:'传入冒泡策略，排 5 1 4 2 3'}, {hi:['b'],t:'冒泡结果：1 2 3 4 5'}, {hi:['c', 's', 'i'],t:'换插入策略，调用方代码不改'}, {hi:['i'],t:'插入结果：1 2 3 4 5'}, {hi:['c'],t:'结果相同，过程不同：选择权在调用方'}]});</script>
 
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>C 与 C++：两种解耦</h2>
+    <h2><span class="n">05</span>C 与 C++ 对照</h2>
     
     
     <div class="tbl">
       <table>
         <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
-        <tbody><tr><td>协议抽象</td><td><code>proto_t</code> + 函数指针</td><td><code>Protocol</code> 抽象基类</td><td>C 的协议是结构体，C++ 是类型</td></tr><tr><td>物理层抽象</td><td><code>link_t</code> + <code>send()</code></td><td><code>Link</code> 抽象基类</td><td>都只暴露“发一帧”</td></tr><tr><td>组合方式</td><td>运行时给 <code>proto.link</code> 赋值</td><td>构造时传 <code>Link&amp;</code></td><td>C 可换绑，C++ 用引用固定</td></tr><tr><td>新增物理层</td><td>加一个 <code>link_t</code> 表项</td><td>加一个派生类</td><td>两边都不动协议</td></tr><tr><td>生命周期</td><td>静态表，无所有权</td><td>引用，不拥有</td><td>物理层通常比协议活得久</td></tr></tbody>
+        <tbody><tr><td>策略形态</td><td>函数指针</td><td>策略对象</td><td>C 最轻，C++ 可带状态</td></tr><tr><td>注入方式</td><td>参数传入</td><td>构造/Setter 注入</td><td>都在运行时决定</td></tr><tr><td>调用方</td><td>只给数据和策略</td><td>只给数据和策略</td><td>不写算法分支</td></tr><tr><td>扩展算法</td><td>加一个函数</td><td>加一个策略子类</td><td>都不改上下文</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -277,7 +238,7 @@ int main()
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     
-    <div class="prose"><ul><li><b>桥接不是“多一层就高级”。</b>只有两维确实独立扩展时才值得；如果物理层永远只有 CAN，直接写反而清楚。</li><li><b>别让协议知道帧格式。</b>协议一旦开始拼 CAN ID、算 DLC，桥接就退化成四份实现；协议只该产出“服务 + 参数”。</li><li><b>C 版换绑要防悬空。</b>运行时改 <code>proto.link</code> 指向栈上的 <code>link_t</code>，函数返回后就悬空；物理层应是静态或长生命周期对象。</li><li><b>C++ 引用成员不可重新绑定。</b><code>Protocol</code> 持 <code>Link&amp;</code> 后不能换物理层；需要运行时切换就用指针或 <code>std::reference_wrapper</code>。</li><li><b>组合测试仍要覆盖。</b>代码只有两份，但行为有四种；至少每个组合跑一条真实服务，别只测编译通过。</li></ul></div>
+    <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/strategy" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>策略里藏业务规则</b>策略只做算法；折扣、权限这类规则放别处。</li><li><b>策略对象有状态还共享</b>C++ 策略若被多个上下文共用，内部计数会互相干扰。</li><li><b>为两个分支硬抽策略</b>只有算法会独立演化、或需要运行时切换时才值得。</li></ul></div>
   </section>
   <div class="ch-nav" id="chNav"></div>
   </div>
@@ -286,7 +247,6 @@ int main()
 <script src="../assets/pd.js"></script>
 <script src="../assets/dp-data.js"></script>
 <script src="../assets/dp-nav.js"></script>
-<script src="../assets/dp-demo.js"></script>
 <script>dpNav('p4');</script>
 </body>
 </html>

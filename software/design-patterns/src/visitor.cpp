@@ -1,5 +1,5 @@
-// 访问者 · C++：accept/visit 双向分派，节点与统计彻底解耦
-// 编译：g++ -std=c++17 -Wall -Wextra visitor.cpp -o visitor_cpp
+// 访问者 · 文件统计
+// g++ -std=c++17 -Wall -Wextra visitor.cpp -o visitor_cpp
 #include <cstdio>
 #include <memory>
 #include <string>
@@ -7,64 +7,77 @@
 
 class Visitor;
 
-class Element {
+class Node {
 public:
-    explicit Element(std::string name) : name_(std::move(name)) {}
-    virtual ~Element() = default;
-    const std::string &name() const { return name_; }
-    virtual void accept(Visitor &v) const = 0;
-protected:
+    Node(std::string name, bool dir, int size = 0)
+        : name_(std::move(name)), dir_(dir), size_(size) {}
+    virtual ~Node() = default;
+    virtual void accept(Visitor& v) = 0;
+    const std::string& name() const { return name_; }
+    int size() const { return size_; }
+    bool isDir() const { return dir_; }
+private:
     std::string name_;
+    bool dir_;
+    int size_;
+};
+
+class File final : public Node {
+public:
+    File(std::string n, int s) : Node(std::move(n), false, s) {}
+    void accept(Visitor& v) override;
+};
+
+class Dir final : public Node {
+public:
+    Dir(std::string n) : Node(std::move(n), true) {}
+    void add(std::unique_ptr<Node> k) { kids_.push_back(std::move(k)); }
+    const std::vector<std::unique_ptr<Node>>& kids() const { return kids_; }
+    void accept(Visitor& v) override;
+private:
+    std::vector<std::unique_ptr<Node>> kids_;
 };
 
 class Visitor {
 public:
     virtual ~Visitor() = default;
-    virtual void visit(const class Ecu &e) = 0;
-    virtual void visit(const class Sensor &s) = 0;
-    virtual void visit(const class Actuator &a) = 0;
+    virtual void visitFile(const File& f) = 0;
+    virtual void visitDir(const Dir& d) = 0;
 };
 
-class Ecu : public Element {
+class Counter final : public Visitor {
 public:
-    using Element::Element;
-    void accept(Visitor &v) const override { v.visit(*this); }
-};
-class Sensor : public Element {
-public:
-    using Element::Element;
-    void accept(Visitor &v) const override { v.visit(*this); }
-};
-class Actuator : public Element {
-public:
-    using Element::Element;
-    void accept(Visitor &v) const override { v.visit(*this); }
-};
-
-class Counter : public Visitor {
-public:
-    void visit(const Ecu &e) override      { std::printf("visit ECU      %s\n", e.name().c_str()); ecus_++; }
-    void visit(const Sensor &s) override   { std::printf("visit SENSOR   %s\n", s.name().c_str()); sensors_++; }
-    void visit(const Actuator &a) override { std::printf("visit ACTUATOR %s\n", a.name().c_str()); actuators_++; }
-    void report() const
-    {
-        std::printf("合计 ECU=%d SENSOR=%d ACTUATOR=%d\n", ecus_, sensors_, actuators_);
-        std::printf("新增一种统计，只写新的 visitor，不改节点\n");
+    void visitFile(const File& f) override {
+        ++files_; total_ += f.size();
+        std::printf("  文件 %s (%d 字节)\n", f.name().c_str(), f.size());
     }
+    void visitDir(const Dir& d) override {
+        std::printf("  进入目录 %s\n", d.name().c_str());
+    }
+    int files() const { return files_; }
+    int total() const { return total_; }
 private:
-    int ecus_ = 0, sensors_ = 0, actuators_ = 0;
+    int files_ = 0;
+    int total_ = 0;
 };
+
+void File::accept(Visitor& v) { v.visitFile(*this); }
+void Dir::accept(Visitor& v) { v.visitDir(*this); }
 
 int main()
 {
-    std::vector<std::unique_ptr<Element>> nodes;
-    nodes.push_back(std::make_unique<Ecu>("engine_ecu"));
-    nodes.push_back(std::make_unique<Sensor>("o2_sensor"));
-    nodes.push_back(std::make_unique<Actuator>("injector"));
-    nodes.push_back(std::make_unique<Ecu>("abs_ecu"));
+    auto a = std::make_unique<File>("a.c", 120);
+    auto b = std::make_unique<File>("b.c", 80);
+    auto src = std::make_unique<Dir>("src");
+    src->add(std::move(a));
+    src->add(std::move(b));
 
     Counter c;
-    for (const auto &n : nodes) n->accept(c);
-    c.report();
+    src->kids()[0]->accept(c);
+    src->kids()[1]->accept(c);
+    src->accept(c);
+
+    std::printf("统计：%d 个文件，%d 字节\n", c.files(), c.total());
+    std::puts("节点只负责 accept，统计逻辑在 visitor 里");
     return 0;
 }

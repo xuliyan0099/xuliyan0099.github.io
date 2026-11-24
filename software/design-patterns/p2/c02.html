@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>2.2 抽象工厂模式 ABSTRACT FACTORY · C 与 C++ 双实现</title>
-<meta name="description" content="抽象工厂：一个家族同时交付 CAN 驱动与 NVRAM 驱动，避免不同代零件混搭。">
+<meta name="description" content="抽象工厂：浅色/深色两套 GUI 控件成套交付，不会出现浅色按钮配深色复选框。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
 <script src="../assets/dp-demo.js"></script>
@@ -36,199 +36,174 @@
   <div class="wrap">
   <div class="ch-meta"><span class="lv">篇二 · 创建型</span><span class="sep">/</span>第 2 章<span class="sep">/</span>约 30 分钟</div>
   <h1>抽象工厂模式<span class="en">ABSTRACT FACTORY</span></h1>
-  <p class="lede">车型配置里写着 <code>can=bosch</code>、<code>nvram=conti</code>，两行各自看都合法，装到同一辆车上却可能时序对不上、诊断地址对不上。抽象工厂把“同一代的两个零件”绑成一次交付：<b>要 BOSCH 就两个都是 BOSCH，要 CONTI 就两个都是 CONTI</b>。</p>
-  <div class="chips"><span class="chip ok">一个家族两个零件</span><span class="chip">换家族不改调用方</span><span class="chip">C 用函数表家族 · C++ 用抽象基类</span></div>
+  <p class="lede">界面有两套主题：浅色和深色。按钮和复选框如果各自按名字创建，很容易配出“浅色按钮 + 深色复选框”。抽象工厂让<b>一个家族一次交出两个控件</b>：选浅色就两个都浅色，选深色就两个都深色。</p>
+  <div class="chips"><span class="chip ok">一次交付整族控件</span><span class="chip">换主题不改调用方</span><span class="chip">C 用函数表家族 · C++ 用抽象基类</span></div>
 
   <section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：每个车型自己配零件，配错代</h2>
+    <h2><span class="n">01</span>问题：坏代码长什么样</h2>
     
     
       <div class="prose">
-        <p>先看坏写法：每个零件各自按名字取。</p>
-        <pre><code>can_t    can   = make_can(cfg-&gt;can);      /* "bosch"  */
-nvram_t  nv    = make_nvram(cfg-&gt;nvram);  /* "conti"  */</code></pre>
-        <p>问题不在“取不到”，而在<b>取到了也能跑，但组合是错的</b>：</p>
-        <ul>
-          <li><b>时序假设不同。</b>BOSCH 的 CAN 驱动默认 500kbps、周期 10ms；CONTI 的 NVRAM 写一次要 8ms。两个各自达标，叠在一起就超周期。</li>
-          <li><b>诊断地址不同。</b>同一份 UDS 服务，两个供应商的 DID 偏移不一样，混搭后读出来的是隔壁字段。</li>
-          <li><b>问题只在实车出现。</b>台架上两个零件都能单测通过，装车才偶发，定位成本极高。</li>
-        </ul>
-        <p>抽象工厂不改零件本身，只改<b>获取方式</b>：家族对象一次返回两个零件，调用方拿不到“单独换一个”的机会。</p>
+        <p>坏写法是两个控件分别取：</p>
+        <pre><code>Button   *b = make_button(cfg-&gt;theme);
+Checkbox *c = make_checkbox(cfg-&gt;theme2);</code></pre>
+        <p>两行都合法，但 <code>theme</code> 和 <code>theme2</code> 一旦不一致，界面就会花。真正的问题不是“取不到”，而是<b>取到了也能跑，只是组合错了</b>。</p>
+        <p>抽象工厂把两个 <code>make_*</code> 收进同一个家族对象。调用方只选一次家族，之后所有控件都从它出，从结构上断掉混搭。</p>
       </div>
   </section>
 
   <section class="sec" id="s2">
-    <h2><span class="n">02</span>结构：家族一次交付两个零件</h2>
-    <p class="subh">左边是调用方，中间是家族，右边是两个零件。点方框看每一层负责什么。</p>
+    <h2><span class="n">02</span>结构：一次交付整族控件</h2>
+    <p class="subh">左边是界面，中间是主题家族，右边是按钮和复选框。</p>
     
   
     <div class="fig">
-      <div class="fig-h"><b>家族一次交付两个零件</b><span>abstract factory</span></div>
+      <div class="fig-h"><b>一个家族，两个控件，同一套配色</b><span>structure</span></div>
       <div class="diagram">
-<svg viewBox="0 0 880 360" role="img" aria-label="家族一次交付两个零件">
+<svg viewBox="0 0 880 360" role="img" aria-label="一个家族，两个控件，同一套配色">
   <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
-  <g class="node" data-role="client" data-note="调用方只说“我要 BOSCH 这一代”，不分别指定 CAN 和 NVRAM，从源头断掉混搭的可能。"><rect x="24" y="140" width="150" height="76" rx="10"/><text class="nm" x="38" y="164">调用方</text><text class="ty" x="38" y="183">业务 / 初始化</text><text class="mt" x="38" y="201">只要一对零件</text></g>
-  <g class="node" data-role="family" data-note="家族是唯一知道“哪两个零件属于同一代”的对象；换家族就是整套换，不存在只换一半。"><rect x="250" y="140" width="190" height="80" rx="10"/><text class="nm" x="264" y="164">family_t / Family</text><text class="ty" x="264" y="183">零件家族</text><text class="mt" x="264" y="201">make_can + make_nvram</text></g>
-  <g class="node" data-role="can" data-note="CAN 驱动只暴露 send；具体用哪家的实现由家族决定，调用方看不到供应商名字。"><rect x="520" y="62" width="190" height="72" rx="10"/><text class="nm" x="534" y="86">can_t / Can</text><text class="ty" x="534" y="105">通信零件</text><text class="mt" x="534" y="123">send(frame)</text></g>
-  <g class="node" data-role="nvram" data-note="NVRAM 与 CAN 同代：写时序、地址布局都按同一份规范来。"><rect x="520" y="212" width="190" height="72" rx="10"/><text class="nm" x="534" y="236">nvram_t / Nvram</text><text class="ty" x="534" y="255">存储零件</text><text class="mt" x="534" y="273">save(value)</text></g>
+  <g class="node" data-role="client" data-note="界面只选一次主题，不分别指定按钮和复选框。"><rect x="24" y="140" width="150" height="76" rx="10"/><text class="nm" x="38" y="164">界面</text><text class="ty" x="38" y="183">业务代码</text><text class="mt" x="38" y="201">family = light/dark</text></g>
+  <g class="node" data-role="family" data-note="家族是唯一知道“哪两个控件属于同一套主题”的对象。"><rect x="250" y="140" width="190" height="84" rx="10"/><text class="nm" x="264" y="164">GuiFactory</text><text class="ty" x="264" y="183">控件家族</text><text class="mt" x="264" y="201">button() + checkbox()</text></g>
+  <g class="node" data-role="btn" data-note="按钮只负责自己的外观；配色由家族保证一致。"><rect x="520" y="56" width="190" height="74" rx="10"/><text class="nm" x="534" y="80">Button</text><text class="ty" x="534" y="99">控件 A</text><text class="mt" x="534" y="117">label()</text></g>
+  <g class="node" data-role="chk" data-note="复选框和按钮同族，不会出现深浅混搭。"><rect x="520" y="212" width="190" height="74" rx="10"/><text class="nm" x="534" y="236">Checkbox</text><text class="ty" x="534" y="255">控件 B</text><text class="mt" x="534" y="273">label()</text></g>
   <line x1="174" y1="178" x2="250" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="212.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">取家族</text>
-  <line x1="440" y1="160" x2="520" y2="108" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="480.0" y="126.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">造 CAN</text>
+  <text x="212.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">选主题</text>
+  <line x1="440" y1="160" x2="520" y2="100" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="122.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">造按钮</text>
   <line x1="440" y1="200" x2="520" y2="242" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="480.0" y="213.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">造 NVRAM</text>
+  <text x="480.0" y="213.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">造复选框</text>
 </svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：家族负责“成套”，零件只负责自己的接口。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">家族负责“成套”；控件只负责自己的接口。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
-    <h2><span class="n">03</span>两份实现</h2>
+    <h2><span class="n">03</span>两份实现：C 与 C++</h2>
     
-    <p class='subh'>C 版把家族写成“返回两个函数表”的结构；C++ 版把家族写成抽象基类，零件用 unique_ptr 交付。</p>
+    <p class='subh'>C 版家族是“两个返回函数表指针”的结构；C++ 版家族是抽象基类，控件用 <code>unique_ptr</code> 交付。</p>
       <div class="codecard">
         <div class="ch"><span class="lang">C</span><span class="fn">abstract_factory.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 抽象工厂：一次取到“同一代”的两个零件，而不是各取各的 */
+        <pre><code>/* 抽象工厂 · GUI：浅色/深色两套控件
+ * gcc -std=c11 -Wall -Wextra abstract_factory.c -o abstract_factory
+ */
 #include &lt;stdio.h&gt;
-#include &lt;stddef.h&gt;
 
-typedef struct { void (*send)(const char *msg); } can_t;
-typedef struct { void (*save)(int value); } nvram_t;
+typedef struct { const char *(*label)(void); } button_t;
+typedef struct { const char *(*label)(void); } checkbox_t;
 
 typedef struct {
-    const char *name;
-    can_t   (*make_can)(void);
-    nvram_t (*make_nvram)(void);
-} family_t;
+    button_t   *(*button)(void);
+    checkbox_t *(*checkbox)(void);
+} gui_factory_t;
 
-static void bosch_can_send(const char *m)   { printf("[CAN/BOSCH] %s\n", m); }
-static void bosch_nv_save(int v)            { printf("[NVRAM/BOSCH] save %d\n", v); }
-static void conti_can_send(const char *m)   { printf("[CAN/CONTI] %s\n", m); }
-static void conti_nv_save(int v)            { printf("[NVRAM/CONTI] save %d\n", v); }
+static const char *light_btn_label(void) { return "[ 浅色按钮 ]"; }
+static button_t light_btn = { light_btn_label };
+static button_t *light_button(void) { return &amp;light_btn; }
+static const char *light_box_label(void) { return "[ ] 浅色复选框"; }
+static checkbox_t light_box = { light_box_label };
+static checkbox_t *light_checkbox(void) { return &amp;light_box; }
+static gui_factory_t LIGHT = { light_button, light_checkbox };
 
-static can_t   bosch_can(void)   { can_t c = { bosch_can_send };   return c; }
-static nvram_t bosch_nvram(void) { nvram_t n = { bosch_nv_save }; return n; }
-static can_t   conti_can(void)   { can_t c = { conti_can_send };   return c; }
-static nvram_t conti_nvram(void) { nvram_t n = { conti_nv_save }; return n; }
+static const char *dark_btn_label(void) { return "[ 深色按钮 ]"; }
+static button_t dark_btn = { dark_btn_label };
+static button_t *dark_button(void) { return &amp;dark_btn; }
+static const char *dark_box_label(void) { return "[x] 深色复选框"; }
+static checkbox_t dark_box = { dark_box_label };
+static checkbox_t *dark_checkbox(void) { return &amp;dark_box; }
+static gui_factory_t DARK = { dark_button, dark_checkbox };
 
-static const family_t FAMILIES[] = {
-    { "BOSCH", bosch_can, bosch_nvram },
-    { "CONTI", conti_can, conti_nvram },
-};
+static void render(const char *theme, gui_factory_t *f)
+{
+    button_t   *b = f-&gt;button();
+    checkbox_t *c = f-&gt;checkbox();
+    printf("%s 界面：%s  %s\n", theme, b-&gt;label(), c-&gt;label());
+}
 
 int main(void)
 {
-    const size_t nfam = sizeof FAMILIES / sizeof FAMILIES[0];
-    for (size_t i = 0; i &lt; nfam; i++) {
-        const family_t *f = &amp;FAMILIES[i];
-        can_t   c = f-&gt;make_can();     /* 同一家族：语言一致、时序一致 */
-        nvram_t v = f-&gt;make_nvram();
-        printf("-- family %s --\n", f-&gt;name);
-        c.send("0x18FF50E5");
-        v.save(7);
-    }
-    printf("family 数 %zu，零件组合 2 种\n", nfam);
+    render("浅色", &amp;LIGHT);
+    render("深色", &amp;DARK);
     return 0;
 }</code></pre>
       </div>
     <div class="run">
       <div class="ch"><b>RUN</b><span>./abstract_factory.exe</span></div>
-      <pre>-- family BOSCH --
-[CAN/BOSCH] 0x18FF50E5
-[NVRAM/BOSCH] save 7
--- family CONTI --
-[CAN/CONTI] 0x18FF50E5
-[NVRAM/CONTI] save 7
-family 数 2，零件组合 2 种</pre>
+      <pre>浅色 界面：[ 浅色按钮 ]  [ ] 浅色复选框
+深色 界面：[ 深色按钮 ]  [x] 深色复选框</pre>
     </div>
       <div class="codecard">
         <div class="ch"><span class="lang">C++</span><span class="fn">abstract_factory.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 抽象工厂 · C++：家族返回 unique_ptr，生命周期跟着走
-// 编译：g++ -std=c++17 -Wall -Wextra abstract_factory.cpp -o abstract_factory_cpp
+        <pre><code>// 抽象工厂 · GUI：浅色/深色两套控件
+// g++ -std=c++17 -Wall -Wextra abstract_factory.cpp -o abstract_factory_cpp
 #include &lt;cstdio&gt;
 #include &lt;memory&gt;
+#include &lt;string&gt;
 
-struct Can {
-    virtual ~Can() = default;
-    virtual void send(const char *msg) = 0;
-};
-struct Nvram {
-    virtual ~Nvram() = default;
-    virtual void save(int value) = 0;
-};
+class Button { public: virtual ~Button() = default; virtual std::string label() const = 0; };
+class Checkbox { public: virtual ~Checkbox() = default; virtual std::string label() const = 0; };
 
-class BoschCan : public Can {
-public:
-    void send(const char *m) override { std::printf("[CAN/BOSCH] %s\n", m); }
+class LightButton final : public Button {
+public: std::string label() const override { return "[ 浅色按钮 ]"; }
 };
-class BoschNvram : public Nvram {
-public:
-    void save(int v) override { std::printf("[NVRAM/BOSCH] save %d\n", v); }
-};
-class ContiCan : public Can {
-public:
-    void send(const char *m) override { std::printf("[CAN/CONTI] %s\n", m); }
-};
-class ContiNvram : public Nvram {
-public:
-    void save(int v) override { std::printf("[NVRAM/CONTI] save %d\n", v); }
+class LightCheckbox final : public Checkbox {
+public: std::string label() const override { return "[ ] 浅色复选框"; }
 };
 
-struct Family {
-    virtual ~Family() = default;
-    virtual const char *name() const = 0;
-    virtual std::unique_ptr&lt;Can&gt; makeCan() const = 0;
-    virtual std::unique_ptr&lt;Nvram&gt; makeNvram() const = 0;
+class DarkButton final : public Button {
+public: std::string label() const override { return "[ 深色按钮 ]"; }
+};
+class DarkCheckbox final : public Checkbox {
+public: std::string label() const override { return "[x] 深色复选框"; }
 };
 
-class BoschFamily : public Family {
+class GuiFactory {
 public:
-    const char *name() const override { return "BOSCH"; }
-    std::unique_ptr&lt;Can&gt; makeCan() const override { return std::make_unique&lt;BoschCan&gt;(); }
-    std::unique_ptr&lt;Nvram&gt; makeNvram() const override { return std::make_unique&lt;BoschNvram&gt;(); }
+    virtual ~GuiFactory() = default;
+    virtual std::unique_ptr&lt;Button&gt;   button() const = 0;
+    virtual std::unique_ptr&lt;Checkbox&gt; checkbox() const = 0;
+
+    void render(const char* theme) const {
+        auto b = button();
+        auto c = checkbox();
+        std::printf("%s 界面：%s  %s\n", theme, b-&gt;label().c_str(), c-&gt;label().c_str());
+    }
 };
-class ContiFamily : public Family {
+
+class LightFactory final : public GuiFactory {
 public:
-    const char *name() const override { return "CONTI"; }
-    std::unique_ptr&lt;Can&gt; makeCan() const override { return std::make_unique&lt;ContiCan&gt;(); }
-    std::unique_ptr&lt;Nvram&gt; makeNvram() const override { return std::make_unique&lt;ContiNvram&gt;(); }
+    std::unique_ptr&lt;Button&gt; button() const override { return std::make_unique&lt;LightButton&gt;(); }
+    std::unique_ptr&lt;Checkbox&gt; checkbox() const override { return std::make_unique&lt;LightCheckbox&gt;(); }
+};
+
+class DarkFactory final : public GuiFactory {
+public:
+    std::unique_ptr&lt;Button&gt; button() const override { return std::make_unique&lt;DarkButton&gt;(); }
+    std::unique_ptr&lt;Checkbox&gt; checkbox() const override { return std::make_unique&lt;DarkCheckbox&gt;(); }
 };
 
 int main()
 {
-    std::unique_ptr&lt;Family&gt; fams[] = {
-        std::make_unique&lt;BoschFamily&gt;(), std::make_unique&lt;ContiFamily&gt;()
-    };
-    for (auto &amp;f : fams) {
-        std::printf("-- family %s --\n", f-&gt;name());
-        auto can = f-&gt;makeCan();
-        auto nv = f-&gt;makeNvram();
-        can-&gt;send("0x18FF50E5");
-        nv-&gt;save(7);
-    }
-    std::printf("family 数 2，零件组合 2 种\n");
+    LightFactory light;
+    DarkFactory dark;
+    light.render("浅色");
+    dark.render("深色");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
       <div class="ch"><b>RUN</b><span>./abstract_factory_cpp.exe</span></div>
-      <pre>-- family BOSCH --
-[CAN/BOSCH] 0x18FF50E5
-[NVRAM/BOSCH] save 7
--- family CONTI --
-[CAN/CONTI] 0x18FF50E5
-[NVRAM/CONTI] save 7
-family 数 2，零件组合 2 种</pre>
+      <pre>浅色 界面：[ 浅色按钮 ]  [ ] 浅色复选框
+深色 界面：[ 深色按钮 ]  [x] 深色复选框</pre>
     </div>
   </section>
 
   <section class="sec" id="s4">
-    <h2><span class="n">04</span>换一个家族，看零件是否成套</h2>
+    <h2><span class="n">04</span>运行与演示</h2>
     
     
 <div class="demo" id="demo">
-  <div class="demo-h"><b>换一次家族，看两个零件是否成套</b><span>同一段业务流程，只切换家族；CAN 与 NVRAM 的厂牌始终一致。</span></div>
+  <div class="demo-h"><b>切一次主题，看两个控件是否成套</b><span>同一段界面代码，只换家族。</span></div>
   <div class="stage">
     <div class="dflow" id="dflow"></div>
     <div class="dbar" id="dbar">未开始</div>
@@ -242,18 +217,18 @@ family 数 2，零件组合 2 种</pre>
     <div class="log" id="dlog"></div>
   </div>
 </div>
-<script>dpDemo({nodes:[{id:'fam',label:'家族',sub:'BOSCH / CONTI',note:''}, {id:'can',label:'CAN',sub:'send()',note:''}, {id:'nv',label:'NVRAM',sub:'save()',note:''}, {id:'use',label:'业务流程',sub:'发一帧 + 存一次',note:''}],steps:[{hi:['fam'],t:'选家族 BOSCH：一次拿到 CAN 与 NVRAM 两个零件'}, {hi:['can'],t:'CAN 零件 = BOSCH，波特率 500k、周期 10ms'}, {hi:['nv'],t:'NVRAM 零件 = BOSCH，写周期 8ms，符合同一份时序预算'}, {hi:['use'],t:'业务流程：发送 0x18FF50E5，保存标定值 7'}, {hi:['fam', 'can', 'nv'],t:'切到家族 CONTI：两个零件同时换，业务流程一行不改'}, {hi:['use'],t:'再跑同一段流程：报文与保存都走 CONTI，没有混搭'}]});</script>
+<script>dpDemo({nodes:[{id:'ui',label:'界面',sub:'选主题',note:''}, {id:'fam',label:'家族',sub:'light/dark',note:''}, {id:'btn',label:'按钮',sub:'label()',note:''}, {id:'chk',label:'复选框',sub:'label()',note:''}],steps:[{hi:['ui', 'fam'],t:'界面选浅色家族'}, {hi:['btn'],t:'拿到浅色按钮：[ 浅色按钮 ]'}, {hi:['chk'],t:'拿到浅色复选框：[ ] 浅色复选框'}, {hi:['ui', 'fam'],t:'切到深色家族，界面代码不改'}, {hi:['btn', 'chk'],t:'按钮和复选框同时变深：[ 深色按钮 ] / [x] 深色复选框'}]});</script>
 
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>C 与 C++：两种“成套”</h2>
+    <h2><span class="n">05</span>C 与 C++ 对照</h2>
     
     
     <div class="tbl">
       <table>
         <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
-        <tbody><tr><td>家族</td><td><code>family_t</code> 结构 + 两个函数指针</td><td><code>Family</code> 抽象基类</td><td>C 的家族是数据；C++ 的家族是类型</td></tr><tr><td>零件交付</td><td>返回结构体（函数表按值拷贝）</td><td>返回 <code>unique_ptr</code></td><td>C 没有所有权概念，靠约定；C++ 由编译器兜底</td></tr><tr><td>新增家族</td><td>加一组 make_* 函数 + 一条表项</td><td>加一个派生类</td><td>两边都是一处新增，不动调用方</td></tr><tr><td>混搭可能性</td><td>调用方仍可手动取单个零件</td><td>接口上就拿不到单个零件</td><td>C 要靠代码评审守住，C++ 能靠类型挡住</td></tr><tr><td>零件生命周期</td><td>静态/栈对象，谁取谁管</td><td><code>unique_ptr</code> 归调用方</td><td>跨线程共享时要另加锁或引用计数</td></tr></tbody>
+        <tbody><tr><td>家族怎么表示</td><td><code>gui_factory_t</code> 两个函数指针</td><td><code>GuiFactory</code> 抽象基类</td><td>C 的家族是数据，C++ 的家族是类型</td></tr><tr><td>控件怎么交付</td><td>返回静态控件指针</td><td><code>unique_ptr&lt;Button&gt;</code></td><td>C 版不分配堆，C++ 版所有权清晰</td></tr><tr><td>换主题</td><td>换一个家族结构体</td><td>换一个工厂子类</td><td>调用方都只调一次</td></tr><tr><td>扩展新控件</td><td>家族结构加一个函数指针</td><td>基类加一个纯虚函数</td><td>两边都要动家族，这是它的代价</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -261,7 +236,7 @@ family 数 2，零件组合 2 种</pre>
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     
-    <div class="prose"><ul><li><b>家族不是“越多越好”。</b>两个家族刚好；五个家族会让每个新零件都要乘五份实现，先确认真的存在“整代切换”的需求。</li><li><b>别把可变状态塞进家族。</b>家族对象应是只读的“说明书”，当前车速、当前档位属于具体零件或上下文。</li><li><b>C 版函数表按值返回，别存局部指针。</b>函数表里若带指向栈上数据的 <code>void *ctx</code>，返回后会悬空；要么全静态，要么显式传上下文。</li><li><b>C++ 版注意虚析构。</b>基类析构必须是 <code>virtual</code>，否则 <code>unique_ptr</code> 删除派生对象时只析构基类。</li><li><b>测试要成对跑。</b>单测每个零件通过不代表组合通过；至少加一组“同代组合”的集成用例，把时序预算跑满。</li></ul></div>
+    <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/abstract-factory" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>把“主题”当成两个独立配置</b>只要允许分别指定，就迟早会混搭；要么合成一个家族字段，要么在入口校验。</li><li><b>家族里塞太多无关产品</b>抽象工厂适合“必须成套”的少量产品；产品一多，家族会变成上帝对象。</li><li><b>C 版返回可写静态对象</b>两个界面改同一个控件会互相影响；示例只读，真实实现应按需复制。</li></ul></div>
   </section>
   <div class="ch-nav" id="chNav"></div>
   </div>

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>4.11 访问者模式 VISITOR · C 与 C++ 双实现</title>
-<meta name="description" content="访问者：节点只负责 accept，统计逻辑放进 visitor，新增统计不改节点。">
+<meta name="description" content="访问者：文件与目录节点只负责 accept，统计逻辑放在访问者里。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
 <script src="../assets/dp-demo.js"></script>
@@ -36,117 +36,124 @@
   <div class="wrap">
   <div class="ch-meta"><span class="lv">篇四 · 行为型</span><span class="sep">/</span>第 11 章<span class="sep">/</span>约 30 分钟</div>
   <h1>访问者模式<span class="en">VISITOR</span></h1>
-  <p class="lede">诊断树里有 ECU、传感器、执行器三类节点。要统计数量、找最老故障、导出报告，若每个节点自己写一套 <code>count()</code>，节点类会越来越胖。<b>访问者把“遍历时的动作”搬出去</b>：节点只提供 <code>accept()</code>，visitor 决定要做什么。</p>
-  <div class="chips"><span class="chip ok">accept + visit 双向分派</span><span class="chip">统计搬出节点</span><span class="chip">新增统计不改节点</span></div>
+  <p class="lede">目录树要做统计：文件数、总字节、最大文件、按扩展名分组……如果每加一种统计就改每个节点，节点会变成统计代码的垃圾场。访问者把统计搬出去：<b>节点只负责 accept，访问者决定访问时做什么</b>。</p>
+  <div class="chips"><span class="chip ok">统计与节点解耦</span><span class="chip">一次遍历多种统计</span><span class="chip">C 用函数表 · C++ 用双重分派</span></div>
 
   <section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：统计逻辑散落在每个节点</h2>
+    <h2><span class="n">01</span>问题：坏代码长什么样</h2>
     
     
       <div class="prose">
-        <p>把统计写进节点，最初只有一行：</p>
-        <pre><code>if (node-&gt;kind == ECU) ecus++;
-else if (node-&gt;kind == SENSOR) sensors++;</code></pre>
-        <ul>
-          <li><b>每加一种统计就改节点。</b>数量、最老故障、导出 JSON，全塞进同一个类。</li>
-          <li><b>类型判断散落。</b><code>switch (kind)</code> 在每个统计函数里复制，新增节点类型要全改。</li>
-          <li><b>节点被迫认识业务。</b>节点本是数据结构，却开始依赖报表格式。</li>
-        </ul>
-        <p>访问者把动作分成独立对象：节点只回答“我是什么类型”，visitor 针对每种类型写一个 <code>visit()</code>。新增统计只加一个 visitor，节点一行不改。</p>
+        <p>坏写法是节点里塞满统计字段：</p>
+        <pre><code>struct node { int size; int file_count; int max_size; ... };
+/* 每加一种统计，所有节点都要改 */</code></pre>
+        <p>节点本该只描述“我是文件还是目录、我有多大”；统计是使用方的关注点，不该焊进数据结构。</p>
+        <p>访问者把动作外置：节点调 <code>accept(v)</code>，访问者按节点类型分别处理。加统计只加访问者，节点不动。</p>
       </div>
   </section>
 
   <section class="sec" id="s2">
     <h2><span class="n">02</span>结构：accept 与 visit 双向分派</h2>
-    <p class="subh">三类节点在左，visitor 在右；箭头是 accept 后的双向分派。</p>
+    <p class="subh">左边是节点，中间是 accept 分派，右边是访问者。</p>
     
   
     <div class="fig">
-      <div class="fig-h"><b>accept / visit 双向分派</b><span>visitor</span></div>
+      <div class="fig-h"><b>节点只开门，访问者决定做什么</b><span>structure</span></div>
       <div class="diagram">
-<svg viewBox="0 0 880 360" role="img" aria-label="accept / visit 双向分派">
+<svg viewBox="0 0 880 360" role="img" aria-label="节点只开门，访问者决定做什么">
   <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
-  <g class="node" data-role="ecu" data-note="ECU 节点只把自己的类型告诉 visitor，不关心 visitor 要统计什么。"><rect x="50" y="48" width="200" height="76" rx="10"/><text class="nm" x="64" y="72">Ecu</text><text class="ty" x="64" y="91">节点</text><text class="mt" x="64" y="109">accept(v)</text></g>
-  <g class="node" data-role="sensor" data-note="传感器节点同样只做分派；节点之间没有继承关系之外的知识。"><rect x="50" y="148" width="200" height="76" rx="10"/><text class="nm" x="64" y="172">Sensor</text><text class="ty" x="64" y="191">节点</text><text class="mt" x="64" y="209">accept(v)</text></g>
-  <g class="node" data-role="act" data-note="执行器节点也一样；新增节点类型时，visitor 接口要补一个 visit。"><rect x="50" y="248" width="200" height="76" rx="10"/><text class="nm" x="64" y="272">Actuator</text><text class="ty" x="64" y="291">节点</text><text class="mt" x="64" y="309">accept(v)</text></g>
-  <g class="node" data-role="visitor" data-note="visitor 持有统计状态；一次遍历结束后统一 report。"><rect x="430" y="120" width="260" height="150" rx="10"/><text class="nm" x="444" y="144">Visitor</text><text class="ty" x="444" y="163">访问者</text><text class="mt" x="444" y="181">visit(Ecu/Sensor/Act)</text></g>
-  <line x1="250" y1="86" x2="430" y2="150" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="340.0" y="110.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">accept</text>
-  <line x1="250" y1="186" x2="430" y2="186" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="340.0" y="178.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">accept</text>
-  <line x1="250" y1="286" x2="430" y2="235" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="340.0" y="252.5" fill="#8fa3c4" font-size="10.5" text-anchor="middle">accept</text>
+  <g class="node" data-role="node" data-note="节点只知道自己是文件还是目录。"><rect x="24" y="140" width="150" height="76" rx="10"/><text class="nm" x="38" y="164">Node</text><text class="ty" x="38" y="183">节点</text><text class="mt" x="38" y="201">accept(v)</text></g>
+  <g class="node" data-role="acc" data-note="先按节点类型，再按访问者类型分派。"><rect x="250" y="140" width="190" height="84" rx="10"/><text class="nm" x="264" y="164">accept</text><text class="ty" x="264" y="183">双重分派</text><text class="mt" x="264" y="201">file→visitFile</text></g>
+  <g class="node" data-role="v" data-note="统计逻辑集中在这里。"><rect x="520" y="56" width="190" height="74" rx="10"/><text class="nm" x="534" y="80">Visitor</text><text class="ty" x="534" y="99">访问者</text><text class="mt" x="534" y="117">visitFile/visitDir</text></g>
+  <g class="node" data-role="stat" data-note="结果由访问者累计，节点不持有。"><rect x="520" y="212" width="190" height="74" rx="10"/><text class="nm" x="534" y="236">Counter</text><text class="ty" x="534" y="255">统计结果</text><text class="mt" x="534" y="273">2 文件 / 200B</text></g>
+  <line x1="174" y1="178" x2="250" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="212.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">accept</text>
+  <line x1="440" y1="160" x2="520" y2="100" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="122.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">文件</text>
+  <line x1="440" y1="200" x2="520" y2="242" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="213.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">目录</text>
 </svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：节点只分派，visitor 才做统计。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">访问者模式把“遍历结构”和“对每个节点做什么”分开。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
-    <h2><span class="n">03</span>两份实现</h2>
+    <h2><span class="n">03</span>两份实现：C 与 C++</h2>
     
-    <p class='subh'>C 版用 <code>accept</code> 函数指针 + 一个 visitor 结构；C++ 版是标准双分派：<code>Element::accept(Visitor&amp;)</code>。</p>
+    <p class='subh'>C 版节点里放 <code>accept</code> 函数指针，访问者是一组回调；C++ 版用 <code>accept(Visitor&amp;)</code> + 虚函数实现双重分派。</p>
       <div class="codecard">
         <div class="ch"><span class="lang">C</span><span class="fn">visitor.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 访问者：节点只负责 accept，统计逻辑放在 visitor 里 */
+        <pre><code>/* 访问者 · 文件统计
+ * gcc -std=c11 -Wall -Wextra visitor.c -o visitor
+ */
 #include &lt;stdio.h&gt;
 
 typedef struct visitor visitor_t;
 typedef struct node node_t;
 
 struct node {
-    const char *name;
-    int kind;              /* 0=ECU 1=SENSOR 2=ACTUATOR */
-    void (*accept)(node_t *self, visitor_t *v);
+    char name[16];
+    int is_dir;
+    int size;
+    node_t *kids[3];
+    int nkids;
+    void (*accept)(node_t *, visitor_t *);
 };
 
 struct visitor {
-    int ecus, sensors, actuators;
-    void (*visit)(visitor_t *self, node_t *n);
+    int files;
+    int total;
+    void (*visit_file)(visitor_t *, const node_t *);
+    void (*visit_dir)(visitor_t *, const node_t *);
 };
 
-static void visit_node(visitor_t *self, node_t *n)
-{
-    static const char *KIND[] = { "ECU", "SENSOR", "ACTUATOR" };
-    printf("visit %-8s %s\n", KIND[n-&gt;kind], n-&gt;name);
-    if (n-&gt;kind == 0) self-&gt;ecus++;
-    else if (n-&gt;kind == 1) self-&gt;sensors++;
-    else self-&gt;actuators++;
-}
+static void file_accept(node_t *n, visitor_t *v) { v-&gt;visit_file(v, n); }
+static void dir_accept(node_t *n, visitor_t *v)  { v-&gt;visit_dir(v, n); }
 
-static void accept_node(node_t *self, visitor_t *v) { v-&gt;visit(v, self); }
+static void count_file(visitor_t *v, const node_t *n)
+{
+    v-&gt;files++; v-&gt;total += n-&gt;size;
+    printf("  文件 %s (%d 字节)\n", n-&gt;name, n-&gt;size);
+}
+static void enter_dir(visitor_t *v, const node_t *n)
+{
+    printf("  进入目录 %s\n", n-&gt;name);
+    (void)v;
+}
 
 int main(void)
 {
-    node_t nodes[] = {
-        { "engine_ecu", 0, accept_node },
-        { "o2_sensor",  1, accept_node },
-        { "injector",   2, accept_node },
-        { "abs_ecu",    0, accept_node },
-    };
-    visitor_t v = { 0, 0, 0, visit_node };
+    node_t a = { "a.c", 0, 120, { 0 }, 0, file_accept };
+    node_t b = { "b.c", 0, 80,  { 0 }, 0, file_accept };
+    node_t d = { "src", 1, 0, { &amp;a, &amp;b, NULL }, 2, dir_accept };
+    node_t r = { "root", 1, 0, { &amp;d, NULL, NULL }, 1, dir_accept };
 
-    for (size_t i = 0; i &lt; sizeof nodes / sizeof nodes[0]; i++)
-        nodes[i].accept(&amp;nodes[i], &amp;v);
+    visitor_t v = { 0, 0, count_file, enter_dir };
 
-    printf("合计 ECU=%d SENSOR=%d ACTUATOR=%d\n", v.ecus, v.sensors, v.actuators);
-    printf("新增一种统计，只写新的 visitor，不改节点\n");
+    r.accept(&amp;r, &amp;v);
+    d.accept(&amp;d, &amp;v);
+    a.accept(&amp;a, &amp;v);
+    b.accept(&amp;b, &amp;v);
+
+    printf("统计：%d 个文件，%d 字节\n", v.files, v.total);
+    printf("节点只负责 accept，统计逻辑在 visitor 里\n");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
       <div class="ch"><b>RUN</b><span>./visitor.exe</span></div>
-      <pre>visit ECU      engine_ecu
-visit SENSOR   o2_sensor
-visit ACTUATOR injector
-visit ECU      abs_ecu
-合计 ECU=2 SENSOR=1 ACTUATOR=1
-新增一种统计，只写新的 visitor，不改节点</pre>
+      <pre>  进入目录 root
+  进入目录 src
+  文件 a.c (120 字节)
+  文件 b.c (80 字节)
+统计：2 个文件，200 字节
+节点只负责 accept，统计逻辑在 visitor 里</pre>
     </div>
       <div class="codecard">
         <div class="ch"><span class="lang">C++</span><span class="fn">visitor.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 访问者 · C++：accept/visit 双向分派，节点与统计彻底解耦
-// 编译：g++ -std=c++17 -Wall -Wextra visitor.cpp -o visitor_cpp
+        <pre><code>// 访问者 · 文件统计
+// g++ -std=c++17 -Wall -Wextra visitor.cpp -o visitor_cpp
 #include &lt;cstdio&gt;
 #include &lt;memory&gt;
 #include &lt;string&gt;
@@ -154,85 +161,97 @@ visit ECU      abs_ecu
 
 class Visitor;
 
-class Element {
+class Node {
 public:
-    explicit Element(std::string name) : name_(std::move(name)) {}
-    virtual ~Element() = default;
-    const std::string &amp;name() const { return name_; }
-    virtual void accept(Visitor &amp;v) const = 0;
-protected:
+    Node(std::string name, bool dir, int size = 0)
+        : name_(std::move(name)), dir_(dir), size_(size) {}
+    virtual ~Node() = default;
+    virtual void accept(Visitor&amp; v) = 0;
+    const std::string&amp; name() const { return name_; }
+    int size() const { return size_; }
+    bool isDir() const { return dir_; }
+private:
     std::string name_;
+    bool dir_;
+    int size_;
+};
+
+class File final : public Node {
+public:
+    File(std::string n, int s) : Node(std::move(n), false, s) {}
+    void accept(Visitor&amp; v) override;
+};
+
+class Dir final : public Node {
+public:
+    Dir(std::string n) : Node(std::move(n), true) {}
+    void add(std::unique_ptr&lt;Node&gt; k) { kids_.push_back(std::move(k)); }
+    const std::vector&lt;std::unique_ptr&lt;Node&gt;&gt;&amp; kids() const { return kids_; }
+    void accept(Visitor&amp; v) override;
+private:
+    std::vector&lt;std::unique_ptr&lt;Node&gt;&gt; kids_;
 };
 
 class Visitor {
 public:
     virtual ~Visitor() = default;
-    virtual void visit(const class Ecu &amp;e) = 0;
-    virtual void visit(const class Sensor &amp;s) = 0;
-    virtual void visit(const class Actuator &amp;a) = 0;
+    virtual void visitFile(const File&amp; f) = 0;
+    virtual void visitDir(const Dir&amp; d) = 0;
 };
 
-class Ecu : public Element {
+class Counter final : public Visitor {
 public:
-    using Element::Element;
-    void accept(Visitor &amp;v) const override { v.visit(*this); }
-};
-class Sensor : public Element {
-public:
-    using Element::Element;
-    void accept(Visitor &amp;v) const override { v.visit(*this); }
-};
-class Actuator : public Element {
-public:
-    using Element::Element;
-    void accept(Visitor &amp;v) const override { v.visit(*this); }
-};
-
-class Counter : public Visitor {
-public:
-    void visit(const Ecu &amp;e) override      { std::printf("visit ECU      %s\n", e.name().c_str()); ecus_++; }
-    void visit(const Sensor &amp;s) override   { std::printf("visit SENSOR   %s\n", s.name().c_str()); sensors_++; }
-    void visit(const Actuator &amp;a) override { std::printf("visit ACTUATOR %s\n", a.name().c_str()); actuators_++; }
-    void report() const
-    {
-        std::printf("合计 ECU=%d SENSOR=%d ACTUATOR=%d\n", ecus_, sensors_, actuators_);
-        std::printf("新增一种统计，只写新的 visitor，不改节点\n");
+    void visitFile(const File&amp; f) override {
+        ++files_; total_ += f.size();
+        std::printf("  文件 %s (%d 字节)\n", f.name().c_str(), f.size());
     }
+    void visitDir(const Dir&amp; d) override {
+        std::printf("  进入目录 %s\n", d.name().c_str());
+    }
+    int files() const { return files_; }
+    int total() const { return total_; }
 private:
-    int ecus_ = 0, sensors_ = 0, actuators_ = 0;
+    int files_ = 0;
+    int total_ = 0;
 };
+
+void File::accept(Visitor&amp; v) { v.visitFile(*this); }
+void Dir::accept(Visitor&amp; v) { v.visitDir(*this); }
 
 int main()
 {
-    std::vector&lt;std::unique_ptr&lt;Element&gt;&gt; nodes;
-    nodes.push_back(std::make_unique&lt;Ecu&gt;("engine_ecu"));
-    nodes.push_back(std::make_unique&lt;Sensor&gt;("o2_sensor"));
-    nodes.push_back(std::make_unique&lt;Actuator&gt;("injector"));
-    nodes.push_back(std::make_unique&lt;Ecu&gt;("abs_ecu"));
+    auto a = std::make_unique&lt;File&gt;("a.c", 120);
+    auto b = std::make_unique&lt;File&gt;("b.c", 80);
+    auto src = std::make_unique&lt;Dir&gt;("src");
+    src-&gt;add(std::move(a));
+    src-&gt;add(std::move(b));
 
     Counter c;
-    for (const auto &amp;n : nodes) n-&gt;accept(c);
-    c.report();
+    src-&gt;kids()[0]-&gt;accept(c);
+    src-&gt;kids()[1]-&gt;accept(c);
+    src-&gt;accept(c);
+
+    std::printf("统计：%d 个文件，%d 字节\n", c.files(), c.total());
+    std::puts("节点只负责 accept，统计逻辑在 visitor 里");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
       <div class="ch"><b>RUN</b><span>./visitor_cpp.exe</span></div>
-      <pre>visit ECU      engine_ecu
-visit SENSOR   o2_sensor
-visit ACTUATOR injector
-visit ECU      abs_ecu
-合计 ECU=2 SENSOR=1 ACTUATOR=1
-新增一种统计，只写新的 visitor，不改节点</pre>
+      <pre>  文件 a.c (120 字节)
+  文件 b.c (80 字节)
+  进入目录 src
+统计：2 个文件，200 字节
+节点只负责 accept，统计逻辑在 visitor 里</pre>
     </div>
   </section>
 
   <section class="sec" id="s4">
-    <h2><span class="n">04</span>四个节点，一次统计</h2>
+    <h2><span class="n">04</span>运行与演示</h2>
     
     
 <div class="demo" id="demo">
-  <div class="demo-h"><b>四个节点，一次统计</b><span>同一遍遍历，visitor 分别处理 ECU、传感器、执行器。</span></div>
+  <div class="demo-h"><b>两个文件一个目录，统计一次</b><span>Counter 访问者累计文件数和字节。</span></div>
   <div class="stage">
     <div class="dflow" id="dflow"></div>
     <div class="dbar" id="dbar">未开始</div>
@@ -246,18 +265,18 @@ visit ECU      abs_ecu
     <div class="log" id="dlog"></div>
   </div>
 </div>
-<script>dpDemo({nodes:[{id:'e1',label:'engine_ecu',sub:'ECU',note:''}, {id:'s1',label:'o2_sensor',sub:'SENSOR',note:''}, {id:'a1',label:'injector',sub:'ACTUATOR',note:''}, {id:'e2',label:'abs_ecu',sub:'ECU',note:''}, {id:'v',label:'Counter',sub:'visitor',note:''}],steps:[{hi:['e1', 'v'],t:'engine_ecu.accept(counter)：分派到 visit(Ecu)'}, {hi:['s1', 'v'],t:'o2_sensor.accept：分派到 visit(Sensor)'}, {hi:['a1', 'v'],t:'injector.accept：分派到 visit(Actuator)'}, {hi:['e2', 'v'],t:'abs_ecu.accept：又一条 ECU'}, {hi:['v'],t:'遍历结束：ECU=2，SENSOR=1，ACTUATOR=1'}, {hi:['v'],t:'新增“导出 JSON”只写一个新 visitor，节点一行不改'}]});</script>
+<script>dpDemo({nodes:[{id:'root',label:'root',sub:'目录',note:''}, {id:'src',label:'src',sub:'目录',note:''}, {id:'a',label:'a.c',sub:'120B',note:''}, {id:'b',label:'b.c',sub:'80B',note:''}],steps:[{hi:['root', 'src'],t:'根节点 accept：进入 root 目录'}, {hi:['src'],t:'src 目录 accept：进入 src'}, {hi:['a'],t:'a.c accept：Counter 记 1 个文件、120 字节'}, {hi:['b'],t:'b.c accept：再记 1 个文件、80 字节'}, {hi:['root'],t:'汇总：2 个文件，200 字节'}]});</script>
 
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>C 与 C++：分派的代价</h2>
+    <h2><span class="n">05</span>C 与 C++ 对照</h2>
     
     
     <div class="tbl">
       <table>
         <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
-        <tbody><tr><td>分派</td><td><code>accept</code> 函数指针 + <code>visit</code></td><td>虚 <code>accept</code> + 虚 <code>visit</code></td><td>C 手写两跳；C++ 编译器生成</td></tr><tr><td>节点</td><td><code>node_t</code> + <code>kind</code></td><td><code>Ecu/Sensor/Actuator</code> 类</td><td>C 用整数区分；C++ 用类型</td></tr><tr><td>visitor</td><td>结构体 + 计数</td><td><code>Counter : Visitor</code></td><td>统计状态归 visitor</td></tr><tr><td>新增统计</td><td>加一个 visitor 函数</td><td>加一个派生 visitor</td><td>都不改节点</td></tr><tr><td>新增节点类型</td><td>加 kind + 改 visit</td><td>加类 + 扩 Visitor 接口</td><td>两边都要动接口，这是代价</td></tr></tbody>
+        <tbody><tr><td>分派</td><td><code>accept</code> 函数指针 + 回调</td><td><code>accept(Visitor&amp;)</code> 虚函数</td><td>C 手动，C++ 双重分派</td></tr><tr><td>节点状态</td><td>只存名字/类型/大小</td><td>只存名字/类型/大小</td><td>不塞统计字段</td></tr><tr><td>加统计</td><td>加一个访问者结构</td><td>加一个 Visitor 子类</td><td>节点完全不动</td></tr><tr><td>遍历</td><td>调用方按树结构递归</td><td>调用方按树结构递归</td><td>访问者不负责找孩子</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -265,7 +284,7 @@ visit ECU      abs_ecu
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     
-    <div class="prose"><ul><li><b>访问者不是“遍历器”。</b>它只负责“访问到某节点时做什么”；遍历顺序仍由树或调用方决定。</li><li><b>接口扩张是硬代价。</b>新增节点类型要改所有 visitor；节点类型稳定、统计多变时，访问者才划算。</li><li><b>别在 visit 里改节点。</b>遍历中修改结构会让后续访问错位；要改就收集后统一处理。</li><li><b>C 版函数指针要判空。</b><code>accept</code> 或 <code>visit</code> 漏填会直接崩；初始化时统一校验。</li><li><b>C++ 版注意 const 正确性。</b>visitor 统计会改自身状态，<code>visit</code> 不能声明为 const；节点的 <code>accept</code> 可以是 const。</li></ul></div>
+    <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/visitor" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>节点类型判断漏分支</b>访问者必须覆盖所有节点类型，否则统计会漏。</li><li><b>访问者里改节点</b>访问者应只读；要改结构就另开一次操作，别在遍历中改。</li><li><b>双重分派成本</b>每次访问两次虚调用；极热路径要考虑缓存或内联。</li></ul></div>
   </section>
   <div class="ch-nav" id="chNav"></div>
   </div>

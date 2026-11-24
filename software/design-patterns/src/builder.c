@@ -1,59 +1,39 @@
-/* 建造者：把“拼一帧”拆成可检查的步骤，最后一次性交付 */
+/* 建造者 · 一步步盖房子
+ * gcc -std=c11 -Wall -Wextra builder.c -o builder
+ */
 #include <stdio.h>
-#include <stddef.h>
 
 typedef struct {
-    unsigned id;
-    int dlc;
-    unsigned char data[8];
-    unsigned crc;
-} frame_t;
+    int walls, doors, windows;
+    int has_roof;
+} house_t;
 
-typedef struct { frame_t f; } builder_t;
+static void add_walls(house_t *h, int n)   { h->walls = n;   printf("  砌 %d 面墙\n", n); }
+static void add_doors(house_t *h, int n)   { h->doors = n;   printf("  装 %d 扇门\n", n); }
+static void add_windows(house_t *h, int n) { h->windows = n; printf("  装 %d 扇窗\n", n); }
+static void add_roof(house_t *h)           { h->has_roof = 1; printf("  封顶\n"); }
 
-static void b_start(builder_t *b)          { b->f.id = 0; b->f.dlc = 0; b->f.crc = 0; }
-static void b_id(builder_t *b, unsigned v) { b->f.id = v; }
-static void b_data(builder_t *b, const unsigned char *d, int n)
+static int build(const house_t *h)
 {
-    if (n > 8) n = 8;
-    b->f.dlc = n;
-    for (int i = 0; i < n; i++) b->f.data[i] = d[i];
-}
-static void b_crc(builder_t *b)
-{
-    unsigned sum = b->f.id;
-    for (int i = 0; i < b->f.dlc; i++) sum += b->f.data[i];
-    b->f.crc = sum & 0xFFu;
-}
-static frame_t b_build(const builder_t *b) { return b->f; }
-
-static void dump(const frame_t *f)
-{
-    printf("id=0x%X dlc=%d data=[", f->id, f->dlc);
-    for (int i = 0; i < f->dlc; i++) printf("%s%02X", i ? " " : "", f->data[i]);
-    printf("] crc=0x%02X\n", f->crc);
+    if (h->walls < 4 || h->doors < 1 || h->windows < 1 || !h->has_roof) {
+        printf("  校验失败：房子还不完整\n");
+        return -1;
+    }
+    printf("  交付：%d 墙 / %d 门 / %d 窗 / 有屋顶\n",
+           h->walls, h->doors, h->windows);
+    return 0;
 }
 
 int main(void)
 {
-    builder_t b;
-    unsigned char payload[8] = { 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80 };
+    house_t h = { 0, 0, 0, 0 };
+    printf("普通小屋：\n");
+    add_walls(&h, 4); add_doors(&h, 1); add_windows(&h, 2); add_roof(&h);
+    build(&h);
 
-    b_start(&b);
-    b_id(&b, 0x18FF50E5u);
-    b_data(&b, payload, 3);
-    b_crc(&b);
-    frame_t f1 = b_build(&b);
-    printf("frame1 ");
-    dump(&f1);
-
-    b_start(&b);                 /* 复用同一个 builder，不残留上一帧 */
-    b_id(&b, 0x7DFu);
-    b_data(&b, payload, 8);      /* 超长被截到 8 字节 */
-    b_crc(&b);
-    frame_t f2 = b_build(&b);
-    printf("frame2 ");
-    dump(&f2);
-    printf("两次建造独立：frame1 dlc=%d, frame2 dlc=%d\n", f1.dlc, f2.dlc);
+    house_t v = { 0, 0, 0, 0 };
+    printf("缺步骤的房子：\n");
+    add_walls(&v, 4); add_doors(&v, 1);
+    build(&v);
     return 0;
 }

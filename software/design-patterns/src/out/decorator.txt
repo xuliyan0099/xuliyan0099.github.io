@@ -1,5 +1,4 @@
-raw       = 42
-+offset5  = 47
-+clamp40  = 40
-负值路径  = 0
-三层顺序：raw -> offset -> clamp，换顺序结果会变
+原始：hello
+加粗：<b>hello</b>
+加粗+斜体：<i><b>hello</b></i>
+顺序反过来：<b><i>hello</i></b>

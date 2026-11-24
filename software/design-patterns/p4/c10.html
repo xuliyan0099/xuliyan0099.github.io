@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>4.10 模板方法模式 TEMPLATE METHOD · C 与 C++ 双实现</title>
-<meta name="description" content="模板方法：自检顺序固定，电源/通信/传感器三步由子类实现。">
+<meta name="description" content="模板方法：报表骨架固定，CSV 与 HTML 只换表头、行、表尾三步。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
 <script src="../assets/dp-demo.js"></script>
@@ -36,198 +36,181 @@
   <div class="wrap">
   <div class="ch-meta"><span class="lv">篇四 · 行为型</span><span class="sep">/</span>第 10 章<span class="sep">/</span>约 28 分钟</div>
   <h1>模板方法模式<span class="en">TEMPLATE METHOD</span></h1>
-  <p class="lede">台架自检和现场自检的步骤完全一样：电源、通信、传感器，任何一步失败就中止。差别只在每步的具体实现。<b>模板方法把顺序写在一个 <code>run()</code> 里，把每步留成可覆写的钩子</b>，两个变体共用同一套日志和短路规则。</p>
-  <div class="chips"><span class="chip ok">骨架只写一遍</span><span class="chip">步骤可替换</span><span class="chip">失败立即中止</span></div>
+  <p class="lede">同一份数据要导出 CSV 和 HTML。两种格式的“取数—循环—收尾”顺序完全一样，只有表头、每行、表尾不同。模板方法把骨架写死在一个 <code>run()</code> 里，<b>把可变的三步留给子类实现</b>。</p>
+  <div class="chips"><span class="chip ok">骨架只写一遍</span><span class="chip">可变步骤下沉</span><span class="chip">C 用函数表 · C++ 用虚函数</span></div>
 
   <section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：自检流程抄了四遍，顺序还不一致</h2>
+    <h2><span class="n">01</span>问题：坏代码长什么样</h2>
     
     
       <div class="prose">
-        <p>复制流程的写法：</p>
-        <pre><code>int bench_test(void) { power(); comm(); sensor(); ... }
-int field_test(void) { power(); comm(); sensor(); ... }</code></pre>
-        <p>两份代码看起来一样，实际已经开始漂移：</p>
-        <ul>
-          <li><b>顺序不一致。</b>现场版为了快，把传感器挪到通信前面，失败日志就对不上。</li>
-          <li><b>短路规则不同。</b>台架版继续跑完，现场版第一步失败就退出，统计口径不同。</li>
-          <li><b>加一步要改多处。</b>新增“绝缘检查”，两份都要改，第三份测试桩又漏了。</li>
-        </ul>
-        <p>模板方法只保留一个 <code>run()</code>：顺序、日志、短路都在骨架里；子类只实现 <code>power()/comm()/sensor()</code>。新增步骤只改骨架一处。</p>
+        <p>坏写法是两套完整流程：</p>
+        <pre><code>csv_report();    /* 自己循环 1..3 */
+html_report();   /* 又抄一遍循环，顺序还可能不一样 */</code></pre>
+        <p>循环次数、异常处理、空数据判断都抄了两遍；改一处忘另一处，两个报表行为就不一致。</p>
+        <p>模板方法只保留一个 <code>run()</code>：先表头，再循环，再表尾。CSV 和 HTML 各自实现这三步，骨架不再重复。</p>
       </div>
   </section>
 
   <section class="sec" id="s2">
-    <h2><span class="n">02</span>结构：骨架固定，步骤可换</h2>
-    <p class="subh">骨架在左，两个变体在右；点方框看失败如何中止后续步骤。</p>
+    <h2><span class="n">02</span>结构：骨架固定，三步可换</h2>
+    <p class="subh">左边是报表骨架，中间是三个可变步骤，右边是两个格式。</p>
     
   
     <div class="fig">
-      <div class="fig-h"><b>自检骨架与两个变体</b><span>template method</span></div>
+      <div class="fig-h"><b>骨架固定，三步可换</b><span>structure</span></div>
       <div class="diagram">
-<svg viewBox="0 0 880 360" role="img" aria-label="自检骨架与两个变体">
+<svg viewBox="0 0 880 360" role="img" aria-label="骨架固定，三步可换">
   <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
-  <g class="node" data-role="tpl" data-note="骨架负责顺序、日志、失败中止；它不实现任何一步的具体逻辑。"><rect x="40" y="110" width="240" height="130" rx="10"/><text class="nm" x="54" y="134">run()</text><text class="ty" x="54" y="153">模板骨架</text><text class="mt" x="54" y="171">power → comm → sensor</text></g>
-  <g class="node" data-role="bench" data-note="台架变体三步都返回成功，用来验证骨架本身。"><rect x="420" y="56" width="210" height="90" rx="10"/><text class="nm" x="434" y="80">bench</text><text class="ty" x="434" y="99">变体</text><text class="mt" x="434" y="117">三步都成功</text></g>
-  <g class="node" data-role="field" data-note="现场变体在传感器步失败；骨架立即中止，不再跑后续步骤。"><rect x="420" y="206" width="210" height="90" rx="10"/><text class="nm" x="434" y="230">field</text><text class="ty" x="434" y="249">变体</text><text class="mt" x="434" y="267">sensor 失败</text></g>
-  <line x1="280" y1="150" x2="420" y2="101" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <line x1="280" y1="200" x2="420" y2="251" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <g class="node" data-role="run" data-note="顺序和循环次数只在这里。"><rect x="24" y="140" width="150" height="76" rx="10"/><text class="nm" x="38" y="164">Report.run</text><text class="ty" x="38" y="183">模板</text><text class="mt" x="38" y="201">header → rows → footer</text></g>
+  <g class="node" data-role="hooks" data-note="子类只实现这三步。"><rect x="250" y="140" width="190" height="84" rx="10"/><text class="nm" x="264" y="164">三步钩子</text><text class="ty" x="264" y="183">可变部分</text><text class="mt" x="264" y="201">header/row/footer</text></g>
+  <g class="node" data-role="csv" data-note="CSV 的表头和行格式。"><rect x="520" y="56" width="190" height="74" rx="10"/><text class="nm" x="534" y="80">CsvReport</text><text class="ty" x="534" y="99">实现 A</text><text class="mt" x="534" y="117">id,qty</text></g>
+  <g class="node" data-role="html" data-note="HTML 的表头和行格式。"><rect x="520" y="212" width="190" height="74" rx="10"/><text class="nm" x="534" y="236">HtmlReport</text><text class="ty" x="534" y="255">实现 B</text><text class="mt" x="534" y="273">&amp;lt;table&amp;gt;</text></g>
+  <line x1="174" y1="178" x2="250" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="212.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">调用</text>
+  <line x1="440" y1="160" x2="520" y2="100" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="122.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">实现</text>
+  <line x1="440" y1="200" x2="520" y2="242" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="213.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">实现</text>
 </svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：骨架不关心步骤怎么实现，只关心顺序与失败。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">骨架方法不应被调用方覆盖；钩子方法才是扩展点。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
-    <h2><span class="n">03</span>两份实现</h2>
+    <h2><span class="n">03</span>两份实现：C 与 C++</h2>
     
-    <p class='subh'>C 版用函数指针表；C++ 版 <code>run()</code> 非虚、三个步骤虚函数。</p>
+    <p class='subh'>C 版报表是“名字 + 三个函数指针”的结构；C++ 版是抽象基类，<code>run()</code> 非虚，三步纯虚。</p>
       <div class="codecard">
         <div class="ch"><span class="lang">C</span><span class="fn">template_method.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 模板方法：自检顺序固定，每一步换成具体实现 */
+        <pre><code>/* 模板方法 · 生成 CSV / HTML 报告
+ * gcc -std=c11 -Wall -Wextra template_method.c -o template_method
+ */
 #include &lt;stdio.h&gt;
 
 typedef struct {
     const char *name;
-    int (*power)(void);
-    int (*comm)(void);
-    int (*sensor)(void);
-} selftest_t;
+    void (*header)(void);
+    void (*row)(int);
+    void (*footer)(void);
+} report_t;
 
-/* 骨架：顺序不可改，任何一步失败立即中止 */
-static int run(const selftest_t *t)
+static void run(const report_t *r)
 {
-    printf("== %s ==\n", t-&gt;name);
-    printf("step1 power  ... ");
-    if (!t-&gt;power())  { printf("FAIL\n"); return 0; }
-    printf("OK\n");
-
-    printf("step2 comm   ... ");
-    if (!t-&gt;comm())   { printf("FAIL\n"); return 0; }
-    printf("OK\n");
-
-    printf("step3 sensor ... ");
-    if (!t-&gt;sensor()) { printf("FAIL\n"); return 0; }
-    printf("OK\n");
-
-    printf("result PASS\n");
-    return 1;
+    printf("== %s ==\n", r-&gt;name);
+    r-&gt;header();
+    for (int i = 1; i &lt;= 3; i++) r-&gt;row(i);
+    r-&gt;footer();
 }
 
-static int p_ok(void)  { return 1; }
-static int c_ok(void)  { return 1; }
-static int s_ok(void)  { return 1; }
-static int s_bad(void) { return 0; }
+static void csv_header(void) { puts("id,qty"); }
+static void csv_row(int i)    { printf("%d,%d\n", i, i * 10); }
+static void csv_footer(void)  { puts("--"); }
+
+static void html_header(void) { puts("&lt;table&gt;"); }
+static void html_row(int i)   { printf("&lt;tr&gt;&lt;td&gt;%d&lt;/td&gt;&lt;td&gt;%d&lt;/td&gt;&lt;/tr&gt;\n", i, i * 10); }
+static void html_footer(void) { puts("&lt;/table&gt;"); }
 
 int main(void)
 {
-    const selftest_t bench = { "bench",  p_ok, c_ok, s_ok };
-    const selftest_t field = { "field",  p_ok, c_ok, s_bad };
-
-    run(&amp;bench);
-    run(&amp;field);
-    printf("两个变体共用同一套顺序与日志\n");
+    report_t csv  = { "CSV", csv_header, csv_row, csv_footer };
+    report_t html = { "HTML", html_header, html_row, html_footer };
+    run(&amp;csv);
+    run(&amp;html);
+    printf("顺序、循环次数都在 run() 里，两个格式只换三步实现\n");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
       <div class="ch"><b>RUN</b><span>./template_method.exe</span></div>
-      <pre>== bench ==
-step1 power  ... OK
-step2 comm   ... OK
-step3 sensor ... OK
-result PASS
-== field ==
-step1 power  ... OK
-step2 comm   ... OK
-step3 sensor ... FAIL
-两个变体共用同一套顺序与日志</pre>
+      <pre>== CSV ==
+id,qty
+1,10
+2,20
+3,30
+--
+== HTML ==
+&lt;table&gt;
+&lt;tr&gt;&lt;td&gt;1&lt;/td&gt;&lt;td&gt;10&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;2&lt;/td&gt;&lt;td&gt;20&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;3&lt;/td&gt;&lt;td&gt;30&lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+顺序、循环次数都在 run() 里，两个格式只换三步实现</pre>
     </div>
       <div class="codecard">
         <div class="ch"><span class="lang">C++</span><span class="fn">template_method.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 模板方法 · C++：run() 非虚，步骤虚函数，子类只覆写细节
-// 编译：g++ -std=c++17 -Wall -Wextra template_method.cpp -o template_method_cpp
+        <pre><code>// 模板方法 · 生成 CSV / HTML 报告
+// g++ -std=c++17 -Wall -Wextra template_method.cpp -o template_method_cpp
 #include &lt;cstdio&gt;
 #include &lt;string&gt;
 
-class SelfTest {
+class Report {
 public:
-    explicit SelfTest(std::string name) : name_(std::move(name)) {}
-    virtual ~SelfTest() = default;
-
-    // 模板：不打算被覆写
-    bool run() const
-    {
-        std::printf("== %s ==\n", name_.c_str());
-        std::printf("step1 power  ... ");
-        if (!power())  { std::printf("FAIL\n"); return false; }
-        std::printf("OK\n");
-        std::printf("step2 comm   ... ");
-        if (!comm())   { std::printf("FAIL\n"); return false; }
-        std::printf("OK\n");
-        std::printf("step3 sensor ... ");
-        if (!sensor()) { std::printf("FAIL\n"); return false; }
-        std::printf("OK\n");
-        std::printf("result PASS\n");
-        return true;
+    void run() {
+        std::printf("== %s ==\n", name().c_str());
+        header();
+        for (int i = 1; i &lt;= 3; i++) row(i);
+        footer();
     }
+    virtual ~Report() = default;
 protected:
-    virtual bool power() const = 0;
-    virtual bool comm() const = 0;
-    virtual bool sensor() const = 0;
-private:
-    std::string name_;
+    virtual std::string name() const = 0;
+    virtual void header() const = 0;
+    virtual void row(int i) const = 0;
+    virtual void footer() const = 0;
 };
 
-class BenchTest : public SelfTest {
-public:
-    BenchTest() : SelfTest("bench") {}
+class CsvReport final : public Report {
 protected:
-    bool power() const override { return true; }
-    bool comm() const override { return true; }
-    bool sensor() const override { return true; }
+    std::string name() const override { return "CSV"; }
+    void header() const override { std::puts("id,qty"); }
+    void row(int i) const override { std::printf("%d,%d\n", i, i * 10); }
+    void footer() const override { std::puts("--"); }
 };
 
-class FieldTest : public SelfTest {
-public:
-    FieldTest() : SelfTest("field") {}
+class HtmlReport final : public Report {
 protected:
-    bool power() const override { return true; }
-    bool comm() const override { return true; }
-    bool sensor() const override { return false; }
+    std::string name() const override { return "HTML"; }
+    void header() const override { std::puts("&lt;table&gt;"); }
+    void row(int i) const override { std::printf("&lt;tr&gt;&lt;td&gt;%d&lt;/td&gt;&lt;td&gt;%d&lt;/td&gt;&lt;/tr&gt;\n", i, i * 10); }
+    void footer() const override { std::puts("&lt;/table&gt;"); }
 };
 
 int main()
 {
-    BenchTest b;
-    FieldTest f;
-    b.run();
-    f.run();
-    std::printf("两个变体共用同一套顺序与日志\n");
+    CsvReport csv;
+    HtmlReport html;
+    csv.run();
+    html.run();
+    std::puts("顺序、循环次数都在 run() 里，两个格式只换三步实现");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
       <div class="ch"><b>RUN</b><span>./template_method_cpp.exe</span></div>
-      <pre>== bench ==
-step1 power  ... OK
-step2 comm   ... OK
-step3 sensor ... OK
-result PASS
-== field ==
-step1 power  ... OK
-step2 comm   ... OK
-step3 sensor ... FAIL
-两个变体共用同一套顺序与日志</pre>
+      <pre>== CSV ==
+id,qty
+1,10
+2,20
+3,30
+--
+== HTML ==
+&lt;table&gt;
+&lt;tr&gt;&lt;td&gt;1&lt;/td&gt;&lt;td&gt;10&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;2&lt;/td&gt;&lt;td&gt;20&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;3&lt;/td&gt;&lt;td&gt;30&lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;
+顺序、循环次数都在 run() 里，两个格式只换三步实现</pre>
     </div>
   </section>
 
   <section class="sec" id="s4">
-    <h2><span class="n">04</span>跑两个变体，看哪步失败</h2>
+    <h2><span class="n">04</span>运行与演示</h2>
     
     
 <div class="demo" id="demo">
-  <div class="demo-h"><b>跑两个变体，看哪步失败</b><span>同一骨架，bench 全过，field 在 sensor 步失败。</span></div>
+  <div class="demo-h"><b>跑两种报表，骨架完全一样</b><span>表头、三行、表尾。</span></div>
   <div class="stage">
     <div class="dflow" id="dflow"></div>
     <div class="dbar" id="dbar">未开始</div>
@@ -241,18 +224,18 @@ step3 sensor ... FAIL
     <div class="log" id="dlog"></div>
   </div>
 </div>
-<script>dpDemo({nodes:[{id:'power',label:'power',sub:'step1',note:''}, {id:'comm',label:'comm',sub:'step2',note:''}, {id:'sensor',label:'sensor',sub:'step3',note:''}, {id:'res',label:'result',sub:'PASS/FAIL',note:''}],steps:[{hi:['power'],t:'bench：step1 power OK'}, {hi:['comm'],t:'bench：step2 comm OK'}, {hi:['sensor'],t:'bench：step3 sensor OK'}, {hi:['res'],t:'bench result PASS'}, {hi:['power'],t:'field：step1 power OK'}, {hi:['comm'],t:'field：step2 comm OK'}, {hi:['sensor'],t:'field：step3 sensor FAIL → 立即中止，不再打印 PASS',bad:true}]});</script>
+<script>dpDemo({nodes:[{id:'run',label:'run()',sub:'骨架',note:''}, {id:'h',label:'header',sub:'钩子',note:''}, {id:'r',label:'row',sub:'钩子',note:''}, {id:'f',label:'footer',sub:'钩子',note:''}],steps:[{hi:['run', 'h'],t:'run 先调 header：CSV 输出 id,qty'}, {hi:['r'],t:'循环 1..3，调 row：1,10 / 2,20 / 3,30'}, {hi:['f'],t:'调 footer：--'}, {hi:['run'],t:'换 HtmlReport，run 顺序不变'}, {hi:['h', 'r', 'f'],t:'只换三步实现：&lt;table&gt; / &lt;tr&gt; / &lt;/table&gt;'}]});</script>
 
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>C 与 C++：谁定义骨架</h2>
+    <h2><span class="n">05</span>C 与 C++ 对照</h2>
     
     
     <div class="tbl">
       <table>
         <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
-        <tbody><tr><td>骨架</td><td><code>run(const selftest_t*)</code></td><td><code>SelfTest::run()</code>（非虚）</td><td>顺序只写一份</td></tr><tr><td>步骤</td><td>三个函数指针</td><td>三个纯虚函数</td><td>C 换表项；C++ 换派生类</td></tr><tr><td>失败</td><td>返回 0 并立即 return</td><td>返回 false 并立即 return</td><td>短路规则一致</td></tr><tr><td>日志</td><td>骨架里统一打印</td><td>骨架里统一打印</td><td>变体不再各自打日志</td></tr><tr><td>新增步骤</td><td>改结构体 + 骨架</td><td>加虚函数 + 骨架</td><td>只改骨架一处，变体补实现</td></tr></tbody>
+        <tbody><tr><td>骨架</td><td>普通函数 <code>run(report)</code></td><td>非虚成员 <code>run()</code></td><td>都只写一遍</td></tr><tr><td>可变步骤</td><td>三个函数指针</td><td>三个纯虚函数</td><td>C 用数据注入，C++ 用继承</td></tr><tr><td>扩展</td><td>填一个新结构</td><td>写一个子类</td><td>都不改骨架</td></tr><tr><td>顺序</td><td>骨架里硬编码</td><td>骨架里硬编码</td><td>子类不能改顺序</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -260,7 +243,7 @@ step3 sensor ... FAIL
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     
-    <div class="prose"><ul><li><b>骨架不能太胖。</b>把业务判断塞进 <code>run()</code>，子类就失去意义；骨架只该管顺序、日志、短路。</li><li><b>虚函数别在构造/析构里调。</b>构造时派生类还没建好，调用会分派到基类版本。</li><li><b>C 版函数指针要判空。</b>表项漏填就是空指针调用，直接崩；初始化时统一校验。</li><li><b>失败要带步骤。</b>只返回 false，现场不知道是哪步；骨架应输出步骤名或错误码。</li><li><b>别把模板方法当“万能流程”。</b>步骤之间若有复杂条件分支，硬套骨架会让每个钩子都带一堆参数，反而更难读。</li></ul></div>
+    <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/template-method" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>把骨架也开放覆盖</b>子类重写 <code>run()</code> 后，模板就名存实亡。</li><li><b>钩子里做重活</b>每一步应短小；复杂逻辑拆到辅助函数，别把模板变成大杂烩。</li><li><b>C 版函数指针为空</b>缺一个钩子就崩；构造时统一校验三个指针。</li></ul></div>
   </section>
   <div class="ch-nav" id="chNav"></div>
   </div>

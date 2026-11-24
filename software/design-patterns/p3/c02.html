@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>3.2 桥接模式 BRIDGE · C 与 C++ 双实现</title>
-<meta name="description" content="桥接：把 UDS/OBD 与 CAN/LIN 两个维度分开，四种组合不必写四份代码。">
+<meta name="description" content="桥接：形状与渲染器各自独立，2×2 组合不需要 4 个子类。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
 <script src="../assets/dp-demo.js"></script>
@@ -36,216 +36,196 @@
   <div class="wrap">
   <div class="ch-meta"><span class="lv">篇三 · 结构型</span><span class="sep">/</span>第 2 章<span class="sep">/</span>约 28 分钟</div>
   <h1>桥接模式<span class="en">BRIDGE</span></h1>
-  <p class="lede">诊断协议有 UDS 和 OBD，物理层有 CAN 和 LIN。若按“协议 + 物理层”各写一个类，就是 2×2 四份几乎重复的代码；再加一种物理层，要新增四份。<b>桥接把两维各自抽象，中间只留一条引用</b>，组合在运行时决定，新增一侧只改一侧。</p>
-  <div class="chips"><span class="chip ok">2×2 组合不写 4 份</span><span class="chip">协议不关心物理层</span><span class="chip">物理层不关心服务</span></div>
+  <p class="lede">图形库要支持圆和方，还要支持矢量与位图两种渲染。按“形状+渲染器”建子类会得到 <code>VectorCircle</code>、<code>BitmapCircle</code>……每加一维就翻倍。桥接把两维拆开：<b>形状只管几何，渲染器只管画</b>，中间连一条引用。</p>
+  <div class="chips"><span class="chip ok">两维独立扩展</span><span class="chip">组合不爆炸</span><span class="chip">C 用渲染器函数表 · C++ 用抽象基类</span></div>
 
   <section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：协议 × 物理层，组合爆炸</h2>
+    <h2><span class="n">01</span>问题：坏代码长什么样</h2>
     
     
       <div class="prose">
-        <p>坏写法是把两维焊在一起：</p>
-        <pre><code>void uds_over_can(const char *svc);
-void uds_over_lin(const char *svc);
-void obd_over_can(const char *svc);
-void obd_over_lin(const char *svc);</code></pre>
-        <p>四种组合只是“拼字符串”的差别，却要维护四份函数。真正的问题在后面：</p>
-        <ul>
-          <li><b>加一个物理层就乘二。</b>再来一个 FlexRay，就要补 UDS/FlexRay、OBD/FlexRay 两份；漏一份就是运行时 404。</li>
-          <li><b>协议细节散落。</b>UDS 的会话保持、OBD 的 PID 编码，被复制到每条物理层分支里，改一处要改四遍。</li>
-          <li><b>测试矩阵爆炸。</b>2 个协议 × 3 个物理层 = 6 条路径，每条都要单独写用例。</li>
-        </ul>
-        <p>桥接让协议只依赖“能发一帧”的抽象，物理层只负责“怎么发”。组合放在调用方，两边都能独立扩展。</p>
+        <p>坏写法是把渲染方式写进形状：</p>
+        <pre><code>void draw_circle_vector(...);
+void draw_circle_bitmap(...);
+void draw_square_vector(...);
+void draw_square_bitmap(...);</code></pre>
+        <p>2 种形状 × 2 种渲染 = 4 个函数；再加三角形和 SVG，就是 3×3 = 9 个。增长是乘法。</p>
+        <p>桥接之后：形状持有“渲染器接口”，画的时候调 <code>r-&gt;circle(size)</code>。形状 2 种、渲染器 2 种，代码量是加法，组合数还是乘法但实现不用写满。</p>
       </div>
   </section>
 
   <section class="sec" id="s2">
-    <h2><span class="n">02</span>结构：两维各自抽象，中间只连一条线</h2>
-    <p class="subh">左边是协议，右边是物理层，四条线是四种组合；虚线表示同一协议可以换物理层。</p>
+    <h2><span class="n">02</span>结构：两维各自抽象，一条引用</h2>
+    <p class="subh">左边是形状，中间是渲染器引用，右边是两种渲染实现。</p>
     
   
     <div class="fig">
-      <div class="fig-h"><b>协议 × 物理层：两维各自抽象</b><span>bridge</span></div>
+      <div class="fig-h"><b>形状与渲染器各管一维</b><span>structure</span></div>
       <div class="diagram">
-<svg viewBox="0 0 880 360" role="img" aria-label="协议 × 物理层：两维各自抽象">
+<svg viewBox="0 0 880 360" role="img" aria-label="形状与渲染器各管一维">
   <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
-  <g class="node" data-role="uds" data-note="UDS 只管服务语义：会话、安全访问、DID 编码；它不知道帧最后走在 CAN 还是 LIN。"><rect x="40" y="70" width="190" height="80" rx="10"/><text class="nm" x="54" y="94">UDS</text><text class="ty" x="54" y="113">诊断协议</text><text class="mt" x="54" y="131">0x22 读数据</text></g>
-  <g class="node" data-role="obd" data-note="OBD 的 PID 编码与 UDS 不同，但同样只依赖“发一帧”的抽象。"><rect x="40" y="220" width="190" height="80" rx="10"/><text class="nm" x="54" y="244">OBD</text><text class="ty" x="54" y="263">排放协议</text><text class="mt" x="54" y="281">PID 0x0C</text></g>
-  <g class="node" data-role="can" data-note="CAN 只负责把字符串变成帧发出去；它不解析 UDS 服务，也不认识 OBD 的 PID。"><rect x="470" y="70" width="190" height="80" rx="10"/><text class="nm" x="484" y="94">CAN</text><text class="ty" x="484" y="113">物理层</text><text class="mt" x="484" y="131">500kbps / 11bit</text></g>
-  <g class="node" data-role="lin" data-note="LIN 的调度表、主从角色都在这一层；换物理层不需要改协议代码。"><rect x="470" y="220" width="190" height="80" rx="10"/><text class="nm" x="484" y="244">LIN</text><text class="ty" x="484" y="263">物理层</text><text class="mt" x="484" y="281">19.2kbps / 主从</text></g>
-  <line x1="230" y1="110" x2="470" y2="110" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="350.0" y="102.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">UDS over CAN</text>
-  <line x1="230" y1="118" x2="470" y2="250" stroke="#5876a4" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/>
-  <text x="350.0" y="176.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">UDS over LIN</text>
-  <line x1="230" y1="250" x2="470" y2="118" stroke="#5876a4" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/>
-  <text x="350.0" y="176.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">OBD over CAN</text>
-  <line x1="230" y1="262" x2="470" y2="262" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="350.0" y="254.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">OBD over LIN</text>
+  <g class="node" data-role="shape" data-note="形状只算几何，具体怎么画交给渲染器。"><rect x="24" y="140" width="150" height="76" rx="10"/><text class="nm" x="38" y="164">Shape</text><text class="ty" x="38" y="183">形状</text><text class="mt" x="38" y="201">draw() + renderer*</text></g>
+  <g class="node" data-role="r" data-note="渲染器接口只描述“画什么图元”，不关心形状的名字。"><rect x="250" y="140" width="190" height="84" rx="10"/><text class="nm" x="264" y="164">Renderer</text><text class="ty" x="264" y="183">渲染接口</text><text class="mt" x="264" y="201">circle() / square()</text></g>
+  <g class="node" data-role="vec" data-note="矢量渲染：圆输出 r=5，方输出 w=5。"><rect x="520" y="56" width="190" height="74" rx="10"/><text class="nm" x="534" y="80">VectorRenderer</text><text class="ty" x="534" y="99">实现 A</text><text class="mt" x="534" y="117">矢量输出</text></g>
+  <g class="node" data-role="bmp" data-note="位图渲染：圆输出半径 5px，方输出边长 5px。"><rect x="520" y="212" width="190" height="74" rx="10"/><text class="nm" x="534" y="236">BitmapRenderer</text><text class="ty" x="534" y="255">实现 B</text><text class="mt" x="534" y="273">位图输出</text></g>
+  <line x1="174" y1="178" x2="250" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="212.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">持有</text>
+  <line x1="440" y1="160" x2="520" y2="100" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="122.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">画圆</text>
+  <line x1="440" y1="200" x2="520" y2="242" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="213.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">画方</text>
 </svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：协议与物理层各自只守一边，组合由调用方拼。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">形状与渲染器之间只有一条引用；换渲染器不影响形状。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
-    <h2><span class="n">03</span>两份实现</h2>
+    <h2><span class="n">03</span>两份实现：C 与 C++</h2>
     
-    <p class='subh'>C 版用两张表（link_t、proto_t）在运行时拼；C++ 版用两个抽象基类，组合时只传引用。</p>
+    <p class='subh'>C 版渲染器是一张函数表，形状结构里放指针；C++ 版渲染器是抽象基类，形状用引用持有。</p>
       <div class="codecard">
         <div class="ch"><span class="lang">C</span><span class="fn">bridge.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 桥接：协议和物理层各管各的，四种组合靠两张表拼出来 */
+        <pre><code>/* 桥接 · 形状 × 渲染器
+ * gcc -std=c11 -Wall -Wextra bridge.c -o bridge
+ */
 #include &lt;stdio.h&gt;
-#include &lt;string.h&gt;
 
-typedef struct { const char *name; void (*send)(const char *frame); } link_t;
-
-static void can_send(const char *f) { printf("[CAN ] %s\n", f); }
-static void lin_send(const char *f) { printf("[LIN ] %s\n", f); }
-
-static const link_t LINKS[] = {
-    { "CAN", can_send },
-    { "LIN", lin_send },
-};
-
-typedef struct proto proto_t;
-struct proto {
+typedef struct renderer renderer_t;
+struct renderer {
     const char *name;
-    const link_t *link;
-    void (*request)(const proto_t *self, const char *svc);
+    void (*circle)(renderer_t *, int);
+    void (*square)(renderer_t *, int);
 };
 
-static void uds_request(const proto_t *self, const char *svc)
+typedef struct {
+    const char *name;
+    int size;
+    const renderer_t *r;
+} shape_t;
+
+static void shape_draw(const shape_t *s)
 {
-    char buf[64];
-    snprintf(buf, sizeof buf, "UDS %s -&gt; %s", svc, self-&gt;link-&gt;name);
-    self-&gt;link-&gt;send(buf);
+    printf("[%s] %s size=%d -&gt; ", s-&gt;r-&gt;name, s-&gt;name, s-&gt;size);
+    if (s-&gt;name[0] == 'C') s-&gt;r-&gt;circle((renderer_t *)s-&gt;r, s-&gt;size);
+    else                   s-&gt;r-&gt;square((renderer_t *)s-&gt;r, s-&gt;size);
 }
-static void obd_request(const proto_t *self, const char *svc)
-{
-    char buf[64];
-    snprintf(buf, sizeof buf, "OBD %s -&gt; %s", svc, self-&gt;link-&gt;name);
-    self-&gt;link-&gt;send(buf);
-}
+
+static void vector_circle(renderer_t *r, int s) { (void)r; printf("矢量圆 r=%d\n", s); }
+static void vector_square(renderer_t *r, int s) { (void)r; printf("矢量方 w=%d\n", s); }
+static renderer_t VECTOR = { "矢量", vector_circle, vector_square };
+
+static void raster_circle(renderer_t *r, int s) { (void)r; printf("位图圆 半径 %dpx\n", s); }
+static void raster_square(renderer_t *r, int s) { (void)r; printf("位图方 边长 %dpx\n", s); }
+static renderer_t RASTER = { "位图", raster_circle, raster_square };
 
 int main(void)
 {
-    proto_t uds = { "UDS", &amp;LINKS[0], uds_request };
-    proto_t obd = { "OBD", &amp;LINKS[1], obd_request };
-
-    const proto_t *protos[] = { &amp;uds, &amp;obd };
-    for (size_t i = 0; i &lt; sizeof protos / sizeof protos[0]; i++)
-        for (size_t k = 0; k &lt; sizeof LINKS / sizeof LINKS[0]; k++) {
-            proto_t p = *protos[i];
-            p.link = &amp;LINKS[k];
-            printf("-- %s over %s --\n", p.name, p.link-&gt;name);
-            p.request(&amp;p, "0x22F190");
-        }
-    printf("协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧\n");
+    shape_t shapes[] = {
+        { "Circle", 5, &amp;VECTOR },
+        { "Square", 5, &amp;VECTOR },
+        { "Circle", 5, &amp;RASTER },
+        { "Square", 5, &amp;RASTER },
+    };
+    for (unsigned i = 0; i &lt; 4; i++) shape_draw(&amp;shapes[i]);
+    printf("2 种形状 × 2 种渲染器 = 4 种组合，没有 4 个子类\n");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
       <div class="ch"><b>RUN</b><span>./bridge.exe</span></div>
-      <pre>-- UDS over CAN --
-[CAN ] UDS 0x22F190 -&gt; CAN
--- UDS over LIN --
-[LIN ] UDS 0x22F190 -&gt; LIN
--- OBD over CAN --
-[CAN ] OBD 0x22F190 -&gt; CAN
--- OBD over LIN --
-[LIN ] OBD 0x22F190 -&gt; LIN
-协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧</pre>
+      <pre>[矢量] Circle size=5 -&gt; 矢量圆 r=5
+[矢量] Square size=5 -&gt; 矢量方 w=5
+[位图] Circle size=5 -&gt; 位图圆 半径 5px
+[位图] Square size=5 -&gt; 位图方 边长 5px
+2 种形状 × 2 种渲染器 = 4 种组合，没有 4 个子类</pre>
     </div>
       <div class="codecard">
         <div class="ch"><span class="lang">C++</span><span class="fn">bridge.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 桥接 · C++：Link 与 Protocol 各自抽象，组合时只传引用
-// 编译：g++ -std=c++17 -Wall -Wextra bridge.cpp -o bridge_cpp
+        <pre><code>// 桥接 · 形状 × 渲染器
+// g++ -std=c++17 -Wall -Wextra bridge.cpp -o bridge_cpp
 #include &lt;cstdio&gt;
 #include &lt;memory&gt;
 #include &lt;string&gt;
 
-class Link {
+class Renderer {
 public:
-    virtual ~Link() = default;
-    virtual const char *name() const = 0;
-    virtual void send(const std::string &amp;frame) const = 0;
-};
-class CanLink : public Link {
-public:
-    const char *name() const override { return "CAN"; }
-    void send(const std::string &amp;f) const override { std::printf("[CAN ] %s\n", f.c_str()); }
-};
-class LinLink : public Link {
-public:
-    const char *name() const override { return "LIN"; }
-    void send(const std::string &amp;f) const override { std::printf("[LIN ] %s\n", f.c_str()); }
+    virtual ~Renderer() = default;
+    virtual std::string name() const = 0;
+    virtual void circle(int size) const = 0;
+    virtual void square(int size) const = 0;
 };
 
-class Protocol {
+class VectorRenderer final : public Renderer {
 public:
-    explicit Protocol(const Link &amp;l) : link_(l) {}
-    virtual ~Protocol() = default;
-    virtual const char *name() const = 0;
-    virtual void request(const std::string &amp;svc) const = 0;
-    const char *linkName() const { return link_.name(); }
+    std::string name() const override { return "矢量"; }
+    void circle(int s) const override { std::printf("矢量圆 r=%d\n", s); }
+    void square(int s) const override { std::printf("矢量方 w=%d\n", s); }
+};
+
+class RasterRenderer final : public Renderer {
+public:
+    std::string name() const override { return "位图"; }
+    void circle(int s) const override { std::printf("位图圆 半径 %dpx\n", s); }
+    void square(int s) const override { std::printf("位图方 边长 %dpx\n", s); }
+};
+
+class Shape {
+public:
+    Shape(std::unique_ptr&lt;Renderer&gt; r, int size) : r_(std::move(r)), size_(size) {}
+    virtual ~Shape() = default;
+    virtual std::string name() const = 0;
+    void draw() const {
+        std::printf("[%s] %s size=%d -&gt; ", r_-&gt;name().c_str(), name().c_str(), size_);
+        if (name() == "Circle") r_-&gt;circle(size_);
+        else                    r_-&gt;square(size_);
+    }
 protected:
-    const Link &amp;link_;
+    const Renderer&amp; renderer() const { return *r_; }
+    int size() const { return size_; }
+private:
+    std::unique_ptr&lt;Renderer&gt; r_;
+    int size_;
 };
-class Uds : public Protocol {
+
+class Circle final : public Shape {
 public:
-    using Protocol::Protocol;
-    const char *name() const override { return "UDS"; }
-    void request(const std::string &amp;svc) const override
-    {
-        link_.send("UDS " + svc + " -&gt; " + link_.name());
-    }
+    Circle(std::unique_ptr&lt;Renderer&gt; r, int s) : Shape(std::move(r), s) {}
+    std::string name() const override { return "Circle"; }
 };
-class Obd : public Protocol {
+
+class Square final : public Shape {
 public:
-    using Protocol::Protocol;
-    const char *name() const override { return "OBD"; }
-    void request(const std::string &amp;svc) const override
-    {
-        link_.send("OBD " + svc + " -&gt; " + link_.name());
-    }
+    Square(std::unique_ptr&lt;Renderer&gt; r, int s) : Shape(std::move(r), s) {}
+    std::string name() const override { return "Square"; }
 };
 
 int main()
 {
-    CanLink can;
-    LinLink lin;
-    Uds udsCan(can), udsLin(lin);
-    Obd obdCan(can), obdLin(lin);
-
-    const Protocol *protos[] = { &amp;udsCan, &amp;udsLin, &amp;obdCan, &amp;obdLin };
-    for (const Protocol *p : protos) {
-        std::printf("-- %s over %s --\n", p-&gt;name(), p-&gt;linkName());
-        p-&gt;request("0x22F190");
-    }
-    std::printf("协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧\n");
+    Circle v1(std::make_unique&lt;VectorRenderer&gt;(), 5); v1.draw();
+    Square v2(std::make_unique&lt;VectorRenderer&gt;(), 5); v2.draw();
+    Circle r1(std::make_unique&lt;RasterRenderer&gt;(), 5); r1.draw();
+    Square r2(std::make_unique&lt;RasterRenderer&gt;(), 5); r2.draw();
+    std::puts("2 种形状 × 2 种渲染器 = 4 种组合，没有 4 个子类");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
       <div class="ch"><b>RUN</b><span>./bridge_cpp.exe</span></div>
-      <pre>-- UDS over CAN --
-[CAN ] UDS 0x22F190 -&gt; CAN
--- UDS over LIN --
-[LIN ] UDS 0x22F190 -&gt; LIN
--- OBD over CAN --
-[CAN ] OBD 0x22F190 -&gt; CAN
--- OBD over LIN --
-[LIN ] OBD 0x22F190 -&gt; LIN
-协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧</pre>
+      <pre>[矢量] Circle size=5 -&gt; 矢量圆 r=5
+[矢量] Square size=5 -&gt; 矢量方 w=5
+[位图] Circle size=5 -&gt; 位图圆 半径 5px
+[位图] Square size=5 -&gt; 位图方 边长 5px
+2 种形状 × 2 种渲染器 = 4 种组合，没有 4 个子类</pre>
     </div>
   </section>
 
   <section class="sec" id="s4">
-    <h2><span class="n">04</span>四种组合，只换一侧</h2>
+    <h2><span class="n">04</span>运行与演示</h2>
     
     
 <div class="demo" id="demo">
-  <div class="demo-h"><b>四种组合，只换一侧</b><span>同一句服务请求，依次走 UDS/OBD 与 CAN/LIN 的组合。</span></div>
+  <div class="demo-h"><b>四种组合，只换一侧</b><span>圆/方 × 矢量/位图，形状代码不变。</span></div>
   <div class="stage">
     <div class="dflow" id="dflow"></div>
     <div class="dbar" id="dbar">未开始</div>
@@ -259,18 +239,18 @@ int main()
     <div class="log" id="dlog"></div>
   </div>
 </div>
-<script>dpDemo({nodes:[{id:'uds',label:'UDS',sub:'服务语义',note:''}, {id:'obd',label:'OBD',sub:'PID 语义',note:''}, {id:'can',label:'CAN',sub:'物理层',note:''}, {id:'lin',label:'LIN',sub:'物理层',note:''}],steps:[{hi:['uds', 'can'],t:'UDS over CAN：协议拼好服务串，交给 CAN 发'}, {hi:['uds', 'lin'],t:'同一份 UDS，只把物理层换成 LIN，协议代码没动'}, {hi:['obd', 'can'],t:'换成 OBD：只换协议侧，CAN 仍然只负责发帧'}, {hi:['obd', 'lin'],t:'OBD over LIN：两侧都换，仍然没有第四份实现'}, {hi:['uds', 'obd', 'can', 'lin'],t:'四种组合共用两条抽象；新增 FlexRay 只需加一个物理层'}]});</script>
+<script>dpDemo({nodes:[{id:'shape',label:'形状',sub:'Circle/Square',note:''}, {id:'r',label:'渲染器',sub:'Vector/Bitmap',note:''}, {id:'vec',label:'矢量',sub:'r/w',note:''}, {id:'bmp',label:'位图',sub:'px',note:''}],steps:[{hi:['shape', 'r', 'vec'],t:'Circle + VectorRenderer → 矢量圆 r=5'}, {hi:['shape', 'r', 'vec'],t:'Square + VectorRenderer → 矢量方 w=5'}, {hi:['r', 'bmp'],t:'只换渲染器：Circle + BitmapRenderer'}, {hi:['shape', 'bmp'],t:'位图圆 半径 5px'}, {hi:['shape', 'bmp'],t:'位图方 边长 5px；2×2 组合，没有 4 个子类'}]});</script>
 
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>C 与 C++：两种解耦</h2>
+    <h2><span class="n">05</span>C 与 C++ 对照</h2>
     
     
     <div class="tbl">
       <table>
         <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
-        <tbody><tr><td>协议抽象</td><td><code>proto_t</code> + 函数指针</td><td><code>Protocol</code> 抽象基类</td><td>C 的协议是结构体，C++ 是类型</td></tr><tr><td>物理层抽象</td><td><code>link_t</code> + <code>send()</code></td><td><code>Link</code> 抽象基类</td><td>都只暴露“发一帧”</td></tr><tr><td>组合方式</td><td>运行时给 <code>proto.link</code> 赋值</td><td>构造时传 <code>Link&amp;</code></td><td>C 可换绑，C++ 用引用固定</td></tr><tr><td>新增物理层</td><td>加一个 <code>link_t</code> 表项</td><td>加一个派生类</td><td>两边都不动协议</td></tr><tr><td>生命周期</td><td>静态表，无所有权</td><td>引用，不拥有</td><td>物理层通常比协议活得久</td></tr></tbody>
+        <tbody><tr><td>渲染器怎么表示</td><td>函数表指针</td><td>抽象基类引用</td><td>C 的渲染器是数据，C++ 是类型</td></tr><tr><td>形状持有什么</td><td><code>const renderer_t *</code></td><td><code>Renderer&amp;</code></td><td>都只持一条引用</td></tr><tr><td>换渲染器</td><td>换指针</td><td>换引用</td><td>形状对象不用重建</td></tr><tr><td>扩展新维度</td><td>加一种形状或一种渲染器</td><td>同左</td><td>两边各自加，不交叉</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -278,7 +258,7 @@ int main()
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     
-    <div class="prose"><ul><li><b>桥接不是“多一层就高级”。</b>只有两维确实独立扩展时才值得；如果物理层永远只有 CAN，直接写反而清楚。</li><li><b>别让协议知道帧格式。</b>协议一旦开始拼 CAN ID、算 DLC，桥接就退化成四份实现；协议只该产出“服务 + 参数”。</li><li><b>C 版换绑要防悬空。</b>运行时改 <code>proto.link</code> 指向栈上的 <code>link_t</code>，函数返回后就悬空；物理层应是静态或长生命周期对象。</li><li><b>C++ 引用成员不可重新绑定。</b><code>Protocol</code> 持 <code>Link&amp;</code> 后不能换物理层；需要运行时切换就用指针或 <code>std::reference_wrapper</code>。</li><li><b>组合测试仍要覆盖。</b>代码只有两份，但行为有四种；至少每个组合跑一条真实服务，别只测编译通过。</li></ul></div>
+    <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/bridge" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>把两维又合到一个类里</b>只要出现 <code>VectorCircle</code> 这种命名，桥接就白做了。</li><li><b>渲染器里读形状私有字段</b>渲染器只接收图元参数；否则又耦合成一个整体。</li><li><b>引用生命周期不清</b>C 版渲染器是静态表没问题；C++ 若用指针，形状不能活得比渲染器久。</li></ul></div>
   </section>
   <div class="ch-nav" id="chNav"></div>
   </div>

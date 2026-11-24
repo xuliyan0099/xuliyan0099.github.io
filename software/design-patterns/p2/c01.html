@@ -4,9 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>2.1 工厂方法模式 FACTORY METHOD · C 与 C++ 双实现</title>
-<meta name="description" content="工厂方法模式：C 与 C++ 双实现，含结构图、运行输出与可点演示。">
+<meta name="description" content="工厂方法：客户端只说要哪种运输，具体造卡车还是轮船由工厂决定。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
+<script src="../assets/dp-demo.js"></script>
 </head>
 <body>
 <div class="bg" aria-hidden="true"></div>
@@ -34,217 +35,199 @@
 
   <div class="wrap">
   <div class="ch-meta"><span class="lv">篇二 · 创建型</span><span class="sep">/</span>第 1 章<span class="sep">/</span>约 30 分钟</div>
-  <h1>桥接模式<span class="en">BRIDGE</span></h1>
-  <p class="lede">诊断协议有 UDS 和 OBD，物理层有 CAN 和 LIN。若按“协议 + 物理层”各写一个类，就是 2×2 四份几乎重复的代码；再加一种物理层，要新增四份。<b>桥接把两维各自抽象，中间只留一条引用</b>，组合在运行时决定，新增一侧只改一侧。</p>
-  <div class="chips"><span class="chip ok">2×2 组合不写 4 份</span><span class="chip">协议不关心物理层</span><span class="chip">物理层不关心服务</span></div>
+  <h1>工厂方法模式<span class="en">FACTORY METHOD</span></h1>
+  <p class="lede">物流系统一开始只有卡车，后来加了轮船、飞机。如果“造哪一种”写死在客户端，每加一种交通工具就要改一遍下单代码。工厂方法把这句 <code>new</code> 挪进工厂：<b>客户端只传类型名，工厂返回已经造好的产品</b>。</p>
+  <div class="chips"><span class="chip ok">客户端不 import 具体类</span><span class="chip">新增产品只加工厂</span><span class="chip">C 用创建函数表 · C++ 用虚函数</span></div>
 
   <section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：协议 × 物理层，组合爆炸</h2>
+    <h2><span class="n">01</span>问题：坏代码长什么样</h2>
     
     
       <div class="prose">
-        <p>坏写法是把两维焊在一起：</p>
-        <pre><code>void uds_over_can(const char *svc);
-void uds_over_lin(const char *svc);
-void obd_over_can(const char *svc);
-void obd_over_lin(const char *svc);</code></pre>
-        <p>四种组合只是“拼字符串”的差别，却要维护四份函数。真正的问题在后面：</p>
-        <ul>
-          <li><b>加一个物理层就乘二。</b>再来一个 FlexRay，就要补 UDS/FlexRay、OBD/FlexRay 两份；漏一份就是运行时 404。</li>
-          <li><b>协议细节散落。</b>UDS 的会话保持、OBD 的 PID 编码，被复制到每条物理层分支里，改一处要改四遍。</li>
-          <li><b>测试矩阵爆炸。</b>2 个协议 × 3 个物理层 = 6 条路径，每条都要单独写用例。</li>
-        </ul>
-        <p>桥接让协议只依赖“能发一帧”的抽象，物理层只负责“怎么发”。组合放在调用方，两边都能独立扩展。</p>
+        <p>坏写法是客户端自己判断：</p>
+        <pre><code>Transport *t;
+if (strcmp(type, "truck") == 0)      t = truck_new();
+else if (strcmp(type, "ship") == 0)  t = ship_new();
+else                                 t = NULL;</code></pre>
+        <p>它有三个问题：新增“飞机”要改这里；每个调用方都得抄一遍判断；测试要覆盖所有分支组合。</p>
+        <p>工厂方法只做一件事：<b>把“选具体类”从客户端搬到工厂</b>。客户端拿到的是统一的产品接口，只调 <code>deliver()</code>，不再关心轮子还是螺旋桨。</p>
       </div>
   </section>
 
   <section class="sec" id="s2">
-    <h2><span class="n">02</span>结构：两维各自抽象，中间只连一条线</h2>
-    <p class="subh">左边是协议，右边是物理层，四条线是四种组合；虚线表示同一协议可以换物理层。</p>
+    <h2><span class="n">02</span>结构：客户端、工厂、两个产品</h2>
+    <p class="subh">左边是下单方，中间是工厂，右边是两种产品。点方框看它负责什么。</p>
     
   
     <div class="fig">
-      <div class="fig-h"><b>协议 × 物理层：两维各自抽象</b><span>bridge</span></div>
+      <div class="fig-h"><b>客户端只认工厂，不认具体运输工具</b><span>structure</span></div>
       <div class="diagram">
-<svg viewBox="0 0 880 360" role="img" aria-label="协议 × 物理层：两维各自抽象">
+<svg viewBox="0 0 880 360" role="img" aria-label="客户端只认工厂，不认具体运输工具">
   <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
-  <g class="node" data-role="uds" data-note="UDS 只管服务语义：会话、安全访问、DID 编码；它不知道帧最后走在 CAN 还是 LIN。"><rect x="40" y="70" width="190" height="80" rx="10"/><text class="nm" x="54" y="94">UDS</text><text class="ty" x="54" y="113">诊断协议</text><text class="mt" x="54" y="131">0x22 读数据</text></g>
-  <g class="node" data-role="obd" data-note="OBD 的 PID 编码与 UDS 不同，但同样只依赖“发一帧”的抽象。"><rect x="40" y="220" width="190" height="80" rx="10"/><text class="nm" x="54" y="244">OBD</text><text class="ty" x="54" y="263">排放协议</text><text class="mt" x="54" y="281">PID 0x0C</text></g>
-  <g class="node" data-role="can" data-note="CAN 只负责把字符串变成帧发出去；它不解析 UDS 服务，也不认识 OBD 的 PID。"><rect x="470" y="70" width="190" height="80" rx="10"/><text class="nm" x="484" y="94">CAN</text><text class="ty" x="484" y="113">物理层</text><text class="mt" x="484" y="131">500kbps / 11bit</text></g>
-  <g class="node" data-role="lin" data-note="LIN 的调度表、主从角色都在这一层；换物理层不需要改协议代码。"><rect x="470" y="220" width="190" height="80" rx="10"/><text class="nm" x="484" y="244">LIN</text><text class="ty" x="484" y="263">物理层</text><text class="mt" x="484" y="281">19.2kbps / 主从</text></g>
-  <line x1="230" y1="110" x2="470" y2="110" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="350.0" y="102.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">UDS over CAN</text>
-  <line x1="230" y1="118" x2="470" y2="250" stroke="#5876a4" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/>
-  <text x="350.0" y="176.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">UDS over LIN</text>
-  <line x1="230" y1="250" x2="470" y2="118" stroke="#5876a4" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/>
-  <text x="350.0" y="176.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">OBD over CAN</text>
-  <line x1="230" y1="262" x2="470" y2="262" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="350.0" y="254.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">OBD over LIN</text>
+  <g class="node" data-role="client" data-note="客户端只说运输类型，不知道 Truck / Ship 这些类名。"><rect x="24" y="140" width="150" height="76" rx="10"/><text class="nm" x="38" y="164">客户端</text><text class="ty" x="38" y="183">业务下单</text><text class="mt" x="38" y="201">create("truck")</text></g>
+  <g class="node" data-role="factory" data-note="工厂持有“类型名 → 创建函数”的表；新增产品改表，不改客户端。"><rect x="250" y="140" width="190" height="84" rx="10"/><text class="nm" x="264" y="164">TransportFactory</text><text class="ty" x="264" y="183">工厂</text><text class="mt" x="264" y="201">create(type)</text></g>
+  <g class="node" data-role="truck" data-note="卡车负责陆运；它只实现产品接口，不参与“被选中”的过程。"><rect x="520" y="56" width="190" height="74" rx="10"/><text class="nm" x="534" y="80">Truck</text><text class="ty" x="534" y="99">产品 A</text><text class="mt" x="534" y="117">deliver()</text></g>
+  <g class="node" data-role="ship" data-note="轮船负责海运；和卡车共用同一个产品接口。"><rect x="520" y="212" width="190" height="74" rx="10"/><text class="nm" x="534" y="236">Ship</text><text class="ty" x="534" y="255">产品 B</text><text class="mt" x="534" y="273">deliver()</text></g>
+  <line x1="174" y1="178" x2="250" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="212.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">要产品</text>
+  <line x1="440" y1="160" x2="520" y2="100" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="122.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">造卡车</text>
+  <line x1="440" y1="200" x2="520" y2="242" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="213.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">造轮船</text>
 </svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：协议与物理层各自只守一边，组合由调用方拼。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">工厂是唯一知道“有哪些产品”的地方；产品只负责自己的业务。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
-    <h2><span class="n">03</span>两份实现</h2>
+    <h2><span class="n">03</span>两份实现：C 与 C++</h2>
     
-    <p class='subh'>C 版用两张表（link_t、proto_t）在运行时拼；C++ 版用两个抽象基类，组合时只传引用。</p>
+    <p class='subh'>C 版把工厂写成一张静态表：名字 + 创建函数；C++ 版写成抽象基类，产品用 <code>unique_ptr</code> 交付，所有权清楚。</p>
       <div class="codecard">
-        <div class="ch"><span class="lang">C</span><span class="fn">bridge.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 桥接：协议和物理层各管各的，四种组合靠两张表拼出来 */
+        <div class="ch"><span class="lang">C</span><span class="fn">factory.c</span><button class="copy">复制</button></div>
+        <pre><code>/* 工厂方法 · 物流：卡车与轮船
+ * gcc -std=c11 -Wall -Wextra factory.c -o factory
+ */
 #include &lt;stdio.h&gt;
 #include &lt;string.h&gt;
 
-typedef struct { const char *name; void (*send)(const char *frame); } link_t;
-
-static void can_send(const char *f) { printf("[CAN ] %s\n", f); }
-static void lin_send(const char *f) { printf("[LIN ] %s\n", f); }
-
-static const link_t LINKS[] = {
-    { "CAN", can_send },
-    { "LIN", lin_send },
+typedef struct transport transport_t;
+struct transport {
+    const char *(*name)(transport_t *);
+    void (*deliver)(transport_t *);
 };
 
-typedef struct proto proto_t;
-struct proto {
-    const char *name;
-    const link_t *link;
-    void (*request)(const proto_t *self, const char *svc);
-};
+typedef transport_t *(*creator_t)(void);
 
-static void uds_request(const proto_t *self, const char *svc)
-{
-    char buf[64];
-    snprintf(buf, sizeof buf, "UDS %s -&gt; %s", svc, self-&gt;link-&gt;name);
-    self-&gt;link-&gt;send(buf);
+typedef struct { transport_t base; } truck_t;
+static const char *truck_name(transport_t *t) { (void)t; return "卡车"; }
+static void truck_deliver(transport_t *t) { (void)t; puts("  卡车：陆运 200 箱"); }
+static transport_t *truck_new(void) {
+    static truck_t x = { { truck_name, truck_deliver } };
+    return &amp;x.base;
 }
-static void obd_request(const proto_t *self, const char *svc)
+
+typedef struct { transport_t base; } ship_t;
+static const char *ship_name(transport_t *t) { (void)t; return "轮船"; }
+static void ship_deliver(transport_t *t) { (void)t; puts("  轮船：海运 800 箱"); }
+static transport_t *ship_new(void) {
+    static ship_t x = { { ship_name, ship_deliver } };
+    return &amp;x.base;
+}
+
+static const struct { const char *kind; creator_t create; } REG[] = {
+    { "truck", truck_new },
+    { "ship",  ship_new  },
+};
+
+static transport_t *create(const char *kind)
 {
-    char buf[64];
-    snprintf(buf, sizeof buf, "OBD %s -&gt; %s", svc, self-&gt;link-&gt;name);
-    self-&gt;link-&gt;send(buf);
+    for (unsigned i = 0; i &lt; sizeof REG / sizeof REG[0]; i++)
+        if (strcmp(kind, REG[i].kind) == 0)
+            return REG[i].create();
+    return NULL;
 }
 
 int main(void)
 {
-    proto_t uds = { "UDS", &amp;LINKS[0], uds_request };
-    proto_t obd = { "OBD", &amp;LINKS[1], obd_request };
-
-    const proto_t *protos[] = { &amp;uds, &amp;obd };
-    for (size_t i = 0; i &lt; sizeof protos / sizeof protos[0]; i++)
-        for (size_t k = 0; k &lt; sizeof LINKS / sizeof LINKS[0]; k++) {
-            proto_t p = *protos[i];
-            p.link = &amp;LINKS[k];
-            printf("-- %s over %s --\n", p.name, p.link-&gt;name);
-            p.request(&amp;p, "0x22F190");
-        }
-    printf("协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧\n");
+    const char *want[] = { "truck", "ship", "plane" };
+    for (unsigned i = 0; i &lt; 3; i++) {
+        transport_t *t = create(want[i]);
+        if (!t) { printf("create(\"%s\") -&gt; 未知类型，返回 NULL\n", want[i]); continue; }
+        printf("create(\"%s\") -&gt; %s\n", want[i], t-&gt;name(t));
+        t-&gt;deliver(t);
+    }
     return 0;
 }</code></pre>
       </div>
     <div class="run">
-      <div class="ch"><b>RUN</b><span>./bridge.exe</span></div>
-      <pre>-- UDS over CAN --
-[CAN ] UDS 0x22F190 -&gt; CAN
--- UDS over LIN --
-[LIN ] UDS 0x22F190 -&gt; LIN
--- OBD over CAN --
-[CAN ] OBD 0x22F190 -&gt; CAN
--- OBD over LIN --
-[LIN ] OBD 0x22F190 -&gt; LIN
-协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧</pre>
+      <div class="ch"><b>RUN</b><span>./factory.exe</span></div>
+      <pre>create("truck") -&gt; 卡车
+  卡车：陆运 200 箱
+create("ship") -&gt; 轮船
+  轮船：海运 800 箱
+create("plane") -&gt; 未知类型，返回 NULL</pre>
     </div>
       <div class="codecard">
-        <div class="ch"><span class="lang">C++</span><span class="fn">bridge.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 桥接 · C++：Link 与 Protocol 各自抽象，组合时只传引用
-// 编译：g++ -std=c++17 -Wall -Wextra bridge.cpp -o bridge_cpp
+        <div class="ch"><span class="lang">C++</span><span class="fn">factory.cpp</span><button class="copy">复制</button></div>
+        <pre><code>// 工厂方法 · 物流：卡车与轮船
+// g++ -std=c++17 -Wall -Wextra factory.cpp -o factory_cpp
 #include &lt;cstdio&gt;
 #include &lt;memory&gt;
 #include &lt;string&gt;
 
-class Link {
+class Transport {
 public:
-    virtual ~Link() = default;
-    virtual const char *name() const = 0;
-    virtual void send(const std::string &amp;frame) const = 0;
-};
-class CanLink : public Link {
-public:
-    const char *name() const override { return "CAN"; }
-    void send(const std::string &amp;f) const override { std::printf("[CAN ] %s\n", f.c_str()); }
-};
-class LinLink : public Link {
-public:
-    const char *name() const override { return "LIN"; }
-    void send(const std::string &amp;f) const override { std::printf("[LIN ] %s\n", f.c_str()); }
+    virtual ~Transport() = default;
+    virtual const char* name() const = 0;
+    virtual void deliver() const = 0;
 };
 
-class Protocol {
+class Truck final : public Transport {
 public:
-    explicit Protocol(const Link &amp;l) : link_(l) {}
-    virtual ~Protocol() = default;
-    virtual const char *name() const = 0;
-    virtual void request(const std::string &amp;svc) const = 0;
-    const char *linkName() const { return link_.name(); }
-protected:
-    const Link &amp;link_;
+    const char* name() const override { return "卡车"; }
+    void deliver() const override { std::puts("  卡车：陆运 200 箱"); }
 };
-class Uds : public Protocol {
+
+class Ship final : public Transport {
 public:
-    using Protocol::Protocol;
-    const char *name() const override { return "UDS"; }
-    void request(const std::string &amp;svc) const override
-    {
-        link_.send("UDS " + svc + " -&gt; " + link_.name());
+    const char* name() const override { return "轮船"; }
+    void deliver() const override { std::puts("  轮船：海运 800 箱"); }
+};
+
+class Logistics {
+public:
+    virtual ~Logistics() = default;
+    virtual std::unique_ptr&lt;Transport&gt; create() const = 0;
+
+    void plan(const char* kind) const {
+        auto t = create();
+        std::printf("create(\"%s\") -&gt; %s\n", kind, t-&gt;name());
+        t-&gt;deliver();
     }
 };
-class Obd : public Protocol {
+
+class RoadLogistics final : public Logistics {
 public:
-    using Protocol::Protocol;
-    const char *name() const override { return "OBD"; }
-    void request(const std::string &amp;svc) const override
-    {
-        link_.send("OBD " + svc + " -&gt; " + link_.name());
+    std::unique_ptr&lt;Transport&gt; create() const override {
+        return std::make_unique&lt;Truck&gt;();
+    }
+};
+
+class SeaLogistics final : public Logistics {
+public:
+    std::unique_ptr&lt;Transport&gt; create() const override {
+        return std::make_unique&lt;Ship&gt;();
     }
 };
 
 int main()
 {
-    CanLink can;
-    LinLink lin;
-    Uds udsCan(can), udsLin(lin);
-    Obd obdCan(can), obdLin(lin);
-
-    const Protocol *protos[] = { &amp;udsCan, &amp;udsLin, &amp;obdCan, &amp;obdLin };
-    for (const Protocol *p : protos) {
-        std::printf("-- %s over %s --\n", p-&gt;name(), p-&gt;linkName());
-        p-&gt;request("0x22F190");
-    }
-    std::printf("协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧\n");
+    RoadLogistics road;
+    SeaLogistics sea;
+    road.plan("truck");
+    sea.plan("ship");
+    std::puts("create(\"plane\") -&gt; 没有对应工厂，返回 nullptr");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
-      <div class="ch"><b>RUN</b><span>./bridge_cpp.exe</span></div>
-      <pre>-- UDS over CAN --
-[CAN ] UDS 0x22F190 -&gt; CAN
--- UDS over LIN --
-[LIN ] UDS 0x22F190 -&gt; LIN
--- OBD over CAN --
-[CAN ] OBD 0x22F190 -&gt; CAN
--- OBD over LIN --
-[LIN ] OBD 0x22F190 -&gt; LIN
-协议 2 × 物理层 2 = 4 种组合，新增一种只改一侧</pre>
+      <div class="ch"><b>RUN</b><span>./factory_cpp.exe</span></div>
+      <pre>create("truck") -&gt; 卡车
+  卡车：陆运 200 箱
+create("ship") -&gt; 轮船
+  轮船：海运 800 箱
+create("plane") -&gt; 没有对应工厂，返回 nullptr</pre>
     </div>
   </section>
 
   <section class="sec" id="s4">
-    <h2><span class="n">04</span>四种组合，只换一侧</h2>
+    <h2><span class="n">04</span>运行与演示</h2>
     
     
 <div class="demo" id="demo">
-  <div class="demo-h"><b>四种组合，只换一侧</b><span>同一句服务请求，依次走 UDS/OBD 与 CAN/LIN 的组合。</span></div>
+  <div class="demo-h"><b>换一种运输方式，只改传给工厂的名字</b><span>同一段下单流程，分别要卡车、轮船和一个不存在的类型。</span></div>
   <div class="stage">
     <div class="dflow" id="dflow"></div>
     <div class="dbar" id="dbar">未开始</div>
@@ -258,18 +241,18 @@ int main()
     <div class="log" id="dlog"></div>
   </div>
 </div>
-<script>dpDemo({nodes:[{id:'uds',label:'UDS',sub:'服务语义',note:''}, {id:'obd',label:'OBD',sub:'PID 语义',note:''}, {id:'can',label:'CAN',sub:'物理层',note:''}, {id:'lin',label:'LIN',sub:'物理层',note:''}],steps:[{hi:['uds', 'can'],t:'UDS over CAN：协议拼好服务串，交给 CAN 发'}, {hi:['uds', 'lin'],t:'同一份 UDS，只把物理层换成 LIN，协议代码没动'}, {hi:['obd', 'can'],t:'换成 OBD：只换协议侧，CAN 仍然只负责发帧'}, {hi:['obd', 'lin'],t:'OBD over LIN：两侧都换，仍然没有第四份实现'}, {hi:['uds', 'obd', 'can', 'lin'],t:'四种组合共用两条抽象；新增 FlexRay 只需加一个物理层'}]});</script>
+<script>dpDemo({nodes:[{id:'client',label:'客户端',sub:'create(type)',note:''}, {id:'factory',label:'工厂',sub:'查表',note:''}, {id:'truck',label:'卡车',sub:'陆运',note:''}, {id:'ship',label:'轮船',sub:'海运',note:''}],steps:[{hi:['client', 'factory'],t:'客户端调用 create("truck")'}, {hi:['factory', 'truck'],t:'工厂查到 Truck 的创建函数，返回卡车'}, {hi:['truck'],t:'卡车 deliver：陆运 200 箱'}, {hi:['client', 'factory', 'ship'],t:'客户端改传 "ship"，同一行代码'}, {hi:['ship'],t:'轮船 deliver：海运 800 箱；传 "plane" 时工厂返回 NULL'}]});</script>
 
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>C 与 C++：两种解耦</h2>
+    <h2><span class="n">05</span>C 与 C++ 对照</h2>
     
     
     <div class="tbl">
       <table>
         <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
-        <tbody><tr><td>协议抽象</td><td><code>proto_t</code> + 函数指针</td><td><code>Protocol</code> 抽象基类</td><td>C 的协议是结构体，C++ 是类型</td></tr><tr><td>物理层抽象</td><td><code>link_t</code> + <code>send()</code></td><td><code>Link</code> 抽象基类</td><td>都只暴露“发一帧”</td></tr><tr><td>组合方式</td><td>运行时给 <code>proto.link</code> 赋值</td><td>构造时传 <code>Link&amp;</code></td><td>C 可换绑，C++ 用引用固定</td></tr><tr><td>新增物理层</td><td>加一个 <code>link_t</code> 表项</td><td>加一个派生类</td><td>两边都不动协议</td></tr><tr><td>生命周期</td><td>静态表，无所有权</td><td>引用，不拥有</td><td>物理层通常比协议活得久</td></tr></tbody>
+        <tbody><tr><td>谁创建产品</td><td>工厂查静态表，调用创建函数</td><td>工厂子类的虚函数 new 出对象</td><td>C 的“类”是表项，C++ 的“类”是类型</td></tr><tr><td>客户端依赖</td><td>只依赖 <code>transport_t</code> 接口</td><td>只依赖 <code>Transport</code> 接口</td><td>都能换产品而不改调用方</td></tr><tr><td>未知类型</td><td>查表失败返回 <code>NULL</code></td><td>抛异常或返回空指针</td><td>错误必须显式处理，不要返回半成品</td></tr><tr><td>所有权</td><td>静态对象，谁都不能 delete</td><td><code>unique_ptr</code> 明确归属</td><td>C 版省堆分配，代价是产品不能带走</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -277,7 +260,7 @@ int main()
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     
-    <div class="prose"><ul><li><b>桥接不是“多一层就高级”。</b>只有两维确实独立扩展时才值得；如果物理层永远只有 CAN，直接写反而清楚。</li><li><b>别让协议知道帧格式。</b>协议一旦开始拼 CAN ID、算 DLC，桥接就退化成四份实现；协议只该产出“服务 + 参数”。</li><li><b>C 版换绑要防悬空。</b>运行时改 <code>proto.link</code> 指向栈上的 <code>link_t</code>，函数返回后就悬空；物理层应是静态或长生命周期对象。</li><li><b>C++ 引用成员不可重新绑定。</b><code>Protocol</code> 持 <code>Link&amp;</code> 后不能换物理层；需要运行时切换就用指针或 <code>std::reference_wrapper</code>。</li><li><b>组合测试仍要覆盖。</b>代码只有两份，但行为有四种；至少每个组合跑一条真实服务，别只测编译通过。</li></ul></div>
+    <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/factory-method" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>把工厂当万能</b>只有“创建逻辑会变、或需要统一入口”时才值得抽工厂；一个 <code>struct</code> 直接初始化更清楚。</li><li><b>返回内部静态对象还允许修改</b>多个调用方拿到同一份对象会互相污染；要可变就每次新建。</li><li><b>类型名拼错没有兜底</b>查表失败必须返回错误，不要默认造第一个产品。</li></ul></div>
   </section>
   <div class="ch-nav" id="chNav"></div>
   </div>
@@ -286,7 +269,6 @@ int main()
 <script src="../assets/pd.js"></script>
 <script src="../assets/dp-data.js"></script>
 <script src="../assets/dp-nav.js"></script>
-<script src="../assets/dp-demo.js"></script>
 <script>dpNav('p2');</script>
 </body>
 </html>

@@ -1,41 +1,37 @@
-/* 装饰：一条读数流水线，每层只加一件事，顺序可换 */
+/* 装饰器 · 给文本加粗、加斜体
+ * gcc -std=c11 -Wall -Wextra decorator.c -o decorator
+ */
 #include <stdio.h>
+#include <string.h>
 
-typedef struct stage stage_t;
-struct stage {
-    int (*apply)(stage_t *self, int raw);
-    stage_t *inner;   /* 下一层；最底层为 NULL */
-    int arg;
-};
+typedef struct { char text[96]; } text_t;
 
-static int raw_apply(stage_t *self, int raw) { (void)self; return raw; }
-
-static int offset_apply(stage_t *self, int raw)
+static text_t bold(text_t t)
 {
-    int v = self->inner->apply(self->inner, raw);
-    return v + self->arg;
+    text_t out;
+    snprintf(out.text, sizeof out.text, "<b>%.*s</b>", (int)(sizeof out.text - 9), t.text);
+    return out;
 }
-static int clamp_apply(stage_t *self, int raw)
+
+static text_t italic(text_t t)
 {
-    int v = self->inner->apply(self->inner, raw);
-    if (v < 0) v = 0;
-    if (v > self->arg) v = self->arg;
-    return v;
+    text_t out;
+    snprintf(out.text, sizeof out.text, "<i>%.*s</i>", (int)(sizeof out.text - 9), t.text);
+    return out;
 }
 
 int main(void)
 {
-    stage_t raw   = { raw_apply,   NULL, 0 };
-    stage_t off   = { offset_apply, &raw, 5 };
-    stage_t clamp = { clamp_apply,  &off, 40 };
+    text_t t = { "hello" };
+    printf("原始：%s\n", t.text);
 
-    printf("raw       = %d\n", raw.apply(&raw, 42));
-    printf("+offset5  = %d\n", off.apply(&off, 42));
-    printf("+clamp40  = %d\n", clamp.apply(&clamp, 42));
+    text_t b = bold(t);
+    printf("加粗：%s\n", b.text);
 
-    stage_t off2   = { offset_apply, &raw, -60 };
-    stage_t clamp2 = { clamp_apply,  &off2, 40 };
-    printf("负值路径  = %d\n", clamp2.apply(&clamp2, 42));
-    printf("三层顺序：raw -> offset -> clamp，换顺序结果会变\n");
+    text_t bi = italic(b);
+    printf("加粗+斜体：%s\n", bi.text);
+
+    text_t ib = bold(italic(t));
+    printf("顺序反过来：%s\n", ib.text);
     return 0;
 }

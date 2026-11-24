@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1.1 设计模式 · C 与 C++ 双实现</title>
+<meta name="description" content="9 个设计模式：结构图、可点的运行演示，以及能编译运行的 C 与 C++ 两份实现。C 版用函数指针表，C++ 版用虚函数。">
+<meta name="theme-color" content="#08090c">
+<link rel="stylesheet" href="../assets/pd.css">
+<style>
+.rec{padding:2px}
+.rec-h{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+.rec-h b{font-size:16px;color:#eaf0ff}
+.rec p{margin:0 0 8px;font-size:13.2px;line-height:1.75;color:#c8d3e6}
+.rec .rk{font-size:12.4px;color:#ffd6a6}
+.rec .rk b{color:#ffb85c;font-weight:600}
+.rec-link{display:inline-flex;align-items:center;gap:6px;margin-top:2px;font:600 12px/1 var(--mono);
+  color:#8ff5d6;text-decoration:none;padding:7px 10px;border:1px solid rgba(67,214,168,.4);border-radius:8px;background:rgba(67,214,168,.08)}
+.rec-link:hover{background:rgba(67,214,168,.14)}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <label for="navChk" class="nav-toggle">☰ 目录</label>
+    <a class="brand" href="../index.html"><i></i>设计模式<small>C / C++ 双实现</small></a>
+    <span class="tb-sp"></span>
+    <a class="tb" href="../../../index.html">知识库</a>
+    <a class="tb" href="../index.html">目录</a>
+  </div>
+</header>
+
+<input type="checkbox" id="navChk" class="nav-chk" hidden>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">篇一 · 基础<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
+    <ol id="sideList"></ol>
+    <div class="vol-nav" id="volNav"></div>
+  </aside>
+
+  <div class="wrap">
+  <div class="ch-meta"><span class="lv">篇一 · 基础</span><span class="sep">/</span>第 1 章<span class="sep">/</span>约 15 分钟</div>
+  <h1>设计模式 · 一半在 C，一半在 C++</h1>
+  <p class="lede">设计模式不是模板代码，而是“这类结构问题”的共同名字。这里每个模式都配一张结构图（点方框能看职责）、一个能点的运行演示，以及两份真编译、真跑过的实现：<b>C 版用函数指针表</b>，<b>C++ 版用虚函数</b>。并排放着看，才能看出同一种分派在两种语言里各付什么代价。这一页只做导读：为什么用、怎么读、出处在哪；九个模式的编号、一句话与六节直达都在 <a href="../index.html">整节目录</a>。</p>
+  <div class="chips">
+    <span class="chip ok">gcc / g++ 16.2.0 · 实际运行</span>
+    <span class="chip">9 章 · 每个模式一章</span>
+    <span class="chip">18 份可编译源码</span>
+    <span class="chip">单页静态 · 无第三方请求</span>
+    <a class="chip link" href="../index.html">☰ 整节目录</a>
+  </div>
+<section class="sec" id="s1">
+    <h2><span class="n">01</span>先按症状找，别按名字背</h2>
+    <p class="subh">模式的名字不值钱，值钱的是“出现什么症状时该动结构”。选一个你正在遇到的问题。</p>
+
+    <div class="demo">
+      <div class="demo-h"><b>症状 → 模式</b><span>选一项，右侧给推荐与代价</span></div>
+      <div class="ctl" id="symCtl"></div>
+      <div class="demo-grid" style="margin-top:12px">
+        <div class="stage" id="symStage">
+          <div class="rec">
+            <div class="rec-h"><span class="pill">待选</span><b id="recName">先选一个症状</b></div>
+            <p id="recWhy">左边每个按钮对应一种常见结构病。选完这里会写：用哪个模式、为什么是它、以及它带来的新麻烦。</p>
+            <p class="rk" id="recRisk"></p>
+            <a class="rec-link" id="recLink" href="#" hidden>打开这一页 →</a>
+          </div>
+        </div>
+        <div class="side">
+          <div class="log" id="symLog"><div class="mute">// 选择记录</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="s2">
+    <h2><span class="n">02</span>三条读法</h2>
+    <div class="prose">
+      <p><b>从地基开始（推荐给写 C 的人）。</b>先看 <a href="../p1/c02.html">C 也能面向对象</a>，弄清“vptr 在第 0 字节”这件事，再按顺序读策略 → 观察者 → 状态。C 版的每个模式，本质都是这一页的排列组合。</p>
+      <p><b>按症状查。</b>用上面第 01 节。选中之后先看“代价/坑”，再看代码：模式真正的成本，通常不在写法，而在它引入的间接层。</p>
+      <p><b>按分类通读。</b>创建型看工厂与单例；结构型看适配器（装饰器、代理的差别在页末对照）；行为型五页连起来看，会发现它们都在回答同一个问题：<b>把“谁在什么时候做什么”从调用链里拆出来，放到一个可替换、可观察、可测试的结构里。</b></p>
+    </div>
+    <div class="key"><b>看图的约定。</b>实线箭头 = 调用或持有；虚线箭头 = 实现或订阅关系；方框里第一行是类型名，第二行斜体是它的角色，第三行等宽字体是它暴露的方法。点任意方框，图下方的说明栏会换成那个角色的职责。</div>
+  </section>
+
+  <section class="sec" id="s3">
+    <h2><span class="n">03</span>经典出处与本节的取舍</h2>
+    <div class="prose">
+      <p>目录结构和“意图 / 问题 / 结构 / 代价”的讲法，沿用 <a href="https://refactoring.guru/design-patterns">Refactoring.Guru</a> 的设计模式目录；C++ 全 23 个模式的可运行示例在 GitHub：<a href="https://github.com/RefactoringGuru/design-patterns-cpp">RefactoringGuru/design-patterns-cpp</a>（每个模式都有 Conceptual 与 RealWorld 两套）。C 侧“用结构体 + 函数指针表实现封装、继承、多态”的原典是 Axel-Tobias Schreiner 的《Object-Oriented Programming with ANSI-C》，有 <a href="https://gitee.com/jiahelinyula/ooc">中文社区译本</a>。</p>
+      <p><b>本节的代码没有抄这些示例</b>：例子取自 Refactoring Guru 中文版与菜鸟教程的经典场景（物流、GUI、文件、聊天室、订单等），每份源码都保留在 <code>src/</code> 目录，页面里的“运行结果”是实际跑出来的输出。C 版统一用静态存储 + 函数指针表，避免在示例里引入堆分配；C++ 版统一用 <code>unique_ptr</code> / <code>shared_ptr</code> 表达所有权。</p>
+      <p>一点提醒：模式是<b>事后命名</b>，不是事前套用。先写出能跑的直白版本，等第二、第三个调用方出现、结构开始重复时，再回来找名字。</p>
+    </div>
+  </section>
+
+  <div class="foot">
+    <p>全部示例：<code>gcc -std=c11 -Wall -Wextra</code> / <code>g++ -std=c++17 -Wall -Wextra</code>，GCC 16.2.0（MinGW-W64 x86_64），本机编译并运行。 · 静态页面 · 无统计脚本 · 无第三方请求<br>
+    <a href="../../../index.html">← 返回个人知识库</a></p>
+  </div>
+  <div class="ch-nav">
+      <a href="../index.html"><span>返回</span><b>← 全书目录</b></a>
+      <a class="nx" href="../p1/c02.html"><span>下一章</span><b>1.2 C 也能面向对象 →</b></a>
+    </div>
+</div>
+
+</div>
+
+<script src="../assets/pd.js"></script>
+<script src="../assets/dp-data.js"></script>
+<script src="../assets/dp-nav.js"></script>
+<script>dpNav('p1');</script>
+<script>
+(function () {
+  var SYM = [
+    { k: '算法要能换', pat: '策略 Strategy', page: 'strategy.html',
+      why: '把“选哪个算法”从 if/else 里搬到一张可替换的函数表或策略对象里；上下文只认一个签名。',
+      risk: '只有一两个分支时别上模式；无状态策略被多线程共享时，注意别在策略里写可变状态。' },
+    { k: '一处变化，多处要跟着动', pat: '观察者 Observer', page: 'observer.html',
+      why: '发布者只负责广播，订阅者各自决定怎么处理。新加一个模块，不用回头改发布者。',
+      risk: '通知过程中增删订阅者、订阅者先于发布者销毁，是这类代码最常炸的两处。' },
+    { k: '状态一多，if 套 if', pat: '状态 State', page: 'state.html',
+      why: '把“当前状态 + 事件 → 下一个状态”变成显式的表或状态类，非法转移能在一个地方统一拒绝。',
+      risk: '状态数爆炸时先拆层级或子状态机；一张巨大的转移表只是把 if 换了个地方。' },
+    { k: '操作要排队、撤销、重放', pat: '命令 Command', page: 'command.html',
+      why: '把“做什么”变成对象，排队、记日志、撤销都只是对这个列表的操作，调用者不必知道细节。',
+      risk: '撤销要存旧值；命令持有接收者引用时，生命周期比写法更容易出事。' },
+    { k: '请求要过一串检查', pat: '责任链 Chain', page: 'chain.html',
+      why: '每环只管一件事，放行或终止自己决定；增减检查项只动装配处，业务代码不动。',
+      risk: '链一长就难排查，所以每环丢弃时都要能说清“是谁、为什么”。' },
+    { k: '新硬件接口对不上', pat: '适配器 Adapter', page: 'adapter.html',
+      why: '厂商库原样保留，用一层薄适配器把它的整数缩放、错误码翻译成上层统一的接口。',
+      risk: '适配器只做翻译；顺手加业务逻辑就变成了装饰器或门面，职责会混。' },
+    { k: '按名字创建，不想知道具体类', pat: '工厂 + 注册表', page: 'factory.html',
+      why: '名字到构造函数指针的映射；新增型号只加一行注册，上层创建代码不动。',
+      risk: '字符串拼错只有运行时才发现；未注册必须有明确的返回空 + 降级路径。' },
+    { k: '全局就一个配置/日志对象', pat: '单例 Singleton', page: 'singleton.html',
+      why: '确实只有一个实例、且需要全局访问点时才用。C 版还要额外处理线程安全与测试隔离。',
+      risk: '它本质是全局可变状态，会悄悄扩大耦合；能用依赖注入（把对象传进去）就别用它。' },
+    { k: 'C 代码也想要多态', pat: 'C 的 OOP 地基', page: 'c-oop.html',
+      why: '结构体首成员放函数表指针、派生类首成员嵌基类，就能得到与 C++ 虚调用同构的分派。',
+      risk: '没有虚析构、没有 RAII：销毁必须走函数表里的 destroy，否则漏资源。' }
+  ];
+
+  var ctl = document.getElementById('symCtl');
+  var log = document.getElementById('symLog');
+  var name = document.getElementById('recName');
+  var why = document.getElementById('recWhy');
+  var risk = document.getElementById('recRisk');
+  var link = document.getElementById('recLink');
+  var tag = document.querySelector('.rec .pill');
+
+  SYM.forEach(function (s, i) {
+    var b = document.createElement('button');
+    b.className = 'btn';
+    b.textContent = s.k;
+    b.onclick = function () {
+      Array.prototype.forEach.call(ctl.children, function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      name.textContent = s.pat;
+      why.textContent = s.why;
+      risk.innerHTML = '<b>代价 / 坑</b>　' + s.risk;
+      link.hidden = false;
+      link.href = s.page;
+      tag.className = 'pill hot';
+      tag.textContent = '推荐';
+      PD.log(log, '<b>' + s.pat + '</b> <span class="mute">← ' + PD.esc(s.k) + '</span>');
+    };
+    ctl.appendChild(b);
+  });
+})();
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

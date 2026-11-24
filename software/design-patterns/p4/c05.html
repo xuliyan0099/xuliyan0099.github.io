@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>4.5 中介者模式 MEDIATOR · C 与 C++ 双实现</title>
-<meta name="description" content="中介者：发动机、仪表、制动不两两直连，所有消息走同一条总线。">
+<meta name="description" content="中介者：聊天室里所有消息经房间转发，用户之间不互相持有。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
 <script src="../assets/dp-demo.js"></script>
@@ -36,183 +36,169 @@
   <div class="wrap">
   <div class="ch-meta"><span class="lv">篇四 · 行为型</span><span class="sep">/</span>第 5 章<span class="sep">/</span>约 28 分钟</div>
   <h1>中介者模式<span class="en">MEDIATOR</span></h1>
-  <p class="lede">三个模块两两直连是 3 条线，五个模块是 10 条线，十个模块是 45 条。<b>中介者让每个模块只认识总线</b>，消息由总线决定投给谁；新增模块只加一个连接，不改其他人的代码。</p>
-  <div class="chips"><span class="chip ok">N² 条线收成 N 条</span><span class="chip">发送方不认识接收方</span><span class="chip">路由规则集中一处</span></div>
+  <p class="lede">三个用户两两直连是 3 条线，十个用户就是 45 条。每加一个人，所有人都要认识他。中介者把连线收到中间：<b>用户只认识房间，房间负责转发</b>。</p>
+  <div class="chips"><span class="chip ok">N² 降到 N</span><span class="chip">用户互不持有</span><span class="chip">C 用房间数组 · C++ 用类</span></div>
 
   <section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：N 个模块两两直连，N² 条线</h2>
+    <h2><span class="n">01</span>问题：坏代码长什么样</h2>
     
     
       <div class="prose">
-        <p>两两直连的代码通常长这样：</p>
-        <pre><code>engine.brake = &amp;brake;
-engine.dash  = &amp;dash;
-brake.dash   = &amp;dash;</code></pre>
-        <ul>
-          <li><b>依赖网越织越密。</b>每加一个模块，都要改已有模块的初始化，漏一条就收不到消息。</li>
-          <li><b>路由规则散落。</b>“BRAKE 要广播、TEMP 只给仪表”写在各个发送方里，改规则要翻遍代码。</li>
-          <li><b>无法统一审计。</b>想知道谁发了什么，只能逐模块加日志。</li>
-        </ul>
-        <p>中介者把所有发送改成“发给总线”，总线按主题路由。发送方只认识 <code>bus</code>，接收方只认识自己的处理函数；路由规则只有一份。</p>
+        <p>坏写法是用户互相保存指针：</p>
+        <pre><code>alice.to[0] = &amp;bob; alice.to[1] = &amp;carol;
+bob.to[0] = &amp;alice; /* 每加一个人，所有人都要改 */</code></pre>
+        <p>连线数量随人数平方增长，而且“谁在线、谁能收”这类规则散落在每个用户里。</p>
+        <p>中介者让用户只持有 <code>room</code>：发消息调 <code>send(from, msg)</code>，房间遍历名单转发。加人只改房间名单。</p>
       </div>
   </section>
 
   <section class="sec" id="s2">
-    <h2><span class="n">02</span>结构：所有消息过总线</h2>
-    <p class="subh">三个节点围着总线；点方框看一条消息会被投给谁。</p>
+    <h2><span class="n">02</span>结构：所有消息穿过房间</h2>
+    <p class="subh">左边是三个用户，中间是聊天室，右边是转发目标。</p>
     
   
     <div class="fig">
-      <div class="fig-h"><b>总线式中介者：三个节点，一个路由中心</b><span>mediator</span></div>
+      <div class="fig-h"><b>所有线穿过房间，用户之间不直连</b><span>structure</span></div>
       <div class="diagram">
-<svg viewBox="0 0 880 360" role="img" aria-label="总线式中介者：三个节点，一个路由中心">
+<svg viewBox="0 0 880 360" role="img" aria-label="所有线穿过房间，用户之间不直连">
   <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
-  <g class="node" data-role="eng" data-note="发动机只把主题交给总线；它不知道仪表和制动是否存在。"><rect x="60" y="56" width="180" height="76" rx="10"/><text class="nm" x="74" y="80">ENGINE</text><text class="ty" x="74" y="99">发送方</text><text class="mt" x="74" y="117">publish()</text></g>
-  <g class="node" data-role="dash" data-note="仪表订阅温度类主题；它不关心消息来自发动机还是制动。"><rect x="60" y="244" width="180" height="76" rx="10"/><text class="nm" x="74" y="268">DASH</text><text class="ty" x="74" y="287">接收方</text><text class="mt" x="74" y="305">handle()</text></g>
-  <g class="node" data-role="brake" data-note="制动既能发轮速，也能收广播；节点角色可以重叠。"><rect x="620" y="150" width="180" height="76" rx="10"/><text class="nm" x="634" y="174">BRAKE</text><text class="ty" x="634" y="193">发送/接收</text><text class="mt" x="634" y="211">publish()</text></g>
-  <g class="node" data-role="bus" data-note="路由规则集中在这里：BRAKE 广播，其余主题只给仪表；改规则只改这一处。"><rect x="330" y="130" width="220" height="96" rx="10"/><text class="nm" x="344" y="154">mediator / bus</text><text class="ty" x="344" y="173">路由中心</text><text class="mt" x="344" y="191">route(from, topic)</text></g>
-  <line x1="240" y1="100" x2="330" y2="150" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="285.0" y="117.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">publish</text>
-  <line x1="240" y1="270" x2="330" y2="210" stroke="#5876a4" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/>
-  <text x="285.0" y="232.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">subscribe</text>
-  <line x1="550" y1="170" x2="620" y2="180" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="585.0" y="167.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">route</text>
+  <g class="node" data-role="alice" data-note="只认识 room，不知道 Bob/Carol 的地址。"><rect x="24" y="60" width="150" height="70" rx="10"/><text class="nm" x="38" y="84">Alice</text><text class="ty" x="38" y="103">用户</text><text class="mt" x="38" y="121">send(msg)</text></g>
+  <g class="node" data-role="bob" data-note="同样只认识 room。"><rect x="24" y="150" width="150" height="70" rx="10"/><text class="nm" x="38" y="174">Bob</text><text class="ty" x="38" y="193">用户</text><text class="mt" x="38" y="211">send(msg)</text></g>
+  <g class="node" data-role="carol" data-note="同样只认识 room。"><rect x="24" y="240" width="150" height="70" rx="10"/><text class="nm" x="38" y="264">Carol</text><text class="ty" x="38" y="283">用户</text><text class="mt" x="38" y="301">send(msg)</text></g>
+  <g class="node" data-role="room" data-note="房间持有名单，负责广播。"><rect x="300" y="150" width="200" height="84" rx="10"/><text class="nm" x="314" y="174">ChatRoom</text><text class="ty" x="314" y="193">中介者</text><text class="mt" x="314" y="211">users[] + send</text></g>
+  <g class="node" data-role="all" data-note="发送者自己不再收一遍。"><rect x="610" y="150" width="190" height="84" rx="10"/><text class="nm" x="624" y="174">其他人</text><text class="ty" x="624" y="193">接收方</text><text class="mt" x="624" y="211">收到消息</text></g>
+  <line x1="174" y1="95" x2="300" y2="175" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="174" y1="185" x2="300" y2="185" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="174" y1="275" x2="300" y2="205" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="500" y1="192" x2="610" y2="192" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="555.0" y="184.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">转发</text>
 </svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：发送方只认总线，路由规则只在总线里。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">中介者知道“谁在名单里”，用户只知道“往哪发”。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
-    <h2><span class="n">03</span>两份实现</h2>
+    <h2><span class="n">03</span>两份实现：C 与 C++</h2>
     
-    <p class='subh'>C 版用节点数组 + 一个 <code>bus_publish()</code>；C++ 版用 <code>Mediator</code> 类持有 <code>Colleague*</code>。</p>
+    <p class='subh'>C 版房间是用户指针数组；C++ 版房间是类，用户持有房间指针。</p>
       <div class="codecard">
         <div class="ch"><span class="lang">C</span><span class="fn">mediator.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 中介者：三个 ECU 不互相认识，所有转发走同一条总线 */
+        <pre><code>/* 中介者 · 聊天室转发
+ * gcc -std=c11 -Wall -Wextra mediator.c -o mediator
+ */
 #include &lt;stdio.h&gt;
 #include &lt;string.h&gt;
 
-typedef struct mediator mediator_t;
-typedef struct ecu ecu_t;
+typedef struct chat chat_t;
+typedef struct { const char *name; chat_t *room; } user_t;
 
-struct ecu { const char *name; mediator_t *bus; };
-struct mediator { ecu_t *nodes[3]; int n; };
+struct chat { user_t *users[4]; int n; };
 
-static void bus_publish(mediator_t *m, ecu_t *from, const char *topic)
+static void join(chat_t *c, user_t *u) { u-&gt;room = c; c-&gt;users[c-&gt;n++] = u; }
+
+static void send(user_t *from, const char *msg)
 {
-    printf("[BUS] %s -&gt; %s\n", from-&gt;name, topic);
-    for (int i = 0; i &lt; m-&gt;n; i++) {
-        ecu_t *to = m-&gt;nodes[i];
-        if (to == from) continue;
-        int want = strcmp(topic, "BRAKE") == 0 || strcmp(to-&gt;name, "DASH") == 0;
-        if (want) printf("      %s handles %s\n", to-&gt;name, topic);
+    printf("%s: %s\n", from-&gt;name, msg);
+    for (int i = 0; i &lt; from-&gt;room-&gt;n; i++) {
+        user_t *u = from-&gt;room-&gt;users[i];
+        if (u != from) printf("  -&gt; %s 收到\n", u-&gt;name);
     }
 }
 
 int main(void)
 {
-    ecu_t engine = { "ENGINE", NULL };
-    ecu_t dash   = { "DASH",   NULL };
-    ecu_t brake  = { "BRAKE",  NULL };
-    mediator_t bus = { .nodes = { &amp;engine, &amp;dash, &amp;brake }, .n = 3 };
+    chat_t room = { { 0 }, 0 };
+    user_t alice = { "Alice", NULL };
+    user_t bob   = { "Bob", NULL };
+    user_t carol = { "Carol", NULL };
+    join(&amp;room, &amp;alice); join(&amp;room, &amp;bob); join(&amp;room, &amp;carol);
 
-    engine.bus = &amp;bus; dash.bus = &amp;bus; brake.bus = &amp;bus;
-
-    bus_publish(&amp;bus, &amp;engine, "BRAKE");
-    bus_publish(&amp;bus, &amp;engine, "TEMP");
-    bus_publish(&amp;bus, &amp;brake,  "WHEEL_SPEED");
-    printf("发送方只认识 bus，不认识另外两个节点\n");
+    send(&amp;alice, "晚上好");
+    send(&amp;bob, "在的");
+    printf("三个用户互不知道对方地址，只认识 room\n");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
       <div class="ch"><b>RUN</b><span>./mediator.exe</span></div>
-      <pre>[BUS] ENGINE -&gt; BRAKE
-      DASH handles BRAKE
-      BRAKE handles BRAKE
-[BUS] ENGINE -&gt; TEMP
-      DASH handles TEMP
-[BUS] BRAKE -&gt; WHEEL_SPEED
-      DASH handles WHEEL_SPEED
-发送方只认识 bus，不认识另外两个节点</pre>
+      <pre>Alice: 晚上好
+  -&gt; Bob 收到
+  -&gt; Carol 收到
+Bob: 在的
+  -&gt; Alice 收到
+  -&gt; Carol 收到
+三个用户互不知道对方地址，只认识 room</pre>
     </div>
       <div class="codecard">
         <div class="ch"><span class="lang">C++</span><span class="fn">mediator.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 中介者 · C++：Colleague 只持 Mediator&amp;，路由规则集中在一处
-// 编译：g++ -std=c++17 -Wall -Wextra mediator.cpp -o mediator_cpp
+        <pre><code>// 中介者 · 聊天室转发
+// g++ -std=c++17 -Wall -Wextra mediator.cpp -o mediator_cpp
 #include &lt;cstdio&gt;
 #include &lt;string&gt;
 #include &lt;vector&gt;
 
-class Mediator;
+class ChatRoom;
 
-class Colleague {
+class User {
 public:
-    explicit Colleague(std::string name) : name_(std::move(name)) {}
-    virtual ~Colleague() = default;
-    const std::string &amp;name() const { return name_; }
-    void join(Mediator *m) { bus_ = m; }
-    void publish(const std::string &amp;topic);   /* 定义放在 Mediator 之后 */
-protected:
-    Mediator *bus_ = nullptr;
+    User(std::string name) : name_(std::move(name)) {}
+    void join(ChatRoom* room);
+    void send(const std::string&amp; msg);
+    const std::string&amp; name() const { return name_; }
 private:
     std::string name_;
+    ChatRoom* room_ = nullptr;
 };
 
-class Mediator {
+class ChatRoom {
 public:
-    void add(Colleague *c) { nodes_.push_back(c); c-&gt;join(this); }
-    void route(Colleague *from, const std::string &amp;topic)
-    {
-        std::printf("[BUS] %s -&gt; %s\n", from-&gt;name().c_str(), topic.c_str());
-        for (auto *to : nodes_) {
-            if (to == from) continue;
-            bool want = topic == "BRAKE" || to-&gt;name() == "DASH";
-            if (want) std::printf("      %s handles %s\n", to-&gt;name().c_str(), topic.c_str());
-        }
+    void add(User* u) { users_.push_back(u); }
+    void broadcast(User* from, const std::string&amp; msg) {
+        std::printf("%s: %s\n", from-&gt;name().c_str(), msg.c_str());
+        for (auto u : users_)
+            if (u != from) std::printf("  -&gt; %s 收到\n", u-&gt;name().c_str());
     }
 private:
-    std::vector&lt;Colleague *&gt; nodes_;
+    std::vector&lt;User*&gt; users_;
 };
 
-inline void Colleague::publish(const std::string &amp;topic)
-{
-    if (bus_) bus_-&gt;route(this, topic);
+void User::join(ChatRoom* room) { room_ = room; room-&gt;add(this); }
+
+void User::send(const std::string&amp; msg) {
+    if (room_) room_-&gt;broadcast(this, msg);
 }
 
 int main()
 {
-    Mediator bus;
-    Colleague engine("ENGINE"), dash("DASH"), brake("BRAKE");
-    bus.add(&amp;engine); bus.add(&amp;dash); bus.add(&amp;brake);
+    ChatRoom room;
+    User alice("Alice"), bob("Bob"), carol("Carol");
+    alice.join(&amp;room); bob.join(&amp;room); carol.join(&amp;room);
 
-    engine.publish("BRAKE");
-    engine.publish("TEMP");
-    brake.publish("WHEEL_SPEED");
-    std::printf("发送方只认识 bus，不认识另外两个节点\n");
+    alice.send("晚上好");
+    bob.send("在的");
+    std::puts("三个用户互不知道对方地址，只认识 room");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
       <div class="ch"><b>RUN</b><span>./mediator_cpp.exe</span></div>
-      <pre>[BUS] ENGINE -&gt; BRAKE
-      DASH handles BRAKE
-      BRAKE handles BRAKE
-[BUS] ENGINE -&gt; TEMP
-      DASH handles TEMP
-[BUS] BRAKE -&gt; WHEEL_SPEED
-      DASH handles WHEEL_SPEED
-发送方只认识 bus，不认识另外两个节点</pre>
+      <pre>Alice: 晚上好
+  -&gt; Bob 收到
+  -&gt; Carol 收到
+Bob: 在的
+  -&gt; Alice 收到
+  -&gt; Carol 收到
+三个用户互不知道对方地址，只认识 room</pre>
     </div>
   </section>
 
   <section class="sec" id="s4">
-    <h2><span class="n">04</span>三条消息，看谁被通知</h2>
+    <h2><span class="n">04</span>运行与演示</h2>
     
     
 <div class="demo" id="demo">
-  <div class="demo-h"><b>三条消息，看谁被通知</b><span>BRAKE 广播，TEMP 只给仪表，WHEEL_SPEED 也只给仪表。</span></div>
+  <div class="demo-h"><b>两条消息，看谁被通知</b><span>Alice 和 Bob 先后发言，Carol 都收到。</span></div>
   <div class="stage">
     <div class="dflow" id="dflow"></div>
     <div class="dbar" id="dbar">未开始</div>
@@ -226,18 +212,18 @@ int main()
     <div class="log" id="dlog"></div>
   </div>
 </div>
-<script>dpDemo({nodes:[{id:'eng',label:'ENGINE',sub:'发送',note:''}, {id:'dash',label:'DASH',sub:'接收',note:''}, {id:'brake',label:'BRAKE',sub:'发送/接收',note:''}, {id:'bus',label:'BUS',sub:'路由',note:''}],steps:[{hi:['eng', 'bus'],t:'ENGINE 发 BRAKE：总线收到，准备广播'}, {hi:['dash', 'brake'],t:'BRAKE 是广播主题：DASH 与 BRAKE 都被通知（发送方自己跳过）'}, {hi:['eng', 'bus'],t:'ENGINE 再发 TEMP：主题只给仪表'}, {hi:['dash'],t:'只有 DASH 处理 TEMP，BRAKE 不被打扰'}, {hi:['brake', 'bus'],t:'BRAKE 发 WHEEL_SPEED：仍由总线决定投递'}, {hi:['dash'],t:'DASH 收到轮速；三个节点之间没有一条直连'}]});</script>
+<script>dpDemo({nodes:[{id:'a',label:'Alice',sub:'发送',note:''}, {id:'room',label:'ChatRoom',sub:'名单',note:''}, {id:'b',label:'Bob',sub:'接收/发送',note:''}, {id:'c',label:'Carol',sub:'接收',note:''}],steps:[{hi:['a', 'room'],t:'Alice 调 room.send("晚上好")'}, {hi:['room', 'b', 'c'],t:'房间遍历名单：Bob、Carol 收到，Alice 跳过'}, {hi:['b', 'room'],t:'Bob 调 room.send("在的")'}, {hi:['room', 'a', 'c'],t:'房间转发：Alice、Carol 收到'}, {hi:['room'],t:'三个用户互不知道对方地址，只认识 room'}]});</script>
 
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>C 与 C++：谁持有谁</h2>
+    <h2><span class="n">05</span>C 与 C++ 对照</h2>
     
     
     <div class="tbl">
       <table>
         <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
-        <tbody><tr><td>中心</td><td><code>mediator_t</code> + 节点数组</td><td><code>Mediator</code> + <code>vector&lt;Colleague*&gt;</code></td><td>C 固定上限；C++ 动态加入</td></tr><tr><td>发送</td><td><code>bus_publish(bus, from, topic)</code></td><td><code>from-&gt;publish(topic)</code></td><td>C 要显式传总线；C++ 节点持有总线指针</td></tr><tr><td>路由</td><td>总线内 <code>strcmp</code> 判断</td><td>总线内 <code>topic ==</code> 判断</td><td>规则集中，但仍是硬编码字符串</td></tr><tr><td>回环</td><td>跳过 <code>from</code></td><td>跳过 <code>from</code></td><td>不跳会自己通知自己，递归爆栈</td></tr><tr><td>新增节点</td><td>加进数组 + 设 <code>bus</code></td><td>构造 + <code>add()</code></td><td>两边都不改已有节点</td></tr></tbody>
+        <tbody><tr><td>中介者形态</td><td><code>chat_t</code> + 用户数组</td><td><code>ChatRoom</code> 类</td><td>C 用数组，C++ 用容器</td></tr><tr><td>用户持有什么</td><td><code>chat_t*</code></td><td><code>ChatRoom*</code></td><td>都只有一条反向引用</td></tr><tr><td>广播规则</td><td>遍历 <code>users[]</code></td><td>遍历 <code>users_</code></td><td>规则只在中介者里</td></tr><tr><td>扩展</td><td>加人进数组</td><td>加人进容器</td><td>用户代码不改</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -245,7 +231,7 @@ int main()
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     
-    <div class="prose"><ul><li><b>中介者会变成上帝对象。</b>所有路由都塞进去，最后它知道每个模块的业务细节；路由规则要按主题分层，必要时拆多个总线。</li><li><b>别忘跳过发送方。</b>广播时把自己也通知一遍，轻则重复处理，重则递归。</li><li><b>同步调用会放大延迟。</b>一个 publish 里同步跑完所有接收方，慢的接收方拖住发送方；实时总线要考虑队列或异步。</li><li><b>C 版字符串主题易拼错。</b>用枚举或常量表，别让 "BRAKE" 和 "BRAKE " 成为两个主题。</li><li><b>死锁风险。</b>接收方在回调里再 publish，可能形成环；路由要检测重入或限制深度。</li></ul></div>
+    <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/mediator" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>中介者变成上帝对象</b>所有业务都塞进房间，它会长成第二个“万能模块”；只做路由和名单。</li><li><b>用户和中介者互相持有又销毁</b>C++ 用裸指针要约定谁先死；必要时用弱引用。</li><li><b>广播包含发送者</b>自己收到自己的消息，通常要显式排除。</li></ul></div>
   </section>
   <div class="ch-nav" id="chNav"></div>
   </div>

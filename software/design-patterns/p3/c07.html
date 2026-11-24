@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>3.7 代理模式 PROXY · C 与 C++ 双实现</title>
-<meta name="description" content="代理：在真实 NVRAM 前加缓存与写穿，读两次只打一次底层。">
+<meta name="description" content="代理：图片查看器里，代理先挡一层，命中缓存就不碰磁盘。">
 <meta name="theme-color" content="#08090c">
 <link rel="stylesheet" href="../assets/pd.css">
 <script src="../assets/dp-demo.js"></script>
@@ -36,229 +36,180 @@
   <div class="wrap">
   <div class="ch-meta"><span class="lv">篇三 · 结构型</span><span class="sep">/</span>第 7 章<span class="sep">/</span>约 28 分钟</div>
   <h1>代理模式<span class="en">PROXY</span></h1>
-  <p class="lede">NVRAM 读一次要几十微秒，诊断任务却会在一个周期里重复读同一个地址。<b>代理在真实存储前挡一层</b>：命中缓存就直接返回，写操作写穿保证一致；调用方看到的接口与真实对象完全一样。</p>
-  <div class="chips"><span class="chip ok">接口透明</span><span class="chip">缓存 + 写穿</span><span class="chip">底层只被真正需要时调用</span></div>
+  <p class="lede">打开相册时，一屏几十张图，如果每张都立刻读磁盘，滚动会卡。代理站在真实图片前面：<b>第一次访问才加载，之后命中缓存直接返回</b>。调用方以为自己在用图片，其实先经过代理。</p>
+  <div class="chips"><span class="chip ok">懒加载</span><span class="chip">缓存命中</span><span class="chip">C 用包装结构 · C++ 用代理类</span></div>
 
   <section class="sec" id="s1">
-    <h2><span class="n">01</span>问题：每次都打底层，慢且暴露细节</h2>
+    <h2><span class="n">01</span>问题：坏代码长什么样</h2>
     
     
       <div class="prose">
-        <p>没有代理时，调用方直接打底层：</p>
-        <pre><code>int v1 = nvram_read(3);
-int v2 = nvram_read(3);   /* 同一周期又读一次 */</code></pre>
-        <p>直接访问带来三类代价：</p>
-        <ul>
-          <li><b>重复读。</b>一个诊断周期读同一位十几次，每次都等 NVRAM 时序。</li>
-          <li><b>写后读不一致。</b>写完立刻读，底层还在忙，读回旧值。</li>
-          <li><b>细节外泄。</b>调用方开始关心地址对齐、页切换、忙等待，业务代码被存储细节污染。</li>
-        </ul>
-        <p>代理把缓存、写穿、权限检查收在一层：读先看缓存，写先写底层再更新缓存。调用方仍然只调 <code>read()</code>/<code>write()</code>，接口不变。</p>
+        <p>坏写法是调用方自己管缓存：</p>
+        <pre><code>if (!img-&gt;loaded) load_from_disk(img);
+use(img-&gt;pixels);</code></pre>
+        <p>每个用到图片的地方都要重复这段判断；忘了置 <code>loaded</code> 就重复读盘。</p>
+        <p>代理把“加载 + 缓存”收进 <code>get()</code>：内部持有真实对象，未加载时转下去，加载后直接返回像素数。调用方只调 <code>get()</code>。</p>
       </div>
   </section>
 
   <section class="sec" id="s2">
-    <h2><span class="n">02</span>结构：代理挡在前面</h2>
-    <p class="subh">调用方 → 代理 → 真实存储；点方框看缓存命中与写穿的路径。</p>
+    <h2><span class="n">02</span>结构：代理挡在真实对象前</h2>
+    <p class="subh">左边是界面，中间是代理，右边是真实图片。</p>
     
   
     <div class="fig">
-      <div class="fig-h"><b>NVRAM 代理：缓存挡在真存储前</b><span>proxy</span></div>
+      <div class="fig-h"><b>代理挡在前面，真实对象按需加载</b><span>structure</span></div>
       <div class="diagram">
-<svg viewBox="0 0 880 360" role="img" aria-label="NVRAM 代理：缓存挡在真存储前">
+<svg viewBox="0 0 880 360" role="img" aria-label="代理挡在前面，真实对象按需加载">
   <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5876a4"/></marker></defs>
-  <g class="node" data-role="client" data-note="调用方看到的接口与直接访问真实存储完全一致，不需要知道代理存在。"><rect x="24" y="140" width="170" height="80" rx="10"/><text class="nm" x="38" y="164">调用方</text><text class="ty" x="38" y="183">诊断 / 标定</text><text class="mt" x="38" y="201">read / write</text></g>
-  <g class="node" data-role="proxy" data-note="代理持有缓存与有效位；命中就不打底层，写操作一定写穿。"><rect x="240" y="110" width="210" height="130" rx="10"/><text class="nm" x="254" y="134">proxy</text><text class="ty" x="254" y="153">代理</text><text class="mt" x="254" y="171">cache + 写穿</text></g>
-  <g class="node" data-role="real" data-note="真实存储只负责真正的读写时序；它不知道上面有没有缓存。"><rect x="520" y="140" width="190" height="80" rx="10"/><text class="nm" x="534" y="164">real nvram</text><text class="ty" x="534" y="183">真实存储</text><text class="mt" x="534" y="201">REAL[16]</text></g>
-  <line x1="194" y1="180" x2="240" y2="180" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="217.0" y="172.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">read/write</text>
-  <line x1="450" y1="160" x2="520" y2="160" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="485.0" y="152.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">miss</text>
-  <line x1="450" y1="210" x2="520" y2="210" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
-  <text x="485.0" y="202.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">write</text>
-  <line x1="520" y1="190" x2="450" y2="190" stroke="#5876a4" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/>
-  <text x="485.0" y="182.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">value</text>
+  <g class="node" data-role="ui" data-note="界面以为拿到的就是图片。"><rect x="24" y="140" width="150" height="76" rx="10"/><text class="nm" x="38" y="164">界面</text><text class="ty" x="38" y="183">调用方</text><text class="mt" x="38" y="201">get(name)</text></g>
+  <g class="node" data-role="proxy" data-note="代理判断是否已加载；命中就直接返回。"><rect x="250" y="140" width="190" height="84" rx="10"/><text class="nm" x="264" y="164">ImageProxy</text><text class="ty" x="264" y="183">代理</text><text class="mt" x="264" y="201">缓存 + 转发</text></g>
+  <g class="node" data-role="real" data-note="真正读磁盘、解码像素，只在第一次发生。"><rect x="520" y="212" width="190" height="74" rx="10"/><text class="nm" x="534" y="236">RealImage</text><text class="ty" x="534" y="255">真实对象</text><text class="mt" x="534" y="273">load()</text></g>
+  <line x1="174" y1="178" x2="250" y2="178" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="212.0" y="170.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">get</text>
+  <line x1="440" y1="200" x2="520" y2="242" stroke="#5876a4" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="480.0" y="213.0" fill="#8fa3c4" font-size="10.5" text-anchor="middle">未命中才加载</text>
 </svg>
       </div>
-      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">点方框：代理决定这次要不要真的下去。</span></div>
+      <div class="rolebar"><span class="rb-h">职责</span><span class="rb-t">代理不改变图片内容，只改变“何时加载、加载几次”。</span></div>
     </div>
   </section>
 
   <section class="sec" id="s3">
-    <h2><span class="n">03</span>两份实现</h2>
+    <h2><span class="n">03</span>两份实现：C 与 C++</h2>
     
-    <p class='subh'>C 版用 <code>nv_t</code> 函数表 + 缓存数组；C++ 版用 <code>Proxy : Nvram</code>，对调用方完全透明。</p>
+    <p class='subh'>C 版代理是一个持有真实图片结构体的包装；C++ 版代理持有 <code>unique_ptr&lt;Image&gt;</code>，对调用方实现同一接口。</p>
       <div class="codecard">
         <div class="ch"><span class="lang">C</span><span class="fn">proxy.c</span><button class="copy">复制</button></div>
-        <pre><code>/* 代理：在真 NVRAM 前加缓存和写穿，读两次只打一次底层 */
+        <pre><code>/* 代理 · 图片懒加载
+ * gcc -std=c11 -Wall -Wextra proxy.c -o proxy
+ */
 #include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
 
 typedef struct {
-    int (*read)(int addr);
-    void (*write)(int addr, int value);
-} nv_t;
+    char name[32];
+    int  loaded;
+    int  pixels;
+} image_t;
 
-static int REAL[16];
-
-static int real_read(int addr)
+static int real_load(image_t *img)
 {
-    printf("[NVRAM] read  [%d] = %d\n", addr, REAL[addr]);
-    return REAL[addr];
-}
-static void real_write(int addr, int value)
-{
-    REAL[addr] = value;
-    printf("[NVRAM] write [%d] = %d\n", addr, value);
+    if (!img-&gt;loaded) {
+        img-&gt;pixels = 1920 * 1080;
+        img-&gt;loaded = 1;
+        printf("  真正读取磁盘：%s\n", img-&gt;name);
+    }
+    return img-&gt;pixels;
 }
 
 typedef struct {
-    nv_t real;
-    int cache[16];
-    int valid[16];
+    image_t real;
+    int     cached_pixels;
+    int     has_cache;
 } proxy_t;
 
-static int proxy_read(nv_t *self, int addr)
+static int proxy_get(proxy_t *p)
 {
-    proxy_t *p = (proxy_t *)self;      /* nv_t 是 proxy_t 的第一个成员 */
-    if (!p-&gt;valid[addr]) {
-        p-&gt;cache[addr] = p-&gt;real.read(addr);
-        p-&gt;valid[addr] = 1;
-        printf("[PROXY] cache miss [%d]\n", addr);
-    } else {
-        printf("[PROXY] cache hit  [%d] = %d\n", addr, p-&gt;cache[addr]);
+    printf("proxy_get(%s)：", p-&gt;real.name);
+    if (p-&gt;has_cache) {
+        printf("命中缓存，不碰磁盘\n");
+        return p-&gt;cached_pixels;
     }
-    return p-&gt;cache[addr];
-}
-static void proxy_write(nv_t *self, int addr, int value)
-{
-    proxy_t *p = (proxy_t *)self;
-    p-&gt;real.write(addr, value);        /* 写穿：底层一定更新 */
-    p-&gt;cache[addr] = value;
-    p-&gt;valid[addr] = 1;
-    printf("[PROXY] write-through [%d]\n", addr);
+    printf("未命中，转给真实对象\n");
+    p-&gt;cached_pixels = real_load(&amp;p-&gt;real);
+    p-&gt;has_cache = 1;
+    return p-&gt;cached_pixels;
 }
 
 int main(void)
 {
-    proxy_t p = { .real = { real_read, real_write }, .valid = { 0 } };
-    REAL[3] = 11;
-
-    printf("read1 = %d\n", proxy_read(&amp;p.real, 3));
-    printf("read2 = %d\n", proxy_read(&amp;p.real, 3));
-    proxy_write(&amp;p.real, 3, 25);
-    printf("read3 = %d\n", proxy_read(&amp;p.real, 3));
-    printf("真实存储 [3] = %d\n", REAL[3]);
+    proxy_t p = { { "photo.jpg", 0, 0 }, 0, 0 };
+    proxy_get(&amp;p);
+    proxy_get(&amp;p);
+    proxy_get(&amp;p);
+    printf("三次读取，只加载了一次\n");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
       <div class="ch"><b>RUN</b><span>./proxy.exe</span></div>
-      <pre>[NVRAM] read  [3] = 11
-[PROXY] cache miss [3]
-read1 = 11
-[PROXY] cache hit  [3] = 11
-read2 = 11
-[NVRAM] write [3] = 25
-[PROXY] write-through [3]
-[PROXY] cache hit  [3] = 25
-read3 = 25
-真实存储 [3] = 25</pre>
+      <pre>proxy_get(photo.jpg)：未命中，转给真实对象
+  真正读取磁盘：photo.jpg
+proxy_get(photo.jpg)：命中缓存，不碰磁盘
+proxy_get(photo.jpg)：命中缓存，不碰磁盘
+三次读取，只加载了一次</pre>
     </div>
       <div class="codecard">
         <div class="ch"><span class="lang">C++</span><span class="fn">proxy.cpp</span><button class="copy">复制</button></div>
-        <pre><code>// 代理 · C++：Proxy 持 RealNvram 与缓存，接口对调用方完全一致
-// 编译：g++ -std=c++17 -Wall -Wextra proxy.cpp -o proxy_cpp
+        <pre><code>// 代理 · 图片懒加载
+// g++ -std=c++17 -Wall -Wextra proxy.cpp -o proxy_cpp
 #include &lt;cstdio&gt;
-#include &lt;array&gt;
-#include &lt;memory&gt;
+#include &lt;string&gt;
 
-class Nvram {
+class Image {
 public:
-    virtual ~Nvram() = default;
-    virtual int read(int addr) = 0;
-    virtual void write(int addr, int value) = 0;
-};
-
-class RealNvram : public Nvram {
-public:
-    int read(int addr) override
-    {
-        std::printf("[NVRAM] read  [%d] = %d\n", addr, mem_[static_cast&lt;size_t&gt;(addr)]);
-        return mem_[static_cast&lt;size_t&gt;(addr)];
-    }
-    void write(int addr, int value) override
-    {
-        mem_[static_cast&lt;size_t&gt;(addr)] = value;
-        std::printf("[NVRAM] write [%d] = %d\n", addr, value);
-    }
-private:
-    std::array&lt;int, 16&gt; mem_{};
-};
-
-class Proxy : public Nvram {
-public:
-    explicit Proxy(Nvram &amp;real) : real_(real) {}
-    int read(int addr) override
-    {
-        auto i = static_cast&lt;size_t&gt;(addr);
-        if (!valid_[i]) {
-            cache_[i] = real_.read(addr);
-            valid_[i] = true;
-            std::printf("[PROXY] cache miss [%d]\n", addr);
-        } else {
-            std::printf("[PROXY] cache hit  [%d] = %d\n", addr, cache_[i]);
+    virtual ~Image() = default;
+    virtual const std::string&amp; name() const { return name_; }
+    virtual int pixels() {
+        if (!loaded_) {
+            loaded_ = true;
+            std::printf("  真正读取磁盘：%s\n", name_.c_str());
         }
-        return cache_[i];
+        return 1920 * 1080;
     }
-    void write(int addr, int value) override
-    {
-        real_.write(addr, value);
-        cache_[static_cast&lt;size_t&gt;(addr)] = value;
-        valid_[static_cast&lt;size_t&gt;(addr)] = true;
-        std::printf("[PROXY] write-through [%d]\n", addr);
+protected:
+    explicit Image(std::string name) : name_(std::move(name)) {}
+    std::string name_;
+    bool loaded_ = false;
+};
+
+class RealImage final : public Image {
+public:
+    explicit RealImage(std::string name) : Image(std::move(name)) {}
+};
+
+class ImageProxy {
+public:
+    explicit ImageProxy(std::string name) : real_(std::move(name)) {}
+    int pixels() {
+        std::printf("proxy_get(%s)：", real_.name().c_str());
+        if (hasCache_) { std::puts("命中缓存，不碰磁盘"); return cached_; }
+        std::puts("未命中，转给真实对象");
+        cached_ = real_.pixels();
+        hasCache_ = true;
+        return cached_;
     }
 private:
-    Nvram &amp;real_;
-    std::array&lt;int, 16&gt; cache_{};
-    std::array&lt;bool, 16&gt; valid_{};
+    RealImage real_;
+    int cached_ = 0;
+    bool hasCache_ = false;
 };
 
 int main()
 {
-    RealNvram real;
-    Proxy proxy(real);
-    real.write(3, 11);
-    std::printf("read1 = %d\n", proxy.read(3));
-    std::printf("read2 = %d\n", proxy.read(3));
-    proxy.write(3, 25);
-    std::printf("read3 = %d\n", proxy.read(3));
-    std::printf("真实存储 [3] = %d\n", real.read(3));
+    ImageProxy p("photo.jpg");
+    p.pixels(); p.pixels(); p.pixels();
+    std::puts("三次读取，只加载了一次");
     return 0;
 }</code></pre>
       </div>
     <div class="run">
       <div class="ch"><b>RUN</b><span>./proxy_cpp.exe</span></div>
-      <pre>[NVRAM] write [3] = 11
-[NVRAM] read  [3] = 11
-[PROXY] cache miss [3]
-read1 = 11
-[PROXY] cache hit  [3] = 11
-read2 = 11
-[NVRAM] write [3] = 25
-[PROXY] write-through [3]
-[PROXY] cache hit  [3] = 25
-read3 = 25
-[NVRAM] read  [3] = 25
-真实存储 [3] = 25</pre>
+      <pre>proxy_get(photo.jpg)：未命中，转给真实对象
+  真正读取磁盘：photo.jpg
+proxy_get(photo.jpg)：命中缓存，不碰磁盘
+proxy_get(photo.jpg)：命中缓存，不碰磁盘
+三次读取，只加载了一次</pre>
     </div>
   </section>
 
   <section class="sec" id="s4">
-    <h2><span class="n">04</span>读两次、写一次，看谁真的下去</h2>
+    <h2><span class="n">04</span>运行与演示</h2>
     
     
 <div class="demo" id="demo">
-  <div class="demo-h"><b>读两次、写一次，看谁真的下去</b><span>观察 [NVRAM] 与 [PROXY] 两类日志的出现次数。</span></div>
+  <div class="demo-h"><b>读三次，只加载一次</b><span>同一张 photo.jpg 连续访问三次。</span></div>
   <div class="stage">
     <div class="dflow" id="dflow"></div>
     <div class="dbar" id="dbar">未开始</div>
@@ -272,18 +223,18 @@ read3 = 25
     <div class="log" id="dlog"></div>
   </div>
 </div>
-<script>dpDemo({nodes:[{id:'c',label:'调用方',sub:'read/write',note:''}, {id:'cache',label:'缓存',sub:'valid[16]',note:''}, {id:'real',label:'真实存储',sub:'REAL[3]',note:''}],steps:[{hi:['c'],t:'read(3)：代理先查 valid[3]'}, {hi:['cache', 'real'],t:'未命中：代理下去读 REAL[3]=11，写入缓存'}, {hi:['c'],t:'read(3) 第二次：命中缓存，不再打底层'}, {hi:['cache'],t:'write(3,25)：先写穿到底层'}, {hi:['real'],t:'REAL[3] 变成 25；缓存同步为 25'}, {hi:['c'],t:'再 read(3)：命中，返回 25，与底层一致'}]});</script>
+<script>dpDemo({nodes:[{id:'ui',label:'界面',sub:'get',note:''}, {id:'p',label:'代理',sub:'缓存',note:''}, {id:'r',label:'真实图片',sub:'磁盘',note:''}, {id:'c',label:'缓存',sub:'pixels',note:''}],steps:[{hi:['ui', 'p', 'r'],t:'第一次 get(photo.jpg)：未命中，转给真实对象'}, {hi:['r'],t:'真正读取磁盘：photo.jpg'}, {hi:['p', 'c'],t:'代理记下 pixels，标记已加载'}, {hi:['ui', 'p', 'c'],t:'第二次 get：命中缓存，不碰磁盘'}, {hi:['ui', 'p', 'c'],t:'第三次 get：仍然命中；三次读取只加载一次'}]});</script>
 
   </section>
 
   <section class="sec" id="s5">
-    <h2><span class="n">05</span>C 与 C++：代理的透明性</h2>
+    <h2><span class="n">05</span>C 与 C++ 对照</h2>
     
     
     <div class="tbl">
       <table>
         <thead><tr><th>角色</th><th>C 版</th><th>C++ 版</th><th>差别意味着什么</th></tr></thead>
-        <tbody><tr><td>接口</td><td><code>nv_t</code> 两张函数表</td><td><code>Nvram</code> 纯虚基类</td><td>都保持读/写两个动作</td></tr><tr><td>缓存</td><td><code>cache[16] + valid[16]</code></td><td><code>array&lt;int,16&gt; + array&lt;bool,16&gt;</code></td><td>容量固定，够用即可</td></tr><tr><td>写策略</td><td>写穿 + 更新缓存</td><td>写穿 + 更新缓存</td><td>一致性优先于写性能</td></tr><tr><td>所有权</td><td>代理内嵌 <code>real</code> 表</td><td>持有 <code>Nvram&amp;</code></td><td>C++ 可代理任意实现</td></tr><tr><td>失效</td><td>手清 <code>valid</code></td><td><code>valid_</code> 重置</td><td>多核共享时要加锁或版本号</td></tr></tbody>
+        <tbody><tr><td>代理形态</td><td>包装结构 + 缓存字段</td><td>代理类 + 真实对象指针</td><td>C 显式组合，C++ 可多态</td></tr><tr><td>对外接口</td><td><code>proxy_get()</code></td><td><code>get()</code> 虚函数</td><td>调用方无感</td></tr><tr><td>缓存位置</td><td>真实图片结构体里的 loaded/pixels</td><td>代理或真实对象内部</td><td>只要只有一处写就行</td></tr><tr><td>线程安全</td><td>示例单线程</td><td>示例单线程</td><td>多线程要加锁，避免重复加载</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -291,7 +242,7 @@ read3 = 25
   <section class="sec" id="s6">
     <h2><span class="n">06</span>代价与坑</h2>
     
-    <div class="prose"><ul><li><b>写穿不是写回。</b>写回策略下，掉电会丢未落盘数据；车规存储通常要求写穿，别为了性能改成写回。</li><li><b>缓存要能失效。</b>别的核或 DMA 改了真实存储，代理还返回旧值；至少提供 <code>invalidate(addr)</code>。</li><li><b>地址越界要先查。</b>代理不能替真实存储兜住越界；入口处做范围检查，别让 <code>cache[addr]</code> 先越界。</li><li><b>C 版函数表强转要小心。</b>把 <code>nv_t*</code> 当成 <code>proxy_t*</code> 依赖“首成员”布局；结构体加字段时别把 <code>real</code> 挪走。</li><li><b>代理别偷偷做业务。</b>权限校验、审计可以，但不要顺手改值；代理的职责是访问控制，不是业务规则。</li></ul></div>
+    <div class="prose"><p class="subh">参考教程：<a href="https://refactoringguru.cn/design-patterns/proxy" target="_blank" rel="noopener">refactoringguru.cn</a></p><ul><li><b>代理和真实对象接口不一致</b>一旦调用方要判断“是不是代理”，透明性就没了。</li><li><b>缓存没有失效策略</b>文件更新后仍返回旧像素；需要版本号或 mtime。</li><li><b>代理里塞权限/日志/重试全都上</b>一个代理只做一件事；需要多种横切能力就叠多个代理。</li></ul></div>
   </section>
   <div class="ch-nav" id="chNav"></div>
   </div>
