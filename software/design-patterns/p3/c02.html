@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>工厂模式 Factory · C 与 C++ 双实现</title>
+<title>3.2 工厂模式 Factory · C 与 C++ 双实现</title>
 <meta name="description" content="按名字创建驱动：C 用注册表 + 函数指针 + GCC constructor 自注册，C++ 用 map + std::function + AutoReg 模板；含注册表演示。">
 <meta name="theme-color" content="#08090c">
-<link rel="stylesheet" href="assets/pd.css">
+<link rel="stylesheet" href="../assets/pd.css">
 <style>
 .reg{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 .reg span{font:11px/1.6 var(--mono);padding:6px 10px;border-radius:6px;border:1px solid var(--line);color:#93a4c4}
@@ -21,11 +21,11 @@
 <header class="topbar">
   <div class="topbar-in">
     <label for="navChk" class="nav-toggle">☰ 目录</label>
-    <a class="brand" href="index.html"><i></i>设计模式<small>C / C++ 双实现</small></a>
+    <a class="brand" href="../index.html"><i></i>设计模式<small>C / C++ 双实现</small></a>
     <span class="tb-sp"></span>
-    <a class="tb" href="index.html">导读</a>
-    <a class="tb" href="../../index.html">知识库</a>
-    <a class="tb" href="sitemap.html">目录</a>
+    <a class="tb" href="../p1/c01.html">导读</a>
+    <a class="tb" href="../../../index.html">知识库</a>
+    <a class="tb" href="../index.html">目录</a>
   </div>
 </header>
 
@@ -34,33 +34,13 @@
 
 <div class="shell">
   <aside id="sidebar">
-    <div class="vol-h">设计模式篇 · 10 章<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
-    <ol>
-      <li><a href="index.html"><span class="no">1.1</span><span>导读<span class="sub">为什么用 · 怎么读</span></span></a></li>
-      <li><a href="c-oop.html"><span class="no">1.2</span><span>C 也能面向对象<span class="sub">手工虚表</span></span></a></li>
-      <li><a href="strategy.html"><span class="no">1.3</span><span>策略<span class="sub">三种 CAN 调度</span></span></a></li>
-      <li><a href="observer.html"><span class="no">1.4</span><span>观察者<span class="sub">通知名单解耦</span></span></a></li>
-      <li><a href="state.html"><span class="no">1.5</span><span>状态<span class="sub">转移表拒绝非法</span></span></a></li>
-      <li><a href="command.html"><span class="no">1.6</span><span>命令<span class="sub">队列与撤销</span></span></a></li>
-      <li><a href="chain.html"><span class="no">1.7</span><span>职责链<span class="sub">四道关</span></span></a></li>
-      <li><a href="adapter.html"><span class="no">1.8</span><span>适配器<span class="sub">两种传感器</span></span></a></li>
-      <li><a href="factory.html" class="active"><span class="no">1.9</span><span>工厂<span class="sub">注册表取驱动</span></span></a>
-        <ol class="side-sub">
-          <li><a href="#s1"><i>01</i>问题：新增一个型号就要改 switch</a></li>
-          <li><a href="#s2"><i>02</i>结构：一张表、两个方向</a></li>
-          <li><a href="#s3"><i>03</i>两份实现</a></li>
-          <li><a href="#s4"><i>04</i>按名字取驱动，包括一个不存在的名字</a></li>
-          <li><a href="#s5"><i>05</i>C 与 C++：一张表，两种造法</a></li>
-          <li><a href="#s6"><i>06</i>代价与坑</a></li>
-        </ol>
-      </li>
-      <li><a href="singleton.html"><span class="no">1.10</span><span>单例<span class="sub">一个入口一个对象</span></span></a></li>
-    </ol>
-    <div class="vol-nav"><a href="sitemap.html">☰ 整节目录</a><a href="singleton.html">下一节 →</a></div>
+    <div class="vol-h">篇三 · 结构型与创建型<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
+    <ol id="sideList"></ol>
+    <div class="vol-nav" id="volNav"></div>
   </aside>
 
   <div class="wrap">
-  <div class="kicker"><b>设计模式</b><span>·</span><span>第 9 章</span><span>·</span><span>创建型</span></div>
+  <div class="ch-meta"><span class="lv">篇三 · 结构型与创建型</span><span class="sep">/</span>第 2 章<span class="sep">/</span>约 30 分钟</div>
   <h1>工厂模式<span class="en">FACTORY</span></h1>
   <p class="lede">配置文件里写着 <code>sensor = "sht3x"</code>，代码里却没有一个 <code>if (name == "sht3x")</code>。答案是一张注册表：每个驱动在自己被链接进来的那一刻就把“名字 → 构造函数”登记进去，上层只按字符串查表，查不到就返回空，由它决定怎么降级。</p>
   <div class="chips">
@@ -427,20 +407,20 @@ create("bme280"):
     </div>
   </section>
 
-  <nav class="pager">
-    <a href="adapter.html"><span class="k">← 1.8</span><b>适配器模式</b><i>两种传感器接同一接口</i></a>
-    <a class="nx" href="singleton.html"><span class="k">1.10 →</span><b>单例模式</b><i>全局配置只初始化一次</i></a>
-  </nav>
+  <div class="ch-nav">
+      <a href="../p3/c01.html"><span>上一章</span><b>← 3.1 适配器模式</b></a>
+      <a class="nx" href="../p3/c03.html"><span>下一章</span><b>3.3 单例模式 →</b></a>
+    </div>
 
-  <footer class="foot">
-    <p><b>设计模式 · C / C++ 双实现</b>　第 9 章　Factory</p>
-    <p>静态页面 · 无统计脚本 · 无第三方请求</p>
-  </footer>
+  
 </div>
 
 </div>
 
-<script src="assets/pd.js"></script>
+<script src="../assets/pd.js"></script>
+<script src="../assets/dp-data.js"></script>
+<script src="../assets/dp-nav.js"></script>
+<script>dpNav('p3');</script>
 <script>
 (function () {
   var REG = {
@@ -492,6 +472,11 @@ create("bme280"):
 </script>
 </body>
 </html>
+
+
+
+
+
 
 
 
