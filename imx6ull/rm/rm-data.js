@@ -100,8 +100,9 @@ window.RM =
           "line": "NAND/BCH 走的不是 SDMA，而是这条带链式描述符的 APBH 通道。",
           "pts": ["链式描述符格式与通道仲裁", "与 GPMI、BCH 的握手；NAND 读状态轮询实例"] },
         { "n": 21, "zh": "外部并行总线 EIM", "en": "External Interface Module", "pp": "821–884", "pages": 64, "pri": "read", "batch": 3,
-          "line": "接 NOR、PSRAM、FPGA 的总线，核心是把 ns 换算成 CS 时序寄存器。",
-          "pts": ["片选空间划分与地址映射", "RW/W/R 时序字段与时序图逐段对照", "从器件手册的 tRC/tOE 算出寄存器值"] },
+"line": "接 NOR、PSRAM、FPGA 的总线，核心是把 ns 换算成 CS 时序寄存器。",
+"pts": ["六片选与 128 MB 窗口怎么切", "基址 0x021B_8000 与每片选 0x18 步长的寄存器地图", "GCR1 位域：DSZ 口宽与 AUS 地址移位", "异步读写：RWSC/WWSC 拍数与 133 MHz 换算", "同步突发与页读：BCLK/BL/APR", "七步启动与五条故障判据", "板级现实：EIM 脚被 NAND 与 CSI 借走"],
+"ready": true },
         { "n": 29, "zh": "NAND 控制器 GPMI", "en": "General Purpose Media Interface", "pp": "1371–1420", "pages": 50, "pri": "read", "batch": 3,
           "line": "NAND 的时序、命令与数据搬运，和 BCH 一起构成一条 ECC 流水线。",
           "pts": ["GPMI NAND 模式的命令/DMA 流程", "与 BCH 的 ECC 交接、坏块与页组织"] },
@@ -123,7 +124,7 @@ window.RM =
         { "n": 49, "zh": "外设总线仲裁 SPBA", "en": "Shared Peripheral Bus Arbiter", "pp": "3451–3464", "pages": 14, "pri": "opt", "batch": 6,
           "line": "同一个外设被 A7 和 SDMA 同时访问时，谁说了算。",
           "pts": ["资源归属寄存器", "外设所有权与访问冲突"] },
-        { "n": 58, "zh": "SD/eMMC 主机控制器 uSDHC", "en": "Ultra Secured Digital Host Controller", "pp": "3947–4078", "pages": 132, "pri": "read", "batch": 3,
+        { "n": 58, "zh": "SD/eMMC 主机控制器 uSDHC", "en": "Ultra Secured Digital Host Controller", "pp": "3947–4078", "pages": 132, "pri": "read", "batch": 3, "ready": true,
           "line": "TF 卡与 eMMC 的命令流、数据搬运、1.8V 切换与初始化序列。",
           "pts": ["命令/响应寄存器与传输状态机", "ADMA、DMA 与 block 传输", "UHS/DDR 与 IO 电压切换、初始化步骤"] }
       ]
@@ -160,7 +161,7 @@ window.RM =
         { "n": 53, "zh": "电阻触摸屏 TSC", "en": "Touch Screen Controller", "pp": "3537–3558", "pages": 22, "pri": "opt", "batch": 2,
           "line": "四线/五线电阻屏的转换序列与压力测量。",
           "pts": ["转换序列与坐标计算", "与 ADC 共用前端的关系"] },
-        { "n": 59, "zh": "看门狗 WDOG", "en": "Watchdog Timer", "pp": "4079–4098", "pages": 20, "pri": "read", "batch": 2,
+        { "n": 59, "zh": "看门狗 WDOG", "en": "Watchdog Timer", "pp": "4079–4098", "pages": 20, "pri": "read", "batch": 2, "ready": true,
           "line": "两个看门狗，上电默认就开；「没喂狗却复位」先查这里。",
           "pts": ["WCR/WSR/WICR 与控制序列", "超时、复位与中断两种收尾方式"] }
       ]
