@@ -59,6 +59,7 @@ window.RM =
       "intro": "「寄存器写了没反应」有一半是时钟没开、复位没放、LDO 没起。这一篇按「总览 → CCM → 门控/电源 → 复位 → 晶振 → 温度」的顺序，把芯片的「心跳」讲清楚，并用一台配频计算器把 126 页的 CCM 变成可点的树。",
       "chapters": [
         { "n": 10, "zh": "时钟与电源管理总览", "en": "Clock and Power Management", "pp": "345–380", "pages": 36, "pri": "read", "batch": 1,
+          "ready": true,
           "line": "先看域划分与低功耗策略，再去读 18/27/39/51 的寄存器细节。",
           "pts": ["时钟管理：PLL 家族与根时钟分配", "电源域、ONOFF 按键与 DVFS 的关系"] },
         { "n": 18, "zh": "时钟控制器 CCM：PLL、分频、门控", "en": "Clock Controller Module", "pp": "625–750", "pages": 126, "pri": "read", "batch": 1,
@@ -207,6 +208,7 @@ window.RM =
       "intro": "一篇讲完一条链：摄像头进来（CSI）→ 像素处理（PXP）→ 屏幕出去（eLCDIF），旁边挂着电子纸（EPDC）与音频（SAI/ESAI/ASRC/MQS/SPDIF），再加 NAND 用的 ECC 加速器（BCH）。476 页的 PXP 只讲三级引擎与一次缩放/旋转的完整配置。",
       "chapters": [
         { "n": 9, "zh": "多媒体子系统总览", "en": "Multimedia", "pp": "335–344", "pages": 10, "pri": "opt", "batch": 4,
+          "ready": true,
           "line": "十页把显示链与音频链画清楚，先看它再进各外设。",
           "pts": ["显示与图形：LCDIF/PXP/EPDC/CSI 分工", "音频：SAI/ESAI/ASRC/SPDIF/MQS 分工"] },
         { "n": 16, "zh": "异步采样率转换 ASRC", "en": "Asynchronous Sample Rate Converter", "pp": "505–562", "pages": 58, "pri": "opt", "batch": 4,
