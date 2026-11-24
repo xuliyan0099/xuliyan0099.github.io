@@ -1,0 +1,183 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>多线程与锁：pthread、条件变量、常见死锁 · 卷 10 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j10.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 10 · 用户态</div>
+<ol><li><a href="d10-01.html">
+  <span class="no">01</span><span>文件 IO 与 mmap：从 read 到直接映射寄存器<span class="sub">约 2 小时</span></span></a></li>
+<li><a href="d10-02.html" class="active">
+  <span class="no">02</span><span>多线程与锁：pthread、条件变量、常见死锁<span class="sub">约 2 小时 · 当前</span></span></a></li>
+<li><a href="d10-03.html">
+  <span class="no">03</span><span>socket 与 epoll：一个能扛住千连接的事件循环<span class="sub">约 2 小时</span></span></a></li>
+<li><a href="d10-04.html">
+  <span class="no">04</span><span>进程间通信：管道、共享内存、消息队列、信号<span class="sub">约 2 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j09.html">← 卷 09</a>
+  <a href="../juan/j11.html">卷 11 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 10<span>·</span>用户态<span>·</span>第 02 篇</div>
+  <h1>多线程与锁：pthread、条件变量、常见死锁</h1>
+  
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 2 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+<p class="lead">线程比进程便宜，是因为它共享地址空间——不用切页表，不用复制内存。代价是<strong>共享的一切都可能被同时改</strong>。</p>
+
+<p>锁不是「加了就安全」，它带来三个新问题：粒度（太粗等于串行）、顺序（互相等就死锁）、唤醒（通知丢了就永久卡住）。这一篇把这三件事说透。</p>
+
+<h2 id="s1">先玩一下：一个线程的一生</h2>
+
+<p>点事件按钮，看状态怎么转。注意 <code>BLOCKED</code> 有两种来源：等锁、等条件变量。两者醒来后都要<strong>重新检查条件</strong>。</p>
+
+<div class="ikit" data-type="machine" data-json='{"title":"线程状态（简化）","badge":"machine",
+"states":[{"id":"NEW","x":16,"y":22},{"id":"RUN","x":42,"y":14},{"id":"CPU","x":66,"y":26},{"id":"WAIT","x":44,"y":60},{"id":"TERM","x":78,"y":72}],
+"edges":[
+{"from":"NEW","to":"RUN","label":"pthread_create","event":"创建"},
+{"from":"RUN","to":"CPU","label":"被调度","event":"被调度"},
+{"from":"CPU","to":"RUN","label":"时间片用完","event":"时间片到"},
+{"from":"CPU","to":"WAIT","label":"等锁/等条件","event":"阻塞"},
+{"from":"WAIT","to":"RUN","label":"被唤醒","event":"被唤醒"},
+{"from":"CPU","to":"TERM","label":"return / exit","event":"退出"},
+{"from":"RUN","to":"CPU","label":"抢占","event":"被抢占"}],
+"script":[0,1,3,4,2,1,5],
+"stateNotes":{
+"NEW":"刚创建，还没被调度过。",
+"RUN":"就绪，在运行队列里排队。",
+"CPU":"正在某个核上执行。单核时任何时刻只有一个。",
+"WAIT":"睡眠，不占 CPU。等锁、等条件变量、等 IO 都在这里。",
+"TERM":"已退出，等 join 回收资源（否则成僵尸）。"}}'></div>
+
+<p>单核（i.MX6ULL）也能「并发」：靠时间片轮转与阻塞让出。所以「我这只有一个核，不用加锁」是错的——只要有两个执行流会被调度交错，就有竞争。</p>
+
+<h2 id="s2">一、锁的四个家族</h2>
+
+<table>
+<thead><tr><th>机制</th><th>等待方式</th><th>能否睡眠</th><th>用户态对应</th></th></tr></thead>
+<tbody>
+<tr><td>原子操作</td><td>不等待，硬件指令</td><td>不涉及</td><td><code>stdatomic</code> / <code>__atomic</code></td></tr>
+<tr><td>自旋锁</td><td>忙等，占 CPU</td><td>不能睡</td><td>几乎没有（内核专用）</td></tr>
+<tr><td>互斥锁</td><td>睡等，唤醒后抢</td><td>能睡</td><td><code>pthread_mutex</code></td></tr>
+<tr><td>信号量</td><td>睡等，可计数</td><td>能睡</td><td><code>sem_t</code></td></tr>
+</tbody></table>
+
+<p>选择标准很朴素：<strong>临界区里有阻塞操作（IO、sleep、等另一个锁）就用互斥锁；纯 CPU 的极短临界区在内核里才考虑自旋锁</strong>。用户态几乎没有理由自旋。</p>
+
+<h2 id="s3">二、条件变量：为什么必须配 while</h2>
+
+<p>条件变量本身不存「有没有数据」，它只是「等/通知」的通道。所以标准写法一定是：</p>
+
+<pre data-lang="c"><code>pthread_mutex_lock(&amp;m);
+while (!has_data)                              /* 必须 while，不是 if */
+    pthread_cond_wait(&amp;cond, &amp;m);             /* 内部会原子地放锁 + 睡 */
+take_data();
+pthread_mutex_unlock(&amp;m);
+
+/* 生产者 */
+pthread_mutex_lock(&amp;m);
+has_data = 1;
+pthread_cond_signal(&amp;cond);                    /* 或 broadcast */
+pthread_mutex_unlock(&amp;m);</code></pre>
+
+<p>用 <code>if</code> 会踩两种坑：<b>虚假唤醒</b>（系统可能无故唤醒你）与<b>惊群</b>（broadcast 唤醒多个，只有一个能拿到数据，其余必须回去再等）。两者都要求重新检查条件——所以只能是 <code>while</code>。</p>
+
+<div class="ikit" data-type="seq" data-json='{"title":"丢失唤醒是怎么发生的","badge":"seq",
+"actors":[{"name":"消费者","start":"准备等"},{"name":"生产者","start":"准备发"}],
+"steps":[
+{"label":"消费者：检查 has_data = 0","states":["判断中","待命"],"note":"此刻确实没数据。"},
+{"label":"生产者：has_data = 1; signal()","states":["即将睡","已发信号"],"note":"信号发出，但此时没有等待者，信号被丢弃——条件变量不保存通知。"},
+{"label":"消费者：cond_wait 睡下","states":["睡下","待命"],"note":"它睡在一个已经发生过的通知之后，于是永远等下去。"},
+{"label":"修复：先拿锁再检查再等","states":["正确","正确"],"note":"把「检查」和「进入等待」放在同一把锁的保护下，signal 就不可能插进中间。","dir":"l"},
+{"label":"被唤醒后 while 重查","states":["拿到数据","完成"],"note":"醒来重新判断，才敢消费。"}]}'></div>
+
+<p>「先拿锁、再检查、再 wait」这三步的顺序，就是避免丢失唤醒的全部秘密。看起来只是顺序问题，实际上是一类 bug 的总开关。</p>
+
+<h2 id="s4">三、死锁：四个条件与三种破法</h2>
+
+<p>死锁需要同时满足四个条件（互斥、持有并等待、不可剥夺、循环等待）。工程上最容易破的是<strong>循环等待</strong>：给所有锁编号，永远按同一顺序获取。</p>
+
+<ul>
+  <li><b>锁顺序</b>：全局规定 <code>lock A → lock B</code>，禁止反向。代码评审时先看这个。</li>
+  <li><b>超时</b>：<code>pthread_mutex_timedlock</code> 可以在拿不到时退出并重试，把死锁降级为「慢」。</li>
+  <li><b>缩小临界区</b>：把 IO、日志、回调移出锁外，减少「持有并等待」的窗口。</li>
+</ul>
+
+<div class="cal warn"><span class="h">误解：加锁就一定线程安全</span>锁保护的是「数据」，不是「函数」。同一个对象的读和写若用两把不同的锁，等于没锁。另一个常见错误是返回内部指针，调用方在锁外继续用。</div>
+
+<div class="ikit" data-type="param" data-json='{"title":"并行比例决定加速上限（Amdahl）","badge":"param",
+"fields":[{"k":"p","label":"可并行比例","min":0,"max":100,"step":5,"val":80,"unit":"%"},
+{"k":"n","label":"核数","min":1,"max":16,"step":1,"val":4,"unit":"核"},
+{"k":"ov","label":"同步开销","min":0,"max":50,"step":1,"val":10,"unit":"%"}],
+"outs":[
+{"label":"理论加速比","expr":"1 / ((1 - V.p/100) + (V.p/100) / V.n)","unit":" ×"},
+{"label":"含同步开销后","expr":"1 / ((1 - V.p/100) + (V.p/100) / V.n + V.ov/100)","unit":" ×"},
+{"label":"串行部分占比","expr":"100 - V.p","unit":" %"},
+{"label":"16 核时的上限","expr":"1 / (1 - V.p/100)","unit":" ×"}],
+"bar":{"expr":"min((1 / ((1 - V.p/100) + (V.p/100) / V.n + V.ov/100)) / V.n * 100, 100)"},
+"verdict":{"expr":"V.p >= 90 && V.ov <= 10","ok":"并行效率不错","bad":"锁太重或串行太多：先优化临界区，再加线程"},
+"note":"把「可并行比例」拉到 50%，即使给 16 个核，加速也超不过 2 倍。这就是「加线程不加性能」的算术解释。"}'></div>
+
+<h2 id="s5">动手（可选）：亲手制造一次死锁</h2>
+
+<div class="cal q"><span class="h">只在 🔧 实作模式展开</span>PC 上即可，几行代码。</div>
+
+<ol>
+  <li>两个线程、两把锁，线程 A 先锁 1 再锁 2，线程 B 反过来。跑几百次几乎必然卡住。</li>
+  <li><code>gdb</code> attach 上去，<code>thread apply all bt</code> 看到两个线程各持一把锁——这就是死锁的现场证据。</li>
+  <li>改成统一顺序（都先锁 1），问题消失。</li>
+  <li>再用 <code>helgrind</code>（valgrind 工具）或 <code>ThreadSanitizer</code>（<code>-fsanitize=thread</code>）扫一遍数据竞争。</li>
+</ol>
+
+<h2 id="s6">离开这一篇，你应该能</h2>
+
+<ul class="qa">
+  <li>解释为什么条件变量必须配 <code>while</code>，以及丢失唤醒是怎么发生的。</li>
+  <li>说出死锁四个条件，并给出两种工程上的破法。</li>
+  <li>用 Amdahl 定律解释「加到 16 核只快 2 倍」。</li>
+</ul>
+
+<p>线程是「一个连接一个线程」时代的答案。连接数上万之后，答案换成事件循环——下一篇。</p>
+
+
+<nav class="pager">
+  <a href="d10-01.html"><span>← 上一篇</span><b>文件 IO 与 mmap：从 read 到直接映射寄存器</b></a>
+  <a class="nx" href="d10-03.html"><span>下一篇 →</span><b>socket 与 epoll：一个能扛住千连接的事件循环</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

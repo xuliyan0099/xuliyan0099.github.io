@@ -1,0 +1,404 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BSP 与设备树原理 · 卷 07 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j07.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 07 · 芯片与硬件底座</div>
+<ol><li><a href="course-th07.html">
+  <span class="no">01</span><span>ARM 架构与 Cortex-A7<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-35.html">
+  <span class="no">02</span><span>i.MX6ULL 最小系统<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th10.html">
+  <span class="no">03</span><span>总线体系：AXI / AHB / APB 与 I2C / SPI / CAN<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="course-th11.html">
+  <span class="no">04</span><span>时钟树、复位、电源域、RTC 与看门狗<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-th12.html">
+  <span class="no">05</span><span>最小系统必需外设（上）：DDR、中断、定时器、GPIO、UART<span class="sub">约 6 小时</span></span></a></li>
+<li><a href="course-th13.html">
+  <span class="no">06</span><span>最小系统必需外设（下）：存储、DMA、以太网、USB<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-37.html">
+  <span class="no">07</span><span>设备树<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th16.html" class="active">
+  <span class="no">08</span><span>BSP 与设备树原理<span class="sub">约 6 小时 · 当前</span></span></a></li>
+<li><a href="course-38.html">
+  <span class="no">09</span><span>总线<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-39.html">
+  <span class="no">10</span><span>GIC 与定时器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-40.html">
+  <span class="no">11</span><span>存储与外设<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="viz-clock-tree.html">
+  <span class="no">12</span><span>互动台：时钟树与门控<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="viz-gpio.html">
+  <span class="no">13</span><span>互动台：GPIO 与 IOMUX 配置<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="viz-nvic.html">
+  <span class="no">14</span><span>互动台：中断优先级与抢占<span class="sub">💻 · 约 1 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j06.html">← 卷 06</a>
+  <a href="../juan/j08.html">卷 08 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 07<span>·</span>芯片与硬件底座<span>·</span>第 08 篇</div>
+  <h1>BSP 与设备树原理</h1>
+  <p class="lede">这一章讲「Linux 怎么知道你这块板子上焊了什么」。答案是设备树——一份用文本写成、编译成二进制的硬件描述。学会它，你就能在不改内核一行代码的前提下支持一块新板子。这是嵌入式 Linux 与单片机开发最大的分水岭。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 6 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+    <div class="viz" data-kind="tree" data-title="一棵设备树长什么样" data-sub="硬件描述写成树，内核按树去找驱动" data-json='{"nodes":[{"n":"/ 根节点","d":"compatible = fsl,imx6ull-14x14-evk","c":"cy","ch":[{"n":"chosen","d":"bootargs：内核启动参数","c":"vi"},{"n":"memory@80000000","d":"reg = 512MB，告诉内核内存多大"},{"n":"soc","d":"片上外设都挂在这里","c":"gr","ch":[{"n":"aips1 / aips2","d":"两条外设总线","ch":[{"n":"uart1","d":"status = okay，地址 0x02020000","c":"or"},{"n":"gpio1","d":"引脚控制器","c":"or"}]}]},{"n":"leds","d":"自定义节点，绑定 gpio-leds 驱动"}]}],"note":"设备树里 status = disabled 的节点，内核直接忽略。改硬件不改代码，改的其实是这份树——这是 BSP 移植的核心工作。"}'></div>
+
+
+    <div class="card">
+      <h4>本章要解决的问题</h4>
+      <p>① BSP 到底是哪几样东西；② 为什么内核不再用 board 文件写死硬件；③ dts、dtsi、dtb 三者怎么转换；④ 设备树里的节点凭什么能匹配到某个驱动；⑤ 自己画一块 i.MX6ULL 板，要改哪些地方。</p>
+    </div>
+
+    <div class="card">
+      <h4>读完你应该能回答</h4>
+      <ul>
+        <li>同一份内核镜像怎么支持两种不同外设配置的板子？</li>
+        <li><code>compatible = "fsl,mx6ull-evk"</code> 这个字符串在哪一侧被比较？</li>
+        <li>pinctrl 的 <code>&amp;iomuxc</code> 引用在编译后变成了什么？</li>
+        <li><code>reg = &lt;0x02190000 0x4000&gt;</code> 这两个数字分别是什么？</li>
+        <li>改完 dts 要重新编译哪个文件、放在哪、谁去读它？</li>
+      </ul>
+    </div>
+
+    <div class="anim2" data-json='{"title":"设备树从源码到驱动匹配","hint":"同一份内核配不同板子","nodes":[{"k":"dts 源码","s":"人写的文本"},{"k":"dtc 编译","s":"压成二进制"},{"k":"dtb","s":"交给内核"},{"k":"内核解析","s":"建 device"},{"k":"驱动匹配","s":"compatible"}],"frames":[{"i":0,"d":"dts 里写的是事实：内存多大、串口在哪个地址、哪个脚当 UART。"},{"i":1,"d":"dtc 把 dts 编成扁平二进制 dtb，启动时由 U-Boot 连同内核一起交给内核。"},{"i":2,"d":"dtb 只有几 KB，读起来不需要解析文本，启动快。"},{"i":3,"d":"内核展开 dtb，为每个带 compatible 的节点建 platform_device 与资源数组。"},{"i":4,"d":"驱动的 compatible 表与之比对，命中就 probe。拼错一个字符，probe 永远不来。"}],"kind":"flow"}'></div>
+
+    <h2 id="s1">1. BSP 是什么：一整套「让板子能跑」的东西</h2>
+
+    <p>BSP（Board Support Package）不是单个文件，而是五件套。缺任何一件，板子都跑不起来：</p>
+
+    <table>
+      <thead><tr><th>组成</th><th>内容</th><th>典型来源</th></tr></thead>
+      <tbody>
+        <tr><td>Bootloader</td><td>U-Boot（含 SPL）与该板的配置</td><td>U-Boot 主线 + 厂商补丁</td></tr>
+        <tr><td>内核</td><td>zImage + 该板的设备树 dtb</td><td>厂商 BSP 内核分支</td></tr>
+        <tr><td>设备树</td><td><code>imx6ull-xxx.dts</code> 与其引用的 dtsi</td><td>从 EVK 的 dts 改出来</td></tr>
+        <tr><td>根文件系统</td><td>busybox / buildroot / Yocto 产物</td><td>自建或用厂商镜像</td></tr>
+        <tr><td>工具链</td><td>交叉编译器、sysroot、调试工具</td><td>Linaro / 厂商提供</td></tr>
+      </tbody>
+    </table>
+
+    <div class="tip">
+      <b>BSP 与「驱动」不是一回事</b>
+      驱动是内核里通用的代码（如 <code>drivers/mmc/host/sdhci-esdhc-imx.c</code> 这种），BSP 是<b>针对某块板的配置集合</b>。同一份驱动代码，配不同的设备树，就服务不同的板子。
+    </div>
+
+    <h2 id="s2">2. 设备树的由来：从「代码里写死」到「数据描述」</h2>
+
+    <p>2011 年之前，ARM Linux 的做法是给每块板子写一个 <code>board-xxx.c</code>，里面用 C 代码写死「我的串口在哪个地址、我的 I2C 上挂了什么芯片」。结果是 <code>arch/arm/mach-*</code> 目录塞满上千个板级文件，内核越来越大，Linus 在邮件列表上公开发火。</p>
+
+    <p>设备树的思路正好相反：<b>硬件信息从代码里剥离，变成一份数据</b>。内核只保留「怎么驱动这类设备」的知识，具体地址、引脚、中断号全部来自设备树。</p>
+
+    <table>
+      <thead><tr><th></th><th>board 文件时代</th><th>设备树时代</th></tr></thead>
+      <tbody>
+        <tr><td>硬件信息位置</td><td>C 代码里</td><td>独立的 dts 文本</td></tr>
+        <tr><td>换一块板</td><td>重新编译内核</td><td>只换 dtb 文件</td></tr>
+        <tr><td>一份内核</td><td>只能对应一种配置</td><td>可配多个 dtb，启动时选一个</td></tr>
+        <tr><td>维护成本</td><td>板级代码爆炸</td><td>新增板只加 dts</td></tr>
+      </tbody>
+    </table>
+
+    <p>这就是为什么现在的嵌入式内核「一个 zImage + 十几个 dtb」就能覆盖一整条产品线——dtb 是运行时选择的，不是编译期决定的。</p>
+
+    <h2 id="s3">3. dts / dtsi / dtb 的关系</h2>
+    <div class="viz" data-kind="flow" data-title="dtsi 与 dts 怎么合成一个 dtb" data-sub="公共部分抽 dtsi，板级差异写 dts" data-json='{"steps":[{"n":"imx6ull.dtsi","d":"SoC 内部：地址、中断、时钟"},{"n":"board.dts","d":"include dtsi + 板级改动"},{"n":"dtc","d":"预处理 include、编译成树"},{"n":"board.dtb","d":"二进制，内核直接读"},{"n":"/proc/device-tree","d":"运行时能反查实际生效内容"}],"note":"改完不生效，先看 /proc/device-tree 里那棵树——它才是内核真正看到的东西，不是你改的文件。"}'></div>
+
+
+    <div class="flow">
+      <span>soc.dtsi（芯片级）</span><span>→</span><span>board.dts（板级）</span><span>→</span><span>dtc 编译</span><span>→</span><span>board.dtb</span><span>→</span><span>U-Boot 加载并传给内核</span><span>→</span><span>内核展开成 device_node 树</span>
+    </div>
+
+    <table>
+      <thead><tr><th>文件</th><th>内容</th><th>谁维护</th></tr></thead>
+      <tbody>
+        <tr><td><code>.dtsi</code></td><td>芯片级公共描述（CPU、中断控制器、各外设寄存器基址）</td><td>SoC 厂商，如 <code>imx6ull.dtsi</code></td></tr>
+        <tr><td><code>.dts</code></td><td>板级差异（内存大小、外设使能、引脚、挂载的芯片）</td><td>板厂或你自己</td></tr>
+        <tr><td><code>.dtb</code></td><td>编译后的二进制（FDT 格式）</td><td>由 dtc 生成</td></tr>
+      </tbody>
+    </table>
+
+    <p>编译命令就一条：</p>
+
+    <div class="reg">dtc -I dts -O dtb -o board.dtb board.dts
+# 内核构建系统里更常用：
+make ARCH=arm imx6ull_xxx.dtb</div>
+
+    <p>U-Boot 通过 <code>bootz zImage - dtb</code> 的第三个参数把 dtb 地址传给内核，内核启动时把它展开成 <code>device_node</code> 与 <code>property</code> 组成的内存树。</p>
+
+    <h2 id="s4">4. 语法要点：节点与属性</h2>
+
+    <p>设备树的语法只有三层：<b>节点</b>（用花括号包住的一块）、<b>属性</b>（键值对）、<b>cell</b>（属性值里的 32 位数字）。</p>
+
+    <div class="reg">/ {                              // 根节点
+    model = "My i.MX6ULL Board";  // 字符串属性
+    compatible = "fsl,imx6ull", "fsl,imx6ull-evk";  // 字符串列表，按优先级
+
+    memory@80000000 {             // 节点名@地址
+        device_type = "memory";
+        reg = &lt;0x80000000 0x20000000&gt;;   // 起始地址 大小（两个 cell）
+    };
+
+    leds {
+        compatible = "gpio-leds";
+        led0: led {               // label:led0 便于被引用
+            gpios = &lt;&amp;gpio1 3 GPIO_ACTIVE_LOW&gt;;  // phandle 引用 + 引脚号 + 极性
+            linux,default-trigger = "heartbeat";
+        };
+    };
+};</div>
+
+    <p>几个必须掌握的语法点：</p>
+
+    <ul>
+      <li><b>label 与 phandle</b>：<code>led0:</code> 是标签，编译后变成唯一的 32 位 phandle 数字，<code>&amp;led0</code> 就是引用它。</li>
+      <li><b><code>&amp;node</code> 追加</b>：在 dts 里写 <code>&amp;uart1 { status = "okay"; };</code> 表示「往 dtsi 里已有的 uart1 节点里补属性」。</li>
+      <li><b><code>status</code></b>：<code>"okay"</code> 启用、<code>"disabled"</code> 不启用。这是板级文件里出现频率最高的属性。</li>
+      <li><b><code>#address-cells</code> / <code>#size-cells</code></b>：决定子节点 <code>reg</code> 里地址与长度各占几个 cell。</li>
+      <li><b><code>ranges</code></b>：把子总线的地址映射到父总线地址空间。</li>
+    </ul>
+
+    <div class="calc">
+      <h5>算一笔：reg = &lt;0x02190000 0x4000&gt; 是什么</h5>
+      <div class="line">第一个 cell <code>0x02190000</code> 是<b>起始物理地址</b>（uSDHC1 控制器基址）</div>
+      <div class="line">第二个 cell <code>0x4000</code> 是<b>长度</b>（16KB 寄存器空间）</div>
+      <div class="line">驱动 probe 时 <code>platform_get_resource</code> 拿到的就是这对值，再 <code>ioremap</code> 成虚拟地址</div>
+      <div class="line">若 <code>#address-cells = &lt;2&gt;</code>，则地址要用两个 cell 拼成 64 位，写成一个 32 位数就是错的</div>
+    </div>
+    <h2 id="s5">5. compatible 如何把节点和驱动配上</h2>
+
+    <p>这是设备树最核心的机制。一句话：<b>内核遍历所有已注册驱动的 match 表，逐个和节点里的 compatible 字符串比较，第一个匹配上的驱动去 probe 这个节点</b>。</p>
+
+    <div class="reg">// 设备树一侧
+uart1: serial@021a0000 {
+    compatible = "fsl,imx6ull-uart", "fsl,imx21-uart";
+    reg = &lt;0x021a0000 0x4000&gt;;
+    interrupts = &lt;GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH&gt;;
+    status = "okay";
+};
+
+// 驱动一侧
+static const struct of_device_id imx_uart_dt_ids[] = {
+    { .compatible = "fsl,imx6ull-uart" },
+    { .compatible = "fsl,imx21-uart" },
+    { /* sentinel */ }
+};
+
+static struct platform_driver imx_uart_driver = {
+    .probe  = imx_uart_probe,
+    .driver = { .name = "imx-uart", .of_match_table = imx_uart_dt_ids },
+};</div>
+
+    <p>匹配规则里有三个细节，容易踩：</p>
+
+    <ol>
+        <li><b>字符串必须完全一致</b>，包括逗号、大小写。<code>"fsl,imx6ull-uart"</code> 与 <code>"fsl,IMX6ULL-uart"</code> 不匹配。</li>
+        <li><b>按顺序匹配</b>：节点里写了两个 compatible，驱动表里只要命中任意一个即可，但节点第一个通常是最具体的型号。</li>
+        <li><b>匹配不到不会报错</b>：节点就静静躺在那里，没有驱动绑定。查 <code>/sys/firmware/devicetree/base/</code> 能看到它存在，但设备不会工作。</li>
+    </ol>
+
+    <div class="tip">
+      <b>「设备树写了但设备不工作」的标准排查三步</b>
+      ① <code>ls /sys/firmware/devicetree/base/</code> 确认节点在不在；② 看 <code>status</code> 是不是 <code>"okay"</code>；③ <code>dmesg | grep -i &lt;驱动名&gt;</code> 看有没有 probe 记录。三步下来基本能定位到「没写 / 没启用 / 没匹配」。
+    </div>
+
+    <h3>5.1 驱动里怎么读设备树</h3>
+
+    <table>
+      <thead><tr><th>需求</th><th>接口</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>读字符串</td><td><code>of_property_read_string</code></td><td>如读 <code>model</code>、自定义属性</td></tr>
+        <tr><td>读整数</td><td><code>of_property_read_u32</code></td><td>读单个 cell</td></tr>
+        <tr><td>读数组</td><td><code>of_property_read_u32_array</code></td><td>读多个 cell</td></tr>
+        <tr><td>读寄存器资源</td><td><code>platform_get_resource</code></td><td>内部就是用 <code>reg</code></td></tr>
+        <tr><td>读中断号</td><td><code>platform_get_irq</code></td><td>内部用 <code>interrupts</code></td></tr>
+        <tr><td>读 GPIO</td><td><code>devm_gpiod_get</code></td><td>按 <code>gpios</code> 属性名匹配</td></tr>
+        <tr><td>找子节点</td><td><code>for_each_child_of_node</code></td><td>遍历子节点（如 I2C 上的设备）</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s6">6. 从设备树到硬件：一条完整链路</h2>
+    <div class="viz" data-kind="matrix" data-title="compatible 怎么把节点和驱动配上" data-sub="字符串完全匹配才 probe" data-json='{"corner":"设备树节点","cols":["compatible","驱动里的表","结果"],"rows":[{"n":"gpio-leds","cells":[{"v":"gpio-leds","c":"cy"},{"v":"{\"gpio-leds\"}","c":"vi"},{"v":"probe ✓","c":"gr"}]},{"n":"mydev@0","cells":[{"v":"vendor,mydev-v2","c":"or"},{"v":"vendor,mydev-v2","c":"or"},{"v":"probe ✓","c":"gr"}]},{"n":"写错一个字母","cells":[{"v":"vendor,mydev-v1","c":"rd"},{"v":"vendor,mydev-v2","c":"rd"},{"v":"永远不 probe ✗","c":"rd"}]}],"note":"匹配是「整串比较」，不是模糊匹配。所以 dmesg 里没有 probe 日志时，先 diff 两个字符串，别怀疑硬件。"}'></div>
+
+
+    <p>以「设备树里挂了一个 I2C 上的 RTC 芯片」为例，走完全程：</p>
+
+    <div class="flow">
+      <span>dts 写节点</span><span>→</span><span>dtc 编译成 dtb</span><span>→</span><span>U-Boot 传给内核</span><span>→</span><span>内核建 device_node</span><span>→</span><span>I2C 子系统扫子节点</span><span>→</span><span>compatible 匹配驱动</span><span>→</span><span>probe 执行</span><span>→</span><span>i2c_transfer 读芯片</span><span>→</span><span>注册 rtc_device</span><span>→</span><span>/dev/rtc0 出现</span>
+    </div>
+
+    <div class="reg">// 设备树片段
+&i2c1 {
+    status = "okay";
+    clock-frequency = &lt;100000&gt;;
+
+    rtc@68 {
+        compatible = "nxp,pcf8563";
+        reg = &lt;0x68&gt;;      // I2C 从机地址（7 位）
+    };
+};
+
+// 驱动 probe 里做三件事
+1. 用 reg 里的地址作为 i2c_client 的 addr
+2. 申请中断（如果有 interrupts 属性）
+3. 向 RTC 子系统注册 rtc_device，暴露 /dev/rtc0</div>
+
+    <div class="calc">
+      <h5>算一笔：I2C 地址为什么是 0x68 而不是 0xD0</h5>
+      <div class="line">7 位地址 0x68 = 二进制 1101000</div>
+      <div class="line">总线上实际先发 8 位：<code>(0x68 &lt;&lt; 1) | R/W</code>，写 = 0xD0，读 = 0xD1</div>
+      <div class="line">设备树里写的是 <b>7 位地址</b>，驱动里也按 7 位存</div>
+      <div class="line">把 0xD0 写进设备树 → 内核会再左移一位变成 0x1A0，溢出 8 位 → 通信彻底失败</div>
+    </div>
+    <h2 id="s7">7. 自己画一块板：BSP 要改哪几处</h2>
+
+    <p>从 EVK 的 dts 复制一份改名，是最省力的起点。然后逐项核对下面这张清单——<b>漏一项，板子就在某个阶段停住</b>：</p>
+
+    <table>
+      <thead><tr><th>要改的地方</th><th>具体内容</th><th>漏了会怎样</th></tr></thead>
+      <tbody>
+        <tr><td>model / compatible（根节点）</td><td>改成你板子的名字</td><td>只是标识不对，不影响启动，但会影响某些匹配逻辑</td></tr>
+        <tr><td>memory 节点</td><td><code>reg</code> 的地址与大小要跟你实际 DDR 容量一致</td><td>内存被少报或越界，内核可能启动到一半崩</td></tr>
+        <tr><td>启动介质</td><td>uSDHC 或 NAND 的 <code>status</code> 与总线宽度</td><td>找不到根文件系统，卡在 <code>VFS: Unable to mount root</code></td></tr>
+        <tr><td>串口</td><td>调试串口的 <code>status</code> 与 pinctrl</td><td>没有任何输出，等于黑屏调试</td></tr>
+        <tr><td>pinctrl</td><td>每个外设引脚的 mux 与电气属性</td><td>引脚功能不对，设备注册成功但收发全错</td></tr>
+        <tr><td>I2C / SPI 子节点</td><td>挂载的芯片型号与地址</td><td>对应设备不存在，相关功能全废</td></tr>
+        <tr><td>GPIO（LED、按键）</td><td><code>gpios</code> 属性与极性</td><td>灯不亮、按键没反应</td></tr>
+        <tr><td>网卡 PHY</td><td>PHY 地址、复位 GPIO、RMII 时钟</td><td>Link 不通</td></tr>
+        <tr><td>regulator（电源）</td><td>各路的 GPIO 使能脚与电压</td><td>外设不上电，表现为「驱动 probe 失败」</td></tr>
+        <tr><td>bootargs</td><td>console、root=、rootwait 等</td><td>启动参数错，找不到根文件系统或没有控制台</td></tr>
+      </tbody>
+    </table>
+
+    <div class="warn">
+      <b>pinctrl 是新手最容易漏的一项</b>
+      dtsi 里通常只定义了外设节点，<b>引脚复用写在板级 dts 的 iomuxc 子节点里</b>。只开 <code>status = "okay"</code> 不配 pinctrl，驱动会 probe 成功但引脚还是默认功能。
+    </div>
+
+    <h2 id="s8">8. 常见误解</h2>
+
+    <table>
+      <thead><tr><th>误解</th><th>真相</th></tr></thead>
+      <tbody>
+        <tr><td>「设备树是驱动」</td><td>设备树只是数据描述，驱动仍是 C 代码；两者靠 compatible 结合。</td></tr>
+        <tr><td>「改 dts 要重新编译内核」</td><td>只需重新编译 dtb，内核不用动（除非驱动也改了）。</td></tr>
+        <tr><td>「status = okay 就一定能工作」</td><td>还要 pinctrl、时钟、regulator、中断都对，缺一项就不工作。</td></tr>
+        <tr><td>「compatible 随便写都行」</td><td>必须与驱动 <code>of_match_table</code> 完全一致，否则永不匹配。</td></tr>
+        <tr><td>「reg 里两个数一个是地址一个是中断号」</td><td>是「起始地址 + 长度」，中断在 <code>interrupts</code> 属性里。</td></tr>
+        <tr><td>「I2C 地址按 8 位写更直观」</td><td>设备树与驱动统一用 7 位，写 8 位会溢出。</td></tr>
+        <tr><td>「一份 dtb 能适配所有板子」</td><td>dtb 是板级描述，一块板一个；一份内核可以配多个 dtb。</td></tr>
+        <tr><td>「设备树写在 dtsi 里更省事」</td><td>dtsi 是芯片级公共描述，板级差异必须写在 dts，否则会污染所有板。</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s9">9. 自检：能答出来才算懂</h2>
+
+    <div class="q"><span class="n">1</span><p>BSP 五件套是哪五样？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>Bootloader、内核、设备树、根文件系统、工具链。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>设备树解决了 board 文件时代的什么问题？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>硬件信息写死在 C 代码导致板级文件爆炸、一份内核只能配一种板。设备树把硬件变成数据，换板只换 dtb。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>dts、dtsi、dtb 分别是什么，谁生成谁？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>dtsi 是芯片级公共描述，dts 是板级描述（include dtsi），dtc 把 dts 编译成 dtb。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p><code>&amp;uart1 { status = "okay"; };</code> 这一句做了什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>往 dtsi 里已定义的 uart1 节点追加属性，把它启用。这叫「引用并追加」，不是新建节点。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>compatible 匹配发生在内核的哪一侧，匹配不到会报错吗？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>在内核侧，遍历驱动的 <code>of_match_table</code> 与节点 compatible 比较。匹配不到不报错，节点保持未绑定状态。</p>
+    </div></details>
+
+    <div class="q"><span class="n">6</span><p><code>reg = &lt;0x02190000 0x4000&gt;</code> 两个数分别是什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>起始物理地址与长度（16KB 寄存器空间）。中断号在 <code>interrupts</code> 里，不是这里。</p>
+    </div></details>
+
+    <div class="q"><span class="n">7</span><p>设备树里 I2C 从机地址该写 0x68 还是 0xD0，为什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>写 7 位的 0x68。驱动会左移一位加读写位，写 0xD0 会溢出成错误地址。</p>
+    </div></details>
+
+    <div class="q"><span class="n">8</span><p>只写 <code>status = "okay"</code> 不配 pinctrl，会发生什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>驱动 probe 成功、设备注册成功，但引脚仍是默认功能，实际收发全错或无输出。</p>
+    </div></details>
+
+    <h2 id="s10">10. 这一章要动手的命令</h2>
+
+    <div class="steps">
+      <ol>
+        <li><code>ls /sys/firmware/devicetree/base/</code> —— 看内核实际拿到的设备树节点树。</li>
+        <li><code>cat /sys/firmware/devicetree/base/model</code> —— 读当前板子的 model。</li>
+        <li><code>ls /sys/bus/platform/drivers/</code> —— 看哪些平台驱动已注册。</li>
+        <li><code>ls /sys/bus/platform/devices/</code> —— 看哪些设备已被识别。</li>
+        <li><code>dmesg | grep -i "of_"</code> 或 <code>grep -i deferred /sys/kernel/debug/devices_deferred</code> —— 查未匹配/延迟 probe 的设备。</li>
+        <li><code>dtc -I dtb -O dts /boot/xxx.dtb | head -60</code> —— 把 dtb 反编译回文本，验证是否是你写的那份。</li>
+        <li>U-Boot 里 <code>fdt addr $fdt_addr_r; fdt print /</code> —— 看 bootloader 传给内核的树。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一章预告</b>
+      T17 讲交叉编译与工具链：为什么 ARM 代码不能在 x86 上直接跑、工具链名字里三段各是什么意思、从 .c 到可执行文件要经过哪四步。
+    </div>
+
+
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"设备树四类关键属性","items":[{"b":"compatible","d":"驱动的身份证。写成 厂商,型号 的形式，驱动表里有它才会匹配。多个值按从具体到通用排列。"},{"b":"reg","d":"寄存器基地址与长度，可能有多组。内核据此 ioremap，驱动据此算偏移。"},{"b":"interrupts","d":"中断号与触发方式。这里的号是 GIC 的硬件号，不是内核里看到的虚拟号。"},{"b":"pinctrl","d":"引脚复用与电气属性：这个脚当 UART 还是 GPIO，上拉还是下拉，驱动多大。"},{"b":"为什么用设备树","d":"同一份内核可以配不同板子：硬件差异全写进 dtb，内核里不再有一堆 board-xxx.c。"}],"note":"设备树只描述硬件，不放逻辑。能在驱动里算的，不要写进 dts；写进去的是「这块板子的事实」。"}'></div>
+  
+
+<nav class="pager">
+  <a href="course-37.html"><span>← 上一篇</span><b>设备树</b></a>
+  <a class="nx" href="course-38.html"><span>下一篇 →</span><b>总线</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

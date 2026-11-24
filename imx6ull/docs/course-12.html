@@ -1,0 +1,232 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>一条指令的完整旅程 · 卷 01 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j01.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 01 · 机器与指令</div>
+<ol><li><a href="course-00.html">
+  <span class="no">01</span><span>计算机只是一台会照抄指令的机器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-01.html">
+  <span class="no">02</span><span>为什么偏偏是二进制<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-02.html">
+  <span class="no">03</span><span>一个字节能装什么<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-03.html">
+  <span class="no">04</span><span>从按键到屏幕<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-04.html">
+  <span class="no">05</span><span>一个开关能做什么<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-05.html">
+  <span class="no">06</span><span>与、或、非<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-06.html">
+  <span class="no">07</span><span>从半加器到全加器<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-07.html">
+  <span class="no">08</span><span>补码与减法器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-08.html">
+  <span class="no">09</span><span>时钟与触发器<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-09.html">
+  <span class="no">10</span><span>冯诺依曼五件事<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-10.html">
+  <span class="no">11</span><span>PC 与指令寄存器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-11.html">
+  <span class="no">12</span><span>ALU 与标志位<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-12.html" class="active">
+  <span class="no">13</span><span>一条指令的完整旅程<span class="sub">约 1 小时 · 当前</span></span></a></li>
+<li><a href="course-13.html">
+  <span class="no">14</span><span>流水线<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-14.html">
+  <span class="no">15</span><span>机器码的位段<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-15.html">
+  <span class="no">16</span><span>九种寻址方式<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-16.html">
+  <span class="no">17</span><span>汇编只有四类动作<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-17.html">
+  <span class="no">18</span><span>函数调用与 ABI<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-18.html">
+  <span class="no">19</span><span>从 C 到汇编<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th18.html">
+  <span class="no">20</span><span>CPU 是怎么执行一行代码的（详解）<span class="sub">约 3 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j00.html">← 卷 00</a>
+  <a href="../juan/j02.html">卷 02 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 01<span>·</span>机器与指令<span>·</span>第 13 篇</div>
+  <h1>一条指令的完整旅程</h1>
+  <p class="lede">这一课只做一件事：把 ldr r0, [r1, #4] 这一条指令，从内存里的 4 个字节，走到 r0 里的 4 个字节，逐拍拆开。你会看清每个阶段谁在动作、哪些控制信号被拉高、数据走了哪几条总线。看完这一课，反汇编不再是天书，而是一串你能复述的动作。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+<div class="cpu3" data-json='{"title":"CPU 跑一条 ldr：从 Flash 取指到寄存器拿到值","hint":"PC 指向哪、取指拉哪条线、访存走哪条总线，一帧一步"}'></div>
+
+    <div class="anim2" data-json='{"title":"一条指令的完整旅程","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"IR 的 opcode 位"},{"k":"查控制表"},{"k":"RegWrite=1"},{"k":"MemRead=1"},{"k":"ALUSrc=1, ALUOp=add"}],"frames":[{"i":0,"d":"决定这是 load/store 类"},{"i":1,"d":"组合逻辑，输出一组 0/1"},{"i":2,"d":"允许写回寄存器"},{"i":3,"d":"允许读数据存储器"},{"i":4,"d":"让 ALU 算地址"}]}'></div>
+
+    <div class="viz" data-kind="pipe" data-title="五个阶段：一条 ldr 的完整旅程" data-sub="每一拍只推进一个阶段，五拍之后 r0 才有值" data-json='{"stages":[{"n":"IF 取指","d":"PC → 指令存储器 → IR，PC+=4","c":"cy"},{"n":"ID 译码","d":"拆位段，读 r1，立即数 #4 扩展","c":"vi"},{"n":"EX 执行","d":"地址 = r1 + 4（用 ALU 加法）","c":"or"},{"n":"MEM 访存","d":"用地址读数据存储器，得 4 字节","c":"rd"},{"n":"WB 写回","d":"写进 r0 寄存器堆","c":"gr"}],"note":"注意：ldr 的「执行」阶段不算数，它只是算地址；真正取数据在 MEM 阶段。这也是为什么访存指令在流水线里更「娇气」——它比算术指令多一个慢环节。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 五个阶段分别做什么？② 控制信号是谁发的，什么时候发？③ 为什么 ldr 的 EX 阶段只是算地址？④ 单周期、多周期、流水线三种组织方式差在哪？⑤ 一条指令在真实 CPU 里到底花几个周期？</p>
+    </div>
+
+    <h2 id="s1">1. 具体走一遍：给它填上真实数字</h2>
+
+    <p>假设：<code>r1 = 0x8000_1000</code>，内存 <code>0x8000_1004</code> 处存着 <code>0x1234_5678</code>，指令本身在 <code>0x8000_2000</code>。</p>
+
+    <table>
+      <thead><tr><th>拍</th><th>阶段</th><th>动作</th><th>此刻的值</th></tr></thead>
+      <tbody>
+        <tr><td>T1</td><td>IF</td><td>读 <code>0x8000_2000</code> 的 32 位到 IR；PC → 0x8000_2004</td><td>IR = <code>E5910004</code></td></tr>
+        <tr><td>T2</td><td>ID</td><td>拆位段：opcode=load、Rn=r1、Rd=r0、imm=4；读 r1</td><td>r1 = 0x8000_1000</td></tr>
+        <tr><td>T3</td><td>EX</td><td>ALU 做 r1 + 4</td><td>地址 = 0x8000_1004</td></tr>
+        <tr><td>T4</td><td>MEM</td><td>按地址读 4 字节（小端：低字节在前）</td><td>数据 = 0x1234_5678</td></tr>
+        <tr><td>T5</td><td>WB</td><td>写入 r0（受 RegWrite 控制）</td><td>r0 = 0x1234_5678</td></tr>
+      </tbody>
+    </table>
+
+    <p>把 <code>E5910004</code> 拆开：<code>1110 0101 1001 0001 0000 0000 0000 0100</code>。cond=1110（无条件执行）、bits27:26=01（单数据传送类）、bits25:20 = <code>1 1 0 1 0 1</code> 依次是 P=1（前索引）、U=1（加偏移）、B=0（按字访问）、W=0（不写回基址）、L=1（load，读内存）、I 的位在 bit25=0（偏移是立即数，来自索引寄存器，不是移位寄存器）。Rn=0001（r1）、Rd=0000（r0）、offset=0x004。第 14 课会把这 32 位完整拆给你看。</p>
+
+    <h2 id="s2">2. 控制信号：译码器的「命令清单」</h2>
+
+    <p>译码器不是「理解」指令，它只是按位段拉高一组控制线。一条 ldr 会拉高这些：</p>
+
+    <div class="viz" data-kind="flow" data-title="从 IR 到控制信号：一条指令的分发过程" data-sub="译码器本质是一张查找表，不是「智能」" data-json='{"steps":[{"n":"IR 的 opcode 位","d":"决定这是 load/store 类"},{"n":"查控制表","d":"组合逻辑，输出一组 0/1"},{"n":"RegWrite=1","d":"允许写回寄存器"},{"n":"MemRead=1","d":"允许读数据存储器"},{"n":"ALUSrc=1, ALUOp=add","d":"让 ALU 算地址"}],"note":"这些信号名字（RegWrite / MemRead / ALUSrc）是教学用的标准叫法，真实 ARM 核里有几百条控制线，但逻辑完全一样：译码器把「指令的某些位」翻译成「一堆开关的开合」。"}'></div>
+
+    <p>关键洞察：<b>CPU 没有「理解」这条指令，它只是照着控制表把一堆开关拨到某个组合</b>。所谓「指令集」，就是这张表的全部行。</p>
+
+    <h2 id="s3">3. 三种组织方式：单周期 / 多周期 / 流水线</h2>
+
+    <table>
+      <thead><tr><th>方式</th><th>做法</th><th>一条指令耗时</th><th>问题</th></tr></thead>
+      <tbody>
+        <tr><td>单周期</td><td>一拍走完五个阶段</td><td>1 个长周期</td><td>周期必须按最慢指令（如访存）定，其它指令都在浪费</td></tr>
+        <tr><td>多周期</td><td>每个阶段一拍</td><td>3~5 拍</td><td>硬件复用省面积，但吞吐低</td></tr>
+        <tr><td>流水线</td><td>五条指令各占一个阶段，同时推进</td><td>理想 1 拍/条</td><td>有冒险（数据、控制、结构），要旁路与预测</td></tr>
+      </tbody>
+    </table>
+
+    <p>Cortex-A7 是 8~10 级流水、双发射（一个周期可以启动两条指令）。i.MX6ULL 上跑 Linux 时，你看到的「528MHz」就是流水线节拍的频率。</p>
+
+    <div class="viz" data-kind="timeline" data-title="一条指令各阶段的时间占比（示意）" data-sub="访存阶段通常最慢，这也是「内存墙」的微观体现" data-json='{"items":[{"t":"IF","n":"取指 1 拍","d":"若 I-Cache 命中则快","c":"cy"},{"t":"ID","n":"译码 1 拍","d":"纯组合逻辑","c":"vi"},{"t":"EX","n":"执行 1 拍","d":"ALU 关键路径","c":"or"},{"t":"MEM","n":"访存 1~N 拍","d":"D-Cache 未命中时几十拍","c":"rd"},{"t":"WB","n":"写回 1 拍","d":"写寄存器堆","c":"gr"}],"note":"理想情况五拍；如果 D-Cache 未命中，MEM 阶段可能扩展到几十拍，把整条流水线卡住。这就是为什么第 21 课的 Cache 参数如此重要。"}'></div>
+
+    <h2 id="s4">4. 与 Linux 的接缝：readl 就是一条 ldr</h2>
+
+    <pre><code>// 内核里的 readl() 最终就是一条 ldr（或 ldr + 屏障）
+static inline u32 readl(const volatile void __iomem *addr) {
+    u32 v;
+    __asm__ volatile("ldr %0, [%1]" : "=r"(v) : "r"(addr) : "memory");
+    return v;
+}
+
+// 你写的驱动：
+val = readl(base + 0x04);   // 读 GPIO1_DR 寄存器
+// 硬件上发生的事情，与上面表格里的五拍完全一致
+// 唯一区别：地址落在「设备区」而不是 DDR，
+// 所以总线会把它路由到 GPIO 控制器，而不是内存控制器</code></pre>
+
+    <p>这条链路解释了嵌入式开发的很多现象：为什么 <code>readl</code> 比读普通变量慢（设备区通常不可缓存、要等外设响应）、为什么必须加 <code>memory</code> 屏障（防止编译器重排或 CPU 乱序）、为什么外设寄存器常要求「先写后读回」来保证生效。</p>
+
+    <h2 id="s5">5. 实验：数清一条指令的周期</h2>
+
+    <pre><code>// 在 Ubuntu 上，用 perf 看指令与周期
+perf stat -e instructions,cycles ./a.out
+
+// 在板子上（需要内核开启 perf）
+perf stat -e cycles,instructions,branch-misses ./your_prog
+
+// 用 objdump 找一条 ldr，确认它的偏移字段
+arm-linux-gnueabihf-objdump -d your.o | grep ldr</code></pre>
+
+    <p>如果 <code>instructions / cycles</code> 接近 1.0，说明流水线吃得比较饱；如果远小于 1，说明大量时间在等（缓存未命中或分支预测失败）。<b>这个比值是理解「CPU 到底在忙什么」的第一个量化指标。</b></p>
+
+    <h2 id="s6">6. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于指令执行的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["一条指令一拍就执行完，CPU 是一条条排队的","ldr 的执行阶段就是去内存取数据","译码器「懂」这条指令在干什么"]},"good":{"t":"实际","items":["五阶段流水，理想每拍完成一条，但同时有 5 条在处理","ldr 的 EX 只算地址，MEM 才真正取数据","译码器只是一张查找表，把某些位翻译成一组控制开关"]},"note":"理解第三条，你就不会再把 CPU 神秘化。它是极其复杂的电路，但没有一处「魔法」——每个动作都能追到某个门、某根线。"}'></div>
+
+    <h2 id="s7">7. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>ldr 的哪一阶段真正访问内存？为什么不是 EX？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>MEM 阶段。EX 只做「基址 + 偏移」的地址计算，访存要单独一个阶段（因为存储器慢，需要独立时序）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>单周期设计最大的浪费是什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>周期长度由最慢指令（通常是访存）决定，所有算逻指令都在等一个它们用不完的长周期。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>译码器输出的是什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>一组控制信号（RegWrite、MemRead、ALUSrc、ALUOp、MemWrite、Branch 等）的 0/1 组合，本质是查找表。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>为什么 <code>readl()</code> 比读普通变量慢？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>地址在设备区，不可缓存、需经过总线到外设、外设响应有等待周期；且限制编译器优化，必须真读。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>CPI 大于 1 意味着什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>平均每条指令花了多于一个周期，通常因为缓存未命中、分支惩罚、依赖停顿——是性能优化的主要靶点。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>把 <code>E5910004</code> 按位段自己拆一遍，与第 14 课的对照表核验。</li>
+        <li>在板子上跑 <code>perf stat</code>，记录 CPI，换一个访存密集的程序再对比。</li>
+        <li>写一段 C，编译后找出其中的 <code>ldr</code>，标注它是「取变量」还是「取外设」。</li>
+        <li>把同一条指令写成单周期/多周期/流水的表格，自己画一遍时序。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      五阶段串起来虽然清楚，但每条指令都要等上一条走完。第 13 课讲流水线：怎么让五条指令重叠，为什么能接近「一拍一条」，以及它带来的三个新麻烦——数据冒险、控制冒险、结构冒险。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"一条 ldr 指令，五个周期","hint":"一步步看数据流","note":"注意第五周期之前，结果已经算出来了，但还没写回寄存器——这就是流水线冒险的根源。","steps":[{"t":"① 取指","d":"PC 指向这条 ldr，指令从内存进 IR。"},{"t":"② 译码 + 读寄存器","d":"识别出是「装载」，同时把基址寄存器 Rn 的内容读出来。"},{"t":"③ 算地址","d":"ALU 把 Rn 加立即数偏移，得到真正的访存地址。"},{"t":"④ 访存","d":"把地址送上数据总线，等存储器把数据送回（这一拍最慢，可能几十个周期）。"},{"t":"⑤ 写回","d":"数据写进 Rd。此时后面那条指令如果也要用 Rd，就必须等。"}]}'></div>
+  
+
+<nav class="pager">
+  <a href="course-11.html"><span>← 上一篇</span><b>ALU 与标志位</b></a>
+  <a class="nx" href="course-13.html"><span>下一篇 →</span><b>流水线</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

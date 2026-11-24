@@ -1,0 +1,228 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>写一个字符设备 · 卷 09 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j09.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 09 · 驱动体系</div>
+<ol><li><a href="course-th05.html">
+  <span class="no">01</span><span>设备模型与驱动框架<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="course-45.html" class="active">
+  <span class="no">02</span><span>写一个字符设备<span class="sub">约 1 小时 · 当前</span></span></a></li>
+<li><a href="course-46.html">
+  <span class="no">03</span><span>pinctrl 与 GPIO<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-47.html">
+  <span class="no">04</span><span>I2C 设备驱动<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-48.html">
+  <span class="no">05</span><span>中断的上半部与下半部<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-ch12.html">
+  <span class="no">06</span><span>驱动开发入门<span class="sub">约 20 小时</span></span></a></li>
+<li><a href="d09-01.html">
+  <span class="no">07</span><span>platform 总线模型：probe、匹配、资源与设备树<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="d09-02.html">
+  <span class="no">08</span><span>阻塞 IO 与等待队列：poll / select / epoll 的驱动侧<span class="sub">约 3 小时</span></span></a></li>
+<li><a href="d09-03.html">
+  <span class="no">09</span><span>SPI 子系统：控制器驱动与设备驱动<span class="sub">◆ · 约 3 小时</span></span></a></li>
+<li><a href="d09-04.html">
+  <span class="no">10</span><span>块设备与 eMMC：gendisk、请求队列与分区<span class="sub">◆ · 约 4 小时</span></span></a></li>
+<li><a href="d09-05.html">
+  <span class="no">11</span><span>DMA 与 Cache 一致性：谁负责 flush，谁负责 invalidate<span class="sub">◆ · 约 3 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j08.html">← 卷 08</a>
+  <a href="../juan/j10.html">卷 10 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 09<span>·</span>驱动体系<span>·</span>第 02 篇</div>
+  <h1>写一个字符设备</h1>
+  <p class="lede">前面四十四课都在讲「为什么」。从这一课起动手：写一个能 echo 进去、能 cat 出来的驱动，看清「用户进程的一次 read」到底落到你写的哪个函数上。这是所有驱动的最小原型——把这个跑通，LED、按键、I2C 传感器只是换里面的寄存器操作。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+
+    <div class="anim2" data-json='{"title":"字符设备：从一个函数表到一次 read","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"用户态 cat"},{"k":"系统调用层"},{"k":"VFS"},{"k":"你的驱动"}],"frames":[{"i":0,"d":"open、read、write(1)、close"},{"i":1,"d":"svc 进内核，参数搬到内核栈"},{"i":2,"d":"按 inode 找到 cdev，取出 fops 表"},{"i":3,"d":"copy_to_user 把数据搬到用户缓冲"}]}'></div>
+
+    <div class="viz" data-kind="bits" data-title="dev_t 的 32 位怎么分" data-sub="主设备号 12 位、次设备号 20 位；Linux 4.x 之后主设备号扩展到 20 位" data-json='{"w":32,"fields":[{"n":"主设备号 major","lo":20,"hi":31,"c":"rd","t":"12 位：哪一类设备（同一个驱动）"},{"n":"次设备号 minor","lo":0,"hi":19,"c":"cy","t":"20 位：这一类里的第几个（通道/端口）"}],"note":"mkdev(major,minor) 把它们拼成一个数；MAJOR(dev) 取高位、MINOR(dev) 取低位。设备节点 /dev/xxx 的 inode 里存的就是这个数，VFS 靠它找到你的驱动。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 主次设备号各自决定什么？② <code>/dev</code> 下的一个节点是怎么和内核里的驱动对上号的？③ <code>file_operations</code> 这张函数表是谁在什么时候调用？④ 为什么必须用 <code>copy_to_user</code> 而不是直接 <code>memcpy</code>？⑤ 没有 <code>mknod</code> 的现代系统怎么自动生成设备节点？</p>
+    </div>
+
+    <h2 id="s1">1. 直觉：设备是一扇窗，窗口后面挂着一张函数表</h2>
+    <p>用户进程打开 <code>/dev/mychr</code> 那一刻，内核手里拿到的是一个 <code>struct file</code>，里面有一个指针 <code>f_op</code>，指向<b>你注册的那张表</b>。之后进程每次 <code>read</code>，VFS 只是查表：<code>f->f_op->read(...)</code>。所以「驱动开发」本质是「填表」，不是「写主函数」。</p>
+    <p><b>类比失效处</b>：窗口这个比喻会让人以为数据是「流过去的」。实际是：用户缓冲区在内核眼里是<b>另一个地址空间</b>，必须用专门的拷贝函数跨过去，跨不过就返回 <code>-EFAULT</code>。</p>
+
+    <div class="viz" data-kind="flow" data-title="一次 cat /dev/mychr 的路径" data-sub="四层，每层只做一件事" data-json='{"steps":[{"n":"用户态 cat","d":"open、read、write(1)、close"},{"n":"系统调用层","d":"svc 进内核，参数搬到内核栈"},{"n":"VFS","d":"按 inode 找到 cdev，取出 fops 表"},{"n":"你的驱动","d":"copy_to_user 把数据搬到用户缓冲"}],"note":"中间所有层都是查表与转发。你的代码只出现在最后一步；前面出错（比如设备号没注册上）根本走不到这里。"}'></div>
+
+    <h2 id="s2">2. 软件路径：注册的三步</h2>
+    <p>不管字符设备还是别的，注册都绕不开三步：<b>拿号</b>（<code>alloc_chrdev_region</code> 或 <code>register_chrdev_region</code>）→ <b>绑表</b>（<code>cdev_init</code> 把 <code>file_operations</code> 挂到 <code>cdev</code> 上）→ <b>入册</b>（<code>cdev_add</code> 告诉内核「这个号段归我」）。卸载时逆序 <code>cdev_del</code>、<code>unregister_chrdev_region</code>。</p>
+    <p>老教材里的 <code>register_chrdev(0, name, &amp;fops)</code> 是这三步的语法糖，一次占掉 256 个次设备号，现代内核不推荐——它没法只精确登记一个次设备号。</p>
+
+    <h2 id="s3">3. 最小可编译驱动</h2>
+<pre><code>#include &lt;linux/module.h&gt;
+#include &lt;linux/fs.h&gt;
+#include &lt;linux/cdev.h&gt;
+#include &lt;linux/uaccess.h&gt;
+
+#define NAME "mychr"
+#define SZ   256
+
+static dev_t dev;
+static struct cdev cdev;
+static char kbuf[SZ];
+static int  klen;
+
+static int my_open(struct inode *i, struct file *f) { return 0; }
+
+static ssize_t my_read(struct file *f, char __user *ub, size_t n, loff_t *off)
+{
+    int cnt = min((size_t)(klen - *off), n);
+    if (cnt &lt;= 0) return 0;
+    if (copy_to_user(ub, kbuf + *off, cnt)) return -EFAULT;
+    *off += cnt;
+    return cnt;
+}
+
+static ssize_t my_write(struct file *f, const char __user *ub, size_t n, loff_t *off)
+{
+    if (n &gt; SZ) n = SZ;
+    if (copy_from_user(kbuf, ub, n)) return -EFAULT;
+    klen = n; *off = 0;
+    return n;
+}
+
+static struct file_operations fops = {
+    .owner = THIS_MODULE,
+    .open  = my_open,
+    .read  = my_read,
+    .write = my_write,
+};
+
+static int __init my_init(void)
+{
+    int ret = alloc_chrdev_region(&amp;dev, 0, 1, NAME);
+    if (ret) return ret;
+    cdev_init(&amp;cdev, &amp;fops);
+    cdev.owner = THIS_MODULE;
+    ret = cdev_add(&amp;cdev, dev, 1);
+    if (ret) { unregister_chrdev_region(dev, 1); return ret; }
+    pr_info("mychr: major=%d minor=%d\n", MAJOR(dev), MINOR(dev));
+    return 0;
+}
+
+static void __exit my_exit(void)
+{
+    cdev_del(&amp;cdev);
+    unregister_chrdev_region(dev, 1);
+}
+
+module_init(my_init);
+module_exit(my_exit);
+MODULE_LICENSE("GPL");</code></pre>
+    <h2 id="s4">4. 编译、加载、验证</h2>
+<pre><code># Makefile（交叉编译到 i.MX6ULL，内核源码树按自己的路径改）
+obj-m := mychr.o
+KDIR  := /home/you/imx6ull/linux-imx
+PWD   := $(shell pwd)
+all:
+	$(MAKE) -C $(KDIR) M=$(PWD) ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- modules
+clean:
+	$(MAKE) -C $(KDIR) M=$(PWD) clean</code></pre>
+<pre><code># 板上
+insmod mychr.ko
+dmesg | tail -1          # 应看到 major=xxx
+cat /proc/devices        # 找 mychr 这一行，确认号段被占用
+mknod /dev/mychr c &lt;major&gt; 0
+chmod 666 /dev/mychr
+
+echo hello-kernel &gt; /dev/mychr
+cat /dev/mychr           # 输出 hello-kernel
+rmmod mychr
+ls /dev/mychr            # 节点还在，但驱动已撤走：此时 open 会返回 ENODEV</code></pre>
+    <p>这四个现象必须全部对上，否则说明中间某一步没做：<b>dmesg 有号</b>、<b>/proc/devices 有名字</b>、<b>echo 成功</b>、<b>rmmod 后 open 失败</b>。最后一条最容易忽略，它证明「节点只是文件，真正干活的是驱动」。</p>
+
+    <div class="viz" data-kind="compare" data-title="新手最常踩的三个坑" data-sub="左边是现象，右边是原因" data-json='{"bad":{"t":"看到的","items":["echo 报 No such device or address","cat 输出乱码，或卡住不动","insmod 报 Invalid module format"]},"good":{"t":"实际原因","items":["节点的主设备号写错了，或者 cdev_add 失败","读的偏移 *off 没更新，每次返回同样的开头；或没更新就返回 -EINVAL","内核版本/工具链不匹配：模块必须用同一个内核源码树编译"]},"note":"三条都能用一条命令先排掉一半：dmesg 看驱动自己的 printk，比猜快十倍。"}'></div>
+
+    <h2 id="s5">5. 三条误解</h2>
+    <ul>
+      <li><b>「设备节点是驱动创建的」</b>：老式 <code>register_chrdev</code> 时代确实靠手写 <code>mknod</code>；现代内核是 <b>udev/mdev 按 <code>/sys/class</code> 里的信息自动建</b>（见下一条）。节点是文件系统对象，驱动只负责把自己的号登记进内核。</li>
+      <li><b>「class_create 只是建个目录」</b>：<code>class_create</code> + <code>device_create</code> 会生成 <code>/sys/class/mychr/mychr0/dev</code>，里面写着 <code>主:次</code>；mdev/udev 读到它就自动 <code>mknod</code>。这才是「插上就能用」的来源。</li>
+      <li><b>「read 返回长度随便写」</b>：返回大于实际拷贝的字节数，用户态会读到未初始化内存；返回负数是错误码，返回 0 表示「读完了」。这三个约定是所有 VFS 接口的共同语言。</li>
+    </ul>
+
+    <h2 id="s6">6. 五题自测</h2>
+    <div class="q"><span class="n">1</span><p>同一个驱动要管 4 路串口，主设备号和次设备号各怎么用？</p></div>
+    <details class="ans"><summary>看答案</summary><p>同一个主设备号（一个驱动一个 major），4 个次设备号 0–3。<code>alloc_chrdev_region(&amp;dev, 0, 4, NAME)</code> 一次登记 4 个，然后在 <code>open</code> 里用 <code>iminor(inode)</code> 区分是哪一路。</p></details>
+
+    <div class="q"><span class="n">2</span><p><code>copy_to_user</code> 失败通常返回什么？为什么不能直接 <code>memcpy</code>？</p></div>
+    <details class="ans"><summary>看答案</summary><p>返回 <code>-EFAULT</code>。<code>memcpy</code> 用的是内核页表视角，用户缓冲区可能不在当前页表里（甚至被换出），直接解引用会触发 oops；<code>copy_to_user</code> 会做地址合法性检查并可休眠换页。</p></details>
+
+    <div class="q"><span class="n">3</span><p>没有 <code>mknod</code>，节点为什么也会自己出现？</p></div>
+    <details class="ans"><summary>看答案</summary><p>驱动调用 <code>class_create</code> 与 <code>device_create</code> 后，<code>/sys/class/&lt;class&gt;/&lt;dev&gt;/dev</code> 里出现 <code>major:minor</code>；mdev/udev 监听 uevent，读到这行就建节点。</p></details>
+
+    <div class="q"><span class="n">4</span><p>两次 <code>cat</code> 同一个设备，第二次为什么可能读到空？</p></div>
+    <details class="ans"><summary>看答案</summary><p>因为 <code>loff_t *off</code> 是按「打开的文件」维护的。同一个进程里 cat 两次是新的一次 open，偏移归零，能读到；但如果你的 <code>read</code> 忘了用 <code>*off</code> 或忘了推进，就会出现「越读越怪」的现象。</p></details>
+
+    <div class="q"><span class="n">5</span><p>模块卸载时忘了 <code>cdev_del</code> 会怎样？</p></div>
+    <details class="ans"><summary>看答案</summary><p>号段仍被占着，下次 <code>alloc_chrdev_region</code> 拿不到同一段；更糟的是代码段已卸载而内核还留着指向它的函数表，一旦有人 open 就是野指针 oops。</p></details>
+
+    <h2 id="s7">7. 动手（30 分钟）</h2>
+    <div class="steps">
+      <p>1. 按上面的代码与 Makefile 编出 <code>mychr.ko</code>，<code>insmod</code> 后从 <code>dmesg</code> 抄下主设备号。</p>
+      <p>2. 手写 <code>mknod</code> 建节点，跑通 <code>echo</code> / <code>cat</code>，贴出两条输出。</p>
+      <p>3. 给驱动补上 <code>class_create</code> 与 <code>device_create</code>，删掉 <code>mknod</code>，验证节点自动出现。</p>
+      <p>4. 故意把 <code>copy_to_user</code> 换成 <code>memcpy</code>，在板上 <code>cat</code> 一次，看 dmesg 里那条 oops——这比你读十页文档更能记住为什么不能这么写。</p>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      设备节点会自己出现了，可灯还不会亮。第 46 课讲 pinctrl 与 GPIO 子系统：一个引脚要先「被复用成 GPIO」、再「配置成输出」、最后「被谁拉高」——这三件事分别归谁管。
+    </div>
+  
+    <!--IVIZ--><div class="iviz" data-kind="slider" data-iviz="1" data-json='{"title":"主设备号 250，拖动 minor 拼出 dev_t","hint":"看位段怎么拼","label":"次设备号 minor","unit":"","min":0,"max":255,"step":1,"value":0,"presets":[{"t":"minor = 0","v":0},{"t":"minor = 1","v":1},{"t":"minor = 255","v":255}],"note":"dev_t 不是「两个数字打包」，是位段：高 12 位主设备号、低 20 位次设备号。用户态用 mknod 时写 250:1，内核里存的就是这个整数。","out":[{"k":"dev_t 十六进制","expr":"hex(250 * 1048576 + v, 8)"},{"k":"主设备号","expr":"Math.floor((250 * 1048576 + v) / 1048576)"},{"k":"次设备号","expr":"(250 * 1048576 + v) % 1048576"},{"k":"mknod 命令","expr":"\"mknod /dev/mychr c 250 \" + v"}]}'></div>
+  
+
+<nav class="pager">
+  <a href="course-th05.html"><span>← 上一篇</span><b>设备模型与驱动框架</b></a>
+  <a class="nx" href="course-46.html"><span>下一篇 →</span><b>pinctrl 与 GPIO</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

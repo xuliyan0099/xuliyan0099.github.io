@@ -1,0 +1,318 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vim 与 Shell 脚本 · 卷 00 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j00.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 00 · 起步 · Linux 与实验台</div>
+<ol><li><a href="course-ch01.html">
+  <span class="no">01</span><span>Linux 全景认知<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="course-ch02.html">
+  <span class="no">02</span><span>搭好实验台<span class="sub">约 10 小时</span></span></a></li>
+<li><a href="course-ch03.html">
+  <span class="no">03</span><span>命令行与文件系统<span class="sub">约 16 小时</span></span></a></li>
+<li><a href="course-ch04.html">
+  <span class="no">04</span><span>系统管理四件事<span class="sub">约 16 小时</span></span></a></li>
+<li><a href="course-ch05.html" class="active">
+  <span class="no">05</span><span>Vim 与 Shell 脚本<span class="sub">约 14 小时 · 当前</span></span></a></li>
+<li><a href="course-ch06.html">
+  <span class="no">06</span><span>网络与远程开发<span class="sub">约 10 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <span></span>
+  <a href="../juan/j01.html">卷 01 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 00<span>·</span>起步 · Linux 与实验台<span>·</span>第 05 篇</div>
+  <h1>Vim 与 Shell 脚本</h1>
+  <p class="lede">板子上没有 IDE、没有鼠标。Vim 决定你改代码的速度，Shell 决定你把重复劳动交给机器的能力。这两样是嵌入式开发者的「手」。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 14 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+    <div class="viz" data-kind="flow" data-title="Vim 只有三种模式" data-sub="所有「不会用」都源于不知道自己在哪个模式" data-json='{"play":true,"steps":[{"n":"普通模式","d":"按 dd 删行、yy 复制、gg 跳开头"},{"n":"i 进入插入","d":"这时候才是打字"},{"n":"Esc 回普通","d":"回到按键当命令的状态"},{"n":"冒号命令","d":"w 保存、q 退出、! 强制"},{"n":"可视模式 v","d":"选中一块再操作"}],"note":"新手最常犯的错：在普通模式里打字，结果触发了一堆删除和替换命令。记住一句：不知道在哪，先按 Esc，再按冒号。"}'></div>
+
+
+    <div class="card">
+      <h4>本章目标</h4>
+      <p>① Vim 三种模式切换形成肌肉记忆，能无鼠标完成全部编辑；② 会搜索替换、分屏、批量操作；③ 能写带参数、判断、循环、函数的 Shell 脚本；④ 写完 4 个实用脚本。</p>
+    </div>
+
+    <div class="anim2" data-json='{"title":"Vim 三个模式来回切换","hint":"模式搞混是新手第一坑","nodes":[{"k":"普通模式","s":"按键是命令"},{"k":"插入模式","s":"按 i 进入"},{"k":"Esc 返回","s":"停止输入"},{"k":"命令模式","s":":wq 保存"},{"k":"文件落盘","s":"写进磁盘"}],"frames":[{"i":0,"d":"打开文件就在普通模式：dd 删行、yy 复制、p 粘贴、/ 搜索。"},{"i":1,"d":"按 i 进入插入模式，这时按下的才是字符；想改代码先想清楚在哪个模式。"},{"i":2,"d":"按 Esc 回到普通模式，光标左移一格是正常的。"},{"i":3,"d":"普通模式下按 : 进命令模式，:w 保存、:q 退出、:wq 保存退出、:q! 丢弃。"},{"i":4,"d":"写入磁盘后 shell 里 cat 一下确认；嵌入式上只有 busybox vi，动作一样。"}],"kind":"flow"}'></div>
+
+    <h2 id="s1">5.1 Vim 的核心：三种模式</h2>
+
+    <p>新手觉得 Vim 难，是因为它不像记事本「所见即所输」。它有三个模式，<strong>你敲的字在不同模式下含义完全不同</strong>：</p>
+
+    <div class="flow">
+      <div class="box"><b>普通模式</b><span>默认状态<br>按键=命令（删、复制、跳转）</span></div>
+      <div class="arrow">i / a / o</div>
+      <div class="box"><b>插入模式</b><span>真正打字<br>Esc 回到普通模式</span></div>
+      <div class="arrow">Esc</div>
+      <div class="box"><b>命令行模式</b><span>普通模式按 : / ?<br>保存、替换、执行命令</span></div>
+    </div>
+
+    <div class="key">
+      <b>最重要的一条</b>
+      卡住了、不知道现在什么状态、敲出来的字跑进正文了——<b>连按两下 <span class="kbd">Esc</span></b>，回到普通模式再想。这是 Vim 的「复位键」。
+    </div>
+
+    <h2 id="s2">5.2 够用就好的常用操作</h2>
+
+    <h3>移动（普通模式）</h3>
+    <table>
+      <thead><tr><th>键</th><th>动作</th><th>键</th><th>动作</th></tr></thead>
+      <tbody>
+        <tr><td><code>h j k l</code></td><td>左 下 上 右</td><td><code>w</code> <code>b</code></td><td>下一个 / 上一个单词</td></tr>
+        <tr><td><code>0</code> <code>$</code></td><td>行首 / 行尾</td><td><code>gg</code> <code>G</code></td><td>文件头 / 文件尾</td></tr>
+        <tr><td><code>:12</code></td><td>跳到第 12 行</td><td><code>Ctrl+d/u</code></td><td>翻半页</td></tr>
+        <tr><td><code>%</code></td><td>括号间跳转</td><td><code>Ctrl+o</code></td><td>回到上一个位置</td></tr>
+      </tbody>
+    </table>
+
+    <h3>编辑</h3>
+    <table>
+      <thead><tr><th>键</th><th>动作</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td><code>i</code> <code>a</code> <code>o</code></td><td>光标前插入 / 后插入 / 下行新开</td><td><code>O</code> 上行新开</td></tr>
+        <tr><td><code>x</code> <code>dd</code></td><td>删一个字符 / 删一整行</td><td><code>5dd</code> 删 5 行</td></tr>
+        <tr><td><code>yy</code> <code>p</code></td><td>复制一行 / 粘贴</td><td><code>5yy</code> 复制 5 行</td></tr>
+        <tr><td><code>u</code> <code>Ctrl+r</code></td><td>撤销 / 重做</td><td>救命键</td></tr>
+        <tr><td><code>cc</code></td><td>改写整行</td><td>删掉并进入插入模式</td></tr>
+        <tr><td><code>&gt;&gt;</code> <code>&lt;&lt;</code></td><td>缩进 / 反缩进</td><td>可视模式下可批量</td></tr>
+      </tbody>
+    </table>
+
+    <h3>搜索与替换</h3>
+    <pre><code>/keyword        <span class="c"># 向下搜，n 下一个，N 上一个</span>
+?keyword        <span class="c"># 向上搜</span>
+:s/a/b/         <span class="c"># 当前行第一个 a 换成 b</span>
+:s/a/b/g        <span class="c"># 当前行全部</span>
+:%s/a/b/g       <span class="c"># 全文替换</span>
+:%s/a/b/gc      <span class="c"># 全文替换，每个都询问</span></code></pre>
+
+    <h3>批量与分屏</h3>
+    <pre><code>Ctrl+v          <span class="c"># 可视块模式，选中矩形区域</span>
+<span class="c"># 选中多行后：I 在行首插入，A 在行尾追加，d 删除，y 复制</span>
+<span class="c"># 批量注释：Ctrl+v 选中列 → I → 输入 // → Esc</span>
+
+:sp file.c      <span class="c"># 水平分屏</span>
+:vsp file.h     <span class="c"># 垂直分屏</span>
+Ctrl+w + 方向键  <span class="c"># 切换窗口</span>
+:e file         <span class="c"># 打开另一个文件</span>
+:set nu         <span class="c"># 显示行号</span></code></pre>
+
+    <h3>保存退出</h3>
+    <pre><code>:w       <span class="c"># 保存</span>
+:q       <span class="c"># 退出</span>
+:wq      <span class="c"># 保存并退出</span>
+:q!      <span class="c"># 强制不保存退出（改坏了就跑）</span>
+:w !sudo tee %   <span class="c"># 忘了 sudo 时的补救</span></code></pre>
+
+    <div class="tip">
+      <b>vimrc 四行，体验立刻上升</b>
+      <pre><code>$ vim ~/.vimrc
+set nu            " 显示行号
+set tabstop=4     " Tab 显示为 4 空格
+set shiftwidth=4  " 自动缩进 4 格
+set mouse=a       " 允许鼠标（部分终端有用）</code></pre>
+    </div>
+
+    <h2 id="s3">5.3 Shell 脚本：把重复劳动交给机器</h2>
+    <div class="viz" data-kind="matrix" data-title="Vim 只要记这 8 个动作" data-sub="模式切换是钥匙，其余都是查表" data-json='{"corner":"动作","cols":["按键","在哪个模式","作用"],"rows":[{"n":"进入编辑","cells":[{"v":"i / a","c":"gr"},{"v":"普通","c":"gray"},{"v":"插入 / 追加","c":"gray"}]},{"n":"回普通","cells":[{"v":"Esc","c":"gr"},{"v":"任意","c":"gray"},{"v":"退出编辑态","c":"gray"}]},{"n":"存盘退出","cells":[{"v":":wq","c":"cy"},{"v":"命令行","c":"gray"},{"v":"写盘并退出","c":"gray"}]},{"n":"删一行","cells":[{"v":"dd","c":"or"},{"v":"普通","c":"gray"},{"v":"删除当前行","c":"gray"}]}],"note":"卡住时先按两次 Esc 回普通模式，再 :q! 强退——90% 的「Vim 退不出去」都是还在编辑模式。"}'></div>
+
+
+    <p>脚本就是一个装了命令的文本文件，开头写 <code>#!/bin/bash</code> 告诉系统用哪个解释器，然后加执行权限就能跑。</p>
+
+    <pre><code>$ vim first.sh
+<span class="c">#!/bin/bash</span>
+echo "hello, $USER"
+$ chmod +x first.sh
+$ ./first.sh</code></pre>
+
+    <div class="warn">
+      <b>为什么是 <code>./first.sh</code> 不是 <code>first.sh</code></b>
+      当前目录不在 PATH 里（这是安全设计）。不加 <code>./</code>，shell 会去系统目录找，找不到就报 command not found。这也是新手第一个坑。
+    </div>
+
+    <h3>变量与引号</h3>
+
+    <pre><code>#!/bin/bash
+name="imx6ull"           <span class="c"># 等号两边不能有空格</span>
+echo "$name"             <span class="c"># 双引号：变量会展开</span>
+echo '$name'             <span class="c"># 单引号：原样输出</span>
+num=$((1 + 2))           <span class="c"># 算术运算</span>
+files=$(ls)              <span class="c"># 命令结果赋值</span>
+echo ${name}             <span class="c"># 推荐带花括号，避免歧义</span>
+readonly ROOT="/opt"     <span class="c"># 只读变量</span>
+unset name               <span class="c"># 删除变量</span></code></pre>
+
+    <p>脚本参数：<code>$0</code> 脚本名，<code>$1</code> 第一个参数……<code>$#</code> 参数个数，<code>$@</code> 全部参数，<code>$?</code> 上一条命令的退出码（0 表示成功）。</p>
+
+    <h3>判断</h3>
+
+    <pre><code>#!/bin/bash
+if [ $# -lt 1 ]; then
+    echo "用法: $0 &lt;文件名&gt;"
+    exit 1
+fi
+
+if [ -f "$1" ]; then
+    echo "$1 是普通文件"
+elif [ -d "$1" ]; then
+    echo "$1 是目录"
+else
+    echo "$1 不存在"
+fi</code></pre>
+
+    <table>
+      <thead><tr><th>判断</th><th>含义</th><th>判断</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td><code>-f</code></td><td>是文件</td><td><code>-d</code></td><td>是目录</td></tr>
+        <tr><td><code>-e</code></td><td>存在</td><td><code>-r</code> <code>-w</code> <code>-x</code></td><td>可读/可写/可执行</td></tr>
+        <tr><td><code>-z</code></td><td>字符串为空</td><td><code>-n</code></td><td>字符串非空</td></tr>
+        <tr><td><code>-eq -ne</code></td><td>数值相等/不等</td><td><code>-lt -gt</code></td><td>小于/大于</td></tr>
+      </tbody>
+    </table>
+
+    <h3>循环</h3>
+
+    <pre><code><span class="c"># for 遍历列表</span>
+for f in *.c; do
+    echo "编译 $f"
+done
+
+<span class="c"># for 计数</span>
+for i in $(seq 1 5); do echo "第 $i 次"; done
+
+<span class="c"># while 按行读文件</span>
+while read -r line; do
+    echo "读到: $line"
+done &lt; list.txt
+
+<span class="c"># until：条件不成立才循环</span>
+n=0
+until [ $n -ge 3 ]; do n=$((n+1)); echo $n; done</code></pre>
+
+    <h3>函数</h3>
+
+    <pre><code>log() {
+    echo "[$(date '+%F %T')] $*" &gt;&gt; /tmp/mylog
+}
+log "开始编译"
+log "结束，退出码 $?"</code></pre>
+
+    <div class="tip">
+      <b><code>set -e</code> 加在开头</b>
+      让脚本遇到错误立即退出，而不是带病继续往下跑。生产脚本必备。
+    </div>
+
+    <h2 id="s4">5.4 四个必写脚本（本章作业）</h2>
+
+    <h3>脚本 1：批量重命名</h3>
+    <pre><code>#!/bin/bash
+<span class="c"># 把所有 .txt 改成 .md，并加前缀 note_</span>
+for f in *.txt; do
+    [ -e "$f" ] || continue
+    mv "$f" "note_${f%.txt}.md"
+done
+echo "完成，当前 md 文件数：$(ls *.md 2&gt;/dev/null | wc -l)"</code></pre>
+
+    <h3>脚本 2：一键编译 + 清理</h3>
+    <pre><code>#!/bin/bash
+set -e
+SRC=${1:-main.c}
+OUT=${2:-app}
+CROSS=arm-linux-gnueabihf-gcc
+
+echo "== 编译 $SRC -&gt; $OUT =="
+$CROSS -Wall -O2 "$SRC" -o "$OUT"
+file "$OUT"
+echo "== 清理解压产物 =="
+rm -rf *.o</code></pre>
+
+    <h3>脚本 3：日志按大小清理</h3>
+    <pre><code>#!/bin/bash
+<span class="c"># 保留最近 7 天，超过 100MB 的日志清空</span>
+LOG_DIR=/var/log/myapp
+find "$LOG_DIR" -name "*.log" -mtime +7 -delete
+find "$LOG_DIR" -name "*.log" -size +100M -exec truncate -s 0 {} \;
+echo "清理完成 $(date)"</code></pre>
+
+    <h3>脚本 4：备份并打时间戳</h3>
+    <pre><code>#!/bin/bash
+SRC=/home/ubuntu/lab
+DST=/home/ubuntu/backup
+mkdir -p "$DST"
+tar -zcf "$DST/lab_$(date +%Y%m%d_%H%M).tar.gz" "$SRC"
+ls -lh "$DST" | tail -3</code></pre>
+
+    <h2 id="s5">5.5 动手任务</h2>
+    <ul class="steps">
+      <li>用 Vim 完成上面 4 个脚本，全程不用鼠标，不用其他编辑器。</li>
+      <li>故意在 Vim 里按错键（比如按了 <code>dd</code> 删掉一行），用 <code>u</code> 撤销，连按两次 Esc 复位。</li>
+      <li>用 <code>:%s/old/new/g</code> 把一个 C 文件里的所有 <code>int</code> 临时替换，再撤销回来。</li>
+      <li>用可视块模式给 10 行代码批量加 <code>//</code> 注释，再批量取消。</li>
+      <li>把脚本 2 改成接受「源文件、输出名、优化等级」三个参数，并做参数个数检查。</li>
+      <li>给所有脚本加 <code>set -e</code>，然后故意让其中一步失败，观察是否立即退出。</li>
+    </ul>
+
+    <h2 id="s6">5.6 验收标准</h2>
+    <div class="viz" data-kind="flow" data-title="一个脚本的执行顺序" data-sub="从上到下，退出码决定成败" data-json='{"steps":[{"n":"shebang","d":"#!/bin/sh 决定用哪个解释器"},{"n":"变量","d":"赋值、$1 取参数"},{"n":"判断","d":"if / case / test"},{"n":"循环","d":"for / while + 命令"},{"n":"exit","d":"0 成功、非 0 失败"}],"note":"脚本里的每条命令都可能失败，set -e 让它在第一个错误处就停，比一路跑到底再排错省事。"}'></div>
+
+    <ul class="checklist">
+      <li>能不查资料完成：打开文件、跳转行、搜索、替换、保存退出、分屏</li>
+      <li>知道三种模式怎么切换，卡住时知道按两次 Esc</li>
+      <li>能解释 <code>./script.sh</code> 里 <code>./</code> 的作用</li>
+      <li>能写带参数校验、if 判断、for 循环、函数的脚本</li>
+      <li>能说清单引号和双引号的区别</li>
+      <li>4 个脚本全部跑通，且能改造成自己的场景</li>
+    </ul>
+
+    <footer id="pager"></footer>
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"Vim 的三个模式怎么切换","steps":[{"t":"① 普通模式","d":"打开就是它。按键不当字符输入，而是命令：dd 删行、yy 复制、p 粘贴、/ 搜索。"},{"t":"② 插入模式","d":"按 i 进入，这时才是打字。按 Esc 回普通模式。"},{"t":"③ 命令模式","d":"普通模式下按 : 进入，可以 :w 保存、:q 退出、:wq 保存退出、:q! 丢弃。"},{"t":"④ 可视模式","d":"按 v 选字符、V 选行，选中后 y 复制、d 删除。批量改代码常用。"},{"t":"⑤ 脚本化","d":"把重复操作写进 .sh，加 set -e 让出错即停，用 shellcheck 查一遍再跑。"}],"note":"嵌入式上只有 busybox vi，没有语法高亮也没有插件。先在桌面上把基本动作练成肌肉记忆，上板才不会卡。"}'></div>
+  
+
+<nav class="pager">
+  <a href="course-ch04.html"><span>← 上一篇</span><b>系统管理四件事</b></a>
+  <a class="nx" href="course-ch06.html"><span>下一篇 →</span><b>网络与远程开发</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

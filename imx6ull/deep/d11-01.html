@@ -1,0 +1,119 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>oops 现场还原：寄存器、栈回溯、反汇编定位到行 · 卷 11 | i.MX6ULL</title>
+<meta name="description" content="内核崩了不会给你断点，只给一串十六进制。这一篇教你把那串数字翻译成「第几行、哪个变量是空」。">
+<link rel="stylesheet" href="../assets/deep.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/deep.js" defer></script>
+</head><body>
+<div class="dp-prog"><i></i></div>
+<div class="dp">
+<header class="dp-top">
+  <div class="dp-crumbs">
+    <a href="../../index.html">个人知识库</a><span>/</span>
+    <a href="../index.html">学习站入口</a><span>/</span>
+    <a href="../juan/index.html">十四卷</a><span>/</span>
+    <a href="../juan/j11.html">卷 11</a>
+  </div>
+  <div class="dp-tools">
+    <a href="../juan/j11.html">☰ 卷 11 目录</a>
+    <a href="../juan/index.html">◫ 十四卷总览</a>
+  </div>
+</header>
+
+<div class="dp-hero">
+  <div class="dp-kicker">卷 11<span>·</span>第 11·03 篇</div>
+  <h1>oops 现场还原：寄存器、栈回溯、反汇编定位到行</h1>
+  <p class="dp-lede">内核崩了不会给你断点，只给一串十六进制。这一篇教你把那串数字翻译成「第几行、哪个变量是空」。</p>
+  <div class="dp-chips">
+    <span class="c hot">★ 一读</span>
+    <span class="c">纯读约 3 小时</span>
+    <span class="c">理论为主 · 实作可跳</span>
+    <span class="c">配 3–4 个互动演示</span>
+  </div>
+</div>
+
+<aside class="dp-toc"><div class="dp-toc-h">本页目录</div><a href="#s1"><span>01</span>先玩一下：把 oops 的寄存器搬到反汇编上</a><a href="#s2"><span>02</span>一、oops 的六段，各有用途</a><a href="#s3"><span>03</span>二、常见四类根因</a><a href="#s4"><span>04</span>动手（可选）：故意造一次 oops</a><a href="#s5"><span>05</span>离开这一篇，你应该能</a></aside>
+<main class="dp-main">
+<p class="lead">内核崩了不会给你断点，只给你一段文字：<code>Unable to handle kernel NULL pointer dereference at virtual address 00000000</code>，加一串 <code>PC is at ...</code>、<code>LR is at ...</code>、几行 <code>[&lt;addr&gt;] func+0x..</code>，最后一行 <code>Code: e5900000 ...</code>。</p>
+
+<p>这段文字足够定位到「源文件第几行、哪个指针是空的」——前提是你会按顺序读它。</p>
+
+<h2 id="s1">先玩一下：把 oops 的寄存器搬到反汇编上</h2>
+
+<p>点「单步」。右侧寄存器会随每一行变化，<code>PC</code> 指到哪一行，那一行就是出事的地方。</p>
+
+<div class="ikit" data-type="code" data-json='{"title":"从 PC 定位到出错指令","badge":"code",
+"regs":[{"n":"PC","v":"0xBF04_21A8"},{"n":"LR","v":"0xBF04_2194"},{"n":"R3","v":"0x0000_0000"},{"n":"CPSR","v":"0x6000_0013"}],
+"lines":[
+{"c":"bf042194: push {r4, lr}","set":{"LR":"0xBF04_2194"},"note":"函数入口，保存返回地址。CPSR 的 mode 位显示当时处于 SVC 模式。"},
+{"c":"bf042198: ldr r4, [pc, #8]   ; r4 = dev->base","set":{"R3":"0x0000_0000"},"note":"取 dev 指针。若 dev 是 NULL，后面必崩。"},
+{"c":"bf04219c: mov r3, #0","set":{"R3":"0x0000_0000"},"note":"准备写入的值。"},
+{"c":"bf0421a0: str r3, [r4, #4]   ; ← oops 的 PC","set":{"PC":"0xBF04_21A0"},"note":"写地址 r4+4。R3=0 说明 dev 为空——空指针写。"},
+{"c":"bf0421a4: pop {r4, pc}","set":{"PC":"0xBF04_2194"},"note":"正常返回路径，但这次走不到了。"}]}'></div>
+
+<p>上面这段是「读法演示」，地址与指令是示意的。真实的流程是：<code>PC</code> 值 → 在 <code>vmlinux</code> 里 <code>addr2line</code> → 得到 <code>file:line</code> → 回去看那一行的变量。</p>
+
+<h2 id="s2">一、oops 的六段，各有用途</h2>
+
+<table>
+<thead><tr><th>字段</th><th>含义</th><th>怎么用</th></th></tr></thead>
+<tbody>
+<tr><td>故障描述</td><td>NULL deref / paging request / alignment 等</td><td>先判断是「访问了不该访问的地址」还是「指令本身非法」</td></tr>
+<tr><td>virtual address</td><td>出错时访问的地址</td><td>0x0 → 空指针；0xfffffff0 之类 → 野指针/负偏移</td></tr>
+<tr><td>PC is at</td><td>出错指令地址 + 符号 + 偏移</td><td>定位「哪一行代码」</td></tr>
+<tr><td>LR is at</td><td>调用者返回地址</td><td>回溯上一层</td></tr>
+<tr><td>Call trace</td><td>栈回溯（函数 + 偏移）</td><td>还原调用链，找「谁传了空指针」</td></tr>
+<tr><td>Code:</td><td>出错指令前后的机器码</td><td>反汇编对照；也可用 <code>scripts/decodecode</code></td></tr>
+</tbody></table>
+
+<div class="ikit" data-type="drag" data-json='{"title":"定位 oops 的六步","badge":"drag",
+"items":[{"id":"pc","text":"读 PC 与故障地址，判断类型"},{"id":"sym","text":"用 addr2line 把 PC 换成 file:line"},{"id":"code","text":"打开源码，看那一行的指针来源"},{"id":"trace","text":"读 Call trace，找调用者与参数"},{"id":"asm","text":"必要时反汇编 vmlinux，核对寄存器用途"},{"id":"fix","text":"修完再跑同一场景，确认不再复现"}],
+"answer":["pc","sym","code","trace","asm","fix"],
+"explain":"先「是什么错」，再「哪一行」，再「谁传进来的」。顺序反了就会在错误的函数里改半天。"}'></div>
+
+<p>一个实用细节：<code>func+0x1c/0x2a0</code> 这种偏移是相对函数入口的，<code>addr2line -f -e vmlinux 0xbf0421a0</code> 能直接给出行号；如果没有调试信息，就只剩函数名与偏移，只能靠反汇编硬看。<strong>所以产品必须保留一份带符号的 vmlinux</strong>，与固件版本一一对应。</p>
+
+<h2 id="s3">二、常见四类根因</h2>
+
+<ul>
+  <li><b>空指针</b>：<code>dev</code> 还没赋值就用了；probe 失败路径没清理；<code>of_node</code> 为空。</li>
+  <li><b>野指针 / use-after-free</b>：<code>kfree</code> 后继续用；并发下对象被另一个线程释放。开启 <code>CONFIG_DEBUG_KMEMLEGS</code>/KASAN 能提前抓到。</li>
+  <li><b>栈溢出</b>：内核栈通常 8 KB（ARM 32 位可能是 8 KB），大数组 + 深递归就爆。症状常是「随机在某处崩溃」，回溯看起来毫无关联。</li>
+  <li><b>硬件访问</b>：时钟没开就读写寄存器 → 总线错误（External abort），这类 oops 的地址往往是正常的寄存器地址，但硬件没响应。</li>
+</ul>
+
+<div class="cal warn"><span class="h">oops ≠ panic</span>oops 通常只杀死当前进程（<code>panic_on_oops=0</code> 时），系统还能跑；panic 会停住或重启。所以「崩溃后系统还在，但某个功能不工作了」也是 oops，别以为没日志就没问题，去 <code>dmesg</code> 里翻。</div>
+
+<div class="cal tip"><span class="h">掉电前最后的日志</span>配置 <code>pstore</code>/<code>ramoops</code> 后，崩溃前的 dmesg 会留在内存里，重启后从 <code>/sys/fs/pstore/</code> 读出。<code>panic_timeout</code> 配合看门狗，能把「死机无日志」变成「有现场」。</div>
+
+<h2 id="s4">动手（可选）：故意造一次 oops</h2>
+
+<div class="cal q"><span class="h">只在 🔧 实作模式展开</span>需要板子；没有板子可只读上面的读法。</div>
+
+<ol>
+  <li>写一个模块，在 <code>open</code> 里 <code>*(int *)0 = 1;</code>，<code>insmod</code> 后 <code>cat /dev/xxx</code>。</li>
+  <li><code>dmesg</code> 里拿到 PC 与 Call trace，用 <code>addr2line</code> 定位到你写的那一行。</li>
+  <li>把空指针改成 <code>dev->field</code>（<code>dev</code> 未初始化），看故障地址从 0x0 变成一个小偏移——这就是「结构体成员偏移」的线索。</li>
+  <li>再写一个栈上 16 KB 数组的函数，观察 <code>stack overflow</code> 或莫名其妙的崩溃。</li>
+</ol>
+
+<h2 id="s5">离开这一篇，你应该能</h2>
+
+<ul class="qa">
+  <li>按六段读一份 oops，并说出 <code>PC is at</code> 与 <code>Code:</code> 各自的用途。</li>
+  <li>用 <code>addr2line</code> 把地址换成行号，并说明为什么需要保留 vmlinux。</li>
+  <li>区分空指针、UAF、栈溢出、总线错误四类根因的典型症状。</li>
+</ul>
+
+<p>如果崩溃发生在「串口还没输出」的极早期，oops 根本不会出现。这时候只能靠 JTAG 把 CPU 按停——下一篇。</p>
+
+<nav class="dp-nav">
+  <a href="d10-04.html"><span>← 上一篇</span>进程间通信：管道、共享内存、消息队列、信号</a>
+  <a href="d11-02.html" class="nxt"><span>下一篇 →</span>JTAG 与 Ozone：停核、看页表、单步走启动链</a>
+</nav>
+<footer class="dp-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线。文中的「动手」段落只在 🔧 实作模式下展开，纯读可整篇跳过。</footer>
+</main>
+</div></body></html>

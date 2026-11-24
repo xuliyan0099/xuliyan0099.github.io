@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第 00 章 · 为什么非写不可 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<link rel="stylesheet" href="../assets/asm.css">
+</head><body style="--acc:#03d6b4">
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="index.html">☰ 汇编目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">手写 ARM 汇编 · 10 篇</div>
+    <ol>
+      <li><a href="index.html"><span class="no">⌂</span><span>路口目录<span class="sub">篇目总览与读法</span></span></a></li>
+      <li><a href="a0.html" class="active"><span class="no">00</span><span>为什么非写不可<span class="sub">三个真实场景，和一笔成本账</span></span></a></li>
+      <li><a href="a1.html"><span class="no">01</span><span>最小可跑：工具链与第一条指令<span class="sub">编、链接、反汇编，看到自己写的字节</span></span></a></li>
+      <li><a href="a2.html"><span class="no">02</span><span>寄存器与立即数：那道 8 位旋转墙<span class="sub">16 个寄存器、APSR、4096 种立即数</span></span></a></li>
+      <li><a href="a3.html"><span class="no">03</span><span>寻址与栈：地址是怎么算出来的<span class="sub">四种寻址、批量搬运、满递减栈</span></span></a></li>
+      <li><a href="a4.html"><span class="no">04</span><span>函数调用与 AAPCS：lr 为什么必须保<span class="sub">传参、返回、保存责任、栈帧布局</span></span></a></li>
+      <li><a href="a5.html"><span class="no">05</span><span>条件码与分支：两套门，别走错<span class="sub">cmp 的本质、14 个条件、IT 块</span></span></a></li>
+      <li><a href="a6.html"><span class="no">06</span><span>位操作：配置一个寄存器的标准三行<span class="sub">bic/orr/bfi，掩码怎么造出来</span></span></a></li>
+      <li><a href="a7.html"><span class="no">07</span><span>C 与汇编互调：四条约束和两个别省<span class="sub">内联汇编、volatile、memory clobber</span></span></a></li>
+      <li><a href="a8.html"><span class="no">08</span><span>裸机第一条：在这块板子上点灯<span class="sub">关狗、开钟、配脚、定方向</span></span></a></li>
+      <li><a href="a9.html"><span class="no">09</span><span>二十道练习清单<span class="sub">A/B/C 三档，每题都写了验收法</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="../hardware/index.html">硬件入口</a><a href="../juan/index.html">十四卷总览</a></div>
+  </aside>
+  <main class="doc">
+    <div class="doc-kicker">汇编练习 · i.MX6ULL / Cortex-A7 <span>·</span> 第 00 章</div>
+    <div class="ch-head">
+      <h1>为什么非写不可</h1>
+      <div class="ch-meta"><span class="hot">第 00 章</span><span>约 18 分钟</span><span>★ 必读</span></div>
+    </div>
+<h2 id="s1">先说结论：这门手艺不是用来写产品代码的</h2>
+<p>没人会拿纯汇编去写一个文件系统。手写汇编的真正用途只有三个，而且都很硬：</p>
+<ol>
+<li><b>读懂反汇编</b>。你在板子上跑一个驱动，内核 panic，串口吐出一段 oops，中间是十几个十六进制数字和一段反汇编。这一段就是现场唯一的证据。认不出来，你只能改代码猜；认得出来，你能指出「它在 r0=0 的时候取了 [r0,#0x10]」。</li>
+<li><b>读懂启动代码</b>。i.MX6ULL 上电后不是从 C 开始跑。Boot ROM 读 IVT、跳到你的 u-boot，u-boot 的 <code>_start</code> 前几百行全是汇编：关看门狗、设栈、清 BSS、切 CPU 模式、开 MMU、最后才 <code>bl main</code>。看不懂这几百行，启动阶段的问题你只能凭运气。</li>
+<li><b>看穿寄存器配置</b>。外设配置的本质就是往某个地址的某几位写值。你在 C 里写 <code>writel(0x5, base + 0x10)</code>，编译器忠实地把它变成一条 <code>str</code>——但你对「清掉了哪几位、置了哪几位、哪些位保持原样」是瞎的。手写过 <code>bic / orr / bfi</code>，你才会明白为什么内核到处是「读—改—写」，而不是直接赋值。</li>
+</ol>
+<div class="note">一句话记住：C 会骗你，寄存器不会。你在 C 里写的 <code>*p = 3</code>，可能被优化成一条 <code>str</code>，也可能整段被删掉；你写的 <code>delay()</code> 空循环，可能一条指令都不剩。汇编里没有这些中间层。</div>
+<h2 id="s2">场景一：一段 oops 里的反汇编</h2>
+<p>假设串口打出这么一段（节选，地址已简化）：</p>
+<pre class="asm"><code>Unable to handle kernel NULL pointer dereference at virtual address 00000010
+PC is at my_led_write+0x28/0x60
+LR is at vfs_write+0x1a0/0x2c0</code></pre>
+<p>然后 <code>objdump -d</code> 里 <code>my_led_write</code> 附近是这样：</p>
+<pre class="asm"><code>00000000 &lt;my_led_write&gt;:
+   0:   push   {r4, lr}
+   4:   ldr    r4, [r0, <span class="hl">#0x30</span>]      @ r0 = file 指针，取 private_data
+   8:   cmp    r4, <span class="hl">#0</span>
+   c:   beq    0x3c                @ 空指针就跳去报错
+  10:   ldr    r3, [r4, <span class="hl">#0x10</span>]      @ ← 出事的就是这一条
+  14:   str    r3, [r4, <span class="hl">#0x14</span>]</code></pre>
+<p>对照 oops 里的 <code>virtual address 00000010</code>，结论几乎不用推：<code>r4</code> 是 0，说明 <code>private_data</code> 没被赋值（或者设备没 open 就被写），于是 <code>r4+0x10 = 0x10</code>，正好是出错地址。</p>
+<p>这就是手写汇编的实际收益：<b>地址偏移和寄存器名是可读的证据链</b>。你能一眼看出「它在拿一个结构体第 0x10 字节的字段」，而不是「反正崩了」。</p>
+<h2 id="s3">场景二：u-boot 的 <code>_start</code></h2>
+<p>i.MX6ULL 的 u-boot 第一段代码，结构永远是这几步（顺序不能乱）：</p>
+<pre class="asm"><code>_start:
+    @ 1. 把自己搬到一个干净的地址（relocate），因为 DDR 还没跑起来时可能运行在 SRAM
+    @ 2. 设栈：sp = 某块确定的内存顶端
+    @ 3. 清 BSS、清 cache、关 MMU 与 D-cache（此时还是物理地址直跑）
+    @ 4. 保存启动参数（r0/r1/r2 里是 Boot ROM 传进来的机器类型、dtb 地址）
+    @ 5. 切到 SVC 模式、开 I-cache
+    @ 6. bl board_init_f → 板级初始化 → 重定位 → board_init_r → 进命令行</code></pre>
+<p>其中每一步都是「关一个东西 / 开一个东西」。比如关 MMU 的那几行：</p>
+<pre class="asm"><code>    mrc  p15, 0, r0, c1, c0, 0     @ 读 SCTLR
+    <span class="k">bic</span>  r0, r0, <span class="hl">#0x1</span>              @ 清 M 位：关 MMU
+    <span class="k">bic</span>  r0, r0, <span class="hl">#0x4</span>              @ 清 C 位：关 D-cache
+    mcr  p15, 0, r0, c1, c0, 0     @ 写回
+    <span class="k">isb</span></code></pre>
+<p><code>mrc/mcr</code> 是协处理器访问指令，操作的是 CP15 的系统控制寄存器——这种东西 C 里没法直接表达，只能靠内联汇编或者 <code>.S</code> 文件。你不需要背这些位，但需要能认出「这是在改 SCTLR 的 M/C 位」。</p>
+<h2 id="s4">场景三：<code>writel</code> 到底做了什么</h2>
+<p>C 侧的写法：</p>
+<pre class="asm"><code>writel(0x5, base + 0x68);<span class="c">   /* 想把这个脚的 MUX_MODE 设成 ALT5 */</span></code></pre>
+<p>这句的语义是「把 0x68 偏移处的整个 32 位寄存器写成 5」。如果那个寄存器里别的位正被别人用着（比如 SION、或者相邻功能的选择位），你就把它们一起清成 0 了。</p>
+<p>汇编层面看得很清楚：一条 <code>str</code>，一次全覆盖写。</p>
+<pre class="asm"><code>    <span class="k">mov</span>  r1, <span class="hl">#5</span>
+    <span class="k">str</span>  r1, [r0, <span class="hl">#0x68</span>]      @ 整个寄存器 = 5，其余位全变 0</code></pre>
+<p>正确的做法是读—改—写，只动 bit[2:0]：</p>
+<pre class="asm"><code>    <span class="k">ldr</span>  r1, [r0, <span class="hl">#0x68</span>]      @ 读
+    <span class="k">bic</span>  r1, r1, <span class="hl">#0x7</span>         @ 清低 3 位
+    <span class="k">orr</span>  r1, r1, <span class="hl">#0x5</span>         @ 置成 5
+    <span class="k">str</span>  r1, [r0, <span class="hl">#0x68</span>]      @ 写回</code></pre>
+<p><b>这就是内核里 <code>readl</code> / <code>writel</code> / <code>regmap_update_bits</code> 存在的理由</b>：C 语言里 <code>.field = x</code> 看着像只改字段，实际很可能是一次整寄存器覆盖。手写一遍汇编，这个直觉就长在脑子里了。</p>
+<h2 id="s5">那手写汇编不能干什么</h2>
+<ul>
+<li><b>不要</b>拿它写业务逻辑。寄存器分配、栈帧维护、调用约定，编译器做得比人稳。</li>
+<li><b>不要</b>以为手写一定更快。现代 GCC <code>-O2</code> 出来的代码，在流水线排布、指令选择上经常比人肉强；只有极少数场景（精确延时、上下文切换、启动 stub、DMA 对齐拷贝）值得人写。</li>
+<li><b>不要</b>在没有 objdump 对照的情况下相信自己的记忆。编码规则一定会记错：立即数范围、移位量上限、哪些指令 Thumb 态没有、条件码哪个对应哪种比较，全靠反汇编验证。</li>
+</ul>
+<h2 id="s6">三笔账：成本与收益</h2>
+<table class="regtbl"><thead><tr><th>你投入</th><th>你换到</th></tr></thead><tbody><tr><td class="nm">两小时认指令与寻址</td><td>能读 oops、能读 uboot 入口、能估计一个函数多少条指令</td></tr><tr><td class="nm">半天认立即数/条件码/位域</td><td>配寄存器不再「照抄别人的值」，能自己算掩码</td></tr><tr><td class="nm">一天做完全部 20 道练习</td><td>敢在驱动里写内联汇编（屏障、CPSR、协处理器）并知道为什么加 volatile</td></tr><tr><td class="nm">一个周末把点灯跑通</td><td>完整走一遍「复位 → 时钟 → 引脚 → GPIO → 循环」，这条链是所有外设的模板</td></tr></tbody></table>
+<h2 id="s7">学习路径（这一路口怎么走）</h2>
+<p>十篇是递进的，别跳：</p>
+<ul>
+<li><b>01</b> 先把「写 → 编译 → 反汇编」的闭环打通，你得能看见自己写的字节。</li>
+<li><b>02</b> 撞立即数那道墙，这是后面所有「掩码为什么要移位造」的根。</li>
+<li><b>03</b> 学地址怎么算、栈怎么长，这是函数与中断的地基。</li>
+<li><b>04</b> 学 lr 的生死，这里出错的表现是「跑飞」，最难查。</li>
+<li><b>05</b> 学条件码，特别是「有符号」和「无符号」两套门。</li>
+<li><b>06</b> 把位操作练成肌肉记忆，回到寄存器配置。</li>
+<li><b>07</b> 接回 C 语言，学内联汇编与屏障，这是日常真正会用到的部分。</li>
+<li><b>08</b> 全部压到板子上：纯汇编点灯。</li>
+<li><b>09</b> 二十道题自测，每题都有验收法，别自己觉得对。</li>
+</ul>
+<div class="note">本篇验收：合上页面，能用自己的话讲清「为什么这个函数必须 <code>push {lr}</code>」「为什么 <code>mov r0,#0x12345678</code> 编不过」「为什么配寄存器要读改写」。三条能讲清，再进 01。</div>
+<div class="pager">
+      <a href="index.html"><span>返回</span><b>← 路口目录</b></a>
+      <a href="index.html"><span>目录</span><b>篇目总览</b></a>
+      <a class="nx" href="a1.html"><span>下一篇</span><b>01 最小可跑：工具链与第一条指令 →</b></a>
+    </div>
+  </main>
+</div>
+<script src="../assets/asm-tools.js"></script>
+</body>
+</html>

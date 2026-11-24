@@ -1,0 +1,346 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>交叉编译与工具链原理 · 卷 02 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j02.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 02 · 编译与运行</div>
+<ol><li><a href="course-19.html">
+  <span class="no">01</span><span>从源码到可执行<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-ch07.html">
+  <span class="no">02</span><span>交叉编译与工程构建<span class="sub">约 12 小时</span></span></a></li>
+<li><a href="course-th17.html" class="active">
+  <span class="no">03</span><span>交叉编译与工具链原理<span class="sub">约 4 小时 · 当前</span></span></a></li>
+<li><a href="d02-01.html">
+  <span class="no">04</span><span>ELF 与链接重定位：从符号表到 .rel.text<span class="sub">约 3 小时</span></span></a></li>
+<li><a href="d02-02.html">
+  <span class="no">05</span><span>静态库与动态链接：PLT / GOT / PIC 全链路<span class="sub">约 3 小时</span></span></a></li>
+<li><a href="d02-03.html">
+  <span class="no">06</span><span>程序加载与内存布局：段、栈、堆、core dump<span class="sub">约 2 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j01.html">← 卷 01</a>
+  <a href="../juan/j03.html">卷 03 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 02<span>·</span>编译与运行<span>·</span>第 03 篇</div>
+  <h1>交叉编译与工具链原理</h1>
+  <p class="lede">你在 x86 电脑上敲 gcc hello.c，出来的是 x86 程序，拷到 i.MX6ULL 上根本跑不起来。交叉编译就是「在 A 机器上生成 B 机器的代码」。这一章把工具链拆到底：名字里每段是什么意思、四步编译各产出什么、链接为什么最容易出错。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 4 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+    <div class="viz" data-kind="map" data-title="一个 ELF 文件被切开的样子" data-sub="不是一坨字节，是几段各有地址的东西" data-json='{"rows":[{"segs":[{"n":"ELF 头","size":1,"c":"cy","d":"魔数 7F 45 4C 46"},{"n":"程序头表","size":1,"c":"vi","d":"加载器看这个"},{"n":".text 代码","size":3,"c":"gr","d":"可执行，只读"},{"n":".rodata 常量","size":2,"c":"or","d":"字符串与常量"},{"n":".data / .bss","size":2,"c":"gray","d":"已初始化 / 未初始化数据"}],"from":"文件起始","to":"文件末尾","ptr":0.55}],"note":"加载器只按程序头表把 .text 与 .data 搬到内存，其余（符号表、调试信息）根本不进内存。交叉编译时那句 file 看到的 ARM, EABI5 就是从 ELF 头里读出来的。"}'></div>
+
+
+    <div class="card">
+      <h4>本章要解决的问题</h4>
+      <p>① 为什么不能在板子上直接编译；② <code>arm-linux-gnueabihf-gcc</code> 这串名字怎么读；③ .c 到可执行文件经历了哪四步，每步产生什么文件；④ 静态库与动态库该选哪个；⑤ 「GLIBC_2.29 not found」这类错误到底什么原因。</p>
+    </div>
+
+    <div class="card">
+      <h4>读完你应该能回答</h4>
+      <ul>
+        <li>编译、汇编、链接各自由哪个工具完成，产物后缀是什么？</li>
+        <li>gnueabi 与 gnueabihf 差一个字母，差的是什么？</li>
+        <li>为什么交叉编译时绝对不能把 <code>/usr/include</code> 加进搜索路径？</li>
+        <li>.a 与 .so 的本质区别，GOT/PLT 是干什么的？</li>
+        <li>ELF 里 .text、.data、.bss 分别放什么？</li>
+      </ul>
+    </div>
+
+    <div class="anim2" data-json='{"title":"从 .c 到能在板子上跑的 ELF","hint":"四步，每步产物都能看","nodes":[{"k":".c 源码","s":"人写的"},{"k":"预处理 .i","s":"展开宏与头文件"},{"k":"编译 .s","s":"翻成汇编"},{"k":"汇编 .o","s":"机器码"},{"k":"链接 ELF","s":"分配地址、重定位"}],"frames":[{"i":0,"d":"源码里全是 #include 与宏，编译器先不管语义。"},{"i":1,"d":"预处理把宏展开、头文件贴进来，输出一个大 .i 文件——宏写错在这一步就能看出来。"},{"i":2,"d":"编译做优化、分配寄存器，把 C 翻成汇编。编译器不懂硬件，它只按 ABI 办事。"},{"i":3,"d":"汇编把助记符翻成机器码，地址仍是相对的，符号还没落地。"},{"i":4,"d":"链接拼上库、分配地址、重定位符号，输出 ELF。动态链接的程序还留 PLT 与 GOT。"}],"kind":"flow"}'></div>
+
+    <h2 id="s1">1. 为什么必须交叉编译</h2>
+
+    <p>程序是「机器指令序列」，指令集不同就不能互相执行。x86 的机器码在 ARM 核上是一条条非法指令；ARM 的机器码在 x86 上也一样。所以有两种做法：</p>
+
+    <table>
+      <thead><tr><th>方式</th><th>做法</th><th>问题</th></tr></thead>
+      <tbody>
+        <tr><td><b>本地编译</b>（native）</td><td>在目标板上跑 gcc，直接生成 ARM 码</td><td>板子 CPU 弱、内存小，编译一个内核要几小时甚至几天；工具链本身也占几十 MB</td></tr>
+        <tr><td><b>交叉编译</b>（cross）</td><td>在 PC 上跑「能生成 ARM 码的 gcc」</td><td>需要一套专门的工具链，且要小心别把主机的东西混进来</td></tr>
+      </tbody>
+    </table>
+
+    <p>嵌入式 99% 用交叉编译。工具链本身也是一个「程序」，它跑在 x86 上，但它的<b>输出</b>是 ARM 代码——这个「跑在 A、产出 B」的特性，是靠 gcc 内部的 target 描述（指令模板、寄存器约束、ABI 规则）实现的。</p>
+
+    <div class="note">
+      <b>工具链从哪来</b>
+      三条路：① 直接下载 Linaro / ARM 官方预编译包；② 用 Buildroot / Yocto 自己构建（可定制 libc、可复现）；③ 用 crosstool-NG 从源码构建。厂商 BSP 一般会提供一份，<b>优先用厂商那份</b>，因为内核与驱动是按它验证的。
+    </div>
+
+    <h2 id="s2">2. 工具链的组成</h2>
+
+    <p>「工具链」不是单个 gcc，而是一整套协作的程序：</p>
+
+    <table>
+      <thead><tr><th>组件</th><th>作用</th><th>典型命令</th></tr></thead>
+      <tbody>
+        <tr><td>binutils</td><td>汇编器、链接器、目标文件工具</td><td><code>as</code>、<code>ld</code>、<code>objcopy</code>、<code>objdump</code>、<code>readelf</code>、<code>nm</code>、<code>strip</code></td></tr>
+        <tr><td>gcc</td><td>编译器驱动：调度预处理、编译、汇编、链接</td><td><code>arm-linux-gnueabihf-gcc</code></td></tr>
+        <tr><td>C 库</td><td>提供 printf、malloc 等运行时</td><td>glibc / musl / uClibc</td></tr>
+        <tr><td>sysroot</td><td>目标机的头文件与库的「影子根目录」</td><td><code>--sysroot=/opt/arm-sysroot</code></td></tr>
+        <tr><td>调试器</td><td>源码级调试（配合 gdbserver）</td><td><code>arm-linux-gnueabihf-gdb</code></td></tr>
+        <tr><td>内核头文件</td><td>编译驱动/内核模块时需要</td><td>来自内核源码的 <code>include/</code></td></tr>
+      </tbody>
+    </table>
+
+    <div class="tip">
+      <b>sysroot 是交叉编译的核心概念</b>
+      它是一份「按目标机目录结构摆放」的头文件与库集合（如 <code>sysroot/usr/include</code>、<code>sysroot/usr/lib</code>）。编译器默认只在这个影子根里找，<b>这样就不会误用主机的 x86 头文件</b>。
+    </div>
+
+    <h2 id="s3">3. 名字里的三个约定</h2>
+    <div class="viz" data-kind="tree" data-title="arm-linux-gnueabihf-gcc 这个名字怎么读" data-sub="四段，每段都在排除一种错误用法" data-json='{"nodes":[{"n":"arm-linux-gnueabihf-gcc","c":"vi","ch":[{"n":"arm","d":"目标架构：32 位 ARM","c":"cy"},{"n":"linux","d":"目标系统：Linux（有 syscall/ELF）","c":"or"},{"n":"gnueabihf","d":"GNU 环境 + 硬浮点 ABI","c":"gr"},{"n":"gcc","d":"工具本体","c":"cy"}]}],"note":"写成 arm-none-eabi-gcc 就没有 Linux 系统调用，编出来在板子上跑不了；写成 gnueabi（软浮点）与内核 ABI 不一致，函数调用会错乱。"}'></div>
+
+
+    <p><code>arm-linux-gnueabihf-gcc</code> 可以拆成四段（常被说成「三元组」，实际多为四段）：</p>
+
+    <table>
+      <thead><tr><th>段</th><th>值</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td>arch</td><td><code>arm</code></td><td>目标指令集：32 位 ARM</td></tr>
+        <tr><td>vendor / os</td><td><code>linux</code></td><td>目标操作系统：Linux（要有系统调用、ELF 格式）</td></tr>
+        <tr><td>abi</td><td><code>gnueabihf</code></td><td>GNU EABI + <b>hard float</b>：浮点参数通过 VFP 寄存器传递</td></tr>
+      </tbody>
+    </table>
+
+    <p>同族名字的对比，能看清每个字母的作用：</p>
+
+    <table>
+      <thead><tr><th>名字</th><th>目标</th><th>区别</th></tr></thead>
+      <tbody>
+        <tr><td><code>arm-none-eabi-gcc</code></td><td>裸机（无 OS）</td><td>没有 Linux 系统调用，生成的是裸 ELF/HEX，常用于 STM32</td></tr>
+        <tr><td><code>arm-linux-gnueabi-gcc</code></td><td>ARM Linux 软浮点</td><td>浮点参数用整数寄存器传，靠软件模拟浮点运算</td></tr>
+        <tr><td><code>arm-linux-gnueabihf-gcc</code></td><td>ARM Linux 硬浮点</td><td>浮点参数用 VFP 寄存器传，i.MX6ULL（有 VFP）用这个</td></tr>
+        <tr><td><code>aarch64-linux-gnu-gcc</code></td><td>ARM64</td><td>64 位指令集，与 arm 完全不兼容</td></tr>
+      </tbody>
+    </table>
+
+    <div class="warn">
+      <b>软硬浮点混用是隐形炸弹</b>
+      <code>gnueabi</code> 编译的库 + <code>gnueabihf</code> 编译的程序链接在一起，编译期可能不报错，运行时浮点参数全乱。<b>整个项目（含第三方库）必须统一 ABI。</b>
+    </div>
+    <h2 id="s4">4. 从 .c 到可执行文件：四步</h2>
+
+    <p>很多人以为「编译」是一个动作，其实是四步，每步都可以单独执行、单独观察产物：</p>
+
+    <table>
+      <thead><tr><th>步骤</th><th>做什么</th><th>命令</th><th>产物</th></tr></thead>
+      <tbody>
+        <tr><td>预处理</td><td>展开 #include、宏、条件编译，删注释</td><td><code>gcc -E hello.c -o hello.i</code></td><td>纯展开后的 C 文本</td></tr>
+        <tr><td>编译</td><td>把 C 翻译成汇编</td><td><code>gcc -S hello.i -o hello.s</code></td><td>汇编文本（人类可读）</td></tr>
+        <tr><td>汇编</td><td>把汇编翻成机器码，生成目标文件</td><td><code>gcc -c hello.s -o hello.o</code></td><td>.o（ELF 可重定位文件）</td></tr>
+        <tr><td>链接</td><td>合并多个 .o、解析符号、接上库</td><td><code>gcc hello.o -o hello</code></td><td>可执行 ELF</td></tr>
+      </tbody>
+    </table>
+
+    <div class="calc">
+      <h5>算一笔：一次「看不见的」编译链</h5>
+      <div class="line"><code>arm-linux-gnueabihf-gcc hello.c -o hello</code> 这一条命令内部依次调用</div>
+      <div class="line">cpp（预处理）→ cc1（编译成汇编）→ as（汇编成 .o）→ collect2/ld（链接 libc 与启动代码）</div>
+      <div class="line">加上 <code>-v</code> 就能看到它实际调用的每个子程序与完整命令行</div>
+      <div class="line">调试「头文件找不到」「链接找不到库」时，第一步永远是加 <code>-v</code></div>
+    </div>
+
+    <p>链接阶段是所有交叉编译问题的集中地，因为要同时解决三件事：</p>
+
+    <ol>
+      <li><b>符号解析</b>：<code>printf</code> 在哪个文件里？找不到就报 <code>undefined reference</code>。</li>
+      <li><b>地址重定位</b>：各段最终放在哪个虚拟地址，跳转指令要按最终地址改写。</li>
+      <li><b>指定入口与解释器</b>：可执行文件要告诉内核「从哪开始执行」，动态链接还要指定 <code>ld-linux</code> 路径。</li>
+    </ol>
+
+    <h3>4.1 ELF 文件里有什么</h3>
+
+    <table>
+      <thead><tr><th>段</th><th>内容</th><th>是否占文件空间</th></tr></thead>
+      <tbody>
+        <tr><td><code>.text</code></td><td>机器指令</td><td>是</td></tr>
+        <tr><td><code>.rodata</code></td><td>只读数据（字符串常量、const 表）</td><td>是</td></tr>
+        <tr><td><code>.data</code></td><td>已初始化的全局/静态变量</td><td>是</td></tr>
+        <tr><td><code>.bss</code></td><td>未初始化或初始为 0 的全局/静态变量</td><td><b>否</b>，只记大小，运行时清零</td></tr>
+        <tr><td><code>.symtab</code></td><td>符号表（调试与链接用）</td><td>是，可被 strip 删掉</td></tr>
+        <tr><td><code>.dynamic</code></td><td>动态链接信息（依赖库、GOT/PLT 位置）</td><td>是</td></tr>
+      </tbody>
+    </table>
+
+    <div class="tip">
+      <b>.bss 不占文件空间的原因</b>
+      一个 10MB 的全局数组如果初始化为 0，ELF 里只记录「需要 10MB 的零」，不真的存 10MB 个 0。加载时内核给一块清零的匿名页即可。这就是为什么 <code>int buf[1000000];</code> 不会让程序体积变大。
+    </div>
+
+    <h2 id="s5">5. 静态库与动态库</h2>
+
+    <table>
+      <thead><tr><th></th><th>静态库 .a</th><th>动态库 .so</th></tr></thead>
+      <tbody>
+        <tr><td>本质</td><td>多个 .o 打包（ar 归档）</td><td>独立的 ELF，运行时被加载</td></tr>
+        <tr><td>链接时机</td><td>编译期，代码直接复制进可执行文件</td><td>运行时，由动态链接器装载</td></tr>
+        <tr><td>体积</td><td>每个程序都带一份</td><td>多个程序共享一份</td></tr>
+        <tr><td>升级库</td><td>必须重新编译程序</td><td>换 .so 即可</td></tr>
+        <tr><td>启动速度</td><td>快（无装载与符号解析开销）</td><td>慢一点</td></tr>
+        <tr><td>嵌入式适用</td><td>推荐（依赖少、可控）</td><td>系统里多程序共用时才划算</td></tr>
+      </tbody>
+    </table>
+
+    <p>动态库为了「代码段共享、数据段独立」，需要两个表：</p>
+
+    <ul>
+      <li><b>GOT</b>（全局偏移表）：存外部符号的<b>地址</b>，代码通过它间接访问，这样代码段本身不用改。</li>
+      <li><b>PLT</b>（过程链接表）：函数调用的跳板，第一次调用时解析真实地址（懒绑定），之后直接跳。</li>
+    </ul>
+
+    <div class="calc">
+      <h5>算一笔：strip 能省多少</h5>
+      <div class="line">未 strip 的可执行文件含 .symtab 与调试信息，常见可占总体积的 30%–70%</div>
+      <div class="line">假设程序 2.0MB，strip 后 700KB，省下 65%</div>
+      <div class="line">代价：<code>gdb</code> 失去符号与行号，只能看地址</div>
+      <div class="line">正确做法：保留未 strip 的版本用于调试，strip 版本用于出厂</div>
+    </div>
+    <h2 id="s6">6. 常见坑与判断方法</h2>
+    <div class="viz" data-kind="flow" data-title=".c 到可执行：四步，每步都能单独看" data-sub="出错时先判断是哪一步" data-json='{"steps":[{"n":"① 预处理","d":"gcc -E：展开宏与 #include"},{"n":"② 编译","d":"gcc -S：生成 .s 汇编"},{"n":"③ 汇编","d":"as：变成 .o 机器码"},{"n":"④ 链接","d":"ld：合段、解析符号、定地址"}],"note":"undefined reference 是第④步；宏展开不对是第①步；内联汇编语法错在第②步。分层定位比通读日志快。"}'></div>
+
+
+    <table>
+      <thead><tr><th>现象</th><th>真正原因</th><th>怎么确认</th></tr></thead>
+      <tbody>
+        <tr><td><code>undefined reference to 'xxx'</code></td><td>链接时缺少对应的 .o 或库</td><td>按顺序检查 <code>-l</code> 与 <code>-L</code>；库之间有依赖时顺序很关键</td></tr>
+        <tr><td><code>xxx.h: No such file</code></td><td>sysroot 不对或 <code>-I</code> 指向了主机路径</td><td><code>-v</code> 看它真正搜索了哪些目录</td></tr>
+        <tr><td>运行时 <code>GLIBC_2.29 not found</code></td><td>工具链的 glibc 版本高于目标板上的</td><td><code>strings /lib/libc.so.6 | grep GLIBC_</code> 对比</td></tr>
+        <tr><td>编译通过，运行 <code>Illegal instruction</code></td><td>用了目标 CPU 不支持的指令（如 NEON、硬浮点指令但板子无 VFP）</td><td>看编译选项 <code>-march</code>、<code>-mfpu</code> 是否超出 SoC 能力</td></tr>
+        <tr><td>浮点结果离谱</td><td>软/硬浮点 ABI 混用</td><td><code>readelf -A</code> 看 Tag_ABI_VFP_args</td></tr>
+        <tr><td>程序在板子上「找不到文件」但路径没错</td><td>动态链接器路径不对（<code>/lib/ld-linux-armhf.so.3</code> 不存在）</td><td><code>readelf -l</code> 看 INTERP 段</td></tr>
+        <tr><td>静态链接后 DNS 不工作</td><td>glibc 的 NSS 需要动态加载模块</td><td>改用 musl，或改用动态链接</td></tr>
+      </tbody>
+    </table>
+
+    <div class="warn">
+      <b>最常见的根因只有一个</b>
+      <b>把头文件路径写成了主机的</b>（<code>/usr/include</code>、<code>/usr/local/include</code>）。一旦这样，编译器会拿 x86 环境里的头文件去生成 ARM 代码，类型宽度、结构体布局、宏定义全可能不对，编出来的程序行为诡异且极难查。交叉编译时 <code>-I</code> 只指向 sysroot 里的路径。
+    </div>
+
+    <h2 id="s7">7. 常见误解</h2>
+
+    <table>
+      <thead><tr><th>误解</th><th>真相</th></tr></thead>
+      <tbody>
+        <tr><td>「交叉编译就是换个 gcc」</td><td>还要配套 binutils、目标 libc、sysroot、调试器，一整套才完整。</td></tr>
+        <tr><td>「gnueabi 和 gnueabihf 差不多」</td><td>浮点参数传递方式不同，混用会让浮点值全错。</td></tr>
+        <tr><td>「编译就是一步」</td><td>预处理、编译、汇编、链接四步，每步都能单独跑。</td></tr>
+        <tr><td>「.bss 占文件体积」</td><td>只记录大小，运行时清零，不占文件空间。</td></tr>
+        <tr><td>「静态库更省内存」</td><td>静态库每个程序各带一份，多程序场景下动态库才省。</td></tr>
+        <tr><td>「strip 越狠越好」</td><td>strip 掉符号就没法源码级调试，必须保留未 strip 版本。</td></tr>
+        <tr><td>「-O2 一定比 -O0 好」</td><td>调试时 -O2 会打乱行号与变量，定位问题反而更难。</td></tr>
+        <tr><td>「工具链版本越新越好」</td><td>新版 glibc 编译出的程序在老板上可能直接跑不起来。</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s8">8. 自检：能答出来才算懂</h2>
+
+    <div class="q"><span class="n">1</span><p>为什么不在板子上直接编译？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>板子 CPU 弱、内存小，编译内核要数小时；工具链本身也占几十 MB，不划算。所以用 PC 交叉编译。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p><code>arm-linux-gnueabihf-gcc</code> 里 <code>hf</code> 代表什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>hard float：浮点参数通过 VFP 寄存器传递，而不是用整数寄存器 + 软件模拟。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>预处理、编译、汇编、链接各产出什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>展开后的 .i 文本 → 汇编 .s → 可重定位目标文件 .o → 可执行 ELF（或 .so/.a）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>sysroot 是什么，为什么必须有？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>目标机头文件与库的影子根目录。没有它，编译器会去主机路径找 x86 头文件，编出的 ARM 程序布局错误。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>.a 与 .so 在链接时机上有什么区别？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>.a 在编译期把代码复制进可执行文件；.so 在运行时由动态链接器加载，可被多程序共享。</p>
+    </div></details>
+
+    <div class="q"><span class="n">6</span><p>GOT 与 PLT 各解决什么问题？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>GOT 存外部符号地址，让代码段不必重写；PLT 是函数跳板，首次调用解析地址（懒绑定）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">7</span><p>为什么 <code>int buf[1000000];</code> 不增加文件体积？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>它在 .bss 段，ELF 只记录需要的大小，不存实际零字节，运行时由内核分配清零页。</p>
+    </div></details>
+
+    <div class="q"><span class="n">8</span><p>运行时报 <code>GLIBC_2.29 not found</code>，怎么查、怎么修？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>用 <code>strings /lib/libc.so.6 | grep GLIBC_</code> 看板上实际版本；改用与板上 glibc 匹配的工具链，或静态链接/换 musl。</p>
+    </div></details>
+
+    <h2 id="s9">9. 这一章要动手的命令</h2>
+
+    <div class="steps">
+      <ol>
+        <li><code>arm-linux-gnueabihf-gcc -v</code> —— 看工具链版本、target、配置与 sysroot。</li>
+        <li><code>arm-linux-gnueabihf-gcc -E hello.c -o hello.i</code> —— 亲眼看预处理展开的结果。</li>
+        <li><code>arm-linux-gnueabihf-gcc -S hello.c -o hello.s</code> —— 看生成的 ARM 汇编。</li>
+        <li><code>file hello</code> —— 确认产物是 <code>ELF 32-bit LSB executable, ARM</code> 而不是 x86。</li>
+        <li><code>readelf -h hello</code> 与 <code>readelf -l hello</code> —— 看入口地址、段表、INTERP。</li>
+        <li><code>nm hello | head</code> 与 <code>arm-linux-gnueabihf-objdump -d hello | head -40</code> —— 看符号与反汇编。</li>
+        <li><code>arm-linux-gnueabihf-strip hello -o hello_stripped; ls -l hello hello_stripped</code> —— 量 strip 前后的体积差。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>理论卷到此收尾</b>
+      十七章走完，从「一个字节怎么取指」到「一份 dtb 怎么让内核认识你的板子」，链条是完整的。接下来最好的巩固方式是回到实践卷，把每一章动手做一遍——<b>理论只有被硬件验证过，才算真的懂</b>。
+    </div>
+
+
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"从 .c 到能在板子上跑的 ELF：四步","steps":[{"t":"① 预处理","d":"展开 #include 与宏，处理条件编译，输出一个大 .i 文件。这一步最容易看出「宏写错了」。"},{"t":"② 编译","d":"把 C 翻成汇编，做优化、寄存器分配。编译器不懂硬件，它只按 ABI 办事。"},{"t":"③ 汇编","d":"把汇编翻成机器码，生成 .o。此时地址还是相对的，符号还没落地。"},{"t":"④ 链接","d":"把 .o 和库拼起来，分配地址、重定位符号，输出 ELF。动态链接的程序还留着 PLT 与 GOT。"}],"note":"交叉编译就是用 arm 版的编译器和库，在 x86 上生成 arm 的码。工具链不匹配的典型症状是 Illegal instruction 或找不到 ld-linux-armhf.so.3。"}'></div>
+  
+
+<nav class="pager">
+  <a href="course-ch07.html"><span>← 上一篇</span><b>交叉编译与工程构建</b></a>
+  <a class="nx" href="d02-01.html"><span>下一篇 →</span><b>ELF 与链接重定位：从符号表到 .rel.text</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

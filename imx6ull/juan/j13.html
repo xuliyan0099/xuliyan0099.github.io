@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>卷 13 · 拔高 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<style>
+main.doc table{width:100%;border-collapse:collapse;margin:14px 0 8px;font-size:14px}
+main.doc th,main.doc td{border-bottom:1px solid rgba(110,168,254,.14);padding:9px 10px;text-align:left;vertical-align:top}
+main.doc th{color:#93a9cf;font-weight:600;font-size:13px;background:rgba(12,18,30,.5)}
+main.doc td.sn{white-space:nowrap;font-variant-numeric:tabular-nums;width:56px}
+main.doc td.nm{color:#eafdff}
+main.doc td.kk{color:#93a4c4;font-size:13px;white-space:nowrap}
+main.doc tbody tr:hover{background:rgba(110,168,254,.05)}
+main.doc ul.acc{margin:10px 0 20px;padding-left:22px;color:#c8d6ec}
+main.doc ul.acc li{margin:0 0 8px}
+@media(max-width:900px){main.doc td.kk{display:none}}
+</style>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="index.html">☰ 十四卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+<div class="vol-h">卷 13 · 拔高</div>
+<ol>
+<li><a href="../course/44.html" class="active">
+  <span class="no">01</span><span>总复盘<span class="sub">核心篇</span></span></a></li>
+<li><a href="../docs/d13-01.html">
+  <span class="no">02</span><span>AArch64 / RISC-V / x86：三套体系横向对照<span class="sub">深读 · 待补动手</span></span></a></li>
+<li><a href="../docs/d13-02.html">
+  <span class="no">03</span><span>xv6 或自制一个最小 OS：把操作系统造一遍<span class="sub">深读 · 待补动手</span></span></a></li>
+<li><a href="../docs/d13-03.html">
+  <span class="no">04</span><span>虚拟化与 KVM：ARM 上的 EL2 与 stage-2 页表<span class="sub">深读 · 待补动手</span></span></a></li>
+</ol>
+<div class="vol-nav"><a href="index.html">☰ 总览</a><a href="../index.html">路口页 →</a></div>
+  </aside>
+  <main class="doc">
+
+    <div class="doc-kicker"><span>卷 13 / 13</span><span>·</span><span>4 篇</span><span>·</span><span>读 1h + 做 20h</span></div>
+    <h1>卷 13 · 拔高</h1>
+    <p class="lede">i.MX6ULL 是 32 位 ARMv7 单核，它的天花板就在这。这一卷负责跨出去。</p>
+    <div class="doc-chips"><span class="hot">4 篇</span><span>难度 ●</span><span>读 1h</span><span>做 20h</span></div>
+
+    <h2>这一卷要回答的问题</h2>
+    <ul class="qa">
+<li>AArch64 的四级页表与 EL0–EL3 和 ARMv7 差在哪</li>
+<li>xv6 为什么是理解操作系统最快的路</li>
+<li>KVM 在 ARM 上靠什么硬件支持</li>
+    </ul>
+
+    <h2>篇目（4 篇）</h2>
+    <p>左栏和这张表是同一套链接，点哪个都行。「深读 · 带互动组件」的篇里嵌了能点能拖的组件。</p>
+    <table>
+      <thead><tr><th>序</th><th>标题</th><th>类型</th></tr></thead>
+      <tbody>
+<tr>
+  <td class="sn">01</td>
+  <td class="nm"><a href="../course/44.html">总复盘</a></td>
+  <td class="kk">核心篇</td>
+</tr>
+<tr>
+  <td class="sn">02</td>
+  <td class="nm"><a href="../docs/d13-01.html">AArch64 / RISC-V / x86：三套体系横向对照</a></td>
+  <td class="kk">深读 · 待补动手</td>
+</tr>
+<tr>
+  <td class="sn">03</td>
+  <td class="nm"><a href="../docs/d13-02.html">xv6 或自制一个最小 OS：把操作系统造一遍</a></td>
+  <td class="kk">深读 · 待补动手</td>
+</tr>
+<tr>
+  <td class="sn">04</td>
+  <td class="nm"><a href="../docs/d13-03.html">虚拟化与 KVM：ARM 上的 EL2 与 stage-2 页表</a></td>
+  <td class="kk">深读 · 待补动手</td>
+</tr>
+      </tbody>
+    </table>
+
+    <h2>读完这一卷要能做到</h2>
+    <ul class="acc">
+<li>说清 ARMv7 与 AArch64 在异常等级、页表、寄存器上的三处关键差异</li>
+<li>能把 xv6 的启动路径与 i.MX6ULL 启动链一一对应</li>
+    </ul>
+
+    <nav class="pager">
+      <a href="j12.html"><span>上一卷</span><b>卷 12 · 产品化</b></a>
+      <a class="nx" href="../index.html"><span>结束</span><b>回路口页 →</b></a>
+    </nav>
+    <div class="doc-foot">卷 13 · 4 篇 · 侧栏是本卷全部篇目 · 本页由 build-hub.js 生成</div>
+  </main>
+</div>
+<script src="../assets/anime.iife.min.js"></script>
+<script src="../assets/viz.js"></script>
+<script src="../assets/iviz.js"></script>
+<script src="../assets/anim2.js"></script>
+<script src="../assets/anim.js"></script>
+<script src="../assets/cpu3.js"></script>
+<script src="../assets/ikit.js"></script>
+</body></html>

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第 01 章 · 电的四个字：电压、电流、电阻、功率 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/doc-compat.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+<link rel="stylesheet" href="../../assets/asm.css">
+</head><body style="--acc:#ffb545">
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="index.html">☰ 硬件基础目录</a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">硬件是怎么工作的 · 9 篇</div>
+    <ol>
+      <li><a href="index.html"><span class="no">⌂</span><span>路口目录<span class="sub">篇目总览与读法</span></span></a></li>
+      <li><a href="b0.html"><span class="no">00</span><span>先修：怎么学才算学会<span class="sub">三条判断标准，和一条错的路径</span></span></a></li>
+      <li><a href="b1.html" class="active"><span class="no">01</span><span>电的四个字：电压、电流、电阻、功率<span class="sub">欧姆定律、串并联、LED 限流实算</span></span></a></li>
+      <li><a href="b2.html"><span class="no">02</span><span>无源五件套：电阻、电容、电感、二极管、晶振<span class="sub">每个元件都在解决一个具体问题</span></span></a></li>
+      <li><a href="b3.html"><span class="no">03</span><span>有源器件：三极管与 MOS 管<span class="sub">为什么一个「开关」需要三个脚</span></span></a></li>
+      <li><a href="b4.html"><span class="no">04</span><span>数字电路的骨架：电平、门、组合、时序<span class="sub">五种门、真值表、加法器、触发器</span></span></a></li>
+      <li><a href="b5.html"><span class="no">05</span><span>时间：时钟、建立保持、抖动、消抖<span class="sub">为什么电路需要「等一会儿」</span></span></a></li>
+      <li><a href="b6.html"><span class="no">06</span><span>总线到底是什么<span class="sub">地址、数据、控制，与片选、时序</span></span></a></li>
+      <li><a href="b7.html"><span class="no">07</span><span>回到这块板子：元件对号入座<span class="sub">电源树、晶振、DDR、eMMC、按键、LED</span></span></a></li>
+      <li><a href="b8.html"><span class="no">08</span><span>工具与六个实验<span class="sub">万用表、示波器、逻辑分析仪怎么用</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="../index.html">硬件入口</a><a href="../../juan/index.html">十四卷总览</a></div>
+  </aside>
+  <main class="doc">
+    <div class="doc-kicker">硬件基础课 · 从一颗电阻开始 <span>·</span> 第 01 章</div>
+    <div class="ch-head">
+      <h1>电的四个字：电压、电流、电阻、功率</h1>
+      <div class="ch-meta"><span class="hot">第 01 章</span><span>约 24 分钟</span><span>★ 必读</span><span>含互动工具</span></div>
+    </div>
+<h2 id="s1">四个字，四句话</h2>
+<table class="regtbl"><thead><tr><th>量</th><th>符号</th><th>一句话</th><th>单位</th></tr></thead><tbody><tr><td class="nm">电压</td><td>U</td><td>两点之间的「电势差」，推动电荷的力量</td><td>V</td></tr><tr><td class="nm">电流</td><td>I</td><td>单位时间流过多少电荷</td><td>A</td></tr><tr><td class="nm">电阻</td><td>R</td><td>对电流的阻碍</td><td>Ω</td></tr><tr><td class="nm">功率</td><td>P</td><td>单位时间消耗的能量（多半变成热）</td><td>W</td></tr></tbody></table>
+<p>四者的关系只有一个公式（欧姆定律）：</p>
+<div class="fm">U = I × R</div>
+<p>以及功率的三种写法：</p>
+<div class="fm">P = U × I = I<sup>2</sup>R = U<sup>2</sup> / R</div>
+<p><b>这五个等式是所有硬件计算的全部基础。</b> 后面每一章都会回到它们。</p>
+<h2 id="s2">电压是「相对的」</h2>
+<p>电压永远说「两点之间」。你量到的 3.3V，是「这一点相对 GND 是 3.3V」。所以：</p>
+<ul>
+<li><b>GND 不是「零电位」，是「大家约定的参考点」</b>。</li>
+<li>一块板子上所有 GND 必须连通（否则两边的「3.3V」互相没有意义）。</li>
+<li>「这个脚是 3.3V 电平」意思是「它相对 GND 是 3.3V」，不是绝对电位。</li>
+</ul>
+<p>这就是为什么接错地线会「什么都读不对」——参考点错了。</p>
+<h2 id="s3">串联与并联：两个必记结论</h2>
+<p><b>串联</b>（电流只有一条路）：</p>
+<div class="fm">R<sub>总</sub> = R<sub>1</sub> + R<sub>2</sub> + ⋯　　电流处处相等，电压按电阻比例分。</div>
+<p><b>并联</b>（电压相同，电流分流）：</p>
+<div class="fm">1 / R<sub>总</sub> = 1 / R<sub>1</sub> + 1 / R<sub>2</sub> + ⋯　　两个电阻时 R<sub>总</sub> = R<sub>1</sub>R<sub>2</sub> / (R<sub>1</sub> + R<sub>2</sub>)</div>
+<p>一个常用直觉：<b>并联永远小于其中最小的那个</b>。两个 10k 并联 = 5k。</p>
+<h2 id="s4">为什么 LED 必须串电阻</h2>
+<p>LED 的正向特性不是电阻性的：它的伏安曲线很陡——<b>电压略微超过正向压降（Vf），电流就急剧上升</b>。</p>
+<p>假设一颗红色 LED 的 Vf ≈ 2.0V（具体看器件手册），接在 3.3V 上：</p>
+<ul>
+<li>不串电阻：LED 自己会把「多余的 1.3V」压在极小的内阻上，电流可能到几百 mA，瞬间烧掉。</li>
+<li>串一个 330Ω：电流 = (3.3 − 2.0)/330 ≈ 3.9 mA，安全且亮度够。</li>
+</ul>
+<p>这就是「限流电阻」的全部含义：<b>不是限制 LED，是限制电流</b>。</p>
+<h2 id="s5">实算：三种常见接法</h2>
+<p><b>接法 A：3.3V → 电阻 → LED → GND（高电平点亮）</b></p>
+<div class="fm">R = (3.3 − 2.0) / 0.005 = 260 Ω　　取 E24 就近 270Ω，实际电流 4.8mA。</div>
+<p><b>接法 B：LED 阳极接 3.3V，阴极 → 电阻 → GPIO（低电平点亮）</b></p>
+<p>同样的电流，但<b>逻辑反了</b>：GPIO 输出 0 才亮。软件里要写成「active low」，否则你会以为「灯常亮是坏了」。</p>
+<p><b>接法 C：多颗 LED 并联共用一颗电阻</b></p>
+<p>看起来省事，实际是错的：每颗 LED 的 Vf 有离散性，Vf 最低的那颗会先导通、抢走大部分电流，亮度不均甚至烧掉。<b>每颗 LED 一颗电阻。</b></p>
+<h2 id="s6">用工具算一遍</h2>
+<div class="tool">
+  <h4>LED 限流计算器 · 改电压与电流，看电阻与功耗</h4>
+  <div class="sim-row">
+    <input id="ledV" type="text" value="3.3">
+    <input id="ledVf" type="text" value="2.0">
+    <input id="ledI" type="text" value="5">
+    <button class="tbtn" id="ledGo">计算</button>
+  </div>
+  <div class="out" id="ledOut"></div>
+</div>
+<p>三个输入分别是：电源电压（V）、LED 正向压降（V）、目标电流（mA）。输出会给你理想电阻、E24 就近值、电阻功耗，以及「亮度/安全」判定。</p>
+<p>试三组，把结论记住：</p>
+<ul>
+<li>3.3V / 2.0V / 5mA → 约 260Ω，正常指示。</li>
+<li>3.3V / 2.0V / 20mA → 约 65Ω，功耗还是很小，但已接近常规指示 LED 的上限。</li>
+<li>5V / 3.2V（蓝光）/ 10mA → 约 180Ω，注意蓝光 Vf 明显更高。</li>
+</ul>
+<h2 id="s7">功率的直觉：什么时候要担心「热」</h2>
+<p>电阻是有功率上限的（常见 1/16W、1/8W、1/4W、1/2W、1W）。判断很简单：</p>
+<div class="fm">P = I<sup>2</sup>R</div>
+<ul>
+<li>LED 限流电阻：几 mA × 几百 Ω → 毫瓦级，1/4W 绰绰有余。</li>
+<li>但如果是「用电阻分压给某模块供电」，电流一大，电阻就发热，效率还极低——<b>这时候该用稳压器，不是电阻。</b></li>
+</ul>
+<p>一条经验：<b>功率余量取 2 倍以上</b>。算出来 0.2W 就用 1/2W，不要用 1/4W 贴着极限。</p>
+<h2 id="s8">本篇验收</h2>
+<ul>
+<li>能默写欧姆定律与功率三式。</li>
+<li>能解释「电压是两点之间」的含义，以及为什么地线必须共。</li>
+<li>能算 3.3V 接一颗 2.0V LED、想要 5mA 时的电阻，并选出 E24 值。</li>
+<li>能说出「多颗 LED 共用一个电阻」错在哪。</li>
+<li>能判断「电阻分压供电」为什么不可靠。</li>
+</ul>
+<h2 id="s9">下一篇</h2>
+<p>四个字会用了，看元件。02 篇讲无源五件套：电阻、电容、电感、二极管、晶振——每一个都在解决一个具体的物理问题，没有一个是「习惯性加上去的」。</p>
+<div class="pager">
+      <a href="b0.html"><span>上一篇</span><b>← 00 先修：怎么学才算学会</b></a>
+      <a href="index.html"><span>目录</span><b>篇目总览</b></a>
+      <a class="nx" href="b2.html"><span>下一篇</span><b>02 无源五件套：电阻、电容、电感、二极管、晶振 →</b></a>
+    </div>
+  </main>
+</div>
+<script src="../../assets/hw-tools.js"></script>
+</body>
+</html>

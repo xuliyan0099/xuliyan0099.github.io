@@ -1,0 +1,174 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>综合实战项目 · 卷 12 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j12.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 12 · 产品化</div>
+<ol><li><a href="course-ch14.html" class="active">
+  <span class="no">01</span><span>综合实战项目<span class="sub">约 16 小时 · 当前</span></span></a></li>
+<li><a href="d12-01.html">
+  <span class="no">02</span><span>Buildroot 到 Yocto：定制镜像、裁剪包、产出固件<span class="sub">约 6 小时</span></span></a></li>
+<li><a href="d12-02.html">
+  <span class="no">03</span><span>分区与双 Bank OTA：A/B 切换、回滚与校验<span class="sub">约 6 小时</span></span></a></li>
+<li><a href="d12-03.html">
+  <span class="no">04</span><span>HAB 安全启动：签名、验签、失败现象<span class="sub">◆ · 约 4 小时</span></span></a></li>
+<li><a href="d12-04.html">
+  <span class="no">05</span><span>看门狗、电源管理与长时间稳定性测试<span class="sub">◆ · 约 4 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j11.html">← 卷 11</a>
+  <a href="../juan/j13.html">卷 13 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 12<span>·</span>产品化<span>·</span>第 01 篇</div>
+  <h1>综合实战项目</h1>
+  <p class="lede">前面 13 章的知识点，在这一章被拧成一个能演示的东西。目标不是做出多高级的产品，而是证明你能独立闭环：从改设备树到应用跑起来。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 16 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+    <div class="viz" data-kind="flow" data-title="综合项目的七个里程碑" data-sub="每一关都有明确的验收动作" data-json='{"play":true,"steps":[{"n":"① 系统能启动","d":"串口出到 shell"},{"n":"② 网络通","d":"ping 得通、SSH 能进"},{"n":"③ 自研程序运行","d":"交叉编译的 ARM 程序跑起来"},{"n":"④ 驱动控制硬件","d":"insmod 后点亮 LED"},{"n":"⑤ 设备树匹配","d":"改 dts 改引脚，不改代码"},{"n":"⑥ 系统可裁剪","d":"内核从 8MB 降到 3MB 仍能跑"},{"n":"⑦ 有验收脚本","d":"一条命令跑完全套自检"}],"note":"七关不是七个作业，是一条链：任何一环断了，后面的都做不下去。这也是面试时最常问的「你独立做过一套系统吗」的实际含义。"}'></div>
+
+
+    <div class="card">
+      <h4>项目：一块能自检、能上报的板子</h4>
+      <p>板子上电后自动启动自己的服务，LED 按心跳闪烁；按键按下时记录事件并改变 LED 状态；程序把运行日志写进文件；网络通则定时把状态发到 PC，网络断则本地缓存。</p>
+    </div>
+
+    <div class="anim2" data-json='{"title":"从空板到能跑的系统：六步闭环","hint":"验收标准是能重来一遍","nodes":[{"k":"硬件核对","s":"对着原理图"},{"k":"U-Boot","s":"能停能读"},{"k":"dts","s":"按板子改"},{"k":"内核","s":"滚到挂 rootfs"},{"k":"rootfs","s":"nfs → eMMC"},{"k":"加驱动","s":"闭环完成"}],"frames":[{"i":0,"d":"先量电源、时钟、复位、串口，硬件不对软件白忙。"},{"i":1,"d":"烧一个能用的 U-Boot，串口能停、能 printenv、能从存储读文件。"},{"i":2,"d":"按板子改 dts：内存大小、串口引脚、存储控制器、网口 PHY。"},{"i":3,"d":"tftp 拉 zImage 与 dtb，bootm 引导，看内核日志滚到挂 rootfs。"},{"i":4,"d":"rootfs 先用 nfs 快速迭代，定型后换成 eMMC 上的 ext4。"},{"i":5,"d":"写一个字符设备，读写能通、重启自动加载——整条链闭环。"}],"kind":"flow"}'></div>
+
+    <h2 id="s1">14.1 需求拆成技术点</h2>
+
+    <table>
+      <thead><tr><th>功能</th><th>技术点</th><th>对应章节</th></tr></thead>
+      <tbody>
+        <tr><td>LED 可控</td><td>设备树 pinctrl + gpio-leds 或自写驱动</td><td>10 / 12</td></tr>
+        <tr><td>按键检测</td><td>GPIO 输入 + 中断（或轮询）</td><td>12</td></tr>
+        <tr><td>字符设备节点</td><td>cdev + class_create + /dev 节点</td><td>12</td></tr>
+        <tr><td>应用程序</td><td>open/read/write/ioctl + 定时器</td><td>07 / 12</td></tr>
+        <tr><td>开机自启</td><td>systemd unit 或 /etc/init.d 脚本</td><td>04 / 11</td></tr>
+        <tr><td>日志</td><td>写文件 + 按大小轮转</td><td>05 / 13</td></tr>
+        <tr><td>网络上报</td><td>TCP 客户端 / UDP 发送</td><td>06</td></tr>
+        <tr><td>调试</td><td>NFS 根文件系统 + gdbserver</td><td>06 / 11 / 13</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s2">14.2 八个步骤，按顺序做</h2>
+
+    <ol class="steps">
+      <li><strong>画硬件连接图</strong>：哪个 GPIO 接 LED、哪个接按键、有效电平是什么。翻原理图，别猜。把引脚号、bank、offset 写在纸上。</li>
+      <li><strong>先不写驱动，用 sysfs 验证硬件</strong>：如果内核已有 gpio-leds 节点，直接 <code>echo 1 &gt; /sys/class/leds/xxx/brightness</code>。灯亮 = 硬件和引脚配置都对，这一步排除了 50% 的变量。</li>
+      <li><strong>改设备树</strong>：加 pinctrl 组、加自己的节点、<code>compatible</code> 取一个独一无二的名字。编 dtbs，启动确认 <code>/proc/device-tree</code> 里能看到你的节点。</li>
+      <li><strong>写驱动</strong>：platform_driver + probe，先只打印一行 <code>dev_info(&amp;pdev-&gt;dev, "probed\n")</code>，确认能匹配上，再往里加 GPIO 和字符设备。</li>
+      <li><strong>写应用</strong>：先跑通 open → write → LED 变化，再加按键读取和心跳逻辑。<b>每加一个功能就测一次</b>，别一次写完再调。</li>
+      <li><strong>做开机自启</strong>：systemd unit 指向你的应用，<code>enable --now</code>，重启验证。日志用 <code>journalctl -u</code> 看。</li>
+      <li><strong>加网络上报</strong>：PC 上开一个 TCP 服务端（或用 <code>nc -l</code>），板子上定时发一行状态。断网时缓存到本地文件，恢复后补发。</li>
+      <li><strong>做一次全流程复现</strong>：清空环境，从烧写开始，不看教程，把整套重新做一遍。做不出来的地方，就是你没真掌握的地方。</li>
+    </ol>
+
+    <h2 id="s3">14.3 每一环的验证方法</h2>
+    <div class="viz" data-kind="timeline" data-title="综合项目：八步走到「能演示」" data-sub="每一步都有可验收的产物" data-json='{"items":[{"t":"1","n":"需求拆点","d":"列出要用的外设与接口","c":"cy"},{"t":"2","n":"硬件确认","d":"引脚、地址、供电","c":"vi"},{"t":"3","n":"最小系统","d":"能启动、能登录","c":"or"},{"t":"4","n":"驱动","d":"设备树 + 字符设备","c":"gr"},{"t":"5","n":"应用","d":"把驱动包装成服务","c":"cy"}],"note":"完整八步见正文；原则是「每步单独可验证」，别把驱动和应用一起调。"}'></div>
+
+
+    <table>
+      <thead><tr><th>阶段</th><th>怎么算通过</th></tr></thead>
+      <tbody>
+        <tr><td>设备树</td><td><code>cat /proc/device-tree/你的节点/compatible</code> 能看到字符串</td></tr>
+        <tr><td>驱动匹配</td><td><code>dmesg</code> 里有 probe 打印；<code>/sys/bus/platform/drivers/名字/</code> 下有设备</td></tr>
+        <tr><td>设备节点</td><td><code>ls -l /dev/yourdev</code> 出现 c 开头的节点</td></tr>
+        <tr><td>GPIO 输出</td><td>LED 实际亮灭，或万用表量到电平翻转</td></tr>
+        <tr><td>按键输入</td><td><code>cat /dev/yourdev</code> 能看到键值；<code>/proc/interrupts</code> 计数增长</td></tr>
+        <tr><td>开机自启</td><td>断电重启后不登录也能跑；<code>systemctl status</code> 是 active</td></tr>
+        <tr><td>网络上报</td><td>PC 端能收到；拔网线后本地日志继续增长</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s4">14.4 最容易翻车的五个点</h2>
+
+    <div class="grid two">
+      <div class="card"><h4>引脚被占用</h4><p>设备树里原生 gpio-leds 已经用了同一个脚，你的 <code>gpio_request</code> 必然失败。先 disable 原生节点。</p></div>
+      <div class="card"><h4>compatible 写错</h4><p>大小写、厂商前缀、逗号，差一个字符就不匹配，且没有任何报错。</p></div>
+      <div class="card"><h4>pinctrl 没配</h4><p>寄存器写了，但引脚还复用成别的功能，电平根本不出去。</p></div>
+      <div class="card"><h4>开机时序</h4><p>服务在网络起来之前启动，连不上对端。unit 里加 <code>After=network-online.target</code> 并重试。</p></div>
+      <div class="card"><h4>日志写满存储</h4><p>eMMC 只有几 GB，日志无轮转会写死系统。按大小或按天轮转。</p></div>
+      <div class="card"><h4>只看软件不看电</h4><p>怀疑代码之前，先用万用表量引脚。<b>硬件问题代码永远修不好。</b></p></div>
+    </div>
+
+    <h2 id="s5">14.5 交付物清单</h2>
+    <ul class="checklist">
+      <li>一份 dts 修改前后对比（哪几行加了什么）</li>
+      <li>驱动源码 + Makefile，能一条 <code>make</code> 编出来</li>
+      <li>应用源码 + Makefile，交叉编译产物能在板子上跑</li>
+      <li>systemd unit 文件或启动脚本</li>
+      <li>一份可复现的操作笔记：从烧写到验证的命令序列</li>
+      <li>一份踩坑记录：每个问题、报错原文、最终解法</li>
+    </ul>
+
+    <h2 id="s6">14.6 做完之后往哪走</h2>
+    <div class="viz" data-kind="compare" data-title="最容易翻车的五个点" data-sub="都是「看起来没问题」的地方" data-json='{"bad":{"t":"坑","items":["引脚复用没配对，寄存器写了没反应","设备树改了但没重编 dtb","驱动里用了 sleep 在中断上下文","内核与模块版本不匹配，insmod 报错","NFS 根文件系统路径写错，卡在 VFS"]},"good":{"t":"规避","items":["先 iomuxc 再 gpio，写完 reg 立刻读回","改 dts 后 make dtbs 并确认时间戳","中断里只用 spinlock，慢活丢工作队列","用同一棵树编内核与模块","bootargs 里 root=/dev/nfs 后跟 nfsroot=IP:path"]},"note":"这五条占了现场问题的一大半，做完一项就打勾，别凭记忆。"}'></div>
+
+
+    <p>这套东西做完，你已经具备了「能独立开发一个嵌入式 Linux 小项目」的完整能力。往下走有三个方向，选一个深入，别同时开三条线：</p>
+
+    <table>
+      <thead><tr><th>方向</th><th>下一步学什么</th></tr></thead>
+      <tbody>
+        <tr><td>驱动深入</td><td>中断与并发（自旋锁/互斥量）、I2C/SPI 子系统、input 子系统、DMA、电源管理</td></tr>
+        <tr><td>系统深入</td><td>内核启动流程源码、内存管理、设备模型（bus/device/driver）、Yocto/Buildroot 定制、OTA 升级</td></tr>
+        <tr><td>应用与产品</td><td>网络编程与协议、Qt/LVGL 界面、多线程、看门狗、可靠性设计、量产测试</td></tr>
+      </tbody>
+    </table>
+
+    <div class="key">
+      <b>最后一条建议</b>
+      不要等「学完」再动手做东西。<b>你现在就可以拿一块板子，从点亮一个 LED 开始，一路上把每次卡住的地方记下来。</b>那些卡点，才是你真正学到的东西；顺利跑通的部分，只是验证了教程没写错。
+    </div>
+
+    <footer id="pager"></footer>
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"综合实战：从空板到能跑的系统","steps":[{"t":"① 硬件核对","d":"对着原理图确认电源、时钟、DDR、串口、存储。硬件不对，软件白忙。"},{"t":"② 跑通 U-Boot","d":"烧一个能用的 U-Boot，串口能停、能 printenv、能从存储读文件。"},{"t":"③ 配设备树","d":"按板子改 dts：内存大小、串口引脚、存储控制器、网口 PHY。"},{"t":"④ 起内核","d":"tftp 拉 zImage 与 dtb，bootm 引导，看到内核日志滚到挂 rootfs。"},{"t":"⑤ 起 rootfs","d":"nfs 先行，再换成 eMMC 上的 ext4。init 起来后能登录。"},{"t":"⑥ 加一个驱动","d":"写一个字符设备，读写能通，重启后自动加载。至此闭环完成。"}],"note":"验收标准不是「能开机」，而是「改一行代码能重跑、坏了能定位、重来一遍不用查笔记」。"}'></div>
+  
+
+<nav class="pager">
+  <a href="d11-03.html"><span>← 上一篇</span><b>ftrace / perf / eBPF：内核里的可观测四件套</b></a>
+  <a class="nx" href="d12-01.html"><span>下一篇 →</span><b>Buildroot 到 Yocto：定制镜像、裁剪包、产出固件</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

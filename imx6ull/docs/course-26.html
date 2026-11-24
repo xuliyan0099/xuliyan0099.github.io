@@ -1,0 +1,208 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>缺页与换页 · 卷 03 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j03.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 03 · 存储与地址</div>
+<ol><li><a href="course-20.html">
+  <span class="no">01</span><span>存储层次<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-21.html">
+  <span class="no">02</span><span>Cache 三参数<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-22.html">
+  <span class="no">03</span><span>内存墙与局部性<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-23.html">
+  <span class="no">04</span><span>用 perf 量化<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="course-24.html">
+  <span class="no">05</span><span>虚拟地址是什么<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-25.html">
+  <span class="no">06</span><span>页表与 MMU<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-26.html" class="active">
+  <span class="no">07</span><span>缺页与换页<span class="sub">约 1 小时 · 当前</span></span></a></li>
+<li><a href="course-th03.html">
+  <span class="no">08</span><span>虚拟内存与地址翻译（详解）<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="course-th14.html">
+  <span class="no">09</span><span>内存管理进阶：分页、回收与 OOM<span class="sub">◆ · 约 5 小时</span></span></a></li>
+<li><a href="viz-mmu.html">
+  <span class="no">10</span><span>互动台：MMU 页表翻译<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="viz-cache.html">
+  <span class="no">11</span><span>互动台：Cache 层次与命中<span class="sub">💻 · 约 1 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j02.html">← 卷 02</a>
+  <a href="../juan/j04.html">卷 04 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 03<span>·</span>存储与地址<span>·</span>第 07 篇</div>
+  <h1>缺页与换页</h1>
+  <p class="lede">你 malloc 了 100MB，程序立刻返回，物理内存却只多了一点。真相是：malloc 只给了一段虚拟地址，物理页要等第一次访问才分配。这个「等」由一个异常完成——缺页异常。它同时是 SIGSEGV 的来源，也是 fork 能廉价的原因。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+
+    <div class="anim2" data-json='{"title":"缺页与换页：物理内存是「按需」给的","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"访问虚拟地址"},{"k":"触发缺页异常"},{"k":"查 VMA"},{"k":"合法 → 补页"},{"k":"非法 → SIGSEGV"}],"frames":[{"i":0,"d":"MMU 查页表，有效位=0"},{"i":1,"d":"陷入内核，保存现场"},{"i":2,"d":"这个地址属于哪段区域？权限够吗？"},{"i":3,"d":"分配物理页、清零、填 PTE、返回重试"},{"i":4,"d":"不发页，向进程投递信号"}]}'></div>
+
+    <div class="viz" data-kind="flow" data-title="缺页异常的处理流程" data-sub="同一个异常，两种结局：补页或杀进程" data-json='{"steps":[{"n":"访问虚拟地址","d":"MMU 查页表，有效位=0"},{"n":"触发缺页异常","d":"陷入内核，保存现场"},{"n":"查 VMA","d":"这个地址属于哪段区域？权限够吗？"},{"n":"合法 → 补页","d":"分配物理页、清零、填 PTE、返回重试"},{"n":"非法 → SIGSEGV","d":"不发页，向进程投递信号"}],"note":"关键洞察：硬件只报「这个地址翻译不了」，是否「合法」的判断完全在软件（内核的 fault handler）里。所以 SIGSEGV 不是硬件给的，是内核判的。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① malloc 为什么立刻返回？② 缺页异常怎么区分「补页」与「SIGSEGV」？③ 写时复制（COW）怎么省内存？④ minor fault 与 major fault 差别？⑤ 没有 swap 的板子内存不够会怎样？</p>
+    </div>
+
+    <h2 id="s1">1. malloc 的真相</h2>
+
+    <pre><code>char *p = malloc(100 * 1024 * 1024);   // 立刻返回，不占物理内存
+// 此时 p 指向一段虚拟地址，页表项全部「无效」
+// 内核只在 VMA 里记了一笔「这 100MB 是堆，可读写」
+
+p[0] = 1;      // 第一次写 → 缺页 → 分配 1 页（4KB）
+// 之后每跨过 4KB 边界写一次，才再多分配一页
+
+// 所以「malloc 成功但 OOM」是很常见的现象：
+// 分配时没花钱，真正花钱是在访问时</code></pre>
+
+    <p>Linux 默认开启 overcommit，所以 <code>malloc</code> 几乎不会失败；<b>OOM 发生在访问阶段</b>，由内核的 OOM killer 选一个进程杀掉。这就是「为什么程序跑着跑着被 killed」的常见原因。</p>
+
+    <h2 id="s2">2. 判断合法与非法的依据：VMA</h2>
+
+    <p>内核为每个进程维护一张 VMA（虚拟内存区域）表，就是 <code>/proc/&lt;pid&gt;/maps</code> 的内容。缺页时它做三件事：</p>
+
+    <ol>
+      <li>地址落在某个 VMA 里吗？不在 → SIGSEGV。</li>
+      <li>访问类型与 VMA 权限匹配吗？（写一个 r-- 的段）→ SIGSEGV。</li>
+      <li>都在 → 分配页、填 PTE、返回重试。</li>
+    </ol>
+
+    <div class="viz" data-kind="compare" data-title="三种「访问失败」，三种不同原因" data-sub="现象一样（进程崩），机制完全不同" data-json='{"bad":{"t":"非法（真 bug）","items":["地址不在任何 VMA 里（野指针）","写入只读段（.rodata / .text）","栈溢出越界（落到 guard 页）"]},"good":{"t":"合法但未就绪（内核正常工作）","items":["malloc 后首次访问（demand paging）","fork 后写入（COW 复制单页）","mmap 文件后首次读（从存储读入）"]},"note":"同一个 SIGSEGV，背后可能是「补页成功所以没信号」或「真非法所以有信号」。所以看崩溃不能只看信号名，要结合地址与 maps 判断。"}'></div>
+
+    <h2 id="s3">3. 写时复制：fork 为什么这么快</h2>
+
+    <p>fork 要复制整个地址空间？如果真复制，一个 100MB 的进程 fork 一次要拷 100MB。实际做法是：</p>
+
+    <ul>
+      <li>子进程的页表<b>指向同一批物理页</b>，但全部标成「只读」。</li>
+      <li>任何一方写入 → 触发「写保护」缺页 → 内核此时才复制那一页，并各自改成可写。</li>
+    </ul>
+
+    <p>于是 fork 的代价是「复制页表」，与内存大小近似无关。<b>这也是 exec 前的 fork 几乎不花钱的原因——exec 会立刻把地址空间整个换掉，那些 COW 页从来没被复制过。</b></p>
+
+    <h2 id="s4">4. minor 与 major fault</h2>
+
+    <div class="viz" data-kind="bars" data-title="两类缺页的代价（示意）" data-sub="major fault 要读磁盘，是 minor 的几百到几千倍" data-json='{"items":[{"n":"minor（仅分配物理页）","v":1,"c":"cy"},{"n":"major（从 eMMC 读入）","v":500,"c":"or"},{"n":"major（从 SD 卡读入）","v":3000,"c":"rd"}],"unit":"相对代价","max":3000,"note":"所以「程序启动慢」常常是 major fault 密集：加载可执行文件、读配置文件、初始化数据库，全是磁盘 IO。预读（readahead）与 mmap 都在缓解它。"}'></div>
+
+    <pre><code># 观察两类缺页
+/usr/bin/time -v ./prog        # 输出里有 minor/major page faults
+perf stat -e page-faults,minor-faults,major-faults ./prog
+cat /proc/<pid>/stat | awk '{print "minflt="$10, "majflt="$12}'</code></pre>
+
+    <p>一个健康的长期运行程序，启动时 major fault 多、之后应该几乎为 0。如果持续有 major fault，说明它在不断「换入换出」或反复读文件——这就是性能问题的信号。</p>
+
+    <h2 id="s5">5. 没有 swap 的嵌入式</h2>
+
+    <p>板子上通常不配 swap（Flash 写寿命有限、SD 卡太慢）。所以内存压力只能靠：</p>
+
+    <ul>
+      <li><b>回收页缓存</b>：丢弃可再生的文件缓存（<code>drop_caches</code>）。</li>
+      <li><b>压缩内存</b>：zram（用 CPU 换内存）。</li>
+      <li><b>杀掉进程</b>：OOM killer。</li>
+    </ul>
+
+    <pre><code># 看内存压力
+cat /proc/meminfo | head -8
+cat /proc/pressure/memory      # PSI：内存压力指标（新版内核）
+dmesg | grep -i "oom\|killed process"</code></pre>
+
+    <p><b>嵌入式里最实用的三条经验</b>：别 malloc 大块、注意页缓存占用（它算在 available 里但可回收）、以及给关键进程设 <code>oom_score_adj</code>。</p>
+
+    <h2 id="s6">6. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于缺页的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["malloc 成功就说明内存够用","SIGSEGV 一定是代码写错了","free 之后内存立刻还给系统"]},"good":{"t":"实际","items":["只说明虚拟地址空间够用，物理页是访问时才分配的","也可能是「栈溢出」「权限不符」，甚至内核的 guard page","free 只是把块还给分配器，物理页可能仍被进程持有（RSS 不降）"]},"note":"第三条解释了一个常见困惑：程序 free 了大量内存，RSS 却没降。因为 glibc 的分配器把内存留在自己手里，供后续复用。"}'></div>
+
+    <h2 id="s7">7. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>malloc 100MB 成功，物理内存会立刻少 100MB 吗？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>不会。只建立了虚拟映射（VMA），物理页在首次访问时才分配。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>内核怎么判断一个缺页该补页还是该杀进程？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>查 VMA：地址是否在区域内、访问类型是否匹配权限。合法就补页，否则投递 SIGSEGV。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>COW 为什么让 fork 变快？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>子进程共享物理页并标只读，只有真正写入时才复制单页；fork 成本因此与内存大小近似无关。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>major fault 与 minor fault 的本质区别？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>minor 只需分配物理页（或 COW 复制）；major 还要从磁盘/Flash 读入数据，慢得多。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>嵌入式为什么常不配 swap？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>Flash/SD 写入慢且寿命有限，频繁换页会拖垮性能并磨损存储；改用 zram 或直接控内存。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>写一个 malloc 100MB 但不访问的程序，看 RSS 是否几乎不变。</li>
+        <li>访问它，每跨 4KB 写一次，用 <code>/proc/pid/stat</code> 观察 minflt 增长。</li>
+        <li>fork 一个大内存进程，测耗时，验证 COW 的效果。</li>
+        <li>在板子上看 <code>/proc/pressure/memory</code>，制造内存压力观察变化。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      P5 部讲完地址，进入 P6 部：内核。第 27 课从最基础的问题开始——进程到底是什么？它和线程差在哪？内核用什么结构描述它？
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"一次缺页，内核做了五件事","hint":"点下一步","note":"缺页不是错误，是正常机制。程序启动时的代码段、第一次访问的堆页、mmap 的文件页，全是靠缺页按需填进来的。","steps":[{"t":"① 访问触发异常","d":"CPU 访问一个还没建立映射的页，MMU 查表失败，抛出 page fault，带着出错地址进内核。"},{"t":"② 内核查 VMA","d":"看这个地址落在进程的哪段区间里：堆、栈、代码，还是 mmap 的文件。找不到就是非法访问，直接 SIGSEGV。"},{"t":"③ 分配物理页","d":"从伙伴系统拿一个空闲页帧。内存紧张时先回收、换出别人的页。"},{"t":"④ 填充内容","d":"匿名页清零；文件页从磁盘读，或者干脆映射到页缓存里已有的那页。"},{"t":"⑤ 建映射并返回","d":"写页表项、刷 TLB，回到用户态重新执行那条指令——这次就通了。"}]}'></div>
+  
+
+<nav class="pager">
+  <a href="course-25.html"><span>← 上一篇</span><b>页表与 MMU</b></a>
+  <a class="nx" href="course-th03.html"><span>下一篇 →</span><b>虚拟内存与地址翻译（详解）</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

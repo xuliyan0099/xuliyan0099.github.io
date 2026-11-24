@@ -1,0 +1,131 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>看门狗、电源管理与长时间稳定性测试 · 卷 12 | i.MX6ULL</title>
+<meta name="description" content="产品跑三个月不出事，靠的不是运气，是看门狗、温度、内存和文件系统四道防线。">
+<link rel="stylesheet" href="../assets/deep.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/deep.js" defer></script>
+</head><body>
+<div class="dp-prog"><i></i></div>
+<div class="dp">
+<header class="dp-top">
+  <div class="dp-crumbs">
+    <a href="../../index.html">个人知识库</a><span>/</span>
+    <a href="../index.html">学习站入口</a><span>/</span>
+    <a href="../juan/index.html">十四卷</a><span>/</span>
+    <a href="../juan/j12.html">卷 12</a>
+  </div>
+  <div class="dp-tools">
+    <a href="../juan/j12.html">☰ 卷 12 目录</a>
+    <a href="../juan/index.html">◫ 十四卷总览</a>
+  </div>
+</header>
+
+<div class="dp-hero">
+  <div class="dp-kicker">卷 12<span>·</span>第 12·05 篇</div>
+  <h1>看门狗、电源管理与长时间稳定性测试</h1>
+  <p class="dp-lede">产品跑三个月不出事，靠的不是运气，是看门狗、温度、内存和文件系统四道防线。</p>
+  <div class="dp-chips">
+    <span class="c hot">◆ 一读</span>
+    <span class="c">纯读约 4 小时</span>
+    <span class="c">理论为主 · 实作可跳</span>
+    <span class="c">配 3–4 个互动演示</span>
+  </div>
+</div>
+
+<aside class="dp-toc"><div class="dp-toc-h">本页目录</div><a href="#s1"><span>01</span>先玩一下：喂狗窗口</a><a href="#s2"><span>02</span>一、i.MX6ULL 上的看门狗</a><a href="#s3"><span>03</span>二、电源与温度</a><a href="#s4"><span>04</span>三、稳定性测试：把概率问题变成可复现</a><a href="#s5"><span>05</span>动手（可选）：做一次断电循环</a><a href="#s6"><span>06</span>离开这一篇，你应该能</a></aside>
+<main class="dp-main">
+<p class="lead">产品跑三个月不出事，靠的不是运气。它靠四道防线：<strong>看门狗、温度、内存、文件系统</strong>。任何一道失效，另外三道要能兜住。</p>
+
+<p>这一篇讲前三道与「怎么设计长期稳定性测试」，顺带说清一个常见误区：看门狗不是「防死机」，而是「保证死机后能自己活过来」。</p>
+
+<h2 id="s1">先玩一下：喂狗窗口</h2>
+
+<p>看门狗是一个只会倒数的定时器，归零就复位芯片。喂狗就是把它重新装满。关键是「喂得太晚」与「喂得太早（说明逻辑跑飞了）」都不对。</p>
+
+<div class="ikit" data-type="seq" data-json='{"title":"一次看门狗超时的全过程","badge":"seq",
+"actors":[{"name":"系统","start":"正常运行"},{"name":"看门狗","start":"计数中"}],
+"steps":[
+{"label":"应用卡死（死循环/等锁）","states":["卡死","计数中"],"note":"CPU 还在跑，但业务停了——这种「假活」看门狗救不了，除非用多级喂狗。"},
+{"label":"喂狗线程也被阻塞","states":["阻塞","计数中"],"note":"喂狗放在被阻塞的线程里，是这个机制最常见的错误用法。"},
+{"label":"计数器到 0","states":["复位","溢出"],"note":"硬件直接拉复位，软件没有任何机会做清理。"},
+{"label":"重启后读复位原因","states":["已重启","重新计数"],"note":"i.MX6ULL 的 WDOG_SRSR 记录「上次是不是看门狗复位」。"},
+{"label":"若连续 N 次看门狗复位 → 进安全模式","states":["降级","正常"],"note":"例如只提供最小功能、上报云端，而不是无限重启。"}]}'></div>
+
+<p>三个设计要点：<strong>喂狗点要放在「业务真的活着」的路径上</strong>（比如主循环末尾，而不是定时器中断里）；<strong>超时要大于最长合法阻塞时间</strong>（否则正常的长 IO 会误复位）；<strong>要有复位原因记录</strong>，否则你永远不知道设备为什么重启。</p>
+
+<h2 id="s2">一、i.MX6ULL 上的看门狗</h2>
+
+<p>芯片内有 WDOG1/WDOG2（具体编号与时钟见手册），Linux 侧用 <code>/dev/watchdog</code> 与标准 ioctl 访问。几个必须知道的选项：</p>
+
+<ul>
+  <li><code>nowayout</code>：一旦打开就不能用 <code>close</code> 停掉。产品应开启，避免「进程退出顺手关了狗」。</li>
+  <li><code>WDIOC_SETTIMEOUT</code>：设超时；<code>WDIOC_GETBOOTSTATUS</code>：读上次是否看门狗复位。</li>
+  <li>喂狗是 <code>write()</code> 或 <code>ioctl(WDIOC_KEEPALIVE)</code>；间隔建议为超时的 1/3 – 1/2。</li>
+</ul>
+
+<div class="ikit" data-type="param" data-json='{"title":"超时与喂狗周期的安全余量","badge":"param",
+"fields":[{"k":"to","label":"看门狗超时","min":1,"max":120,"step":1,"val":30,"unit":"秒"},
+{"k":"feed","label":"喂狗周期","min":0.5,"max":60,"step":0.5,"val":10,"unit":"秒"},
+{"k":"maxblk","label":"最长合法阻塞","min":0,"max":60,"step":1,"val":8,"unit":"秒"}],
+"outs":[
+{"label":"每个超时窗口喂几次","expr":"V.to / V.feed","unit":" 次"},
+{"label":"阻塞后剩余余量","expr":"V.to - V.maxblk","unit":" 秒"},
+{"label":"是否可能误复位","expr":"(V.maxblk + V.feed > V.to)","unit":" 1=是"},
+{"label":"建议超时下限","expr":"V.maxblk * 2","unit":" 秒"}],
+"bar":{"expr":"min(V.maxblk / V.to * 100, 100)"},
+"verdict":{"expr":"V.maxblk + V.feed < V.to","ok":"有余量，不会误复位","bad":"可能误复位：加大超时或缩短阻塞"},
+"note":"把「最长合法阻塞」拉到 25 秒，你会看到余量变负——这就是产线上「偶发重启」的来源之一。"}'></div>
+
+<h2 id="s3">二、电源与温度</h2>
+
+<ul>
+  <li><b>DVFS</b>：i.MX6ULL 支持按频率/电压档位调频；温度高时降频是最直接的保命手段。</li>
+  <li><b>温度读取</b>：芯片内部温度传感器（TEMPMON）或外部热敏；配合 <code>thermal_zone</code> 可在 <code>/sys/class/thermal/</code> 读到。</li>
+  <li><b>suspend/resume</b>：休眠时大部分时钟关闭，但看门狗可能继续计数，必须确认「休眠期间是否喂狗」；否则设备会在休眠中重启。</li>
+  <li><b>掉电检测</b>：有 PMIC 时可在掉电中断里做「紧急保存」，但时间窗口通常只有几毫秒，只能存极少数据。</li>
+</ul>
+
+<h2 id="s4">三、稳定性测试：把概率问题变成可复现</h2>
+
+<div class="ikit" data-type="drag" data-json='{"title":"三个月不出事，要测哪五件事","badge":"drag",
+"items":[{"id":"mem","text":"内存：连续分配/释放、memtester 跑满"},{"id":"fs","text":"文件系统：反复写、断电重启、检查 fsck"},{"id":"pwr","text":"电源：反复上下电、电压拉偏"},{"id":"temp","text":"温度：高温箱/满载烤机，看降频与复位"},{"id":"net","text":"网络：丢包、断链、长时间大流量"}],
+"answer":["mem","fs","pwr","temp","net"],
+"explain":"每一项对应一类典型的现场故障；测试的目的不是「证明它好」，而是「找出它什么时候坏」。"}'></div>
+
+<p>具体做法：内存用 <code>memtester</code> 循环跑满 + 应用自身长时间运行；文件系统用「写—sync—断电—重启—校验」循环，至少几百次；电源用可编程电源做电压拉偏与随机掉电；温度用高温箱做 24–72 小时满载；网络用 <code>tc</code> 注入丢包与延迟。</p>
+
+<div class="cal warn"><span class="h">误解：能连续跑 72 小时就没问题</span>很多故障是「边界条件」触发的：内存碎片累积到某个阈值、文件系统空闲块降到某个数量、温度到某个点。测试要覆盖边界，而不是只覆盖时间。</div>
+
+<div class="cal tip"><span class="h">留下现场</span>配 <code>pstore/ramoops</code> 保存崩溃日志，配 <code>watchdog</code> 记录复位原因，配 RTC 保证时间戳可信。没有这三样，现场故障只能靠猜。</div>
+
+<h2 id="s5">动手（可选）：做一次断电循环</h2>
+
+<div class="cal q"><span class="h">只在 🔧 实作模式展开</span>需要板子与可编程电源（或带开关的 USB 电源）；注意 eMMC 寿命，别用太便宜的卡。</div>
+
+<ol>
+  <li>写一个循环脚本：写 10 MB 文件 → <code>sync</code> → 随机延时断电 → 上电 → 校验文件系统与数据。</li>
+  <li>跑 100 次，统计「文件系统损坏」「数据丢失」「启动失败」各几次。</li>
+  <li>把 rootfs 换成只读 + overlay（或 squashfs + tmpfs），再跑一遍，对比损坏率。</li>
+  <li>开启 <code>pstore</code>，观察每次异常重启是否留下日志。</li>
+</ol>
+
+<h2 id="s6">离开这一篇，你应该能</h2>
+
+<ul class="qa">
+  <li>解释看门狗为什么救不了「假活」，以及喂狗点应该放哪。</li>
+  <li>算出超时、喂狗周期、最长阻塞三者的安全余量。</li>
+  <li>列出五类稳定性测试与各自的典型故障。</li>
+</ul>
+
+<p>产品卷到此结束。最后一卷往外看：ARMv7 的天花板在哪，AArch64 / RISC-V / x86 怎么对照，以及怎么自己造一个 OS。</p>
+
+<nav class="dp-nav">
+  <a href="d12-03.html"><span>← 上一篇</span>HAB 安全启动：签名、验签、失败现象</a>
+  <a href="d13-01.html" class="nxt"><span>下一篇 →</span>AArch64 / RISC-V / x86：三套体系横向对照</a>
+</nav>
+<footer class="dp-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线。文中的「动手」段落只在 🔧 实作模式下展开，纯读可整篇跳过。</footer>
+</main>
+</div></body></html>

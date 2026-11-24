@@ -1,0 +1,149 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HAB 安全启动：签名、验签、失败现象 · 卷 12 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j12.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 12 · 产品化</div>
+<ol><li><a href="course-ch14.html">
+  <span class="no">01</span><span>综合实战项目<span class="sub">约 16 小时</span></span></a></li>
+<li><a href="d12-01.html">
+  <span class="no">02</span><span>Buildroot 到 Yocto：定制镜像、裁剪包、产出固件<span class="sub">约 6 小时</span></span></a></li>
+<li><a href="d12-02.html">
+  <span class="no">03</span><span>分区与双 Bank OTA：A/B 切换、回滚与校验<span class="sub">约 6 小时</span></span></a></li>
+<li><a href="d12-03.html" class="active">
+  <span class="no">04</span><span>HAB 安全启动：签名、验签、失败现象<span class="sub">◆ · 约 4 小时 · 当前</span></span></a></li>
+<li><a href="d12-04.html">
+  <span class="no">05</span><span>看门狗、电源管理与长时间稳定性测试<span class="sub">◆ · 约 4 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j11.html">← 卷 11</a>
+  <a href="../juan/j13.html">卷 13 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 12<span>·</span>产品化<span>·</span>第 04 篇</div>
+  <h1>HAB 安全启动：签名、验签、失败现象</h1>
+  
+  <div class="doc-chips">
+    <span class="hot">◆ 一读</span>
+    <span>纯读约 4 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+<p class="lead">BootROM 是芯片里一段不可改的代码。它只认一件事：<strong>这个镜像有没有被正确的私钥签过名</strong>。签名链一旦断了，板子连一行串口都不会给你。</p>
+
+<p>i.MX 系列的这套机制叫 <b>HAB</b>（High Assurance Boot）。它的验证发生在 BootROM 里，比你写的任何代码都早。</p>
+
+<h2 id="s1">先玩一下：一次签名镜像的验证链</h2>
+
+<p>点「下一步」。注意第 3 站：BootROM 用的是<strong>熔丝里烧进去的 SRK 公钥 hash</strong>，不是镜像里带的公钥——这是防止「自己签名自己」的关键。</p>
+
+<div class="ikit" data-type="hop" data-json='{"title":"HAB 验签：从熔丝到跳转","badge":"hop","packet":"镜像",
+"nodes":[{"n":"镜像","s":"IVT+CSF"},{"n":"SRK 熔丝","s":"公钥 hash"},{"n":"BootROM","s":"验签"},{"n":"CSF","s":"命令序列"},{"n":"跳转","s":"entry"}],
+"hops":[
+{"at":"镜像","pkt":"IVT","label":"读 IVT 与 CSF 指针","note":"IVT 里记录 CSF 的位置与长度。"},
+{"at":"SRK 熔丝","pkt":"hash","label":"读芯片内的一次性熔丝","note":"烧过之后不可逆；空片（未烧）时 HAB 处于「开放」状态。"},
+{"at":"BootROM","pkt":"verify","label":"用 SRK 公钥验 CSF 签名","note":"失败就直接停住，不执行任何用户代码。"},
+{"at":"CSF","pkt":"commands","label":"按 CSF 命令逐段校验","note":"可以指定哪些区域必须匹配 hash（如整个 U-Boot）。"},
+{"at":"跳转","pkt":"entry","label":"校验通过，跳到 entry","note":"此后才轮到 SPL/U-Boot 运行。"}]}'></div>
+
+<p>注意第 2 站：HAB 的信任根是<strong>熔丝</strong>，不是文件。所以「烧熔丝」是一个不可逆的、必须想清楚的操作——烧错了，芯片就再也启动不了未签名的镜像。</p>
+
+<h2 id="s2">一、四个名词</h2>
+
+<table>
+<thead><tr><th>名词</th><th>是什么</th><th>谁生成</th></th></tr></thead>
+<tbody>
+<tr><td><b>SRK</b></td><td>Super Root Key，根公钥（通常 3–4 把，对应不同用途）</td><td>你用自己的私钥生成，hash 烧进熔丝</td></tr>
+<tr><td><b>CSF</b></td><td>Command Sequence File：一段「要校验哪些区域」的命令 + 签名</td><td>NXP 的 CST 工具生成</td></tr>
+<tr><td><b>CSRT</b></td><td>CSF 的模板/描述，声明镜像布局与要签的段</td><td>手写或工具生成</td></tr>
+<tr><td><b>HAB 状态</b></td><td>BootROM 的验证结果，可在运行时读回</td><td>硬件寄存器 / <code>hab_status</code></td></tr>
+</tbody></table>
+
+<p>签名流程大致是：生成密钥 → 用 CST 生成 CSRT → 对镜像（IVT+U-Boot 等）算 hash → 用私钥签 CSF → 把 CSF 追加进镜像 → 烧写。运行时 BootROM 反向做一遍。</p>
+
+<div class="ikit" data-type="code" data-json='{"title":"签名前后的镜像与验证结果","badge":"code",
+"regs":[{"n":"hab","v":"HAB_OPEN"},{"n":"fuse","v":"0x0000_0000"},{"n":"ret","v":"0"}],
+"lines":[
+{"c":"镜像 = IVT + U-Boot + CSF（未签名）","set":{"hab":"HAB_OPEN"},"note":"空熔丝时，未签名镜像也能启动——这是开发阶段的便利，也是风险。"},
+{"c":"烧 SRK hash 到熔丝（一次性）","set":{"fuse":"SRK_HASH"},"note":"从这一刻起，只有签名匹配的镜像能启动。"},
+{"c":"CST 生成 CSF 并追加","set":{"ret":"0"},"note":"CSF 里包含对指定区域的 hash 与私钥签名。"},
+{"c":"BootROM：用 SRK 验 CSF 签名","set":{"hab":"HAB_SUCCESS"},"note":"成功则跳到 entry，串口随后输出。"},
+{"c":"镜像被改一个字节","set":{"hab":"HAB_FAILURE"},"note":"hash 不匹配 → 验签失败，BootROM 停住，串口通常无输出。"}]}'></div>
+
+<h2 id="s3">二、失败时你会看到什么</h2>
+
+<ul>
+  <li><b>完全无输出</b>：验签在串口初始化之前，所以最常见的就是「一点反应都没有」。这时只能靠 JTAG 停核看 PC 是否停在 ROM 的失败循环里。</li>
+  <li><b>U-Boot 里读到 HAB_FAILURE</b>：如果之前有能启动的镜像，可在 U-Boot 命令行 <code>hab_status</code> 看具体失败原因（CSF 缺失、hash 不匹配、签名错）。</li>
+  <li><b>日志里出现 <code>HAB Failure</code></b>：部分 BSP 会在启动时打印。</li>
+</ul>
+
+<div class="cal warn"><span class="h">最危险的操作：烧熔丝</span>烧之前必须确认：签名镜像已经在同一块板子上验证通过、备份了密钥、记录了 SRK hash、并且有一条「救砖」路径（比如能从另一个启动介质进入 U-Boot 重新烧写）。烧错一次，芯片就报废。</div>
+
+<div class="cal warn"><span class="h">误解：签名能防篡改，所以不用管升级包</span>签名保护的是「启动链」，不是「运行中的系统」。rootfs 是否被改，要靠 dm-verity；升级包是否可信，要靠传输层签名。三者是三件事。</div>
+
+<h2 id="s4">三、与双 Bank 的关系</h2>
+
+<p>双 Bank 解决「换得安全」，HAB 解决「只跑我签过的」。两者叠加才是产品的完整启动信任链：BootROM → 签名的 SPL → 签名的 U-Boot → 校验内核 → 挂载 verity 的 rootfs。</p>
+
+<div class="cal tip"><span class="h">开发阶段的现实做法</span>先不烧熔丝，用 <code>hab_status</code> 验证签名流程能走通；量产前再做一次「烧熔丝 + 断电重启 + 回滚」的完整演练。顺序反了，代价是板子。</div>
+
+<h2 id="s5">动手（可选）：走一次签名（不烧熔丝）</h2>
+
+<div class="cal q"><span class="h">只在 🔧 实作模式展开</span>需要板子、CST 工具与 U-Boot 源码；风险操作，务必先备份。</div>
+
+<ol>
+  <li>用 CST 生成一对密钥与 SRK hash，保存好私钥（丢了就再也签不出能启动的镜像）。</li>
+  <li>按 CSRT 模板对 U-Boot 镜像签名，生成带 CSF 的镜像，烧到板子。</li>
+  <li>不烧熔丝，启动后在 U-Boot 里 <code>hab_status</code>，确认显示 <code>HAB_SUCCESS</code>（或开放状态）。</li>
+  <li>故意改镜像一个字节，再看 <code>hab_status</code> 变成失败——这就是「验签生效」的证据。</li>
+</ol>
+
+<h2 id="s6">离开这一篇，你应该能</h2>
+
+<ul class="qa">
+  <li>说出 SRK、CSF、CSRT 各自是什么，以及信任根为什么是熔丝。</li>
+  <li>解释验签失败时为什么通常「串口无输出」。</li>
+  <li>说明 HAB 与 dm-verity、升级包签名三者的分工。</li>
+</ul>
+
+<p>安全与升级都做完了，产品还要跑三个月不出事。最后一篇讲看门狗、电源与稳定性。</p>
+
+
+<nav class="pager">
+  <a href="d12-02.html"><span>← 上一篇</span><b>分区与双 Bank OTA：A/B 切换、回滚与校验</b></a>
+  <a class="nx" href="d12-04.html"><span>下一篇 →</span><b>看门狗、电源管理与长时间稳定性测试</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

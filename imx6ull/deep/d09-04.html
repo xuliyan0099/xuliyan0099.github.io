@@ -1,0 +1,134 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>块设备与 eMMC：gendisk、请求队列与分区 · 卷 09 | i.MX6ULL</title>
+<meta name="description" content="字符设备一次搬一个字节，块设备一次搬一个 bio。eMMC 在最底下，gendisk 在最上面，中间隔着一套会合并、会排序的队列。">
+<link rel="stylesheet" href="../assets/deep.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/deep.js" defer></script>
+</head><body>
+<div class="dp-prog"><i></i></div>
+<div class="dp">
+<header class="dp-top">
+  <div class="dp-crumbs">
+    <a href="../../index.html">个人知识库</a><span>/</span>
+    <a href="../index.html">学习站入口</a><span>/</span>
+    <a href="../juan/index.html">十四卷</a><span>/</span>
+    <a href="../juan/j09.html">卷 09</a>
+  </div>
+  <div class="dp-tools">
+    <a href="../juan/j09.html">☰ 卷 09 目录</a>
+    <a href="../juan/index.html">◫ 十四卷总览</a>
+  </div>
+</header>
+
+<div class="dp-hero">
+  <div class="dp-kicker">卷 09<span>·</span>第 09·10 篇</div>
+  <h1>块设备与 eMMC：gendisk、请求队列与分区</h1>
+  <p class="dp-lede">字符设备一次搬一个字节，块设备一次搬一个 bio。eMMC 在最底下，gendisk 在最上面，中间隔着一套会合并、会排序的队列。</p>
+  <div class="dp-chips">
+    <span class="c hot">◆ 一读</span>
+    <span class="c">纯读约 4 小时</span>
+    <span class="c">理论为主 · 实作可跳</span>
+    <span class="c">配 3–4 个互动演示</span>
+  </div>
+</div>
+
+<aside class="dp-toc"><div class="dp-toc-h">本页目录</div><a href="#s1"><span>01</span>先玩一下：请求队列不是先进先出</a><a href="#s2"><span>02</span>一、从 bio 到硬件命令</a><a href="#s3"><span>03</span>二、gendisk、分区与设备节点</a><a href="#s4"><span>04</span>三、eMMC 在底下发生了什么</a><a href="#s5"><span>05</span>动手（可选）：看清一次 IO 的形状</a><a href="#s6"><span>06</span>离开这一篇，你应该能</a></aside>
+<main class="dp-main">
+<p class="lead">字符设备是「一次搬一点」，块设备是「一次搬一块，而且要排队」。<code>dd</code> 之所以快，不是因为它聪明，而是因为它把请求交给了会合并、会排序的那一层。</p>
+
+<p>这一篇从 <code>gendisk</code> 往下走到 eMMC 的 CMD17，顺便说清「分区」到底是谁的概念。</p>
+
+<h2 id="s1">先玩一下：请求队列不是先进先出</h2>
+
+<p>下面是一个环形队列。点「写入一块」放请求进去，点「取出一块」模拟被驱动取走。真实的 blk-mq 还会在取出前做合并与排序，但先看清「环」这个结构。</p>
+
+<div class="ikit" data-type="queue" data-json='{"title":"块设备请求队列（8 格示意）","badge":"queue","size":8,
+"note":"真实队列是 blk-mq 的多队列 + 调度器；这里只演示 head/tail 与满/空两种边界。"}'></div>
+
+<p>队列满时上层会被阻塞（或返回 <code>EAGAIN</code>），这就是「磁盘忙」在软件侧的样子。SSD/eMMC 内部还有自己的队列，两层队列叠加，才出现「<code>iostat</code> 里 await 很高但 %util 不满」的现象。</p>
+
+<h2 id="s2">一、从 bio 到硬件命令</h2>
+
+<div class="ikit" data-type="hop" data-json='{"title":"一次 4 KB 读的七站","badge":"hop","packet":"bio",
+"nodes":[{"n":"应用","s":"read()"},{"n":"页缓存","s":"命中?"},{"n":"bio","s":"块 IO"},{"n":"blk-mq","s":"队列"},{"n":"eMMC","s":"CMD17"},{"n":"DMA","s":"搬 512B×8"},{"n":"返回","s":"唤醒"}],
+"hops":[
+{"at":"应用","pkt":"read 4KB","label":"VFS 先查页缓存","note":"命中就直接返回，根本不产生 IO——这是「第二次读很快」的原因。"},
+{"at":"页缓存","pkt":"miss","label":"未命中，建 bio","note":"bio 描述「哪个块、多长、往哪填」。"},
+{"at":"bio","pkt":"bio","label":"合并成 request","note":"相邻扇区的 bio 可能被合并，减少命令数。"},
+{"at":"blk-mq","pkt":"request","label":"入队、调度","note":"多队列按 CPU 分片，减少锁竞争。"},
+{"at":"eMMC","pkt":"CMD17","label":"发读单块命令","note":"512 字节一块；4 KB 要 8 个块，通常用 CMD18 多块读。"},
+{"at":"DMA","pkt":"512B×8","label":"数据进内存","note":"完成后产生中断，标记 request 完成。"},
+{"at":"返回","pkt":"page","label":"填页缓存、唤醒进程","note":"页缓存里留下副本，下次直接命中。"}]}'></div>
+
+<p>这里的关键抽象是「扇区」：块设备的最小寻址单位通常是 512 字节，而文件系统的块是 4 KB。一个文件系统块 = 8 个扇区，所以一次读盘往往会看到「多块读」命令。</p>
+
+<h2 id="s3">二、gendisk、分区与设备节点</h2>
+
+<table>
+<thead><tr><th>对象</th><th>代表什么</th><th>你能看到</th></tr></thead>
+<tbody>
+<tr><td><code>gendisk</code></td><td>一整块磁盘（eMMC 的一个硬件分区也算一个）</td><td><code>/dev/mmcblk0</code>、<code>/sys/block/mmcblk0</code></td></tr>
+<tr><td><code>block_device</code> / hd_struct</td><td>分区</td><td><code>/dev/mmcblk0p1</code></td></tr>
+<tr><td><code>request_queue</code></td><td>该盘的请求队列与调度参数</td><td><code>/sys/block/mmcblk0/queue/</code></td></tr>
+<tr><td><code>bio</code></td><td>一次块 IO 的描述（运行时对象）</td><td>只能在内核里看到</td></tr>
+</tbody></table>
+
+<p><code>gendisk</code> 里最重要的一张表是 <code>fops</code>（<code>block_device_operations</code>）：<code>open</code>、<code>release</code>、<code>ioctl</code>。注意<strong>没有 read/write</strong>——块设备的读写不走 file_operations 的常规路径，而是走 <code>submit_bio</code>。</p>
+
+<div class="ikit" data-type="mem" data-json='{"title":"一张 eMMC 上的典型布局","badge":"mem",
+"segments":[
+{"name":"Boot0","len":8,"color":"rgba(251,191,36,.35)","addr":"硬件分区","note":"eMMC 专用的 boot 分区，BootROM 可直接读，常放 SPL/U-Boot。"},
+{"name":"Boot1","len":8,"color":"rgba(251,191,36,.25)","addr":"硬件分区","note":"备份 boot；双 Bank 方案常把两份 SPL 分放在 boot0/boot1。"},
+{"name":"分区表","len":6,"color":"rgba(95,241,239,.4)","addr":"LBA 0","note":"MBR 或 GPT。它只是磁盘开头的一段数据，不是硬件。"},
+{"name":"boot","len":14,"color":"rgba(110,168,254,.34)","addr":"p1","note":"内核 + 设备树 + 启动脚本。"},
+{"name":"rootfs A","len":20,"color":"rgba(52,211,153,.32)","addr":"p2","note":"只读根文件系统，可加 dm-verity 校验。"},
+{"name":"rootfs B","len":20,"color":"rgba(52,211,153,.2)","addr":"p3","note":"升级用的备用槽，与 A 对称。"},
+{"name":"data","len":16,"color":"rgba(251,113,133,.3)","addr":"p4","note":"可写分区：日志、配置、用户数据。"}]}'></div>
+
+<p>注意 Boot0/Boot1 与 p1/p2 的区别：前两个是 eMMC 规范里的<strong>硬件分区</strong>（有自己的地址空间，用 <code>mmcblk0boot0</code> 访问），后面的分区是分区表里划出来的<strong>逻辑分区</strong>。把这两者混在一起，是量产时「刷了没起来」的常见原因。</p>
+
+<h2 id="s4">三、eMMC 在底下发生了什么</h2>
+
+<p>eMMC 不是「一个会自己管理的闪存」，它是一颗带控制器的芯片。Linux 侧看到的是 <code>mmc_host</code> + <code>mmc_card</code>；驱动把块请求翻译成 MMC 命令：</p>
+
+<ul>
+  <li><b>CMD17</b> 读单块、<b>CMD18</b> 读多块、<b>CMD24/25</b> 写单/多块；<b>CMD12</b> 停止多块传输。</li>
+  <li>数据阶段由 DMA 搬运，命令与响应走命令线。i.MX6ULL 的 <code>uSDHC</code> 控制器同时支持 SD 与 eMMC。</li>
+  <li>速度模式：默认 26 MHz 左右，高速 52 MHz，HS200/HS400 需要板级与时序支持；不确定就用 <code>mmc extcsd read /dev/mmcblk0</code> 看实际协商结果，别照抄别人的 dts。</li>
+</ul>
+
+<div class="cal warn"><span class="h">误解：块设备自己有缓存，所以 read 不会真的读盘</span>缓存主要在上面的页缓存（由文件系统管理）。<code>O_DIRECT</code> 绕过的是页缓存，不是设备缓存；eMMC 内部还有自己的缓存，你控制不了它。</div>
+
+<div class="cal warn"><span class="h">误解：分区是硬件划的</span>分区表只是磁盘开头的一段字节。改分区表（<code>fdisk</code>/<code>parted</code>）本质是改数据，之后内核重读（<code>partprobe</code> 或重启）才出现新节点。所以「分区表改了但设备节点没变」不是 bug。</div>
+
+<h2 id="s5">动手（可选）：看清一次 IO 的形状</h2>
+
+<div class="cal q"><span class="h">只在 🔧 实作模式展开</span>PC 或板子均可。</div>
+
+<ol>
+  <li><code>lsblk -o NAME,SIZE,TYPE,MOUNTPOINT</code> 认磁盘、分区、挂载点三层。</li>
+  <li><code>cat /sys/block/mmcblk0/queue/scheduler</code> 看当前调度器；<code>cat .../rotational</code> 判断是否被当成机械盘。</li>
+  <li><code>dd if=/dev/zero of=/tmp/t.bin bs=4k count=256 oflag=direct</code> 与不加 <code>oflag=direct</code> 对比，看时间差。</li>
+  <li><code>iostat -x 1</code> 看 <code>r/s</code>、<code>w/s</code>、<code>await</code>、<code>%util</code>，再回到上面的队列图对照。</li>
+</ol>
+
+<h2 id="s6">离开这一篇，你应该能</h2>
+
+<ul class="qa">
+  <li>说清 bio → request → 硬件命令这条链，以及页缓存在哪一层。</li>
+  <li>区分 gendisk、分区、硬件 boot 分区三者。</li>
+  <li>解释「队列满」在软件侧的表现，以及 <code>O_DIRECT</code> 到底绕过了什么。</li>
+</ul>
+
+<p>块设备靠 DMA 搬数据，这是效率的来源，也是「幽灵 bug」的来源。下一篇专门处理 DMA 与 Cache 的一致性。</p>
+
+<nav class="dp-nav">
+  <a href="d09-03.html"><span>← 上一篇</span>SPI 子系统：控制器驱动与设备驱动</a>
+  <a href="d09-05.html" class="nxt"><span>下一篇 →</span>DMA 与 Cache 一致性：谁负责 flush，谁负责 invalidate</a>
+</nav>
+<footer class="dp-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线。文中的「动手」段落只在 🔧 实作模式下展开，纯读可整篇跳过。</footer>
+</main>
+</div></body></html>

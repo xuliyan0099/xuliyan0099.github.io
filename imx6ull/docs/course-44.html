@@ -1,0 +1,157 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>总复盘 · 卷 13 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j13.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 13 · 拔高</div>
+<ol><li><a href="course-44.html" class="active">
+  <span class="no">01</span><span>总复盘<span class="sub">约 1 小时 · 当前</span></span></a></li>
+<li><a href="d13-01.html">
+  <span class="no">02</span><span>AArch64 / RISC-V / x86：三套体系横向对照<span class="sub">● · 约 4 小时</span></span></a></li>
+<li><a href="d13-02.html">
+  <span class="no">03</span><span>xv6 或自制一个最小 OS：把操作系统造一遍<span class="sub">● · 约 8 小时</span></span></a></li>
+<li><a href="d13-03.html">
+  <span class="no">04</span><span>虚拟化与 KVM：ARM 上的 EL2 与 stage-2 页表<span class="sub">● · 约 4 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j12.html">← 卷 12</a>
+  
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 13<span>·</span>拔高<span>·</span>第 01 篇</div>
+  <h1>总复盘</h1>
+  <p class="lede">44 课走完，你手里应该有一条完整的链：比特 → 门 → 加法器 → 触发器 → ALU → 指令 → 流水线 → 内存层次 → 地址空间 → 内核 → 板子 → 系统。这一课把它压成一张地图，再给你十条「一句话结论」和三条后续路线。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+
+    <div class="anim2" data-json='{"title":"总复盘：一条从头到尾的链","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"机械触点闭合"},{"k":"GPIO 采样"},{"k":"GIC 汇总"},{"k":"CPU 跳向量"},{"k":"内核 ISR"},{"k":"驱动上报"},{"k":"tty 子系统"},{"k":"调度器"},{"k":"用户程序"},{"k":"终端渲染"}],"frames":[{"i":0,"d":"电平从高变低"},{"i":1,"d":"读到 0，置状态位"},{"i":2,"d":"拉高 IRQ"},{"i":3,"d":"保存 CPSR，进 IRQ"},{"i":4,"d":"识别中断号，读数据"},{"i":5,"d":"放进缓冲区，唤醒等待者"},{"i":6,"d":"编码、行规程"},{"i":7,"d":"唤醒读端进程"},{"i":8,"d":"read 返回字节"},{"i":9,"d":"字符画到屏幕"}]}'></div>
+
+    <div class="viz" data-kind="layers" data-title="全课程的一张地图" data-sub="从上往下是抽象，从下往上是实现" data-json='{"items":[{"n":"应用与 shell","d":"第 16–19、34、41、42 课","c":"gray"},{"n":"内核：进程/内存/中断/驱动","d":"第 26–34 课","c":"rd"},{"n":"硬件：板卡、总线、外设","d":"第 35–40 课","c":"or"},{"n":"指令集与流水线","d":"第 10–15 课","c":"vi"},{"n":"数字电路：门、加法器、触发器","d":"第 04–08 课","c":"cy"},{"n":"物理：比特与电子开关","d":"第 00–03 课","c":"gr"}],"note":"看到这张图你能做一件事：听到任何一个现象，立刻能说「它属于哪一层，上一层靠什么接口与它对话」。这就是「软硬件打通」的定义。"}'></div>
+
+    <div class="card">
+      <h4>复盘的四个问题</h4>
+      <p>① 一条 C 语句怎么变成电平变化？② 一次按键怎么变成屏幕上的字符？③ 一个进程切换时到底发生了什么？④ 板子不启动你会按什么顺序查？</p>
+    </div>
+
+    <h2 id="s1">1. 十条一句话结论</h2>
+
+    <ol>
+      <li><b>一切从开关开始</b>：CPU 是几亿个可控开关的组合，没有魔法，只有门与线。</li>
+      <li><b>反相是免费的</b>：所以 NAND 比 AND 便宜，所以「用与非门搭出一切」成立。</li>
+      <li><b>加法器是心脏</b>：减法是加补码，比较是做减法看标志，地址计算也是加法。</li>
+      <li><b>记忆需要时钟</b>：没有触发器就没有状态；时序违例会随机出错，而不是稳定错。</li>
+      <li><b>PC 就是手指</b>：顺序执行是默认，跳转就是给 PC 赋值，函数调用额外存 LR。</li>
+      <li><b>流水线换吞吐</b>：五条指令同时在路上，代价是三个冒险；load-use 只能停。</li>
+      <li><b>内存墙是主矛盾</b>：一次未命中等于几十条指令的时间，Cache 与局部性是唯一杠杆。</li>
+      <li><b>地址是翻译出来的</b>：虚拟地址只是编号，MMU 决定它落到哪、能不能写、能不能执行。</li>
+      <li><b>内核就在管四件事</b>：谁用 CPU（调度）、谁能用哪块内存（页表）、谁在打断（中断）、怎么访问设备（驱动）。</li>
+      <li><b>一切皆文件</b>：把设备、管道、网络都做成 file_operations，是 Linux 最成功的抽象。</li>
+    </ol>
+
+    <h2 id="s2">2. 一条链：从按键到字符</h2>
+
+    <div class="viz" data-kind="flow" data-title="按下一个键，走完十一层" data-sub="每一层你在这门课里都亲手碰过" data-json='{"steps":[{"n":"机械触点闭合","d":"电平从高变低"},{"n":"GPIO 采样","d":"读到 0，置状态位"},{"n":"GIC 汇总","d":"拉高 IRQ"},{"n":"CPU 跳向量","d":"保存 CPSR，进 IRQ"},{"n":"内核 ISR","d":"识别中断号，读数据"},{"n":"驱动上报","d":"放进缓冲区，唤醒等待者"},{"n":"tty 子系统","d":"编码、行规程"},{"n":"调度器","d":"唤醒读端进程"},{"n":"用户程序","d":"read 返回字节"},{"n":"终端渲染","d":"字符画到屏幕"}],"note":"这条链你在第 03 课走过一次（粗略），现在回头看，每一层你都知道了细节。这就是这门课想让你达到的状态：同一条链，两种深度的理解。"}'></div>
+
+    <h2 id="s3">3. 三条后续路线</h2>
+
+    <table>
+      <thead><tr><th>方向</th><th>下一步学什么</th><th>为什么</th></tr></thead>
+      <tbody>
+        <tr><td>内核深入</td><td>读《Linux 内核设计与实现》+ 抄一个真实驱动</td><td>把第 27–34 课的框架填上细节</td></tr>
+        <tr><td>硬件深入</td><td>Verilog 写一个 RISC-V 单周期 CPU，跑通仿真</td><td>第 04–13 课的知识会瞬间「闭环」</td></tr>
+        <tr><td>系统性能</td><td>perf/ftrace + 一个真实项目（网关、采集、图像）</td><td>第 20–23 课的方法论必须靠项目磨</td></tr>
+      </tbody>
+    </table>
+
+    <p>如果只选一条：<b>先写一个最小驱动，再写一个最小 CPU</b>。两者各花两周，你对「软硬件」的理解会从「知道」变成「做过」。</p>
+
+    <h2 id="s4">4. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>不看笔记，讲一遍「一条 add 指令的五个阶段」。</p></div>
+    <details class="ans"><summary>参考</summary><div class="body">
+      <p>IF 取指 → ID 译码读寄存器 → EX 算 → MEM（无）→ WB 写回；有 S 位时顺带更新 N/Z/C/V。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>为什么 load-use 冒险必须停一拍？</p></div>
+    <details class="ans"><summary>参考</summary><div class="body">
+      <p>load 的数据在 MEM 末才拿到，紧跟的指令此时已进 EX，时间上倒挂，旁路无法解决。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>进程切换的大头开销在哪？</p></div>
+    <details class="ans"><summary>参考</summary><div class="body">
+      <p>换页表后的 TLB 与 Cache 冷启动，而不是寄存器保存本身。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>板子「完全无输出」，你的前五步？</p></div>
+    <details class="ans"><summary>参考</summary><div class="body">
+      <p>电源电压 → 晶振 → 复位电平 → 启动引脚 → 串口接线，最后才怀疑镜像。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>用一句话说明「为什么 Cache 有效」。</p></div>
+    <details class="ans"><summary>参考</summary><div class="body">
+      <p>因为程序的访问有时间和空间局部性，把常用的搬到近处，绝大部分访问就不必等远内存。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>把上面「按键到字符」的十一层，自己画一遍并标出每层的关键接口。</li>
+        <li>挑一条后续路线，写出两周的具体计划。</li>
+        <li>在板子上跑一次 <code>perf stat</code>，把 CPI 与未命中率记下来。</li>
+        <li>写一个 50 行的驱动，注册 /dev 节点并能读写。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>课程结束</b>
+      这套课的价值不在「读完」，而在「能对上」。当你在某天调试一个 bug 时，脑子里能自动浮现「这是 Cache 冲突」「这是 load-use」「这是 TLB 没刷」——那这门课就真正生效了。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"整门课，其实是一条因果链","hint":"回顾用","note":"每一课都是上一课的必然结果：因为电平只能分高低，才有二进制；因为要算，才有 ALU；因为要按顺序，才有 PC；因为要隔离，才有页表。","steps":[{"t":"① 比特","d":"电平只有两个稳定区，于是世界被切成 0 和 1。"},{"t":"② 门与加法器","d":"开关串并联组成与或非，组合出半加器、全加器、ALU。"},{"t":"③ 时钟与寄存器","d":"加上时钟，电路有了「状态」，能记住东西，才能一条条执行。"},{"t":"④ 指令与流水","d":"把操作编码成位段，PC 逐条推进；为了快，切成流水线。"},{"t":"⑤ 存储与地址","d":"代码和数据都要放，于是有层次存储、有虚拟地址、有页表。"},{"t":"⑥ 内核与驱动","d":"要管这么多资源、要隔离、要响应硬件，于是有了进程、中断、文件、驱动。"}]}'></div>
+  
+
+<nav class="pager">
+  <a href="d12-04.html"><span>← 上一篇</span><b>看门狗、电源管理与长时间稳定性测试</b></a>
+  <a class="nx" href="d13-01.html"><span>下一篇 →</span><b>AArch64 / RISC-V / x86：三套体系横向对照</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

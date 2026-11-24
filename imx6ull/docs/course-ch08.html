@@ -1,0 +1,246 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>i.MX6ULL 与启动链路 · 卷 08 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j08.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 08 · 启动链</div>
+<ol><li><a href="course-th08.html">
+  <span class="no">01</span><span>从第一个字节开始：BootROM → SPL → U-Boot<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-36.html">
+  <span class="no">02</span><span>启动链<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-ch08.html" class="active">
+  <span class="no">03</span><span>i.MX6ULL 与启动链路<span class="sub">约 10 小时 · 当前</span></span></a></li>
+<li><a href="course-th09.html">
+  <span class="no">04</span><span>内核怎么起来：head.S → start_kernel → init<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-ch09.html">
+  <span class="no">05</span><span>U-Boot 与烧写<span class="sub">约 12 小时</span></span></a></li>
+<li><a href="course-ch10.html">
+  <span class="no">06</span><span>内核裁剪与设备树<span class="sub">约 18 小时</span></span></a></li>
+<li><a href="course-41.html">
+  <span class="no">07</span><span>根文件系统<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-ch11.html">
+  <span class="no">08</span><span>根文件系统构建<span class="sub">约 14 小时</span></span></a></li>
+<li><a href="course-42.html">
+  <span class="no">09</span><span>做出一块能跑的系统<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="viz-boot.html">
+  <span class="no">10</span><span>互动台：启动链路逐级点亮<span class="sub">💻 · 约 1 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j07.html">← 卷 07</a>
+  <a href="../juan/j09.html">卷 09 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 08<span>·</span>启动链<span>·</span>第 03 篇</div>
+  <h1>i.MX6ULL 与启动链路</h1>
+  <p class="lede">板子按下电源到出现 shell 提示符，中间只跑了一件事：把四个镜像依次搬到内存里，最后交棒给内核。这一章把这条链拆开。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 10 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+    <div class="viz" data-kind="flow" data-title="从按下电源到出现登录提示" data-sub="五个阶段，每个阶段失败的现象都不一样" data-json='{"play":true,"steps":[{"n":"上电复位","d":"串口一个字都不出 → 查供电/晶振/BOOT 拨码"},{"n":"BootROM","d":"出一串乱码或 ROM 信息 → 查启动介质"},{"n":"U-Boot","d":"出 U-Boot 版本号就说明 DDR 通了"},{"n":"内核解压","d":"Starting kernel... 后卡住 → 查设备树/内存"},{"n":"挂载根文件系统","d":"Kernel panic, no init found → 查 root= 参数"},{"n":"init 启动","d":"出现 shell 提示符 → 系统活了"}],"note":"这张图是排障地图：串口停在哪一步，问题就在那一步。不要跳步猜，先确定「死在哪」再动手。"}'></div>
+
+
+    <div class="card">
+      <h4>本章目标</h4>
+      <p>① 认识 i.MX6ULL 的关键资源；② 记住主要外设的地址；③ 画出五级启动流程并标出加载地址；④ 能读懂串口启动日志的每一段；⑤ 知道启动介质是怎么选的。</p>
+    </div>
+
+    <div class="anim2" data-json='{"title":"第一次上电，串口依次吐什么","hint":"排障从最后一句输出往回推","nodes":[{"k":"拨码开关","s":"选启动介质"},{"k":"BootROM","s":"第一行字"},{"k":"U-Boot","s":"倒计时可打断"},{"k":"内核","s":"一屏 [0.000000]"},{"k":"login","s":"整链通了"}],"frames":[{"i":0,"d":"先确认拨码开关位置，从 SD 还是 eMMC 起，别凭记忆，查原理图。"},{"i":1,"d":"上电后串口打出 BootROM 版本信息。看到这行，说明电源、时钟、串口都对。"},{"i":2,"d":"出现 Hit any key to stop autoboot，按个键停下就进命令行。"},{"i":3,"d":"bootm 之后一串 [ 0.000000] 滚过去，最后停在挂 rootfs。"},{"i":4,"d":"看到 login: 或提示符，说明 BootROM→SPL→U-Boot→内核→rootfs 全链打通。"}],"kind":"chain"}'></div>
+
+    <h2 id="s1">8.1 这颗芯片有什么</h2>
+
+    <table>
+      <thead><tr><th>资源</th><th>参数</th><th>对学习的意义</th></tr></thead>
+      <tbody>
+        <tr><td>CPU</td><td>单核 ARM Cortex-A7，最高 528MHz，带 NEON</td><td>有 MMU，能跑完整 Linux</td></tr>
+        <tr><td>片内 SRAM</td><td>OCRAM 128KB</td><td>启动第一阶段只能用它，装不下 U-Boot</td></tr>
+        <tr><td>外部内存</td><td>DDR3 / LPDDR2，常见 256MB 或 512MB</td><td>内核、根文件系统都跑在这</td></tr>
+        <tr><td>存储</td><td>eMMC、SD 卡、NAND、NOR</td><td>四件套就存在这</td></tr>
+        <tr><td>网络</td><td>ENET1 / ENET2，10/100M</td><td>NFS/TFTP 调试</td></tr>
+        <tr><td>串口</td><td>多路 UART，UART1 常作调试口</td><td>你唯一的生命线</td></tr>
+        <tr><td>其他</td><td>2×CAN、I2C、SPI、LCD、ADC、GPIO 5 组</td><td>第 12 章的实验对象</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s2">8.2 地址空间：程序眼里的世界</h2>
+
+    <p>ARM 的地址空间是统一编址的，读一个地址就是读某个外设寄存器。<strong>写驱动时你操作的 <code>ioremap</code> 地址，就来自这张表。</strong></p>
+
+    <table>
+      <thead><tr><th>区域</th><th>起始地址</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td>DDR</td><td><code>0x80000000</code></td><td>256/512MB 内存，内核与程序在这</td></tr>
+        <tr><td>OCRAM</td><td><code>0x00900000</code></td><td>128KB 片内 SRAM，启动第一阶段用</td></tr>
+        <tr><td>GPT / EPIT</td><td><code>0x02098000</code> 附近</td><td>定时器</td></tr>
+        <tr><td>UART1</td><td><code>0x02020000</code></td><td>调试串口</td></tr>
+        <tr><td>GPIO1</td><td><code>0x0209C000</code></td><td>通用 IO</td></tr>
+        <tr><td>IOMUXC</td><td><code>0x020E0000</code></td><td>引脚复用配置（pinctrl 就是配它）</td></tr>
+        <tr><td>CCM</td><td><code>0x020C4000</code></td><td>时钟控制</td></tr>
+        <tr><td>ENET1 / ENET2</td><td><code>0x02188000</code> / <code>0x020B4000</code></td><td>网卡</td></tr>
+        <tr><td>uSDHC1</td><td><code>0x02190000</code></td><td>SD/eMMC 控制器</td></tr>
+      </tbody>
+    </table>
+
+    <div class="warn">
+      <b>地址以芯片手册为准</b>
+      上表是常见值，用之前必须对照《i.MX6ULL Reference Manual》对应章节。板卡不同、芯片型号后缀不同，个别外设可能不在同一位置。<b>背地址没有意义，会查手册才有意义。</b>
+    </div>
+
+    <h2 id="s3">8.3 五级启动，一级都不能少</h2>
+    <div class="viz" data-kind="timeline" data-title="上电到登录：五级启动" data-sub="每一级都有自己的「第一句日志」" data-json='{"items":[{"t":"①","n":"BootROM","d":"读启动引脚 → 载 SPL","c":"rd"},{"t":"②","n":"SPL","d":"初始化 DDR（最关键）","c":"or"},{"t":"③","n":"U-Boot","d":"命令、网络、加载内核","c":"vi"},{"t":"④","n":"内核","d":"解压、start_kernel","c":"cy"},{"t":"⑤","n":"rootfs","d":"挂载 / 启动 init","c":"gr"}],"note":"串口一片空白 = 卡在①或②（DDR 没起来）；有 U-Boot 但没内核日志 = 卡在③挪④。"}'></div>
+
+
+    <div class="flow">
+      <div class="box"><b>① BootROM</b><span>芯片内部固化<br>上电先跑它</span></div>
+      <div class="arrow">→</div>
+      <div class="box"><b>② IVT + DCD</b><span>镜像头 + 初始化数据<br>配 DDR 时钟与参数</span></div>
+      <div class="arrow">→</div>
+      <div class="box"><b>③ SPL / U-Boot 前半</b><span>在 OCRAM 里跑<br>把 U-Boot 搬进 DDR</span></div>
+      <div class="arrow">→</div>
+      <div class="box"><b>④ U-Boot</b><span>DDR 里运行<br>加载内核与设备树</span></div>
+      <div class="arrow">→</div>
+      <div class="box"><b>⑤ 内核</b><span>解压、初始化、<br>挂载根文件系统、起 init</span></div>
+    </div>
+
+    <h3>每一级到底在干什么</h3>
+
+    <ol class="steps">
+      <li><strong>BootROM</strong>：芯片出厂就烧死的代码，改不了。它只做一件事——按 <code>BOOT_MODE</code> 引脚/熔丝决定从哪个介质（SD、eMMC、USB、NAND）读镜像，然后把镜像头部搬到 OCRAM 的固定位置。<b>它只认特定格式的镜像，这是后面所有烧写工具的基础。</b></li>
+      <li><strong>IVT 与 DCD</strong>：镜像开头有一张「中断向量表」(IVT) 和一段「设备配置数据」(DCD)。DCD 是一串「往某地址写某值」的指令，专门用来<b>初始化 DDR</b>——因为此时 DDR 还不能用，只能靠片内 SRAM 干活。</li>
+      <li><strong>SPL / U-Boot 前半段</strong>：DDR 配好后，把完整的 U-Boot 从存储介质搬进 DDR。之所以要分两段，是因为 <b>OCRAM 只有 128KB，装不下完整 U-Boot（通常几百 KB）</b>。这就是「两级引导」的根本原因。</li>
+      <li><strong>U-Boot</strong>：跑到 DDR 后，初始化串口、网卡、MMC，读环境变量 <code>bootcmd</code>，把 zImage 和设备树搬到指定地址，最后 <code>bootz</code> 跳进内核。</li>
+      <li><strong>内核</strong>：自解压、建立页表、初始化各子系统、解析设备树、挂载根文件系统，最后执行 <code>/sbin/init</code>（或 systemd），这才出现登录提示符。</li>
+    </ol>
+
+    <h3>常见加载地址（示例，非通用）</h3>
+
+    <table>
+      <thead><tr><th>镜像</th><th>地址</th><th>谁放的</th></tr></thead>
+      <tbody>
+        <tr><td>U-Boot 链接地址</td><td><code>0x87800000</code></td><td>编译时 <code>CONFIG_SYS_TEXT_BASE</code> 决定</td></tr>
+        <tr><td>zImage</td><td><code>0x80800000</code></td><td>U-Boot 的 bootcmd 里 <code>fatload</code> 指定</td></tr>
+        <tr><td>设备树 .dtb</td><td><code>0x83000000</code></td><td>同上</td></tr>
+      </tbody>
+    </table>
+
+    <div class="key">
+      <b>这些数字是会变的</b>
+      DDR 大小改了、U-Boot 配置改了、设备树里 memory 节点改了，地址就得跟着调。判断方法：<b>看 U-Boot 的 <code>printenv</code> 输出</b>，那是这块板子真正在用的值，不是抄来的。
+    </div>
+
+    <h2 id="s4">8.4 启动介质是怎么选的</h2>
+
+    <p>i.MX6ULL 有一组 <code>BOOT_MODE[1:0]</code> 引脚（板上通常是拨码开关）：</p>
+
+    <table>
+      <thead><tr><th>模式</th><th>行为</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td>内部 Boot</td><td>从 eMMC / SD / NAND 启动</td><td>正常使用</td></tr>
+        <tr><td>Serial Download</td><td>从 USB OTG 接收镜像（UUU / mfgtool）</td><td><b>系统刷死后的救援通道</b></td></tr>
+      </tbody>
+    </table>
+
+    <p>板子变砖的第一反应不是拆芯片，而是把拨码拨到 Serial Download，用 USB 线和工具重新烧。<strong>这个开关的位置现在就去找，记在笔记里</strong>，以后会救你很多次。</p>
+
+    <h2 id="s5">8.5 读懂串口日志</h2>
+
+    <pre><code>U-Boot 2016.03 (Jun 12 2020 - 10:20:31 +0800)
+CPU:   Freescale i.MX6ULL rev1.1 528 MHz
+DRAM:  512 MiB
+MMC:   FSL_SDHC: 0, FSL_SDHC: 1
+In:    serial
+Out:   serial
+Net:   FEC0, FEC1
+Hit any key to stop autoboot:  0
+...
+Starting kernel ...
+Booting Linux on physical CPU 0x0
+...
+[    0.000000] Memory: 509MB available
+...
+[    2.100000] VFS: Mounted root (ext4 filesystem) readonly on device 179:2.
+[    2.300000] Freeing unused kernel memory
+Please press Enter to activate this console.</code></pre>
+
+    <p>从这段日志能读出四件事：U-Boot 版本与编译时间、DDR 容量、有几个 MMC 设备、内核是否成功挂载根文件系统。<strong>起不来时，日志停在哪一行，问题就在哪一级</strong>：</p>
+
+    <table>
+      <thead><tr><th>卡住位置</th><th>大概率原因</th></tr></thead>
+      <tbody>
+        <tr><td>完全无输出</td><td>串口线/波特率错，或板子根本没启动（供电、拨码）</td></tr>
+        <tr><td>停在 U-Boot 之前</td><td>镜像没烧对，DDR 参数（DCD）不匹配</td></tr>
+        <tr><td>反复打印 <code>Hit any key</code> 后无动作</td><td>bootcmd 路径错、镜像文件不存在</td></tr>
+        <tr><td><code>Starting kernel ...</code> 后死住</td><td>加载地址错、dtb 不对、内核与硬件不匹配</td></tr>
+        <tr><td><code>Kernel panic - No working init found</code></td><td>根文件系统没挂上，或里面没有 init</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s6">8.6 动手任务</h2>
+    <div class="viz" data-kind="compare" data-title="串口日志：正常长什么样，卡住长什么样" data-sub="会读日志，等于会一半的排障" data-json='{"bad":{"t":"起不来的典型结尾","items":["U-Boot 之后没有任何输出 → 内核没被加载或 DDR 参数错","VFS: Unable to mount root → 根文件系统路径/分区错","Kernel panic - not syncing → 内核内部致命错，看上一行"]},"good":{"t":"跑起来的标志","items":["Starting kernel ... 之后紧跟内核版本号与机器名","mmc0: SD 卡识别、eth0 link up","Please press Enter to activate console"]},"note":"把「最后一行」和「第一行异常」一起记，比记整段日志有效。"}'></div>
+
+    <ul class="steps">
+      <li>不看本章，白纸画出五级启动流程，并写出每级运行在哪个存储/内存区域。</li>
+      <li>找到你板子上的 BOOT 拨码开关，查厂商文档确认两种模式怎么拨。</li>
+      <li>板子上电，把串口日志从头到尾存成文本，逐段标注「这是哪一级在打印」。</li>
+      <li>进 U-Boot 执行 <code>bdinfo</code>、<code>printenv</code>，抄下 DRAM 大小、bootcmd、bootargs，和你手上的文档对比，找不同。</li>
+      <li>回答：为什么 U-Boot 不能直接在 OCRAM 里跑完？</li>
+    </ul>
+
+    <h2 id="s7">8.7 验收标准</h2>
+    <ul class="checklist">
+      <li>能画出五级启动链，标出每一级的位置与作用</li>
+      <li>能解释 IVT 和 DCD 各是什么，为什么需要 DCD</li>
+      <li>能说出「为什么要两级引导」，并算出 OCRAM 与 U-Boot 体积的矛盾</li>
+      <li>能找到 UART1、GPIO1、IOMUXC、CCM 的地址，并知道去哪查</li>
+      <li>看到串口日志停住时，能判断问题在哪一级</li>
+      <li>知道 Serial Download 模式怎么进，能用来救砖</li>
+    </ul>
+
+    <footer id="pager"></footer>
+  
+    <!--IVIZ--><div class="iviz" data-kind="steps" data-iviz="1" data-json='{"title":"第一次上电：串口上会依次出现什么","steps":[{"t":"① 拨码开关","d":"先确认从哪启动：SD 卡、eMMC、USB 还是串口下载。开关位置查原理图，别凭记忆。"},{"t":"② BootROM 输出","d":"上电后串口打出类似 Boot ROM 版本的一行字。看到了说明电源、时钟、串口都对。"},{"t":"③ U-Boot 倒计时","d":"出现 Hit any key to stop autoboot。按个键停下，就进了 U-Boot 命令行。"},{"t":"④ 加载内核","d":"U-Boot 把 zImage 与 dtb 搬到 DDR 指定地址，bootm 跳进去。地址错了就是静默死机。"},{"t":"⑤ 内核日志","d":"一串 [ 0.000000] 开头的行滚过去，最后停在挂载 rootfs。"},{"t":"⑥ 登录提示","d":"看到 login: 或 shell 提示符，说明整条链通了。"}],"note":"排障顺序永远是「从最后一句输出往下猜」，而不是从第一个怀疑对象开始换件。"}'></div>
+  
+
+<nav class="pager">
+  <a href="course-36.html"><span>← 上一篇</span><b>启动链</b></a>
+  <a class="nx" href="course-th09.html"><span>下一篇 →</span><b>内核怎么起来：head.S → start_kernel → init</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第 00 章 · 六份文档，别拿错 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<link rel="stylesheet" href="../assets/asm.css">
+</head><body style="--acc:#8b7bff">
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="index.html">☰ 手册目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">看懂一份芯片手册 · 8 篇</div>
+    <ol>
+      <li><a href="index.html"><span class="no">⌂</span><span>路口目录<span class="sub">篇目总览与读法</span></span></a></li>
+      <li><a href="m0.html" class="active"><span class="no">00</span><span>六份文档，别拿错<span class="sub">Datasheet / RM / AN / 勘误 / 原理图 / dts 各管什么</span></span></a></li>
+      <li><a href="m1.html"><span class="no">01</span><span>拿到手册，先做四件事<span class="sub">建索引、画内存图、找时钟树、贴引脚表</span></span></a></li>
+      <li><a href="m2.html"><span class="no">02</span><span>Datasheet 怎么读：只读五处<span class="sub">订货型号、绝对最大额定、电气特性、引脚定义、封装</span></span></a></li>
+      <li><a href="m3.html"><span class="no">03</span><span>Reference Manual 一章的固定骨架<span class="sub">概述 → 功能 → 外部信号 → 时钟 → 寄存器 → 初始化流程</span></span></a></li>
+      <li><a href="m4.html"><span class="no">04</span><span>寄存器表怎么逐列读<span class="sub">偏移、位域、Reserved、R/W、W1C、复位值</span></span></a></li>
+      <li><a href="m5.html"><span class="no">05</span><span>四个真实例子：从手册到代码<span class="sub">CCM、IOMUXC、UART、GPIO 各走一遍</span></span></a></li>
+      <li><a href="m6.html"><span class="no">06</span><span>从板子上的一个脚，查到 dts 一行<span class="sub">原理图 → 引脚名 → 复用功能 → 设备树节点</span></span></a></li>
+      <li><a href="m7.html"><span class="no">07</span><span>八个坑，和一张速查<span class="sub">页码对不上、复位值不算、W1C 写 1 才清…</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="../hardware/index.html">硬件入口</a><a href="../juan/index.html">十四卷总览</a></div>
+  </aside>
+  <main class="doc">
+    <div class="doc-kicker">芯片手册研读 · i.MX6ULL <span>·</span> 第 00 章</div>
+    <div class="ch-head">
+      <h1>六份文档，别拿错</h1>
+      <div class="ch-meta"><span class="hot">第 00 章</span><span>约 14 分钟</span><span>★ 必读</span></div>
+    </div>
+<h2 id="s1">六份文档，回答六类不同的问题</h2>
+<table class="regtbl"><thead><tr><th>文档</th><th>通常叫什么</th><th>回答什么问题</th><th>什么时候翻</th></tr></thead><tbody><tr><td class="nm">Datasheet</td><td>数据手册</td><td>这个芯片的电气极限、引脚有哪些、几伏几瓦、能不能买</td><td>选型、画板、算电源</td></tr><tr><td class="nm">Reference Manual</td><td>RM / 参考手册</td><td>每个模块的寄存器在哪、每位什么意思、模块怎么工作</td><td>写驱动、调试、看内核代码</td></tr><tr><td class="nm">Errata</td><td>勘误表</td><td>这个芯片有哪些已知缺陷、怎么绕</td><td>遇到「按手册写却不工作」</td></tr><tr><td class="nm">Application Note</td><td>AN / 应用笔记</td><td>官方推荐的电路与流程（DDR 校准、USB、电源时序）</td><td>画板、移植关键模块</td></tr><tr><td class="nm">原理图 + 硬件设计指南</td><td>Schematic / HW Design Guide</td><td>板子上到底怎么连的、上拉在哪、晶振几兆</td><td>定位引脚、排查硬件</td></tr><tr><td class="nm">dts + 内核驱动源码</td><td>设备树 / 源码</td><td>别人已经怎么配的、字段叫什么</td><td>抄作业、对照</td></tr></tbody></table>
+<p>一条最常见的错位：<b>拿 Datasheet 去查寄存器</b>。Datasheet 里确实有寄存器章节，但只有「几页摘要」，完整定义在 RM 里。反过来，<b>拿 RM 去查某个引脚能接几伏</b>——RM 不管电气特性，那在 Datasheet。</p>
+<h2 id="s2">三份文档的命名规则</h2>
+<p>拿到 PDF 先看标题里的芯片型号后缀，这是判断「这份能不能用」的第一步。</p>
+<ul>
+<li><b>Datasheet</b>：型号主体 + 后缀，后缀编码了「温度等级 / 封装 / 主频」。同一个 i.MX6ULL，工业级和消费级是不同的料号。</li>
+<li><b>RM</b>：一份 RM 覆盖同一家族多个型号（i.MX6ULL 与 i.MX6UL 的 RM 常常合订）。因此<b>章节里出现你不认识的模块，可能只是这颗芯片没做</b>——先看该章开头的 "This chip does not..." 说明。</li>
+<li><b>Errata</b>：文件名里带芯片的硅版本号（silicon revision）。同一型号不同批次，勘误条目可能不同。查勘误前先确认你手上的片子是哪个 revision（一般印在芯片丝印或可读的系统寄存器里）。</li>
+</ul>
+<h2 id="s3">手册里的「实例号」是关键</h2>
+<p>i.MX6ULL 有 8 个 UART、4 个 I2C、2 个 FlexCAN……手册里统一写成 <code>UART1</code>–<code>UART8</code>。这些编号不是「第几个」，而是<b>独立的硬件实例</b>，各有自己的基地址与时钟门控位。</p>
+<p>所以：</p>
+<ul>
+<li>查寄存器时，寄存器名通常是通用的（<code>UART_URXD</code>），但地址按实例不同（<code>UART1</code> 基址 <code>0x02020000</code>、<code>UART2</code> 基址 <code>0x02024000</code> 之类，具体以 RM 的 Memory Map 为准）。</li>
+<li>内核里对应 <code>uart1</code>–<code>uart8</code> 的设备树节点，别把 <code>uart3</code> 写成 <code>uart2</code>——这种错误表现是「串口完全没输出」，极难一眼看出来。</li>
+</ul>
+<p><b>引脚名的规则</b>同样重要：<code>GPIO1_IO03</code> 是「GPIO 模块 1 的第 3 号」，而它在 IOMUXC 里的寄存器名是 <code>SW_MUX_CTL_PAD_GPIO1_IO03</code>。同一个物理脚还有第三种叫法（球号，比如 <code>BGA</code> 上的 <code>A15</code>）。三者要在脑子里有映射，06 篇讲怎么建这张表。</p>
+<h2 id="s4">为什么「先读 RM 的目录」比「先读正文」重要</h2>
+<p>RM 是字典。字典的正确用法是先知道词在哪一页。i.MX6ULL 的 RM 目录结构是固定的：</p>
+<pre class="asm"><code>Chapter 1  Introduction（芯片总览、框图、地址映射入口）
+Chapter 2  ……
+每个外设一章：CCM / IOMUXC / GPIO / UART / I2C / SPI / eMMC / ENET / LCDIF / CSI ……
+靠后的章节：系统模块（SRC、WDOG、GPT、EPIT、GPC）与附录（引脚复用总表）</code></pre>
+<p>两个必须记住的入口：</p>
+<ul>
+<li><b>Memory Map</b>（在 Introduction 章或单独的 System Memory Map 一节）：所有模块基地址一张表。</li>
+<li><b>Signal Multiplexing</b>（在 IOMUXC 章末尾，有时单独成附录）：所有引脚 × 所有复用功能的一张巨表。这张表是全手册最该收藏的部分。</li>
+</ul>
+<h2 id="s5">一份「够用」的资料夹</h2>
+<p>实际干活时，桌面开六个东西就够，不用每次翻两千页：</p>
+<ol>
+<li>RM 的 PDF（带书签），搜关键词用。</li>
+<li>Datasheet 的引脚表（打印一页贴在桌上）。</li>
+<li>板子的原理图 PDF（能搜索网络名）。</li>
+<li><code>dts</code> 与厂商提供的 <code>dtsi</code>。</li>
+<li>一份自己的笔记（按「模块 / 基址 / 关键位 / 踩过的坑」记）。</li>
+<li>Errata（遇到怪现象才翻，但要有）。</li>
+</ol>
+<h2 id="s6">本篇验收</h2>
+<ul>
+<li>能说出 Datasheet 与 RM 各自回答哪类问题，并举一个「拿错会浪费半天」的例子。</li>
+<li>能解释「实例号」是什么，为什么 <code>UART3</code> 与 <code>UART2</code> 不能混。</li>
+<li>能说出 RM 里两张必须记住的表在哪（Memory Map、Signal Multiplexing）。</li>
+<li>拿到一份新芯片的 PDF，30 秒内能判断「这份是 Datasheet 还是 RM」。</li>
+</ul>
+<h2 id="s7">下一篇</h2>
+<p>认清文档之后，下一步不是读，而是<b>做四件准备工作</b>：建索引、画内存图、找时钟树、贴引脚表。01 篇把这四件事的顺序和做法讲清——做完之后，你查任何一个外设都不会乱翻。</p>
+<div class="pager">
+      <a href="index.html"><span>返回</span><b>← 路口目录</b></a>
+      <a href="index.html"><span>目录</span><b>篇目总览</b></a>
+      <a class="nx" href="m1.html"><span>下一篇</span><b>01 拿到手册，先做四件事 →</b></a>
+    </div>
+  </main>
+</div>
+<script src="../assets/asm-tools.js"></script>
+</body>
+</html>

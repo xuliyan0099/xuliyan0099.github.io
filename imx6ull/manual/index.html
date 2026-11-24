@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>看懂一份芯片手册 · 8 篇 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<link rel="stylesheet" href="../assets/asm.css">
+</head><body style="--acc:#8b7bff">
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">看懂一份芯片手册 · 8 篇</div>
+    <ol>
+      <li><a href="index.html" class="active"><span class="no">⌂</span><span>路口目录<span class="sub">怎么读、读什么</span></span></a></li>
+      <li><a href="m0.html"><span class="no">00</span><span>六份文档，别拿错<span class="sub">Datasheet / RM / AN / 勘误 / 原理图 / dts 各管什么</span></span></a></li>
+      <li><a href="m1.html"><span class="no">01</span><span>拿到手册，先做四件事<span class="sub">建索引、画内存图、找时钟树、贴引脚表</span></span></a></li>
+      <li><a href="m2.html"><span class="no">02</span><span>Datasheet 怎么读：只读五处<span class="sub">订货型号、绝对最大额定、电气特性、引脚定义、封装</span></span></a></li>
+      <li><a href="m3.html"><span class="no">03</span><span>Reference Manual 一章的固定骨架<span class="sub">概述 → 功能 → 外部信号 → 时钟 → 寄存器 → 初始化流程</span></span></a></li>
+      <li><a href="m4.html"><span class="no">04</span><span>寄存器表怎么逐列读<span class="sub">偏移、位域、Reserved、R/W、W1C、复位值</span></span></a></li>
+      <li><a href="m5.html"><span class="no">05</span><span>四个真实例子：从手册到代码<span class="sub">CCM、IOMUXC、UART、GPIO 各走一遍</span></span></a></li>
+      <li><a href="m6.html"><span class="no">06</span><span>从板子上的一个脚，查到 dts 一行<span class="sub">原理图 → 引脚名 → 复用功能 → 设备树节点</span></span></a></li>
+      <li><a href="m7.html"><span class="no">07</span><span>八个坑，和一张速查<span class="sub">页码对不上、复位值不算、W1C 写 1 才清…</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="../hardware/index.html">硬件入口</a><a href="../asm/index.html">汇编练习</a></div>
+  </aside>
+
+  <main class="doc">
+    <div class="doc-kicker">芯片手册研读 · i.MX6ULL</div>
+    <h1>看懂一份芯片手册<br><em>1396 页不是拿来通读的</em></h1>
+    <p class="lede">NXP 给的文档一共六份、将近两千页。没人从头读到尾，每一页都是被一个具体问题叫出来的：这个脚能复用成什么、这两位是干什么的、为什么时钟没开写进去没反应。这里把它拆成八篇，每篇解决一类问题。</p>
+
+    <div class="rt-hero">
+      <h2>一句话：手册是字典，不是小说</h2>
+      <p>查字典的前提是知道「要查哪个词」。绝大多数人卡住，不是看不懂英文，而是不知道该翻哪一份、哪一章、哪一张表。八篇之后，你应该能从「板子上一个不亮的 LED」倒推出要查的三张表，并在十分钟内查到那两位。</p>
+    </div>
+
+    <h2>8 篇的路线</h2>
+    <p>八篇可以顺着读，也可以当工具书用：遇到具体问题直接跳对应一篇。05、06 两篇是核心，其余是准备与善后。</p>
+    <table class="chs">
+      <thead><tr><th>章</th><th>篇目</th><th class="m">用时</th></tr></thead>
+      <tbody>
+      <tr>
+        <td class="no">00</td>
+        <td class="ti"><a href="m0.html">六份文档，别拿错</a><span>Datasheet / RM / AN / 勘误 / 原理图 / dts 各管什么</span></td>
+        <td class="m">约 14 分钟</td>
+      </tr>
+      <tr>
+        <td class="no">01</td>
+        <td class="ti"><a href="m1.html">拿到手册，先做四件事</a><span>建索引、画内存图、找时钟树、贴引脚表</span></td>
+        <td class="m">约 18 分钟</td>
+      </tr>
+      <tr>
+        <td class="no">02</td>
+        <td class="ti"><a href="m2.html">Datasheet 怎么读：只读五处</a><span>订货型号、绝对最大额定、电气特性、引脚定义、封装</span></td>
+        <td class="m">约 22 分钟</td>
+      </tr>
+      <tr>
+        <td class="no">03</td>
+        <td class="ti"><a href="m3.html">Reference Manual 一章的固定骨架</a><span>概述 → 功能 → 外部信号 → 时钟 → 寄存器 → 初始化流程</span></td>
+        <td class="m">约 20 分钟</td>
+      </tr>
+      <tr>
+        <td class="no">04</td>
+        <td class="ti"><a href="m4.html">寄存器表怎么逐列读</a><span>偏移、位域、Reserved、R/W、W1C、复位值</span></td>
+        <td class="m">约 26 分钟</td>
+      </tr>
+      <tr>
+        <td class="no">05</td>
+        <td class="ti"><a href="m5.html">四个真实例子：从手册到代码</a><span>CCM、IOMUXC、UART、GPIO 各走一遍</span></td>
+        <td class="m">约 32 分钟</td>
+      </tr>
+      <tr>
+        <td class="no">06</td>
+        <td class="ti"><a href="m6.html">从板子上的一个脚，查到 dts 一行</a><span>原理图 → 引脚名 → 复用功能 → 设备树节点</span></td>
+        <td class="m">约 24 分钟</td>
+      </tr>
+      <tr>
+        <td class="no">07</td>
+        <td class="ti"><a href="m7.html">八个坑，和一张速查</a><span>页码对不上、复位值不算、W1C 写 1 才清…</span></td>
+        <td class="m">约 20 分钟</td>
+      </tr>
+      </tbody>
+    </table>
+
+    <h2>读完这个路口，你应该能</h2>
+    <ul>
+      <li>能说清 Datasheet 与 Reference Manual 各回答什么问题，不再拿错文档</li>
+      <li>拿到一个新外设，能按固定顺序找到「基地址、时钟、引脚、寄存器位域」四样东西</li>
+      <li>能逐列读一张寄存器表，把 Reserved / R/W / W1C / 复位值都读对</li>
+      <li>能把手册上的一个位域，翻译成四条读写代码（读、清、置、写回）</li>
+      <li>能从原理图上的一根线，查到 dts 里该写哪一行</li>
+    </ul>
+
+    <h2>配套工具与料</h2>
+    <div class="flow">
+      <div><b>寄存器解码器（04 篇）</b>给一个 32 位数，逐步拆出位域并打印每个字段的含义，练「位域不是从任意位置开始的」。</div>
+      <div><b>查表路径图（07 篇）</b>从「板上一个脚」到「dts 一行」的完整链路，每一步都标了该翻哪份文档的哪类表。</div>
+    </div>
+
+    <div class="pager">
+      <a href="../hardware/index.html"><span>返回</span><b>← 硬件入口</b></a>
+      <a class="nx" href="m0.html"><span>开始</span><b>00 六份文档，别拿错 →</b></a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

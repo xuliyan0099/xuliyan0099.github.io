@@ -1,0 +1,314 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>总线体系：AXI / AHB / APB 与 I2C / SPI / CAN · 卷 07 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j07.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 07 · 芯片与硬件底座</div>
+<ol><li><a href="course-th07.html">
+  <span class="no">01</span><span>ARM 架构与 Cortex-A7<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-35.html">
+  <span class="no">02</span><span>i.MX6ULL 最小系统<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th10.html" class="active">
+  <span class="no">03</span><span>总线体系：AXI / AHB / APB 与 I2C / SPI / CAN<span class="sub">约 4 小时 · 当前</span></span></a></li>
+<li><a href="course-th11.html">
+  <span class="no">04</span><span>时钟树、复位、电源域、RTC 与看门狗<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-th12.html">
+  <span class="no">05</span><span>最小系统必需外设（上）：DDR、中断、定时器、GPIO、UART<span class="sub">约 6 小时</span></span></a></li>
+<li><a href="course-th13.html">
+  <span class="no">06</span><span>最小系统必需外设（下）：存储、DMA、以太网、USB<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-37.html">
+  <span class="no">07</span><span>设备树<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th16.html">
+  <span class="no">08</span><span>BSP 与设备树原理<span class="sub">约 6 小时</span></span></a></li>
+<li><a href="course-38.html">
+  <span class="no">09</span><span>总线<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-39.html">
+  <span class="no">10</span><span>GIC 与定时器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-40.html">
+  <span class="no">11</span><span>存储与外设<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="viz-clock-tree.html">
+  <span class="no">12</span><span>互动台：时钟树与门控<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="viz-gpio.html">
+  <span class="no">13</span><span>互动台：GPIO 与 IOMUX 配置<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="viz-nvic.html">
+  <span class="no">14</span><span>互动台：中断优先级与抢占<span class="sub">💻 · 约 1 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j06.html">← 卷 06</a>
+  <a href="../juan/j08.html">卷 08 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 07<span>·</span>芯片与硬件底座<span>·</span>第 03 篇</div>
+  <h1>总线体系：AXI / AHB / APB 与 I2C / SPI / CAN</h1>
+  <p class="lede">「地址对了却读不到」「写寄存器没反应」「I2C 一直 NACK」——这些现象几乎都出在总线层。这一章从 SoC 内部的三级互连讲到板上的两根线，把「一次寄存器读」和「一次 I2C 传输」的物理过程讲完。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 4 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+    <div class="viz" data-kind="seq" data-title="AXI 一次读传输的握手" data-sub="VALID 与 READY 同时为高的那个沿，数据才有效" data-json='{"slots":18,"scan":true,"sigs":[{"n":"ACLK","w":"101010101010101010","c":"cy"},{"n":"ARVALID","w":"011111111000000000","c":"vi"},{"n":"ARREADY","w":"001111000000000000","c":"gr","note":"高电平重叠处才算握手成功"},{"n":"RVALID","w":"000001111111000000","c":"or"},{"n":"RDATA","w":"000000111111000000","c":"or","note":"数据在 RVALID 期间一直有效"}],"note":"总线传输不是「发出去就到」，而是两边各举一个旗子（VALID/READY），两个旗子同时举起的时钟沿才成交。慢速外设靠一直不举 READY 来拖住总线——这就是「插入等待周期」。"}'></div>
+
+
+    <div class="card">
+      <h4>本章要解决的问题</h4>
+      <p>① CPU 读写一个外设寄存器，信号在路上经过什么；② AXI/AHB/APB 为什么要分三级；③ 为什么访问外设前必须先开时钟，不开会「挂死」；④ I2C、SPI、CAN 的时序差在哪；⑤ 寄存器位域为什么不能直接赋值。</p>
+    </div>
+
+    <div class="card">
+      <h4>读完你应该能回答</h4>
+      <ul>
+        <li>一次 32 位寄存器读，从 CPU 发出地址到拿到数据，经过哪几级？</li>
+        <li>CCGR 寄存器是干什么的？漏开时钟会有什么现象？</li>
+        <li>I2C 的 ACK 是谁发的？为什么上拉电阻不能省？</li>
+        <li>SPI 的四种模式由哪两个参数决定？</li>
+        <li>「写 1 清 0」和「读清」两种标志位，操作方式差在哪？</li>
+      </ul>
+    </div>
+
+    <div class="anim2" data-json='{"title":"一次寄存器访问穿过几层总线","hint":"越往外越慢","nodes":[{"k":"CPU 核","s":"发地址"},{"k":"AXI","s":"高速互连"},{"k":"AHB","s":"中速外设"},{"k":"APB","s":"慢速外设"},{"k":"I2C 传感器","s":"片外两根线"}],"frames":[{"i":0,"d":"CPU 发出读地址，先经过 L1/L2 Cache 判断是否命中。"},{"i":1,"d":"未命中就到 AXI：CPU、DDR 控制器、DMA 挂在这里，支持突发与乱序，带宽最高。"},{"i":2,"d":"AHB 桥把高速侧转成单笔交易，eMMC、LCD 控制器这类设备挂在这一层。"},{"i":3,"d":"APB 再降一档，UART、GPIO、定时器挂这里，一次读写要几个到十几个周期。"},{"i":4,"d":"真正的传感器在片外：I2C 两根线，100kHz 下一位 10 微秒，读一个字节要几百微秒。"}],"kind":"flow"}'></div>
+
+    <h2 id="s1">1. SoC 内部的三级互连</h2>
+
+    <p>芯片内部不是「所有外设都挂在一条总线上」，而是按速度分层。i.MX6ULL 用的是 ARM 的 NIC（Network Interconnect）架构，概念上分三级：</p>
+
+    <table>
+      <thead><tr><th>层级</th><th>全称</th><th>特点</th><th>挂什么</th></tr></thead>
+      <tbody>
+        <tr><td><b>AXI</b></td><td>Advanced eXtensible Interface</td><td>高性能、可乱序、多通道（读写分离）、支持突发传输</td><td>CPU、DDR 控制器、DMA、显示控制器</td></tr>
+        <tr><td><b>AHB</b></td><td>Advanced High-performance Bus</td><td>中等性能、单时钟沿、突发有限</td><td>USB、SD/eMMC、以太网 MAC</td></tr>
+        <tr><td><b>APB</b></td><td>Advanced Peripheral Bus</td><td>低速、简单、每次一笔传输</td><td>UART、I2C、SPI、GPIO、定时器、看门狗</td></tr>
+      </tbody>
+    </table>
+
+    <p>分层的原因很现实：<b>DDR 需要每次搬 64 字节甚至更多，而 UART 的一个寄存器只要 4 字节</b>。如果全用最高速的总线，面积和功耗都浪费；如果全用最低速的，CPU 取指都会被拖慢。所以中间用「桥」（bridge）把不同速度的域隔开：CPU 访问 APB 外设时，请求要经过 AXI→AHB→APB 两级桥，每次桥都增加几个周期延迟。</p>
+
+    <p>这也解释了一个实际现象：<b>访问 GPIO 寄存器比访问 DDR 慢</b>。不是因为 GPIO 本身慢，而是路径长（多两级桥）+ 通常 uncached（每次都要真的走到硬件）。</p>
+
+    <h2 id="s2">2. 一次寄存器读的物理过程</h2>
+
+    <p>以 <code>readl(GPIO1_BASE + DR)</code> 为例，信号层面发生的是：</p>
+
+    <div class="flow">
+      <span>CPU 发地址</span><span>→</span><span>AXI 主机端口</span><span>→</span><span>地址译码</span><span>→</span><span>桥转发到 APB</span><span>→</span><span>从设备选中</span><span>→</span><span>寄存器值上数据线</span><span>→</span><span>沿原路返回</span>
+    </div>
+
+    <ol>
+      <li><b>地址译码</b>：互连里有一张地址映射表，判断这个地址属于哪个从设备（比如 0x0209_C000 落在 GPIO1 的窗口）。不属于任何设备，就会返回总线错误（在 ARM 上表现为 Abort，内核里可能直接 panic）。</li>
+      <li><b>桥转换</b>：AXI 的协议（含 ID、突发长度、QoS）要翻译成 APB 的简单「地址+选通+读写」。这一步会插入等待周期。</li>
+      <li><b>从设备响应</b>：外设可能「还没准备好」，它会拉低 <code>HREADY</code>/插入 wait state，总线就停在那里等。这就是为什么慢外设会拖慢 CPU。</li>
+      <li><b>返回数据</b>：32 位值沿原路回到 CPU 寄存器。</li>
+    </ol>
+
+    <div class="key">
+      <b>关键认知：总线是「同步握手」的</b>
+      主设备发请求后必须等从设备回应，不是发出去就完事。所以一次外设访问的耗时不由 CPU 主频决定，而由<b>最慢的那个环节</b>决定（桥延迟 + 外设等待周期）。
+    </div>
+
+    <h2 id="s3">3. 时钟门控：不开时钟，总线会「挂死」</h2>
+    <div class="viz" data-kind="seq" data-title="一次 AXI 读：握手信号怎么走" data-sub="VALID 与 READY 同时为高的那一拍才算数" data-json='{"slots":22,"sigs":[{"n":"ARVALID","w":"0..1.......0..................","c":"cy"},{"n":"ARREADY","w":"0....1.....0..................","c":"vi","note":"从机拉高才成交"},{"n":"RVALID","w":"0.......1.....0...............","c":"or"},{"n":"RREADY","w":"0.........1...0...............","c":"gr"}],"note":"从机可以无限期不拉 READY（总线挂死就是这么来的）。所以读寄存器也要有超时保护。"}'></div>
+
+
+    <p>这是 i.MX6ULL 上最容易踩的坑。SoC 里每个外设的时钟都是<b>单独门控</b>的（为了省电），由 CCM 的 <b>CCGR</b> 寄存器组控制。时钟没开时访问该外设会发生什么？</p>
+
+    <p>不是「读到 0」，而是<b>总线永远等不到响应</b>：从设备没有时钟就不会拉 HREADY，主设备就一直等，最终 CPU 卡死在这一条 load 指令上。现象是：</p>
+
+    <ul>
+      <li>系统看起来「死机」，串口也不打印（因为串口自己的时钟可能也受影响）。</li>
+      <li>用 JTAG 挂上去看，PC 停在某条 <code>ldr</code> 上，且该地址正是你访问的外设。</li>
+    </ul>
+
+    <p>所以裸机/U-Boot 阶段的铁律是：<b>先开时钟，再碰寄存器</b>。顺序反了就是硬挂死，不是软件报错。这也是 T11 要把时钟树单独讲一章的原因。</p>
+
+    <div class="calc">
+      <h5>算一笔：为什么「先开时钟」能救命</h5>
+      <div class="line">不开时钟：访问 → 从设备无响应 → 主设备等待 → 无超时机制 → CPU 永久停在该指令</div>
+      <div class="line">开了时钟：访问 → 从设备 1–3 个周期响应 → 正常返回</div>
+      <div class="line">代价对比：多写一个寄存器（几纳秒）vs 整机挂死（只能复位）</div>
+      <div class="line">所以在驱动 probe 的依赖链里，<code>clk_prepare_enable()</code> 永远排在寄存器访问之前</div>
+    </div>
+
+    <p>Linux 里这件事由 clock framework 代管：你在 dts 里写 <code>clocks = &lt;&amp;clks IMX6UL_CLK_GPIO1&gt;</code>，驱动里 <code>clk_prepare_enable()</code>，内核会自动去操作 CCGR。所以「设备树写对了但时钟没配」是常见的一类 probe 失败。</p>
+    <h2 id="s4">4. 板级总线：四根线以内的世界</h2>
+
+    <p>SoC 内部靠并行总线，芯片之间靠串行总线。嵌入式最常打交道的四种，行为差别很大：</p>
+
+    <table>
+      <thead><tr><th>总线</th><th>线数</th><th>速率（典型）</th><th>拓扑</th><th>典型器件</th></tr></thead>
+      <tbody>
+        <tr><td><b>I2C</b></td><td>2（SCL/SDA）</td><td>100k / 400k / 1M</td><td>多主多从，靠地址区分</td><td>EEPROM、PMIC、传感器、触摸屏</td></tr>
+        <tr><td><b>SPI</b></td><td>4（SCK/MOSI/MISO/CS）</td><td>几 MHz – 几十 MHz</td><td>一主多从，靠片选区分</td><td>Flash、LCD、ADC、无线模块</td></tr>
+        <tr><td><b>CAN</b></td><td>2（CANH/CANL，差分）</td><td>125k – 1M</td><td>多主，报文 ID 仲裁</td><td>汽车电子、电机控制器</td></tr>
+        <tr><td><b>USB</b></td><td>2（D+/D-）</td><td>12M / 480M</td><td>主机–从机（星型）</td><td>U 盘、摄像头、串口转换</td></tr>
+      </tbody>
+    </table>
+
+    <h3>4.1 I2C：两根线怎么谈成一笔交易</h3>
+
+    <p>I2C 只有 SCL（时钟）与 SDA（数据），且两者都是<b>开漏输出</b>，必须外接上拉电阻。这个硬件细节直接决定了协议行为：</p>
+
+    <ul>
+      <li><b>线与逻辑</b>：任何设备都可以把线拉低，但只有所有设备都放手时线才为高。所以「拉低」代表「有人在说话」。</li>
+      <li><b>ACK</b>：主机发完 8 位（7 位地址 + 1 位读写方向）后释放 SDA，从机如果存在就把 SDA 拉低一个时钟——这就是 ACK。没拉低就是 NACK，含义是「这个地址没人」或「我不收了」。</li>
+      <li><b>时钟拉伸</b>：从机忙不过来时可以一直拉低 SCL，主机就会等——这是 I2C 唯一的流控手段。</li>
+      <li><b>没有上拉或阻值过大</b>：上升沿变慢，高速下波形变成「圆角」，表现为随机 NACK、数据错位。这是 I2C 调试最常见的硬件问题。</li>
+    </ul>
+
+    <p>一次典型的「读寄存器」交易（以常见的传感器为例）分两段：<b>写寄存器地址（NACK 前结束）→ 重复起始 → 读数据</b>。Linux 的 <code>i2c_smbus_read_byte_data()</code> 就是这两段的封装。</p>
+
+    <h3>4.2 SPI：四个参数决定能不能通</h3>
+
+    <p>SPI 是全双工、无地址、无 ACK 的总线。它的「配置」几乎全在时序上，四个关键参数：</p>
+
+    <table>
+      <thead><tr><th>参数</th><th>含义</th><th>配错了会怎样</th></tr></thead>
+      <tbody>
+        <tr><td><b>CPOL</b></td><td>空闲时 SCK 是高还是低</td><td>采错边沿，收到全 0 或全 1</td></tr>
+        <tr><td><b>CPHA</b></td><td>在第一个还是第二个边沿采样</td><td>数据整体移位一位，值全错</td></tr>
+        <tr><td><b>位宽</b></td><td>8 位 / 16 位 / 32 位</td><td>字节序与对齐全乱</td></tr>
+        <tr><td><b>速率</b></td><td>SCK 频率</td><td>超过从设备上限就随机出错</td></tr>
+      </tbody>
+    </table>
+
+    <p>CPOL 与 CPHA 组合出四种模式（Mode 0–3）。<b>Mode 0（CPOL=0, CPHA=0）最常见</b>：空闲低电平，上升沿采样。设备手册一定会写它用哪个模式，抄错就完全读不出数据，而且现象往往是「读回 0x00 或 0xFF」——这时候先查模式，不要怀疑接线。</p>
+
+    <p>片选（CS）也常出问题：<b>有些器件要求 CS 在整个传输期间保持低电平</b>，如果驱动在每次读写之间把 CS 抬高，器件会把它当成两笔独立命令，行为就错乱了。</p>
+
+    <h2 id="s5">5. 寄存器操作的五个陷阱</h2>
+
+    <p>寄存器不是普通内存，它有「写进去不一定立刻生效」「读出来会清掉」这些硬件语义。五条必须记住的规则：</p>
+
+    <div class="steps">
+      <ol>
+        <li><b>不要直接赋值，要读-改-写。</b> <code>writel(1, base+CTRL)</code> 会把整个寄存器其他位清零，关掉别人的功能。正确做法：先 <code>readl</code>，再置位/清位，最后写回。</li>
+        <li><b>写 1 清 0 型标志位</b>：写 0 没效果。典型是中断状态寄存器。若你写 <code>writel(0, p)</code> 想「清零」，只会什么都不发生，中断永远不清。</li>
+        <li><b>读清型标志位</b>：读完自动清零。这类位不能「先读一遍看状态，再决定要不要处理」——你一读就已经清掉了。</li>
+        <li><b>自清型动作位</b>：写 1 触发一次动作，硬件做完自己清 0。不要「写完再读回来确认」（可能已经被清掉）。</li>
+        <li><b>写完可能要 <code>dsb()</code></b>：若后续动作依赖这次写已生效（例如打开时钟后再访问外设），中间要有屏障，否则流水线可能让后一条访问先到（见 T07）。</li>
+      </ol>
+    </div>
+
+    <h2 id="s6">6. 八个常见误解</h2>
+    <div class="viz" data-kind="matrix" data-title="板级总线：四条以内的线，各管一段" data-sub="线越少，协议越复杂" data-json='{"corner":"总线","cols":["线数","速率量级","挂几个","典型设备"],"rows":[{"n":"I2C","cells":[{"v":"2（SCL/SDA）","c":"cy"},{"v":"100k~1M","c":"gray"},{"v":"多，靠地址","c":"gr"},{"v":"EEPROM、PMIC、传感器","c":"gray"}]},{"n":"SPI","cells":[{"v":"4（CLK/MOSI/MISO/CS）","c":"vi"},{"v":"几 MHz~几十","c":"gray"},{"v":"每设备一根 CS","c":"or"},{"v":"Flash、LCD、AD 转换","c":"gray"}]},{"n":"UART","cells":[{"v":"2（TX/RX）","c":"or"},{"v":"115200 起","c":"gray"},{"v":"点对点","c":"rd"},{"v":"串口控制台、GPS","c":"gray"}]},{"n":"CAN","cells":[{"v":"2（CANH/L）","c":"gr"},{"v":"125k~1M","c":"gray"},{"v":"几十，带仲裁","c":"gr"},{"v":"车载、工业","c":"gray"}]}],"note":"选型口诀：要地址就 I2C、要带宽就 SPI、只要一根线对话就 UART、要抗干扰多主仲裁就 CAN。"}'></div>
+
+
+    <table>
+      <thead><tr><th>误解</th><th>真相</th></tr></thead>
+      <tbody>
+        <tr><td>「所有外设都挂在一根总线上」</td><td>是分级的互连：AXI / AHB / APB，中间有桥，访问不同外设延迟不同。</td></tr>
+        <tr><td>「地址对就能访问」</td><td>还要地址译码命中、设备时钟开启、总线没被占用、权限允许。</td></tr>
+        <tr><td>「时钟没开最多读到 0」</td><td>更可能是总线永久等待、CPU 硬挂死，只能复位。</td></tr>
+        <tr><td>「I2C 的 ACK 是主机发的」</td><td>写操作时 ACK 由从机发；读操作的最后一个字节由主机发 NACK 表示结束。</td></tr>
+        <tr><td>「I2C 不需要上拉电阻」</td><td>开漏输出必须上拉，否则线永远浮空，波形无法成形。</td></tr>
+        <tr><td>「SPI 只要有线就能通」</td><td>CPOL/CPHA 模式必须与器件手册一致，错了读回 0x00 或 0xFF。</td></tr>
+        <tr><td>「寄存器可以直接赋值」</td><td>会误清其他位，必须读-改-写。</td></tr>
+        <tr><td>「总线速度由 CPU 主频决定」</td><td>外设访问速度由最慢环节决定：桥延迟 + 从设备等待周期。</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s7">7. 自检：能答出来才算懂</h2>
+
+    <div class="q"><span class="n">1</span><p>AXI、AHB、APB 各挂什么？为什么要分三级？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>AXI 挂 CPU/DDR/DMA/显示；AHB 挂 USB/SD/以太网；APB 挂 UART/I2C/SPI/GPIO/定时器。分级是为了在「带宽」和「面积功耗」之间取舍，并用桥隔离速度域。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>一次寄存器读，路上经过哪几个环节？哪一步最可能变慢？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>地址译码 → 桥转换（AXI→AHB→APB）→ 从设备响应 → 数据回传。最慢的通常是桥延迟与从设备的 wait state。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>没开外设时钟就访问它的寄存器，会发生什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>从设备无法响应握手，总线永久等待，CPU 卡在那条 load/store 上，表现为整机假死，通常只能复位。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>I2C 的 ACK 是谁发的？NACK 有哪几种常见含义？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>写方向由从机发 ACK；读方向的最后一位由主机发 NACK 表示结束。NACK 常见含义：该地址无器件、器件忙、器件不接收该命令、上拉/波形问题。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>SPI 读回全 0x00 或全 0xFF，最先该查什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>先查 CPOL/CPHA 模式是否与器件一致，再查 CS 是否在整个传输期间保持有效、位宽与速率是否匹配。模式错是最常见原因。</p>
+    </div></details>
+
+    <div class="q"><span class="n">6</span><p>「写 1 清 0」和「读清」操作方式差在哪？各举一个坑。</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>写 1 清 0：必须写 1 才清，写 0 无效（坑：以为写 0 能清）。读清：一读就清（坑：想先读看状态，读掉之后就处理不了）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">7</span><p>为什么访问外设寄存器不能用 <code>memcpy</code> 那套优化？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>因为排序、合并、预读都会改变「实际访问硬件的次数与顺序」。寄存器要求每次访问都真实到达，所以要用 <code>readl/writel</code>（内部含 <code>volatile</code> 与屏障）。</p>
+    </div></details>
+
+    <div class="q"><span class="n">8</span><p>CAN 为什么不需要「地址」？多节点怎么避免冲突？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>CAN 用报文 ID 标识内容而非节点，靠「ID 越小优先级越高」的非破坏性仲裁：多个节点同时发时，发 0 的赢，发 1 的自动退让稍后重发，不丢数据。</p>
+    </div></details>
+
+    <h2 id="s8">8. 这一章要动手的命令</h2>
+
+    <div class="steps">
+      <ol>
+        <li><code>busybox devmem 0x0209C000 32</code> —— 直接读 GPIO1 数据寄存器，验证「地址 + 空指针」就能访问硬件。</li>
+        <li><code>cat /sys/kernel/debug/clk/clk_summary | head -30</code> —— 看各时钟频率与使能状态（需 debugfs）。</li>
+        <li><code>i2cdetect -y 0</code> —— 扫描 I2C 总线上的地址，快速判断器件是否在线。</li>
+        <li><code>i2cget -y 0 0x50 0x00</code> —— 读 EEPROM 第一个字节，验证 I2C 通路。</li>
+        <li><code>ls /sys/bus/i2c/devices/</code> —— 看内核识别到的 I2C 设备与地址。</li>
+        <li><code>cat /proc/interrupts | grep -i i2c</code> —— 确认 I2C 中断在工作。</li>
+        <li><code>dmesg | grep -i -E "bus|i2c|spi"</code> —— 找总线初始化失败、NACK 报错的痕迹。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一章预告</b>
+      T11 讲时钟树：PLL 怎么从 24MHz 晶振生出 528MHz、分频器怎么配、为什么改了主频串口波特率会变、RTC 为什么能断电走时。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"四类总线：谁快、谁便宜、谁挂什么","hint":"点一条看它的位置","items":[{"b":"AXI","d":"片内最快的一层，CPU、DDR 控制器、DMA 挂在这里。带宽几百 MB/s 到 GB/s，能乱序、能突发。"},{"b":"AHB","d":"中等速度，挂 eMMC、LCD 控制器这类。比 AXI 简单，一次一笔交易。"},{"b":"APB","d":"最慢的一层，挂 UART、I2C、GPIO、定时器这些慢设备。一根线一个周期，够用就好。"},{"b":"I2C / SPI","d":"片外总线，两根线或四根线，速度 100kHz 到几十 MHz。挂传感器、EEPROM、小屏。"},{"b":"为什么层层减速","d":"让慢设备用慢总线，省下的面积和功耗才能给快路径。全都做快，成本和功耗都不划算。"}],"note":"你在 dts 里写 reg 地址时，地址落在哪条总线上，决定了访问一次要等多少个周期。"}'></div>
+  
+
+<nav class="pager">
+  <a href="course-35.html"><span>← 上一篇</span><b>i.MX6ULL 最小系统</b></a>
+  <a class="nx" href="course-th11.html"><span>下一篇 →</span><b>时钟树、复位、电源域、RTC 与看门狗</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

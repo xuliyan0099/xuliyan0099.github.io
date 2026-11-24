@@ -1,0 +1,236 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>汇编只有四类动作 · 卷 01 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j01.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 01 · 机器与指令</div>
+<ol><li><a href="course-00.html">
+  <span class="no">01</span><span>计算机只是一台会照抄指令的机器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-01.html">
+  <span class="no">02</span><span>为什么偏偏是二进制<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-02.html">
+  <span class="no">03</span><span>一个字节能装什么<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-03.html">
+  <span class="no">04</span><span>从按键到屏幕<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-04.html">
+  <span class="no">05</span><span>一个开关能做什么<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-05.html">
+  <span class="no">06</span><span>与、或、非<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-06.html">
+  <span class="no">07</span><span>从半加器到全加器<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-07.html">
+  <span class="no">08</span><span>补码与减法器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-08.html">
+  <span class="no">09</span><span>时钟与触发器<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-09.html">
+  <span class="no">10</span><span>冯诺依曼五件事<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-10.html">
+  <span class="no">11</span><span>PC 与指令寄存器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-11.html">
+  <span class="no">12</span><span>ALU 与标志位<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-12.html">
+  <span class="no">13</span><span>一条指令的完整旅程<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-13.html">
+  <span class="no">14</span><span>流水线<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-14.html">
+  <span class="no">15</span><span>机器码的位段<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-15.html">
+  <span class="no">16</span><span>九种寻址方式<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-16.html" class="active">
+  <span class="no">17</span><span>汇编只有四类动作<span class="sub">约 1 小时 · 当前</span></span></a></li>
+<li><a href="course-17.html">
+  <span class="no">18</span><span>函数调用与 ABI<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-18.html">
+  <span class="no">19</span><span>从 C 到汇编<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th18.html">
+  <span class="no">20</span><span>CPU 是怎么执行一行代码的（详解）<span class="sub">约 3 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j00.html">← 卷 00</a>
+  <a href="../juan/j02.html">卷 02 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 01<span>·</span>机器与指令<span>·</span>第 17 篇</div>
+  <h1>汇编只有四类动作</h1>
+  <p class="lede">汇编看起来指令很多，但按「动作类型」分只有四类：搬、算、跳、陷。其余几百条指令都可以归进这四类，或者只是同类的变体。这一课用这四类把一段带 if / 循环 / 函数调用的 C 代码完整重写成汇编，你会发现读汇编的门槛一下子低了很多。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+
+    <div class="anim2" data-json='{"title":"汇编只有四类动作","hint":"逐帧看数据怎么走，可暂停单步","kind":"flow","nodes":[{"k":"C: if (a > b) x=1; else x=2;"},{"k":"分支版"},{"k":"条件执行版"},{"k":"选哪个"},{"k":"结果一样"}],"frames":[{"i":0,"d":"语义"},{"i":1,"d":"cmp a,b / ble .L2 / mov x,#1 / b .L3 / .L2: mov x,#2 / .L3:"},{"i":2,"d":"cmp a,b / movgt x,#1 / movle x,#2"},{"i":3,"d":"分支体内指令少 → 条件执行；多 → 分支"},{"i":4,"d":"语义等价，成本不同"}]}'></div>
+
+    <div class="viz" data-kind="matrix" data-title="四类动作 × 典型指令" data-sub="记住这 4 行，ARM 汇编就记住了大半" data-json='{"corner":"类别","cols":["典型指令","作用","典型用途"],"rows":[{"n":"搬","c":"cy","cells":["mov / mvn / ldr / str","寄存器↔寄存器、寄存器↔内存","传参、取变量"]},{"n":"算","c":"vi","cells":["add / sub / and / orr / eor / lsl / cmp","ALU 运算，更新标志","算术、位运算、比较"]},{"n":"跳","c":"or","cells":["b / bl / bx / 条件后缀","改 PC，让程序转向","if、循环、函数调用"]},{"n":"陷","c":"rd","cells":["svc / mcr / wfi","陷入更高特权级或休眠","系统调用、访问协处理器、空闲"]}],"note":"「陷」这一类很容易被忽略，但它才是「用户程序能碰到内核」的唯一合法通道。你写的 open() / read() / ioctl()，最终都变成一条 svc。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 四类动作分别覆盖哪些指令？② 一条 if-else 在汇编里长什么样？③ 为什么 <code>cmp</code> 和 <code>bne</code> 总成对出现？④ 函数的开头为什么总要 <code>push {...}</code>？⑤「伪指令」是什么，为什么需要它？</p>
+    </div>
+
+    <h2 id="s1">1. 搬：只有两条路</h2>
+
+    <p>数据只能在两个地方之间流动：<b>寄存器 ↔ 寄存器</b>（mov/mvn），<b>寄存器 ↔ 内存</b>（ldr/str）。ARM 是 load-store 架构：<b>ALU 只能操作寄存器，不能直接操作内存</b>。所以 <code>a += b</code> 在 ARM 上是：</p>
+
+    <pre><code>ldr r0, [addr_a]     ; 读 a
+ldr r1, [addr_b]     ; 读 b
+add r0, r0, r1       ; 算
+str r0, [addr_a]     ; 写回 a</code></pre>
+
+    <p>四步。x86 可以一条 <code>add [a], ebx</code> 直接改内存——这就是 RISC 与 CISC 最本质的区别：<b>ARM 用更多指令换更简单的硬件</b>。</p>
+
+    <h2 id="s2">2. 算：ALU 能做的都不出圈</h2>
+
+    <p>算术：add、sub、rsb、mul（乘法）、sdiv（除法，ARMv7 后期才有硬件除）。逻辑：and、orr、eor、bic（位清除）、orn。移位：lsl、lsr、asr、ror——它们通常不是独立指令，而是作为操作数修饰符出现。</p>
+
+    <p>比较：<code>cmp</code> = <code>subs</code>（只更新标志）、<code>tst</code> = <code>ands</code>（测试某些位）、<code>teq</code> = <code>eors</code>。这三个「比较类」指令的共同点是<b>不写结果寄存器，只写标志</b>。</p>
+
+    <h2 id="s3">3. 跳：四种子形态</h2>
+
+<pre><code>b    label       ; 无条件，改 PC
+bl   func        ; 改 PC 且把返回地址存 LR
+bx   reg         ; 跳到寄存器指向的地址（可切换 ARM/Thumb）
+beq / bne / blt  ; 条件跳转（看 CPSR 标志）</code></pre>
+
+    <p>加上第 11 课讲的「条件执行」（<code>addne</code> 这种），跳转的全部形态就齐了。</p>
+
+    <div class="viz" data-kind="flow" data-title="一段 if-else 的两个版本" data-sub="分支版 vs 条件执行版，编译器会按成本选" data-json='{"steps":[{"n":"C: if (a > b) x=1; else x=2;","d":"语义"},{"n":"分支版","d":"cmp a,b / ble .L2 / mov x,#1 / b .L3 / .L2: mov x,#2 / .L3:"},{"n":"条件执行版","d":"cmp a,b / movgt x,#1 / movle x,#2"},{"n":"选哪个","d":"分支体内指令少 → 条件执行；多 → 分支"},{"n":"结果一样","d":"语义等价，成本不同"}],"note":"gcc 会在 -O2 下自动选择。你读反汇编时看到 movgt/movle 不要惊讶——这就是「条件执行」在真实代码里的样子。"}'></div>
+
+    <h2 id="s4">4. 陷：唯一的越界通道</h2>
+
+    <p><code>svc #0</code>（旧写法 <code>swi #0</code>）把 CPU 从用户态切到内核态，并按 <code>r7</code> 里的编号跳到对应的内核函数。这是 Linux 系统调用的物理实现。</p>
+
+    <pre><code>; write(1, "hi\n", 3) 的汇编版（ARM EABI）
+    mov  r0, #1          ; fd = 1（stdout）
+    adr  r1, msg         ; buf
+    mov  r2, #3          ; len
+    mov  r7, #4          ; __NR_write
+    svc  #0              ; 陷入内核
+msg: .ascii "hi\n"</code></pre>
+
+    <p>内核侧的入口在 <code>vector_swi</code>，它读 r7 查系统调用表。<b>这条链路把「软件」和「硬件特权级」缝在一起</b>——第 29、30 课会展开。</p>
+
+    <h2 id="s5">5. 伪指令：汇编器的善意</h2>
+
+    <p>有些写法看起来像指令，其实汇编器会翻译成别的东西：</p>
+
+    <table>
+      <thead><tr><th>伪指令</th><th>真实生成</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td><code>ldr r0, =0x12345678</code></td><td>常量池里的 ldr 或 movw/movt</td><td>加载任意 32 位常量</td></tr>
+        <tr><td><code>adr r0, label</code></td><td>add/sub pc 相对偏移</td><td>取附近地址（位置无关）</td></tr>
+        <tr><td><code>nop</code></td><td><code>mov r0, r0</code></td><td>占位、对齐、延时</td></tr>
+        <tr><td><code>push {r4, lr}</code></td><td><code>stmdb sp!, {...}</code></td><td>压栈（GNU 语法糖）</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s6">6. 实验：手写一段汇编</h2>
+
+    <pre><code>// 目标：int max3(int a, int b, int c) 返回最大值
+// 手写（AAPCS：参数 r0 r1 r2，返回值 r0）
+
+    .text
+    .global max3
+max3:
+    cmp   r0, r1          ; a vs b
+    movlt r0, r1          ; a &lt; b → r0 = b  （条件执行）
+    cmp   r0, r2          ; 现在 r0 是 max(a,b)
+    movlt r0, r2          ; 若 r0 &lt; c → r0 = c
+    bx    lr
+
+// 对照 gcc -O2 的输出，很可能一模一样
+// 整个函数 5 条指令、无分支、无栈操作 —— 这就是条件执行的价值</code></pre>
+
+    <p>把这段编进一个 C 工程（<code>gcc -c max3.S</code>），在 C 里调用它。<b>跑通一次，你就真的「写过汇编」了。</b></p>
+
+    <h2 id="s7">7. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于汇编的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["汇编指令成百上千，要全部背下来才能写","汇编一定比 C 快","汇编不能调用 C 函数"]},"good":{"t":"实际","items":["按动作分只有四类，其余是同族变体，查手册即可","不一定：编译器调度往往比手写更优；汇编的优势在特定热点与硬件操作","可以，遵守 AAPCS（参数放 r0-r3、返回 r0）就能互相调用"]},"note":"真正需要手写汇编的场合很少：启动代码、上下文切换、原子操作、DSP 热点、以及「想看懂崩溃现场」的时候。"}'></div>
+
+    <h2 id="s8">8. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>为什么 ARM 的 <code>a += b</code> 至少要四条指令？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>load-store 架构：ALU 不能直接操作内存，必须先 ldr 到寄存器、运算、再 str 回去。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p><code>cmp</code> 与 <code>sub</code> 的关系？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p><code>cmp</code> 就是 <code>subs</code>：做减法、更新标志、丢弃结果。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>为什么函数开头常要 <code>push {r4-r7, lr}</code>？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>保存 callee-saved 寄存器（r4-r11）与返回地址（r14），保证调用者现场不被破坏；这是 AAPCS 的要求。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p><code>ldr r0, =0x12345678</code> 为什么不能直接是一条指令？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>立即数字段只有 8 位 + 4 位旋转，装不下任意 32 位常量；汇编器会放到常量池或生成 movw/movt。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p><code>svc</code> 与普通函数调用有什么本质区别？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p><code>svc</code> 会切换 CPU 特权级（用户→内核），并走异常向量表；普通 <code>bl</code> 不改变特权级。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>手写 <code>max3</code> 并编进 C 工程跑通，再与 gcc 输出对比。</li>
+        <li>把一段 C 的 for 循环改写成汇编（用后索引寻址）。</li>
+        <li>用 <code>strace</code> 看一次 <code>write</code>，确认它对应 <code>svc</code>。</li>
+        <li>写一个 <code>.S</code> 文件里的 <code>svc</code> 调用，观察返回值从 r0 出来。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      四类动作里最复杂的是「跳」的变体：函数调用要传参、要保存现场、要返回值。规矩是谁定的？第 17 课讲 ABI 与栈帧——不讲清它，你永远看不懂函数调用的崩溃栈。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"汇编只有四类动作","hint":"点一类看它做什么","note":"写不出汇编，通常不是语法问题，是没想清楚「这一步到底是在搬数据、算数据、改流程，还是切换特权」。","items":[{"b":"搬（mov / ldr / str）","d":"在寄存器、内存、外设之间搬字节。驱动代码里 90% 是这一类。"},{"b":"算（add / sub / and / orr / lsl）","d":"在 ALU 里算，顺手改标志位。位操作（置位、清零、取反）都在这里。"},{"b":"跳（b / bl / bx / cmp + bne）","d":"改 PC。条件跳转靠的是前面 cmp 留下的标志位，不是另设一个「if」。"},{"b":"特权（svc / mrs / msr / cpsid）","d":"切模式、开关中断、读写系统寄存器。用户态执行这类指令会触发异常，被内核拦下。"}]}'></div>
+  
+
+<nav class="pager">
+  <a href="course-15.html"><span>← 上一篇</span><b>九种寻址方式</b></a>
+  <a class="nx" href="course-17.html"><span>下一篇 →</span><b>函数调用与 ABI</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

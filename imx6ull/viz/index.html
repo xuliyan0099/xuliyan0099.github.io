@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>互动台 · 6 个可点的实验台</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<style>
+main.doc table{width:100%;border-collapse:collapse;margin:14px 0 8px;font-size:14px}
+main.doc th,main.doc td{border-bottom:1px solid rgba(110,168,254,.14);padding:9px 10px;text-align:left;vertical-align:top}
+main.doc th{color:#93a9cf;font-weight:600;font-size:13px;background:rgba(12,18,30,.5)}
+main.doc td.sn{white-space:nowrap;font-variant-numeric:tabular-nums;width:56px}
+main.doc td.nm{color:#eafdff}
+main.doc td.kk{color:#93a4c4;font-size:13px;white-space:nowrap}
+main.doc tbody tr:hover{background:rgba(110,168,254,.05)}
+main.doc ul.acc{margin:10px 0 20px;padding-left:22px;color:#c8d6ec}
+main.doc ul.acc li{margin:0 0 8px}
+@media(max-width:900px){main.doc td.kk{display:none}}
+</style>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+<div class="vol-h">互动台 · 6 台</div>
+<ol>
+<li><a href="clock-tree.html">
+  <span class="no">01</span><span>时钟树配频台<span class="sub">时钟 · 可拖</span></span></a></li>
+<li><a href="mmu.html">
+  <span class="no">02</span><span>MMU 页表查找台<span class="sub">内存 · 可拖</span></span></a></li>
+<li><a href="gpio.html">
+  <span class="no">03</span><span>GPIO 引脚配置台<span class="sub">外设 · 可拖</span></span></a></li>
+<li><a href="nvic.html">
+  <span class="no">04</span><span>中断优先级与抢占台<span class="sub">中断 · 可拖</span></span></a></li>
+<li><a href="boot.html">
+  <span class="no">05</span><span>上电启动链路台<span class="sub">启动 · 可拖</span></span></a></li>
+<li><a href="cache.html">
+  <span class="no">06</span><span>Cache 与内存层次台<span class="sub">性能 · 可拖</span></span></a></li>
+</ol>
+<div class="vol-nav"><a href="../index.html">← 路口页</a><a href="../juan/index.html">总览 →</a></div>
+  </aside>
+  <main class="doc">
+
+    <div class="doc-kicker"><span>互动</span><span>·</span><span>6 台</span><span>·</span><span>单页离线可跑</span></div>
+    <h1>互动台 · 6 个可点的实验台</h1>
+    <p class="lede">每个都是单页、离线可跑：改参数即时看结果，不依赖任何后台。它们不替代正文，只用来把「寄存器改了会怎样」这件事变成能看见的画面——先在正文里读完机制，再回来拖一遍。</p>
+    <div class="doc-chips"><span class="hot">6 台</span><span>无需后台</span><span>可拖 / 可输</span><span>纯前端</span></div>
+
+    <h2>六台分别在讲什么</h2>
+    <table>
+      <thead><tr><th>序</th><th>实验台</th><th>主题</th><th>能看到什么</th></tr></thead>
+      <tbody>
+<tr>
+  <td class="sn">01</td>
+  <td class="nm"><a href="clock-tree.html">时钟树配频台</a></td>
+  <td class="kk">时钟</td>
+  <td>改 PLL 倍频与分频，看 AHB / IPG / PERCLK 各总线频率怎么跟着变，超限会报警。</td>
+</tr>
+<tr>
+  <td class="sn">02</td>
+  <td class="nm"><a href="mmu.html">MMU 页表查找台</a></td>
+  <td class="kk">内存</td>
+  <td>拖一个虚拟地址，看一级页表 → 二级页表 → 物理页的完整查找，以及权限位怎么拦访问。</td>
+</tr>
+<tr>
+  <td class="sn">03</td>
+  <td class="nm"><a href="gpio.html">GPIO 引脚配置台</a></td>
+  <td class="kk">外设</td>
+  <td>一个引脚从 IOMUXC 复用、方向、上下拉、驱动强度配到寄存器，看引脚电平与外部电路怎么响应。</td>
+</tr>
+<tr>
+  <td class="sn">04</td>
+  <td class="nm"><a href="nvic.html">中断优先级与抢占台</a></td>
+  <td class="kk">中断</td>
+  <td>调 NVIC 优先级分组和三个中断的抢占比，看谁能打断谁、谁只能排队。</td>
+</tr>
+<tr>
+  <td class="sn">05</td>
+  <td class="nm"><a href="boot.html">上电启动链路台</a></td>
+  <td class="kk">启动</td>
+  <td>从复位向量到 BootROM、IVT/DCD、U-Boot、内核，一步一步看谁在读哪个地址、搬到哪。</td>
+</tr>
+<tr>
+  <td class="sn">06</td>
+  <td class="nm"><a href="cache.html">Cache 与内存层次台</a></td>
+  <td class="kk">性能</td>
+  <td>访问地址命中 / 未命中 L1、越过 L2 落到 DDR，看一个 load 到底花多少个周期。</td>
+</tr>
+      </tbody>
+    </table>
+
+    <h2>怎么用</h2>
+    <p>建议顺序：卷 01 读完第 09 篇（时钟与触发器）再开<b>时钟树</b>；卷 05 读完页表那篇再开 <b>MMU</b>；卷 09 读完 GPIO 那章再开 <b>GPIO</b>；卷 12 讲启动链时配 <b>上电链路</b>；<b>中断</b>与 <b>Cache</b> 两台放在卷 03、卷 04 之后最省力。</p>
+
+    <nav class="pager">
+      <a href="../index.html"><span>返回</span><b>路口页 · 六个入口</b></a>
+      <a class="nx" href="../juan/index.html"><span>接着读</span><b>十四卷总览 →</b></a>
+    </nav>
+    <div class="doc-foot">互动台都在 imx6ull/viz/ 目录里，每台是独立 html · 本页由 build-hub.js 生成</div>
+  </main>
+</div>
+<script src="../assets/anime.iife.min.js"></script>
+<script src="../assets/viz.js"></script>
+<script src="../assets/iviz.js"></script>
+<script src="../assets/anim2.js"></script>
+<script src="../assets/anim.js"></script>
+<script src="../assets/cpu3.js"></script>
+<script src="../assets/ikit.js"></script>
+</body></html>

@@ -1,0 +1,128 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>虚拟化与 KVM：ARM 上的 EL2 与 stage-2 页表 · 卷 13 | i.MX6ULL</title>
+<meta name="description" content="虚拟机不是软件模拟出来的假机器，而是硬件多给了一个特权级和一层页表。">
+<link rel="stylesheet" href="../assets/deep.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/deep.js" defer></script>
+</head><body>
+<div class="dp-prog"><i></i></div>
+<div class="dp">
+<header class="dp-top">
+  <div class="dp-crumbs">
+    <a href="../../index.html">个人知识库</a><span>/</span>
+    <a href="../index.html">学习站入口</a><span>/</span>
+    <a href="../juan/index.html">十四卷</a><span>/</span>
+    <a href="../juan/j13.html">卷 13</a>
+  </div>
+  <div class="dp-tools">
+    <a href="../juan/j13.html">☰ 卷 13 目录</a>
+    <a href="../juan/index.html">◫ 十四卷总览</a>
+  </div>
+</header>
+
+<div class="dp-hero">
+  <div class="dp-kicker">卷 13<span>·</span>第 13·04 篇</div>
+  <h1>虚拟化与 KVM：ARM 上的 EL2 与 stage-2 页表</h1>
+  <p class="dp-lede">虚拟机不是软件模拟出来的假机器，而是硬件多给了一个特权级和一层页表。</p>
+  <div class="dp-chips">
+    <span class="c hot">● 一读</span>
+    <span class="c">纯读约 4 小时</span>
+    <span class="c">理论为主 · 实作可跳</span>
+    <span class="c">配 3–4 个互动演示</span>
+  </div>
+</div>
+
+<aside class="dp-toc"><div class="dp-toc-h">本页目录</div><a href="#s1"><span>01</span>先玩一下：两级地址翻译</a><a href="#s2"><span>02</span>一、EL2 与 HCR_EL2：多出来的那个开关</a><a href="#s3"><span>03</span>二、VM exit：什么情况下会「被踢出来」</a><a href="#s4"><span>04</span>三、i.MX6ULL 能不能跑 KVM</a><a href="#s5"><span>05</span>动手（可选）：在 QEMU 里起一个 guest</a><a href="#s6"><span>06</span>离开这一篇，你应该能</a></aside>
+<main class="dp-main">
+<p class="lead">虚拟机不是软件模拟出来的假机器，而是<strong>硬件多给了一个特权级和一层页表</strong>。ARM 上这个特权级叫 EL2，这层页表叫 stage-2。</p>
+
+<p>理解了这两样东西，「VM exit 为什么贵」「MMIO 怎么被拦截」「KVM 为什么比纯软件模拟快一个数量级」就都有答案了。</p>
+
+<h2 id="s1">先玩一下：两级地址翻译</h2>
+
+<p>guest 里的虚拟地址要经过两次翻译：stage-1 是 guest OS 自己的页表，stage-2 是 hypervisor 的页表。拖动地址，看两次查表。</p>
+
+<div class="ikit" data-type="walk" data-json='{"title":"stage-1 + stage-2：一次访存两次翻译","badge":"walk",
+"bits":[{"n":9,"k":"L1"},{"n":9,"k":"L2"},{"n":12,"k":"Offset"}],
+"levels":[
+{"name":"stage-1 L1（guest 页表）","rows":["→ L2 表 @0x4000","→ L2 表 @0x5000","未映射（会触发 stage-1 fault）","→ L2 表 @0x6000"],"window":4},
+{"name":"stage-1 L2（guest 页表）","rows":["→ IPA 0x12000","→ IPA 0x13000","→ IPA 0x14000","未映射"],"window":4},
+{"name":"stage-2（hypervisor 页表）","idx":1,"rows":["IPA 0x12000 → PA 0x80000","IPA 0x13000 → PA 0x81000","IPA 0x14000 → PA 0x82000"],"window":4}],
+"addr":"0x0000_0123",
+"tlbPA":"PA 0x0000_8123",
+"note":"演示地址 30 位；真实 AArch64 用 39/48 位 VA，级数更多。关键是「guest 以为的物理地址（IPA）还要再翻译一次」。"}'></div>
+
+<p>stage-2 的价值在于：hypervisor 可以给每个 VM 一张「IPA → 真实 PA」的表，于是两个 VM 都认为自己从 0 开始用内存，却互不重叠。guest 完全不知道自己被翻译了两次。</p>
+
+<h2 id="s2">一、EL2 与 HCR_EL2：多出来的那个开关</h2>
+
+<div class="layers">
+  <div class="ly"><b>EL0</b><span>guest 的用户态应用。</span></div>
+  <div class="ly"><b>EL1</b><span>guest 的内核。它以为自己在管硬件，其实关键操作会被截住。</span></div>
+  <div class="ly hi"><b>EL2</b><span>hypervisor（KVM）。决定哪些操作允许、哪些触发异常到 EL2。</span></div>
+  <div class="ly"><b>EL3</b><span>安全监控（TrustZone），通常与虚拟化正交。</span></div>
+</div>
+
+<p><code>HCR_EL2</code> 是这套机制的总开关。几个关键位：<code>VM</code>（开启 stage-2）、<code>IMO/FMO/AMO</code>（把中断路由到 EL2）、<code>TGE</code>（让 EL1 的系统调用/异常也陷入 EL2，便于全虚拟化）。改一位，guest 的行为就变一套。</p>
+
+<h2 id="s3">二、VM exit：什么情况下会「被踢出来」</h2>
+
+<div class="ikit" data-type="seq" data-json='{"title":"一次 MMIO 访问的 VM exit / entry","badge":"seq",
+"actors":[{"name":"guest (EL1)","start":"运行"},{"name":"hypervisor (EL2)","start":"等待"}],
+"steps":[
+{"label":"guest 读 UART 寄存器（IPA）","states":["执行中","等待"],"note":"这个 IPA 在 stage-2 表里没有映射到真实设备。"},
+{"label":"stage-2 缺页 → 异常到 EL2","states":["陷入","被唤醒"],"note":"硬件自动保存 guest 上下文（ESR_EL2 记录原因）。"},
+{"label":"KVM 查「这是谁的设备」","states":["等待","处理中"],"note":"多数是 virtio-mmio 或未分配地址；KVM 决定是注入模拟还是报错。"},
+{"label":"KVM 模拟读，写回 vCPU 上下文","states":["等待","处理完"],"note":"对于 virtio，这一步会触发后端（QEMU）的 IO。"},
+{"label":"ERET 回 guest","states":["继续","等待"],"note":"guest 完全不知道刚才出去过一趟——这就是「透明虚拟化」。"}]}'></div>
+
+<p>VM exit 之所以贵，是因为它要保存/恢复大量状态、切换栈、可能还要进出用户态（QEMU 在后端）。所以高性能虚拟化的核心是<strong>减少 exit</strong>：virtio 批量队列、posted interrupt、硬件嵌套页表（stage-2 由硬件走，不用 hypervisor 介入）。</p>
+
+<h2 id="s4">三、i.MX6ULL 能不能跑 KVM</h2>
+
+<p>Cortex-A7 带虚拟化扩展（VE）与 LPAE，理论上支持 32 位 ARM KVM。但实际能不能用，还取决于：内核是否开了 <code>CONFIG_KVM</code>、内存是否够（每个 VM 都要独立内核与 rootfs）、以及你有没有第二套 rootfs。<strong>建议先在 QEMU 上练</strong>：<code>qemu-system-aarch64 -M virt, virtualization=on</code> 起一个 guest，再在 guest 里跑 KVM，成本最低。</p>
+
+<table>
+<thead><tr><th>方案</th><th>成本</th><th>能学到什么</th></tr></thead>
+<tbody>
+<tr><td>QEMU 纯模拟</td><td>最低，PC 上跑</td><td>guest 启动、virtio、镜像制作</td></tr>
+<tr><td>QEMU + KVM（同架构）</td><td>低</td><td>硬件加速、stage-2、exit 路径</td></tr>
+<tr><td>i.MX6ULL 上 KVM</td><td>中（内存与 rootfs 吃紧）</td><td>真实硬件上的 VE 行为</td></tr>
+<tr><td>Xen / Jailhouse</td><td>高</td><td>静态分区、实时性隔离</td></tr>
+</tbody></table>
+
+<div class="cal warn"><span class="h">误解：容器就是轻量虚拟机</span>容器共享宿主内核，靠 namespace + cgroup 隔离；虚拟机有自己的内核，靠 EL2 + stage-2 隔离。前者隔离的是「视图」，后者隔离的是「特权」。安全边界完全不同。</div>
+
+<div class="cal tip"><span class="h">一句话记住三层</span>stage-1 是「进程 → guest 物理」，stage-2 是「guest 物理 → 真实物理」。两次翻译，两次 TLB，两次缺页可能——这就是虚拟化性能损耗的主要来源。</div>
+
+<h2 id="s5">动手（可选）：在 QEMU 里起一个 guest</h2>
+
+<div class="cal q"><span class="h">只在 🔧 实作模式展开</span>PC 上即可，不需要板子。</div>
+
+<ol>
+  <li>装 <code>qemu-system-aarch64</code>，用 <code>-M virt,virtualization=on</code> 起一个最小 guest（可用 Buildroot 的 qemu_aarch64_virt_defconfig）。</li>
+  <li>guest 里 <code>dmesg | grep -i kvm</code>，确认 <code>/dev/kvm</code> 存在。</li>
+  <li>在 guest 里再起一个小 VM（嵌套），观察 <code>dmesg</code> 里的 stage-2 相关日志。</li>
+  <li>用 <code>perf kvm stat</code>（若支持）看 exit 原因分布：MMIO、WFI、中断，各占多少。</li>
+</ol>
+
+<h2 id="s6">离开这一篇，你应该能</h2>
+
+<ul class="qa">
+  <li>解释 stage-1 与 stage-2 的分工，以及 guest 为什么感觉不到第二次翻译。</li>
+  <li>说出 EL2 与 HCR_EL2 的作用，以及 VM exit 的典型触发原因。</li>
+  <li>区分容器与虚拟机的隔离边界。</li>
+</ul>
+
+<p>十四卷到此走完。回到 <a href="../juan/index.html">卷总览</a>，挑一条线重走一遍；或者打开 <a href="../viz/index.html">互动台</a>，把 MMU、Cache、时钟树亲手拨一遍。</p>
+
+<nav class="dp-nav">
+  <a href="d13-02.html"><span>← 上一篇</span>xv6 或自制一个最小 OS：把操作系统造一遍</a>
+  <a href="../juan/index.html" class="nxt"><span>回总览</span>十四卷目录</a>
+</nav>
+<footer class="dp-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线。文中的「动手」段落只在 🔧 实作模式下展开，纯读可整篇跳过。</footer>
+</main>
+</div></body></html>

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第 01 章 · 拿到手册，先做四件事 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<link rel="stylesheet" href="../assets/asm.css">
+</head><body style="--acc:#8b7bff">
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="index.html">☰ 手册目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">看懂一份芯片手册 · 8 篇</div>
+    <ol>
+      <li><a href="index.html"><span class="no">⌂</span><span>路口目录<span class="sub">篇目总览与读法</span></span></a></li>
+      <li><a href="m0.html"><span class="no">00</span><span>六份文档，别拿错<span class="sub">Datasheet / RM / AN / 勘误 / 原理图 / dts 各管什么</span></span></a></li>
+      <li><a href="m1.html" class="active"><span class="no">01</span><span>拿到手册，先做四件事<span class="sub">建索引、画内存图、找时钟树、贴引脚表</span></span></a></li>
+      <li><a href="m2.html"><span class="no">02</span><span>Datasheet 怎么读：只读五处<span class="sub">订货型号、绝对最大额定、电气特性、引脚定义、封装</span></span></a></li>
+      <li><a href="m3.html"><span class="no">03</span><span>Reference Manual 一章的固定骨架<span class="sub">概述 → 功能 → 外部信号 → 时钟 → 寄存器 → 初始化流程</span></span></a></li>
+      <li><a href="m4.html"><span class="no">04</span><span>寄存器表怎么逐列读<span class="sub">偏移、位域、Reserved、R/W、W1C、复位值</span></span></a></li>
+      <li><a href="m5.html"><span class="no">05</span><span>四个真实例子：从手册到代码<span class="sub">CCM、IOMUXC、UART、GPIO 各走一遍</span></span></a></li>
+      <li><a href="m6.html"><span class="no">06</span><span>从板子上的一个脚，查到 dts 一行<span class="sub">原理图 → 引脚名 → 复用功能 → 设备树节点</span></span></a></li>
+      <li><a href="m7.html"><span class="no">07</span><span>八个坑，和一张速查<span class="sub">页码对不上、复位值不算、W1C 写 1 才清…</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="../hardware/index.html">硬件入口</a><a href="../juan/index.html">十四卷总览</a></div>
+  </aside>
+  <main class="doc">
+    <div class="doc-kicker">芯片手册研读 · i.MX6ULL <span>·</span> 第 01 章</div>
+    <div class="ch-head">
+      <h1>拿到手册，先做四件事</h1>
+      <div class="ch-meta"><span class="hot">第 01 章</span><span>约 18 分钟</span><span>★ 必读</span></div>
+    </div>
+<h2 id="s1">这四件事，顺序不能反</h2>
+<pre class="asm"><code>① 建索引（知道词在哪） → ② 画内存图（知道东西在哪）
+     → ③ 找时钟树（知道它靠谁活） → ④ 贴引脚表（知道它接到哪个脚）</code></pre>
+<p>四件事做完，你手上就有了一张「自己版的手册摘要」，之后查任何外设都是查自己这张纸。</p>
+<h2 id="s2">① 建索引：只做三件事</h2>
+<p><b>第一件：确认书签全不全。</b> 从官网下的 PDF 通常带书签，但有人给的是「扫描合并版」，书签全丢。丢了的补救办法不是手工加，而是——用寄存器名直接全文搜。<b>搜寄存器名比搜模块名准得多</b>：搜 <code>UART_URXD</code> 会直接落到寄存器表，搜 <code>UART</code> 会命中几百处。</p>
+<p><b>第二件：抄一张缩写表。</b> RM 前几页有一张 "Table of acronyms"，把你不认识的十个缩写抄下来。i.MX 的手册大量使用缩写，且<b>同一个缩写在不同章节含义可能不同</b>（比如 <code>SRC</code> 是 System Reset Controller，不是 source）。</p>
+<p><b>第三件：把「三张总表」的页码写下来。</b></p>
+<table class="regtbl"><thead><tr><th>总表</th><th>在哪</th><th>用来干什么</th></tr></thead><tbody><tr><td class="nm">Memory Map</td><td>Introduction 章 / System Memory Map</td><td>查基地址</td></tr><tr><td class="nm">Signal Multiplexing（引脚复用总表）</td><td>IOMUXC 章末尾</td><td>查脚能复用成什么</td></tr><tr><td class="nm">Clock Tree（时钟树图）</td><td>CCM 章</td><td>查某模块的时钟从哪来</td></tr></tbody></table>
+<p>页码写在一张便签上，比每次翻目录快十倍。</p>
+<h2 id="s3">② 画内存图：先画「三个圈」</h2>
+<p>i.MX6ULL 的地址空间不是平的，按访问路径分成几段。你不需要背所有地址，只需要知道<b>「我要找的东西在哪一段」</b>：</p>
+<pre class="asm"><code>0x0000_0000 ───────── 片上 ROM / Boot ROM（只读，固化代码）
+0x0001_0000 ───────── 片内 OCRAM（小容量高速 SRAM）
+0x0090_0000 附近 ──── 部分外设（视具体型号映射）
+0x0200_0000 起 ────── AIPS 段：绝大多数外设寄存器（UART/I2C/GPIO/CCM/IOMUXC…）
+0x8000_0000 起 ────── DDR 段：外部内存（容量看板子）
+0xFFFF_0000 附近 ──── 私有外设（GIC、SCU、定时器等，属 Cortex-A7 核）</code></pre>
+<p>画这张图的目的：<b>判断「这个模块的寄存器是读一次要几十周期的慢速外设，还是核内的快速外设」。</b> 前者访问要经过总线桥，后者不用。这个差别在后面写延迟敏感的代码时会出现（比如中断里读 GIC 和读 UART 的代价不同）。</p>
+<p>具体每段的边界与每个模块的基地址，一律以 RM 的 Memory Map 为准；这张图只用来「定方位」，不用来「背数值」。</p>
+<h2 id="s4">③ 找时钟树：三问</h2>
+<p>外设不工作，八成是时钟没开。查时钟，只问三句：</p>
+<ol>
+<li><b>这个模块的时钟从哪个 PLL 来？</b> CCM 章的时钟树图会画出来（PLL1/PLL2/PLL3/PLL528/PLL_ENET 等）。</li>
+<li><b>它有没有分频器 / 门控？</b> 门控就是 <code>CCGRx</code> 寄存器里的两位；分频在 <code>CACRR</code>、<code>CSCDRx</code> 等寄存器里。</li>
+<li><b>开它的顺序有要求吗？</b> 有些模块要求「先停时钟，改配置，再开时钟」，有些要求「设置 PLL 后等锁定」。这些写在模块章的 "Initialization" 小节，不在寄存器表里。</li>
+</ol>
+<p>一个实用的对照方法：<b>内核里这个外设的驱动是怎么开时钟的</b>——<code>clk_prepare_enable()</code> 后面跟的名字（比如 <code>uart1_ipg</code>）就是时钟树里的节点名。用节点名回到 CCM 章找，比从模块名倒推快。</p>
+<h2 id="s5">④ 贴引脚表：一根线四个名字</h2>
+<p>同一个物理脚，在不同语境下叫四个名字：</p>
+<table class="regtbl"><thead><tr><th>语境</th><th>叫法</th><th>例子</th></tr></thead><tbody><tr><td class="nm">原理图网络名</td><td>设计者起的</td><td class="nm"><code>LED_RED</code></td></tr><tr><td class="nm">封装球号</td><td>BGA 上的坐标</td><td class="nm"><code>A15</code></td></tr><tr><td class="nm">数据手册引脚名</td><td>引脚的功能名</td><td class="nm"><code>GPIO1_IO03</code></td></tr><tr><td class="nm">IOMUXC 寄存器名</td><td>可写的那个</td><td class="nm"><code>SW_MUX_CTL_PAD_GPIO1_IO03</code></td></tr></tbody></table>
+<p>做法：拿一张纸（或一个表格文件），四列——网络名 / 球号 / 引脚名 / 复用寄存器名。<b>每用到一根线就填一行。</b> 十行之内你会发现规律：引脚名与寄存器名只差一个 <code>SW_MUX_CTL_PAD_</code> 前缀，但<b>不是所有脚都遵循这个前缀</b>（有的叫 <code>SW_MUX_CTL_PAD_</code>，有的叫 <code>SW_MUX_CTL_GRP_</code> 用于整组，还有 <code>SELECT_INPUT</code> 用于输入选择）。</p>
+<p>这张表填满三十行左右，你查引脚就不需要再翻手册了。</p>
+<h2 id="s6">一张「自己的摘要」长什么样</h2>
+<pre class="asm"><code>== UART1 ==
+基址      0x02020000            （Memory Map）
+时钟      uart1_ipg / uart1_uart（CCM 时钟树 + dts）
+门控      CCGR5 里某两位         （CCM 寄存器表）
+关键位    UCR1.UARTEN(bit0) / UCR2.SRST(bit0)
+坑        先写 UCR2 的 SRST 清 FIFO，再置 UARTEN</code></pre>
+<p>每一行右边括号里写「这个结论从哪来」。<b>这是最有价值的部分</b>：下次结论不对时，你知道该回去翻哪份材料，而不是重头再猜。</p>
+<h2 id="s7">本篇验收</h2>
+<ul>
+<li>能说出为什么「搜寄存器名」比「搜模块名」快。</li>
+<li>能画出 i.MX6ULL 地址空间的「三个圈」，并说出画它的用处。</li>
+<li>能对一个陌生外设问出时钟的三个问题。</li>
+<li>能写出一个引脚的四种名字，并指出你的板子上哪根线对应哪个脚。</li>
+</ul>
+<h2 id="s8">下一篇</h2>
+<p>四件准备做完，可以开始读正文了。但读正文从哪儿读？从最短的那份开始——Datasheet。02 篇讲它到底只值得读五处，其余全是给画板工程师看的。</p>
+<div class="pager">
+      <a href="m0.html"><span>上一篇</span><b>← 00 六份文档，别拿错</b></a>
+      <a href="index.html"><span>目录</span><b>篇目总览</b></a>
+      <a class="nx" href="m2.html"><span>下一篇</span><b>02 Datasheet 怎么读：只读五处 →</b></a>
+    </div>
+  </main>
+</div>
+<script src="../assets/asm-tools.js"></script>
+</body>
+</html>

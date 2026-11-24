@@ -1,0 +1,276 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>交叉编译与工程构建 · 卷 02 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j02.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 02 · 编译与运行</div>
+<ol><li><a href="course-19.html">
+  <span class="no">01</span><span>从源码到可执行<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-ch07.html" class="active">
+  <span class="no">02</span><span>交叉编译与工程构建<span class="sub">约 12 小时 · 当前</span></span></a></li>
+<li><a href="course-th17.html">
+  <span class="no">03</span><span>交叉编译与工具链原理<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="d02-01.html">
+  <span class="no">04</span><span>ELF 与链接重定位：从符号表到 .rel.text<span class="sub">约 3 小时</span></span></a></li>
+<li><a href="d02-02.html">
+  <span class="no">05</span><span>静态库与动态链接：PLT / GOT / PIC 全链路<span class="sub">约 3 小时</span></span></a></li>
+<li><a href="d02-03.html">
+  <span class="no">06</span><span>程序加载与内存布局：段、栈、堆、core dump<span class="sub">约 2 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j01.html">← 卷 01</a>
+  <a href="../juan/j03.html">卷 03 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 02<span>·</span>编译与运行<span>·</span>第 02 篇</div>
+  <h1>交叉编译与工程构建</h1>
+  <p class="lede">板子上装不下编译器，所以必须在 x86 的 PC 上编出 ARM 能执行的程序。这一章解决「编得出、传得过去、跑得起来」三个问题。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 12 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+    <div class="viz" data-kind="flow" data-title="交叉编译的完整流水" data-sub="为什么不能在板子上直接编译" data-json='{"play":true,"steps":[{"n":"源码 .c","d":"写的是通用 C，还没跟架构绑定"},{"n":"arm-linux-gnueabihf-gcc","d":"换成 ARM 指令集"},{"n":"目标文件 .o","d":"机器码 + 符号表"},{"n":"链接","d":"拼上 libc，解决未定义符号"},{"n":"ARM ELF","d":"file 会显示 ARM, EABI5"},{"n":"scp / tftp / NFS","d":"传到板子"},{"n":"板上执行","d":"内核按 ARM 指令解码"}],"note":"板子上没有编译器、也没有足够内存编大工程，所以必须在 PC 上编。能不能跑，取决于两件事：架构对（ARM）、ABI 对（硬浮点 gnueabihf）；错一个就是 Illegal instruction。"}'></div>
+
+
+    <div class="card">
+      <h4>本章目标</h4>
+      <p>① 说清为什么要交叉编译；② 看懂工具链名字每个字段；③ 编出第一个 ARM 程序并在板子上跑；④ 会写多文件 Makefile；⑤ 会远程调试。</p>
+    </div>
+
+    <div class="anim2" data-json='{"title":"交叉编译：在 x86 上造 ARM 的程序","hint":"编译机与运行机不是一台","nodes":[{"k":"源码","s":"在开发机上"},{"k":"arm-gcc","s":"交叉编译器"},{"k":"ARM ELF","s":"目标码"},{"k":"拷到板子","s":"scp / SD"},{"k":"运行","s":"板子上跑"}],"frames":[{"i":0,"d":"源码还是普通 C，问题在于用哪套编译器和哪套库。"},{"i":1,"d":"arm-linux-gnueabihf-gcc 在 x86 上跑，但产出的是 ARM 指令。"},{"i":2,"d":"链接要用 ARM 版的库；拿成 x86 的库会报架构不匹配，或者跑起来 Illegal instruction。"},{"i":3,"d":"scp 或 SD 卡把 ELF 送到板子，注意可执行权限与动态库路径。"},{"i":4,"d":"板子上 ./hello 跑通，才算工具链真的对了。"}],"kind":"flow"}'></div>
+
+    <h2 id="s1">7.1 为什么不能直接在板子上编</h2>
+
+    <table>
+      <thead><tr><th></th><th>PC</th><th>i.MX6ULL 板子</th></tr></thead>
+      <tbody>
+        <tr><td>CPU</td><td>x86_64，多核 GHz</td><td>ARM Cortex-A7，单核 528MHz</td></tr>
+        <tr><td>内存</td><td>8–32GB</td><td>256–512MB</td></tr>
+        <tr><td>编译器</td><td>几百 MB 随便装</td><td>塞不下，也跑不动</td></tr>
+        <tr><td>指令集</td><td>x86</td><td>ARM</td></tr>
+      </tbody>
+    </table>
+
+    <p>x86 的机器读不懂 ARM 指令。<strong>可执行文件必须与运行它的 CPU 架构一致</strong>，这就是 ABI 兼容。交叉编译 = 在 x86 上跑一个「只产出 ARM 指令」的编译器。</p>
+
+    <h2 id="s2">7.2 工具链名字怎么读</h2>
+
+    <pre><code>arm-linux-gnueabihf-gcc
+ │    │     │    │
+ │    │     │    └── hf：hard float，硬件浮点（VFP）
+ │    │     └─────── eabi：嵌入式 ABI
+ │    └───────────── linux：目标是 Linux 系统
+ └────────────────── arm：目标 CPU 架构</code></pre>
+
+    <p>工具链不是一个程序，是一整套：<code>gcc</code>（编译器前端）、<code>as/ld</code>（汇编与链接，来自 binutils）、<code>glibc</code>（目标平台的 C 库）、<code>gdb</code>（调试器）。<strong>这四样必须来自同一套</strong>，混用版本会出现各种链接错误。</p>
+
+    <div class="warn">
+      <b>编译 U-Boot 和内核用厂商工具链</b>
+      apt 装的 <code>gcc-arm-linux-gnueabihf</code> 版本较新，编 4.1.15 这种老内核常报错。厂商提供的 <code>gcc-linaro-4.9.4</code> 那套才是配套的，装到 <code>/opt</code> 下并配好 PATH。
+    </div>
+
+    <h2 id="s3">7.3 第一个 ARM 程序</h2>
+    <div class="viz" data-kind="flow" data-title="make 只重编「变过的东西」" data-sub="靠时间戳比对，不是靠猜" data-json='{"steps":[{"n":".c","d":"源文件改动时间戳"},{"n":".o","d":".o 比 .c 新就跳过"},{"n":"依赖表","d":"Makefile 里写的 : 关系"},{"n":"命令","d":"tab 缩进的 recipe"},{"n":"可执行","d":"链接所有 .o"}],"note":"常见坑：改了头文件但没写进依赖，make 就不重编——加 -MMD 自动生成 .d 依赖文件才稳。"}'></div>
+
+
+    <pre><code>$ mkdir -p ~/lab/ch07 &amp;&amp; cd ~/lab/ch07
+$ vim hello.c</code></pre>
+
+    <pre><code>#include &lt;stdio.h&gt;
+#include &lt;unistd.h&gt;
+int main(void)
+{
+    printf("hello from ARM, pid=%d\n", getpid());
+    return 0;
+}</code></pre>
+
+    <pre><code>$ arm-linux-gnueabihf-gcc -Wall hello.c -o hello_arm
+$ file hello_arm
+hello_arm: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV),
+dynamically linked, interpreter /lib/ld-linux-armhf.so.3 ...
+
+<span class="c"># 本地 x86 编一份对比</span>
+$ gcc hello.c -o hello_x86 &amp;&amp; file hello_x86
+hello_x86: ELF 64-bit LSB pie executable, x86-64 ...
+
+<span class="c"># 传到板子（或 NFS 目录）运行</span>
+$ scp hello_arm root@192.168.1.101:/root/
+<span class="c"># 板子上</span>
+# chmod +x hello_arm &amp;&amp; ./hello_arm</code></pre>
+
+    <div class="tip">
+      <b><code>file</code> 是你的第一道验证</b>
+      编完先 <code>file</code>，看到 <code>ARM, EABI5</code> 才说明编对了。如果显示 x86-64，说明你用错了编译器（多半是 PATH 里 arm 版没生效）。
+    </div>
+
+    <h3>板子上跑不起来？常见三种</h3>
+    <table>
+      <thead><tr><th>报错</th><th>原因</th><th>解法</th></tr></thead>
+      <tbody>
+        <tr><td>Permission denied</td><td>没有执行权限</td><td><code>chmod +x</code></td></tr>
+        <tr><td>not found（明明文件在）</td><td>动态链接器或 libc 版本不匹配</td><td>换 <code>-static</code> 静态编译，或换匹配的工具链</td></tr>
+        <tr><td>Illegal instruction</td><td>编译器用了板子 CPU 不支持的指令集</td><td>加 <code>-march=armv7-a -mfpu=neon -mfloat-abi=hard</code></td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s4">7.4 Makefile：工程化的第一步</h2>
+
+    <p>一个文件可以手敲 gcc，十个文件就必须用 Makefile。核心规则只有一条：<strong>目标 : 依赖 → 制表符 + 命令</strong>。注意命令前面<strong>必须是 Tab，不能是空格</strong>，这是新手第一个坑。</p>
+
+    <pre><code>CC      = arm-linux-gnueabihf-gcc
+CFLAGS  = -Wall -O2 -I./inc
+LDFLAGS =
+TARGET  = app
+OBJS    = main.o uart.o gpio.o
+
+$(TARGET): $(OBJS)
+	$(CC) $(OBJS) -o $@ $(LDFLAGS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $&lt; -o $@
+
+clean:
+	rm -f $(OBJS) $(TARGET)
+
+.PHONY: clean</code></pre>
+
+    <table>
+      <thead><tr><th>写法</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td><code>$@</code></td><td>当前目标名</td></tr>
+        <tr><td><code>$&lt;</code></td><td>第一个依赖</td></tr>
+        <tr><td><code>$^</code></td><td>所有依赖</td></tr>
+        <tr><td><code>%.o: %.c</code></td><td>模式规则：所有 .c 都能这样变成 .o</td></tr>
+        <tr><td><code>.PHONY</code></td><td>声明 clean 是伪目标，防止目录里有同名文件导致不执行</td></tr>
+      </tbody>
+    </table>
+
+    <pre><code>$ make            <span class="c"># 只编译改动的文件</span>
+$ make clean
+$ make -j4        <span class="c"># 并行编译</span>
+$ make V=1        <span class="c"># 看实际执行的完整命令（排查问题用）</span></code></pre>
+
+    <div class="key">
+      <b>改头文件不重新编译？</b>
+      因为 Makefile 没写头文件依赖。简单办法：<code>CFLAGS += -MMD</code>，然后 <code>-include $(OBJS:.o=.d)</code>，让 gcc 自动生成依赖文件。
+    </div>
+
+    <h2 id="s5">7.5 静态库与动态库</h2>
+
+    <table>
+      <thead><tr><th></th><th>静态库 <code>.a</code></th><th>动态库 <code>.so</code></th></tr></thead>
+      <tbody>
+        <tr><td>链接方式</td><td>代码被拷进可执行文件</td><td>运行时才加载</td></tr>
+        <tr><td>体积</td><td>大</td><td>小（多个程序共用一份）</td></tr>
+        <tr><td>部署</td><td>单文件即可，最省心</td><td>必须把 .so 也放到板子上</td></tr>
+        <tr><td>适用</td><td><b>嵌入式首选</b></td><td>多程序共享、需热更新</td></tr>
+      </tbody>
+    </table>
+
+    <pre><code><span class="c"># 静态库</span>
+$ arm-linux-gnueabihf-gcc -c uart.c -o uart.o
+$ arm-linux-gnueabihf-ar rcs libuart.a uart.o
+$ arm-linux-gnueabihf-gcc main.c -L. -luart -o app_static
+
+<span class="c"># 动态库</span>
+$ arm-linux-gnueabihf-gcc -shared -fPIC uart.c -o libuart.so
+$ arm-linux-gnueabihf-gcc main.c -L. -luart -o app_dyn
+<span class="c"># 板子上找不到 .so 时</span>
+# export LD_LIBRARY_PATH=/root/lib
+$ ldd app_dyn        <span class="c"># 看依赖了哪些库、能不能找到</span></code></pre>
+
+    <h2 id="s6">7.6 远程调试：gdbserver</h2>
+    <div class="viz" data-kind="pipe" data-title="gdbserver 远程调试的两端" data-sub="PC 上是 gdb，板子上跑 gdbserver" data-json='{"stages":[{"n":"PC gdb","d":"断点、单步、看变量","c":"cy"},{"n":"TCP 1234","d":"板子与 PC 网络必须通","c":"vi"},{"n":"gdbserver","d":"attach / 启动被调程序","c":"or"},{"n":"目标进程","d":"ARM 指令单步执行","c":"gr"}],"note":"断点打不上，先确认：vmlinux 与板子内核是否同一份编译产物、符号路径是否指对。"}'></div>
+
+
+    <p>板子上跑 <code>gdbserver</code>，PC 上用 <code>gdb-multiarch</code> 连过去，就能像本地一样设断点、看变量、单步。</p>
+
+    <pre><code><span class="c"># PC：编带调试信息的程序</span>
+$ arm-linux-gnueabihf-gcc -g -O0 hello.c -o hello_dbg
+$ scp hello_dbg root@192.168.1.101:/root/
+
+<span class="c"># 板子：启动 gdbserver</span>
+# gdbserver :1234 ./hello_dbg
+
+<span class="c"># PC：连上去</span>
+$ gdb-multiarch hello_dbg
+(gdb) target remote 192.168.1.101:1234
+(gdb) break main
+(gdb) continue
+(gdb) next
+(gdb) print pid
+(gdb) quit</code></pre>
+
+    <div class="tip">
+      <b>板子上没有 gdbserver？</b>
+      用交叉工具链里的 <code>gdbserver</code> 编译一份（<code>./configure --host=arm-linux-gnueabihf &amp;&amp; make</code>），或者用 Buildroot 勾选 <code>BR2_PACKAGE_GDB_SERVER</code>。第 11 章会讲。
+    </div>
+
+    <h2 id="s7">7.7 动手任务</h2>
+    <ul class="steps">
+      <li>编 hello.c 的 ARM 版，用 <code>file</code> 确认架构，传到板子（或 QEMU）执行。</li>
+      <li>分别用 <code>-static</code> 和动态链接编一次，对比体积和运行结果，用 <code>ldd</code> 看依赖。</li>
+      <li>把 hello.c 拆成 <code>main.c + uart.c + uart.h</code> 三个文件，写 Makefile 编译，改一个文件确认 make 只重编那一个。</li>
+      <li>用 <code>make V=1</code> 观察实际命令；故意把 Makefile 的命令行缩进改成空格，看报错。</li>
+      <li>打一个 <code>libuart.a</code> 和 <code>libuart.so</code>，两种方式都链接一次，验证运行差别。</li>
+      <li>用 gdbserver 调试一次，在 main 里设断点，打印一个局部变量。</li>
+    </ul>
+
+    <h2 id="s8">7.8 验收标准</h2>
+    <ul class="checklist">
+      <li>能解释 <code>arm-linux-gnueabihf</code> 每个字段含义</li>
+      <li>能编出 ARM 程序并用 <code>file</code> 验证架构</li>
+      <li>能独立写多文件 Makefile（含变量、模式规则、clean、.PHONY）</li>
+      <li>能说出 Makefile 命令行必须用 Tab 的原因</li>
+      <li>能说清静态库和动态库在部署上的差别</li>
+      <li>能用 gdbserver + gdb 在目标机上设断点并查看变量</li>
+    </ul>
+
+    <footer id="pager"></footer>
+  
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"优化等级的取舍","items":[{"b":"-O0","d":"不优化，变量都在内存里，单步调试最准。体积最大、速度最慢。调试阶段用它。"},{"b":"-O1","d":"基本优化，去掉明显冗余。调试信息还比较可信。日常开发可以接受。"},{"b":"-O2","d":"常规发布级别，重排与内联都开。速度好，但单步会跳来跳去。"},{"b":"-Os","d":"优化体积，嵌入式首选。会牺牲一点速度换更小的镜像，省 Flash 也省启动时间。"}],"note":"同一个程序 -O2 与 -O0 的行为可能不同：volatile 漏写、未定义行为、竞态都会在优化后暴露。发布前务必用发布级别再测一遍。"}'></div>
+  
+
+<nav class="pager">
+  <a href="course-19.html"><span>← 上一篇</span><b>从源码到可执行</b></a>
+  <a class="nx" href="course-th17.html"><span>下一篇 →</span><b>交叉编译与工具链原理</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

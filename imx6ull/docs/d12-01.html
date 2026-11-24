@@ -1,0 +1,151 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Buildroot 到 Yocto：定制镜像、裁剪包、产出固件 · 卷 12 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j12.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 12 · 产品化</div>
+<ol><li><a href="course-ch14.html">
+  <span class="no">01</span><span>综合实战项目<span class="sub">约 16 小时</span></span></a></li>
+<li><a href="d12-01.html" class="active">
+  <span class="no">02</span><span>Buildroot 到 Yocto：定制镜像、裁剪包、产出固件<span class="sub">约 6 小时 · 当前</span></span></a></li>
+<li><a href="d12-02.html">
+  <span class="no">03</span><span>分区与双 Bank OTA：A/B 切换、回滚与校验<span class="sub">约 6 小时</span></span></a></li>
+<li><a href="d12-03.html">
+  <span class="no">04</span><span>HAB 安全启动：签名、验签、失败现象<span class="sub">◆ · 约 4 小时</span></span></a></li>
+<li><a href="d12-04.html">
+  <span class="no">05</span><span>看门狗、电源管理与长时间稳定性测试<span class="sub">◆ · 约 4 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j11.html">← 卷 11</a>
+  <a href="../juan/j13.html">卷 13 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 12<span>·</span>产品化<span>·</span>第 02 篇</div>
+  <h1>Buildroot 到 Yocto：定制镜像、裁剪包、产出固件</h1>
+  
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 6 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+<p class="lead">「能跑 demo」和「能交产品」之间隔着一条沟：构建要可重复、镜像要可裁剪、升级要能回滚。这一篇讲构建系统，下一篇讲升级与分区。</p>
+
+<p>Buildroot 与 Yocto 不是两个发行版，而是两种<strong>组织方式</strong>：一个用 Makefile 一把梭，一个用分层与配方（recipe）做长期维护。</p>
+
+<h2 id="s1">先玩一下：一次构建的六步</h2>
+
+<p>把卡片拖成正确顺序。注意「先编工具链、再编包」——交叉工具链是所有后续步骤的前提。</p>
+
+<div class="ikit" data-type="drag" data-json='{"title":"Buildroot 一次完整构建","badge":"drag",
+"items":[{"id":"cfg","text":"选 defconfig / menuconfig，确定目标架构与包集合"},{"id":"dl","text":"下载源码，校验 hash"},{"id":"tc","text":"构建交叉工具链（或使用外部工具链）"},{"id":"pkg","text":"逐个编译包，装进 target/ 与 staging/"},{"id":"rootfs","text":"打包 rootfs（tar / ext4 / squashfs）"},{"id":"img","text":"生成最终镜像（含 bootloader、内核、dtb、rootfs）"}],
+"answer":["cfg","dl","tc","pkg","rootfs","img"],
+"explain":"每一步的输出都是下一步的输入，所以任何一步失败都会停在那里；查构建日志要从第一个 error 往上找。"}'></div>
+
+<h2 id="s2">一、Buildroot：适合一个人维护的产品</h2>
+
+<p>它的工作目录很直白：<code>output/build/</code> 是各包的源码与编译产物，<code>output/host/</code> 是交叉工具链与主机工具，<code>output/target/</code> 是即将成为 rootfs 的目录树，<code>output/images/</code> 是最终镜像。</p>
+
+<ul>
+  <<li><b>defconfig</b>：把配置固化成文件（<code>make imx6ull_defconfig</code>），保证换台机器也能复现。</li>
+  <li><b>外部树（BR2_EXTERNAL）</b>：把自己的板级包、补丁、overlay 放在独立目录，不污染上游。</li>
+  <li><b>增量</b>：<code>make</code> 只重建变化的包；<code>make &lt;pkg&gt;-rebuild</code> 强制重编单个包。</li>
+  <li><b>overlay</b>：把 <code>/etc</code> 配置、启动脚本直接叠进 target，不用改包。</li>
+</ul>
+
+<div class="ikit" data-type="param" data-json='{"title":"并行编译：核数与时间","badge":"param",
+"fields":[{"k":"pkgs","label":"包数量","min":10,"max":2000,"step":10,"val":200,"unit":"个"},
+{"k":"per","label":"每包平均编译时间","min":10,"max":600,"step":10,"val":60,"unit":"秒"},
+{"k":"j","label":"并行任务数 -j","min":1,"max":32,"step":1,"val":8,"unit":"个"}],
+"outs":[
+{"label":"串行总时间","expr":"V.pkgs * V.per / 60","unit":" 分钟"},
+{"label":"理想并行时间","expr":"V.pkgs * V.per / V.j / 60","unit":" 分钟"},
+{"label":"若 -j 超过核数","expr":"min(V.j, 8)","unit":" 有效并行度"},
+{"label":"首次全量（含工具链）","expr":"V.pkgs * V.per / V.j / 60 + 20","unit":" 分钟"}],
+"bar":{"expr":"min(V.j / 8 * 100, 100)"},
+"verdict":{"expr":"V.j <= 8","ok":"并行度合理","bad":"-j 超过物理核数：只会增加换页与 IO 争抢"},
+"note":"i.MX6ULL 的镜像在 8 核 PC 上通常 20–60 分钟首次全量。把 -j 设成「核数 + 1」左右，比盲目 -j32 更快。"}'></div>
+
+<h2 id="s3">二、Yocto：适合一个团队维护三年</h2>
+
+<p>Yocto 的核心概念只有四个：<b>layer</b>（分层）、<b>recipe</b>（配方）、<b>task</b>（步骤）、<b>sstate</b>（共享状态缓存）。</p>
+
+<table>
+<thead><tr><th>概念</th><th>是什么</th><th>对应文件</th></th></tr></thead>
+<tbody>
+<tr><td>Layer</td><td>一组相关的配方与配置，可叠加、可复用</td><td><code>meta-*/conf/layer.conf</code></td></tr>
+<tr><td>Recipe</td><td>「怎么拿到源码、怎么编、装什么」</td><td><code>xxx_1.0.bb</code></td></tr>
+<tr><td>Task</td><td><code>do_fetch/do_configure/do_compile/do_install</code></td><td>由 <code>bitbake</code> 调度</td></tr>
+<tr><td>sstate-cache</td><td>任务级缓存，命中就不重编</td><td><code>SSTATE_DIR</code></td></tr>
+<tr><td>SDK</td><td>给应用开发者用的工具链 + 库</td><td><code>bitbake -c populate_sdk</code></td></tr>
+</tbody></table>
+
+<p>Yocto 的代价是学习曲线与磁盘：一个完整的 <code>poky</code> 构建动辄几十 GB。收益是<strong>可审计、可复现、可长期维护</strong>：每个包的来源、补丁、许可证都记录在案，适合有合规要求的量产项目。</p>
+
+<div class="cal tip"><span class="h">选型的一条硬标准</span>只有你一个人维护、需求半年内定型 → Buildroot；有团队、要维护三年以上、要做 SDK 给第三方 → Yocto。混着用（Buildroot 起步、后期转 Yocto）往往付出双倍代价。</div>
+
+<h2 id="s4">三、构建产物到手之后</h2>
+
+<p>一次构建会产出四类东西：bootloader（SPL + U-Boot）、内核（zImage/uImage）、设备树（dtb）、根文件系统（tar/ext4/squashfs）。它们最终被写进不同的分区，这就是下一篇的主题。</p>
+
+<div class="cal warn"><span class="h">误解：构建成功就等于镜像能启动</span>构建只保证「文件生成了」。能不能启动取决于分区位置、启动参数（bootargs）、设备树是否匹配板子、rootfs 里是否有 init。四者任何一处错，串口都会停在某个固定位置——这也是排障时「看停在哪一级」的价值。</div>
+
+<h2 id="s5">动手（可选）：产出一个最小镜像</h2>
+
+<div class="cal q"><span class="h">只在 🔧 实作模式展开</span>PC 上做，需要网络与 20 GB 空间。</div>
+
+<ol>
+  <li><code>git clone</code> Buildroot，<code>make imx6ull_defconfig</code>（或 <code>qemu_arm_vexpress_defconfig</code> 先练手）。</li>
+  <li><code>make -j$(nproc)</code>，观察 <code>output/images/</code> 里出现了哪些文件。</li>
+  <li>用 <code>qemu-system-arm -M vexpress-a9 -kernel zImage -dtb vexpress-v2p-ca9.dtb -rootfs ...</code> 起一次，确认能到 shell。</li>
+  <li>改 <code>board/.../rootfs_overlay/etc/inittab</code>，重新 <code>make</code>，验证 overlay 生效。</li>
+</ol>
+
+<h2 id="s6">离开这一篇，你应该能</h2>
+
+<ul class="qa">
+  <li>说出 Buildroot 与 Yocto 的组织差异，以及各自的适用规模。</li>
+  <li>列出一次构建的六步与四类产物。</li>
+  <li>解释 sstate / defconfig / overlay 各自解决什么问题。</li>
+</ul>
+
+<p>构建出来的是「一份镜像」。产品需要的是「能安全地换掉这一份镜像」——下一篇讲双 Bank 与回滚。</p>
+
+
+<nav class="pager">
+  <a href="course-ch14.html"><span>← 上一篇</span><b>综合实战项目</b></a>
+  <a class="nx" href="d12-02.html"><span>下一篇 →</span><b>分区与双 Bank OTA：A/B 切换、回滚与校验</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

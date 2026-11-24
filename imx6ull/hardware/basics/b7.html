@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第 07 章 · 回到这块板子：元件对号入座 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/doc-compat.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+<link rel="stylesheet" href="../../assets/asm.css">
+</head><body style="--acc:#ffb545">
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="index.html">☰ 硬件基础目录</a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">硬件是怎么工作的 · 9 篇</div>
+    <ol>
+      <li><a href="index.html"><span class="no">⌂</span><span>路口目录<span class="sub">篇目总览与读法</span></span></a></li>
+      <li><a href="b0.html"><span class="no">00</span><span>先修：怎么学才算学会<span class="sub">三条判断标准，和一条错的路径</span></span></a></li>
+      <li><a href="b1.html"><span class="no">01</span><span>电的四个字：电压、电流、电阻、功率<span class="sub">欧姆定律、串并联、LED 限流实算</span></span></a></li>
+      <li><a href="b2.html"><span class="no">02</span><span>无源五件套：电阻、电容、电感、二极管、晶振<span class="sub">每个元件都在解决一个具体问题</span></span></a></li>
+      <li><a href="b3.html"><span class="no">03</span><span>有源器件：三极管与 MOS 管<span class="sub">为什么一个「开关」需要三个脚</span></span></a></li>
+      <li><a href="b4.html"><span class="no">04</span><span>数字电路的骨架：电平、门、组合、时序<span class="sub">五种门、真值表、加法器、触发器</span></span></a></li>
+      <li><a href="b5.html"><span class="no">05</span><span>时间：时钟、建立保持、抖动、消抖<span class="sub">为什么电路需要「等一会儿」</span></span></a></li>
+      <li><a href="b6.html"><span class="no">06</span><span>总线到底是什么<span class="sub">地址、数据、控制，与片选、时序</span></span></a></li>
+      <li><a href="b7.html" class="active"><span class="no">07</span><span>回到这块板子：元件对号入座<span class="sub">电源树、晶振、DDR、eMMC、按键、LED</span></span></a></li>
+      <li><a href="b8.html"><span class="no">08</span><span>工具与六个实验<span class="sub">万用表、示波器、逻辑分析仪怎么用</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="../index.html">硬件入口</a><a href="../../juan/index.html">十四卷总览</a></div>
+  </aside>
+  <main class="doc">
+    <div class="doc-kicker">硬件基础课 · 从一颗电阻开始 <span>·</span> 第 07 章</div>
+    <div class="ch-head">
+      <h1>回到这块板子：元件对号入座</h1>
+      <div class="ch-meta"><span class="hot">第 07 章</span><span>约 24 分钟</span><span>★ 必读</span></div>
+    </div>
+<h2 id="s1">先看电源树，别先看点灯</h2>
+<p>新手拿到板子第一件事是找 LED；正确顺序是先看<b>电源树</b>——因为所有「时好时坏」的问题，八成在电源。</p>
+<p>一块 i.MX6ULL 板子的典型电源轨：</p>
+<table class="regtbl"><thead><tr><th>轨</th><th>电压</th><th>给谁</th><th>常见来源</th></tr></thead><tbody><tr><td class="nm">VDD_5V / VIN</td><td>5V</td><td>整板入口</td><td>DC 座 / USB</td></tr><tr><td class="nm">VDD_3V3</td><td>3.3V</td><td>外设 IO、大部分芯片</td><td>降压（buck）</td></tr><tr><td class="nm">VDD_ARM</td><td>可调（约 1.2–1.4V）</td><td>CPU 核</td><td>降压，可动态调压</td></tr><tr><td class="nm">VDD_SOC</td><td>约 1.3–1.4V</td><td>SoC 内部</td><td>降压</td></tr><tr><td class="nm">VDD_DDR</td><td>1.35V（DDR3L）</td><td>DDR 颗粒</td><td>降压/线性</td></tr><tr><td class="nm">VDD_HIGH / NVCC_*</td><td>多路</td><td>模拟、存储接口</td><td>线性（LDO）</td></tr></tbody></table>
+<p><b>看电源树要读出三件事</b>：</p>
+<ol>
+<li><b>谁给谁供电</b>（上游是谁）。</li>
+<li><b>哪几路是「可调」的</b>（CPU 核电压通常随频率变，这就是内核里 DVFS 的物理基础）。</li>
+<li><b>上电顺序有没有要求</b>（有些芯片要求 core 先于 IO，违反会闩锁）。</li>
+</ol>
+<p>这三件事在「硬件设计指南」与 PMIC 手册里，是排查「板子完全不上电」的第一手材料。</p>
+<h2 id="s2">晶振与复位：CPU 的「心跳」与「起跑线」</h2>
+<table class="regtbl"><thead><tr><th>元件</th><th>参数</th><th>作用</th></tr></thead><tbody><tr><td class="nm">主晶振</td><td>24MHz</td><td>给 SoC 的参考时钟，PLL 从这里倍频出所有频率</td></tr><tr><td class="nm">RTC 晶振</td><td>32.768kHz</td><td>走时，断电也靠纽扣电池维持</td></tr><tr><td class="nm">复位电路</td><td>RC + 按键 + 复位芯片</td><td>保证电源稳定后才放开 CPU</td></tr></tbody></table>
+<p><b>主晶振不起振，整块板子就是「上电无反应」</b>。判断方法：示波器（或高阻探头）量晶振脚，看不到 24MHz 正弦/方波就是它的问题。常见原因：负载电容焊错、晶振虚焊、晶振本身坏。</p>
+<h2 id="s3">DDR：最容易「看起来好了其实没配好」的部分</h2>
+<p>i.MX6ULL 的 DDR 接口要点：</p>
+<ul>
+<li><b>DDR3L</b> 常见，1.35V，容量按板子（256MB / 512MB）。</li>
+<li><b>走线等长与端接</b>：数据组内等长、地址/命令组等长，板上常有串联电阻（几十 Ω）。</li>
+<li><b>初始化参数极多</b>：tRCD、tRP、tRAS、刷新周期……这些值来自 DDR 颗粒的 Datasheet，写进 DDR 控制器寄存器。</li>
+</ul>
+<p>这就是为什么「裸机点灯」能跑，「裸机用 DDR」几乎必用官方初始化脚本（DCD 或 uboot 的 <code>ddr_init</code>）。<b>自己手算 DDR 参数不是入门任务。</b></p>
+<p>一个诊断技巧：DDR 初始化失败通常表现为「串口完全无输出」或「跑到某处就复位」——因为代码被链接到 DDR 上，DDR 没起来，代码就飞了。</p>
+<h2 id="s4">eMMC / TF 卡 / SPI Flash：启动介质三选一</h2>
+<table class="regtbl"><thead><tr><th>介质</th><th>接口</th><th>特点</th></tr></thead><tbody><tr><td class="nm">eMMC</td><td>SDIO（4/8 线）</td><td>焊在板上，快，容量大</td></tr><tr><td class="nm">TF 卡</td><td>SDIO</td><td>可换，常用于烧录</td></tr><tr><td class="nm">SPI Flash</td><td>SPI</td><td>小容量，常存 uboot</td></tr></tbody></table>
+<p>i.MX6ULL 的 Boot ROM 支持从这些介质启动，<b>由拨码开关或 eFuse 决定顺序</b>。所以「烧了镜像不启动」的第一件事是<b>确认拨码</b>，不是怀疑镜像。</p>
+<h2 id="s5">按键与 LED：最简单的两样，坑最多</h2>
+<p><b>按键</b>：一端接 GPIO，另一端接 GND，GPIO 侧有上拉（外部或内部）。</p>
+<ul>
+<li>没上拉 → 悬空，读数随机。</li>
+<li>没有 RC 消抖 → 一次按下被识别成几十次。</li>
+<li>判断「按下」要读 <code>PSR</code>（引脚实际电平），不是 <code>DR</code>。</li>
+</ul>
+<p><b>LED</b>：阳极经限流电阻接电源（或接 GPIO），阴极接 GPIO 或地。</p>
+<ul>
+<li><b>极性写反</b> → 灯常亮或常灭，而不是「不工作」。</li>
+<li>多颗 LED 共用一个电阻 → 亮度不均。</li>
+<li>直接接 GPIO 不串电阻 → 可能超过 IO 驱动能力。</li>
+</ul>
+<h2 id="s6">一张「板子地图」该怎么画</h2>
+<p>拿原理图，画四层：</p>
+<pre class="asm"><code>① 电源层：入口 → 各路稳压 → 各模块
+② 时钟层：晶振 → PLL → 各模块（这层要配合 CCM 章）
+③ 接口层：每类总线挂了哪些器件（I2C/SPI/SDIO/ENET）
+④ 交互层：按键、LED、串口、USB、网口</code></pre>
+<p>画完你会立刻发现两件事：<b>哪些脚被复用冲突</b>、<b>哪些外设你没意识到存在</b>。这张图就是 01 篇「自己的摘要」的物理版。</p>
+<h2 id="s7">三个「先量什么」的判断</h2>
+<table class="regtbl"><thead><tr><th>现象</th><th>先量</th></tr></thead><tbody><tr><td class="nm">完全不上电</td><td>入口电压 → 各路稳压输出 → 复位电平</td></tr><tr><td class="nm">上电但无输出</td><td>主晶振是否起振 → 启动拨码 → 串口线序</td></tr><tr><td class="nm">能跑但偶发死机</td><td>电源纹波 → DDR 参数 → 温度（过热降频）</td></tr></tbody></table>
+<p><b>顺序永远是从「电源」往「信号」推</b>，不要从「我怀疑的芯片」开始。</p>
+<h2 id="s8">本篇验收</h2>
+<ul>
+<li>能画出自己板子的四层地图（电源/时钟/接口/交互）。</li>
+<li>能说出 ARM 核电压为什么是可调的，以及它与 DVFS 的关系。</li>
+<li>能解释「烧了镜像不启动，先查拨码」。</li>
+<li>能说出按键的三个坑（上拉、消抖、读 PSR）。</li>
+<li>能说出 LED 极性写反的现象。</li>
+</ul>
+<h2 id="s9">下一篇</h2>
+<p>最后是工具与实验。08 篇讲万用表、逻辑分析仪具体怎么用，以及六个可以在自己板子上完成的实验——做完这六个，这门课就闭环了。</p>
+<div class="pager">
+      <a href="b6.html"><span>上一篇</span><b>← 06 总线到底是什么</b></a>
+      <a href="index.html"><span>目录</span><b>篇目总览</b></a>
+      <a class="nx" href="b8.html"><span>下一篇</span><b>08 工具与六个实验 →</b></a>
+    </div>
+  </main>
+</div>
+<script src="../../assets/hw-tools.js"></script>
+</body>
+</html>

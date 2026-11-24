@@ -1,0 +1,600 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>时钟树、复位、电源域、RTC 与看门狗 · 卷 07 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j07.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 07 · 芯片与硬件底座</div>
+<ol><li><a href="course-th07.html">
+  <span class="no">01</span><span>ARM 架构与 Cortex-A7<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-35.html">
+  <span class="no">02</span><span>i.MX6ULL 最小系统<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th10.html">
+  <span class="no">03</span><span>总线体系：AXI / AHB / APB 与 I2C / SPI / CAN<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="course-th11.html" class="active">
+  <span class="no">04</span><span>时钟树、复位、电源域、RTC 与看门狗<span class="sub">约 5 小时 · 当前</span></span></a></li>
+<li><a href="course-th12.html">
+  <span class="no">05</span><span>最小系统必需外设（上）：DDR、中断、定时器、GPIO、UART<span class="sub">约 6 小时</span></span></a></li>
+<li><a href="course-th13.html">
+  <span class="no">06</span><span>最小系统必需外设（下）：存储、DMA、以太网、USB<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-37.html">
+  <span class="no">07</span><span>设备树<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th16.html">
+  <span class="no">08</span><span>BSP 与设备树原理<span class="sub">约 6 小时</span></span></a></li>
+<li><a href="course-38.html">
+  <span class="no">09</span><span>总线<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-39.html">
+  <span class="no">10</span><span>GIC 与定时器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-40.html">
+  <span class="no">11</span><span>存储与外设<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="viz-clock-tree.html">
+  <span class="no">12</span><span>互动台：时钟树与门控<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="viz-gpio.html">
+  <span class="no">13</span><span>互动台：GPIO 与 IOMUX 配置<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="viz-nvic.html">
+  <span class="no">14</span><span>互动台：中断优先级与抢占<span class="sub">💻 · 约 1 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j06.html">← 卷 06</a>
+  <a href="../juan/j08.html">卷 08 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 07<span>·</span>芯片与硬件底座<span>·</span>第 04 篇</div>
+  <h1>时钟树、复位、电源域、RTC 与看门狗</h1>
+  <p class="lede">这五样东西是「最小系统」的地基：没有时钟 CPU 不跑，没有正确的复位电路上电不可靠，没有电源域管理功耗下不来，没有 RTC 断电就没时间，没有看门狗死机就永远死着。这一章用具体寄存器与算例把它们串起来。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 5 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+    <div class="viz" data-kind="flow" data-title="一个频率要走过五道门" data-sub="24MHz 到 UART 的 80MHz，中途没变过一个字节的数据" data-json='{"play":true,"steps":[{"n":"晶振 24MHz","d":"板上唯一的高频源"},{"n":"PLL 倍频","d":"÷ 之前先乘：×22 = 528MHz"},{"n":"选择器","d":"多路选一，决定这路时钟的来源"},{"n":"分频器 PODF","d":"÷1 到 ÷8，降到模块够用就行"},{"n":"门控 CCGR","d":"写 0b11 才放行，否则模块断粮"},{"n":"外设","d":"UART 拿到 80MHz"}],"note":"五道门里任何一道没开，这条链就断。所以「外设不工作」不一定是驱动写错了，顺序永远是：先量时钟，再看复位，最后才是寄存器配置。"}'></div>
+
+
+    <div class="card">
+      <h4>本章要解决的问题</h4>
+      <p>① 24MHz 晶振怎么变成 528MHz；② 改主频为什么会影响串口波特率；③ 断电后时间靠什么维持；④ 看门狗超时时间怎么算、为什么不能在中断里喂；⑤ 复位有几种来源，怎么区分。</p>
+    </div>
+
+    <div class="key" style="border-left-color:var(--cy)">
+      <h4 style="margin-top:0">▶ 先动手，再读字：互动实验台</h4>
+      <p style="margin:6px 0 10px">这一章最抽象的部分（时钟树怎么分叉、门控关掉会怎样）已经做成了可以拖、可以点的页面。建议先玩五分钟再往下读，理解速度会明显不同。</p>
+      <p style="margin:0"><a href="#" style="display:inline-block;padding:8px 18px;border:1px solid rgba(61,219,217,.4);border-radius:999px;background:rgba(61,219,217,.12);color:var(--cy);text-decoration:none;font-weight:600">打开「时钟树与门控」互动页 →</a></p>
+    </div>
+
+    <div class="card">
+      <h4>读完你应该能回答</h4>
+      <ul>
+        <li>PLL1 到 ARM 核之间还经过哪些环节？</li>
+        <li>CCGR 里每个外设占几位，写什么才是「开」？</li>
+        <li>UART 时钟 80MHz、要 115200，分频值怎么算，误差多少？</li>
+        <li>RTC 的 32.768kHz 为什么是这个名字？</li>
+        <li>看门狗喂狗为什么要写两个特定值？</li>
+      </ul>
+    </div>
+
+    <div class="anim2" data-json='{"title":"24 MHz 怎么变成十几路时钟","hint":"倍频、分频、门控三步","nodes":[{"k":"24MHz 晶振","s":"一切的原点"},{"k":"PLL","s":"倍频到 528MHz"},{"k":"分频器","s":"÷4 / ÷8"},{"k":"CCGR 门控","s":"按模块开关"},{"k":"外设","s":"拿到自己的时钟"}],"frames":[{"i":0,"d":"板上一颗 24MHz 晶振，频率越高的时钟都由它倍频而来——所以它一坏，全系统都停。"},{"i":1,"d":"PLL 锁相环把 24MHz 乘 22 得到 528MHz，作为 ARM 主频；乘 29 是 696MHz 档。"},{"i":2,"d":"分频器把主频切成 AHB 132MHz、IPG 66MHz，越慢的总线越省电。"},{"i":3,"d":"CCGR 是每个模块的时钟阀门：不用 UART 就把它的时钟关掉，省的是实实在在的功耗。"},{"i":4,"d":"外设拿到自己的时钟后才开始工作；改主频要连带改 DDR 时序，否则跑着跑着就死机。"}],"kind":"flow"}'></div>
+
+    <h2 id="s1">0. 为什么需要时钟：从一根导线讲起</h2>
+
+    <p>先把结论放这儿：<b>时钟不是「给 CPU 供能」，而是给整个芯片一个统一节拍</b>。没有节拍，几十亿个晶体管各按各的速度跑，谁也不知道别人算完了没有，结果就是一团随机错误。下面从最小的一块电路开始，一步一步讲到你熟悉的「528MHz」。</p>
+
+    <h3>0.1 先看一个开关</h3>
+
+    <p>芯片里最基本的元件是 MOS 管，它干的事只有一件：<b>当开关</b>。栅极给高电平，源漏导通；给低电平，断开。用几个这样的开关组合，就能做出「与门」「或门」「非门」：</p>
+
+    <table>
+      <thead><tr><th>门</th><th>符号含义</th><th>行为</th></tr></thead>
+      <tbody>
+        <tr><td>非门（NOT）</td><td>输入取反</td><td>输入 1 出 0，输入 0 出 1</td></tr>
+        <tr><td>与门（AND）</td><td>两个都 1 才出 1</td><td>像两个串联的开关，都闭合才通电</td></tr>
+        <tr><td>或门（OR）</td><td>有一个 1 就出 1</td><td>像两个并联的开关，一个闭合就通电</td></tr>
+        <tr><td>异或（XOR）</td><td>不同出 1，相同出 0</td><td>加法器的核心，一位加法的「和」就是它</td></tr>
+      </tbody>
+    </table>
+
+    <p>把这些门连起来，就能做加法器、比较器、译码器——也就是 CPU 里那些「运算」。</p>
+
+    <h3>0.2 关键问题：信号不是瞬间到达的</h3>
+
+    <p>假设你要算 <code>(A AND B) OR (C AND D)</code>。电路上电流要从输入端流到输出端，中间经过晶体管、导线，<b>每一段都要花时间</b>。这个时间叫<b>传播延迟</b>，单位是皮秒到纳秒。</p>
+
+    <table>
+      <thead><tr><th>环节</th><th>典型延迟（40nm/28nm 工艺）</th></tr></thead>
+      <tbody>
+        <tr><td>一个反相器</td><td>约 20–40 ps</td></tr>
+        <tr><td>一个两输入与非门</td><td>约 30–60 ps</td></tr>
+        <tr><td>一段片上导线（1mm）</td><td>约 50–100 ps</td></tr>
+        <tr><td>一个 32 位加法器</td><td>约 1–2 ns</td></tr>
+        <tr><td>一次 L1 cache 访问</td><td>约 1–4 个周期</td></tr>
+      </tbody>
+    </table>
+
+    <p>问题就在这儿：<b>同一个信号，经过不同的路径，到达终点的时间不同</b>。你算 <code>(A AND B) OR (C AND D)</code>，上面那路经过 2 个门，下面那路也 2 个门，还好；但如果写成 <code>A OR (B AND (C OR D))</code>，两条路径的门数就不一样了，一长一短，<b>短的那路早就稳定了，长的那路还在变</b>。此时你去读输出，读到的到底是什么？</p>
+
+    <div class="calc">
+      <h5>算一笔：等多久才算「算完了」</h5>
+      <div class="line">假设最长路径 12 个门，每门 50ps → 600ps</div>
+      <div class="line">最短路径 4 个门 → 200ps</div>
+      <div class="line">在 200–600ps 之间去读结果：可能对，可能错，取决于温度、电压、工艺偏差</div>
+      <div class="line">只有等到 <b>600ps 之后</b>再读，结果才确定正确</div>
+      <div class="line">「600ps 之后」这个时刻，需要一个<b>全芯片统一的计时方式</b>来规定 —— 这就是时钟</div>
+    </div>
+
+    <h3>0.3 时钟就是全队的鼓点</h3>
+
+    <p>想象一百个人一起划船。如果各划各的，船原地打转；只要有一个人敲鼓，所有人「听到鼓点就一起划」，船才往前走。<b>时钟就是这个鼓</b>：它是一条不断在 0 和 1 之间翻转的信号，全芯片所有寄存器都盯着它的同一个沿。</p>
+
+    <div class="flow">
+      <span>时钟低</span><span>→</span><span>上升沿</span><span>→</span><span>时钟高</span><span>→</span><span>下降沿</span><span>→</span><span>再上升沿</span>
+    </div>
+
+    <p>为什么用「沿」而不是「高电平」？因为沿是一个<b>瞬间</b>，高电平是一段<b>时间</b>。用瞬间做「采纳」的动作，所有器件才可能对齐到同一个时刻；用一段时间做动作，谁先谁后又说不清了。</p>
+
+    <p>一个时钟周期里发生的事，固定成三段：</p>
+
+    <div class="steps">
+      <ol>
+        <li><b>沿到来</b>：所有寄存器同时把「此刻的输入」锁进来（这一瞬间叫采样）。</li>
+        <li><b>沿之后</b>：组合逻辑开始算，信号在电路里传播、稳定。这段时间叫<b>逻辑延迟</b>。</li>
+        <li><b>下一个沿到来前</b>：结果必须已经稳定，并且保持了足够长的时间，等着被下一个沿采走。</li>
+      </ol>
+    </div>
+
+    <p>所以「时钟频率」的真正含义是：<b>我给了组合逻辑多长时间去算完</b>。频率 528MHz，周期就是 1.89ns；这 1.89ns 里，最慢的那条路径必须走完。</p>
+
+    <h3>0.4 触发器：只在沿上「看一眼」</h3>
+
+    <p>能实现「沿到来才采样」的电路叫<b>触发器</b>（flip-flop），最常见的是 D 触发器：一个数据输入 D、一个时钟输入 CLK、一个输出 Q。它的规则只有一句：<b>时钟上升沿到来的一瞬间，把 D 的值抄到 Q；其他时间 Q 不动。</b></p>
+
+    <div class="reg">// D 触发器的行为（伪代码）
+on rising_edge(CLK):
+    Q = D          // 只在沿上抄一次
+其余时间:
+    保持 Q 不变    // 输入怎么变都不影响输出</div>
+
+    <p>这条规则带来两个必须遵守的时间窗口，它们是数字电路里最重要的两个参数：</p>
+
+    <table>
+      <thead><tr><th>参数</th><th>含义</th><th>违例后果</th></tr></thead>
+      <tbody>
+        <tr><td><b>建立时间</b> t<sub>setup</sub></td><td>沿到来<b>之前</b>，D 必须已经稳定这么久</td><td>采到正在变化的值 → 亚稳态</td></tr>
+        <tr><td><b>保持时间</b> t<sub>hold</sub></td><td>沿到来<b>之后</b>，D 还要保持这么久不变</td><td>采到的值被后一级抢走/改写 → 亚稳态</td></tr>
+      </tbody>
+    </table>
+
+    <p>违例会怎样？触发器进入<b>亚稳态</b>：输出既不是 0 也不是 1，而是在中间电压上晃，晃多久不确定（可能几纳秒，也可能几毫秒）。后面接的逻辑看到这个「半高不高」的电平，可能这级判成 1、那级判成 0，<b>整个系统进入不可预测状态</b>。这就是为什么「时序不满足」不能靠重试解决——它是物理层面的不确定。</p>
+
+    <div class="tip">
+      <b>一句话记住</b>
+      时钟的作用不是「让电跑起来」，而是<b>规定「什么时候可以认为信号已经算完」</b>。所有数字电路的可靠性，都建立在这条约定上。
+    </div>
+
+    <h3>0.5 为什么频率不能无限提高</h3>
+
+    <p>既然周期越短算得越快，那把 24MHz 直接翻到 5GHz 不就行了？不行，有三个硬约束，一个比一个狠。</p>
+
+    <p><b>约束一：最慢那条路径就那么多延迟。</b></p>
+
+    <div class="calc">
+      <h5>算一笔：一条关键路径决定最高频率</h5>
+      <div class="line">某段逻辑（例如一次 32 位加法 + 选择器）最长路径 = 3.0ns</div>
+      <div class="line">触发器开销（建立时间 + 时钟到输出）≈ 0.3ns</div>
+      <div class="line">所以周期下限 ≈ 3.3ns → 最高频率 ≈ <b>300MHz</b></div>
+      <div class="line">想跑到 528MHz（周期 1.89ns），就必须把这段逻辑拆成两级流水线，每级 1.6ns 左右</div>
+      <div class="line">这就是「流水线」存在的唯一理由：不是为了炫技，是为了把长路径切短</div>
+    </div>
+
+    <p><b>约束二：频率越高，功耗越大，而且是超线性。</b>数字电路动态功耗的公式是</p>
+
+    <p>P = C × V<sup>2</sup> × f × α（C 是节点电容、V 是电压、f 是频率、α 是每周期翻转概率）</p>
+
+    <p>其中 C 是节点电容、V 是电压、f 是频率、α 是翻转率。频率翻倍，功耗就翻倍；更麻烦的是，频率高了电压还得往上提（否则电路跑不动），电压又进平方项——<b>528MHz 的功耗可能是一个 264MHz 系统的三倍以上</b>。</p>
+
+    <p><b>约束三：热量出不去。</b>功耗变成热，封装散热能力有限。温度一高，晶体管更慢、漏电更大，形成恶性循环（热失控）。所以嵌入式芯片的「标称主频」往往是<b>在某个温度与散热条件下的承诺</b>，不是物理极限。</p>
+
+    <div class="note">
+      <b>这三条约束解释了 i.MX6ULL 为什么是 528MHz</b>
+      它是 28nm 工艺、面向工业级温度范围（−40~105℃）、无风扇被动散热。厂商要保证在最坏工艺角、最高温度下仍然满足时序，所以频率不能定得太激进。同一颗芯片换到消费级温度范围，往往能跑更高。
+    </div>
+
+    <h3>0.6 为什么一个芯片需要几十路时钟</h3>
+
+    <p>如果全芯片只有一个时钟，会发生两件荒唐事：</p>
+
+    <ol>
+      <li><b>浪费</b>：I2C 只需要 100kHz，你却给它 528MHz，它的分频器要数 5280 次才出一个周期，功耗白白烧掉。</li>
+      <li><b>做不到</b>：USB 要求 480MHz 且精度 ±500ppm，音频要求低抖动，DDR 要求与数据同步的专用时钟——一个频率满足不了所有需求。</li>
+    </ol>
+
+    <p>所以芯片被切成多个<b>时钟域</b>，每个域有自己的频率与来源：</p>
+
+    <table>
+      <thead><tr><th>时钟域</th><th>典型频率</th><th>为什么是这个值</th></tr></thead>
+      <tbody>
+        <tr><td>ARM 核</td><td>528MHz（可调）</td><td>性能与功耗折中，可随负载调频</td></tr>
+        <tr><td>AXI 总线</td><td>264MHz</td><td>通常取核频率的 1/2，保证带宽够用又不过快</td></tr>
+        <tr><td>AHB / IPG</td><td>132MHz / 66MHz</td><td>外设寄存器访问不需要太快，降频省电</td></tr>
+        <tr><td>UART</td><td>80MHz</td><td>要能分出 115200 等标准波特率且误差小</td></tr>
+        <tr><td>USB PHY</td><td>480MHz</td><td>USB 2.0 高速的物理层要求</td></tr>
+        <tr><td>以太网</td><td>50MHz（RMII 参考）</td><td>100Mbps ÷ 2bit = 50M 组/秒</td></tr>
+        <tr><td>DDR</td><td>400MHz（800MT/s）</td><td>颗粒速率决定</td></tr>
+        <tr><td>RTC</td><td>32.768kHz</td><td>2^15 分频得 1Hz</td></tr>
+      </tbody>
+    </table>
+
+    <p>不同时钟域之间传数据，叫<b>跨时钟域</b>。这是数字设计里最容易出错的地方：A 域的信号在 B 域看来，可能正好在跳变，直接采就会亚稳态。工程上的解法是加<b>两级同步器</b>（连续两个触发器串联）或<b>异步 FIFO</b>。这部分在 T15 讲中断与并发时会再遇到。</p>
+
+    <h3>0.7 为什么用 PLL，不直接把晶振做成 528MHz</h3>
+
+    <p>晶振是靠石英片的<b>机械共振</b>产生频率的，它有一个致命特点：<b>频率由晶片尺寸决定，做不了太高</b>。常见的基频晶振集中在 8–50MHz，再高就要用「泛音」模式，成本与稳定性都变差。所以板上只会焊 24MHz，不可能焊 528MHz。</p>
+
+    <p>把 24MHz 变成 528MHz 的电路叫 <b>PLL</b>（锁相环）。它的原理可以这样理解：</p>
+
+    <div class="flow">
+      <span>24MHz 参考</span><span>→</span><span>鉴相器（比相位）</span><span>→</span><span>滤波器</span><span>→</span><span>压控振荡器 VCO</span><span>→</span><span>分频后反馈</span>
+    </div>
+
+    <p>通俗说：它内部有一个能自由跑的振荡器，PLL 不断比较「它的相位」和「参考时钟的相位」，跑快了就压慢一点、跑慢了就推快一点，最后锁在参考频率的<b>整数倍</b>上。24MHz × 22 = 528MHz，这个 22 就是倍频系数。</p>
+
+    <div class="calc">
+      <h5>算一笔：为什么倍频系数不能随便取</h5>
+      <div class="line">24MHz × 22 = 528MHz ✔（这是硬件支持的组合）</div>
+      <div class="line">想直接要 400MHz：400 / 24 = 16.67 —— 不是整数，PLL 做不出</div>
+      <div class="line">只能 528 再分频：528 / 1 = 528、/2 = 264、/4 = 132 …… 得到的是 528 的约数</div>
+      <div class="line">所以「i.MX6ULL 的主频只能是 528、396(24×16.5 不支持)、264…」这类限制，根源在「PLL 只能整数倍频」</div>
+    </div>
+
+    <p>PLL 还有一个隐藏本领：它能输出<b>多路不同相位的时钟</b>。同频但相位差 90°、180° 的时钟，在 DDR 接口里用来对齐数据与选通信号——这是纯晶振永远做不到的。第 9 章讲 DDR 时会用到。</p>
+
+    <h3>0.8 为什么要分频：不是所有模块都需要快</h3>
+
+    <p>PLL 出来的是高频，但绝大多数模块用不上。给它高速时钟有两个害处：功耗高、时序更难满足。所以每个模块前面都有<b>分频器</b>，把频率降到刚好够用的档位。</p>
+
+    <table>
+      <thead><tr><th>模块</th><th>需要多少</th><th>降频的收益</th></tr></thead>
+      <tbody>
+        <tr><td>UART</td><td>80MHz（分出 115200）</td><td>再高也没有意义，反而分频误差更难凑</td></tr>
+        <tr><td>I2C</td><td>几 MHz 即可</td><td>总线本来就只有 100k/400kHz</td></tr>
+        <tr><td>GPIO</td><td>66MHz（IPG）</td><td>翻转速率远超人手感知</td></tr>
+        <tr><td>定时器</td><td>66MHz 或 32.768kHz</td><td>够做微秒级计时</td></tr>
+      </tbody>
+    </table>
+
+    <p>分频本身很简单：一个计数器数 N 个周期翻转一次，就是 N 分频。但它有个陷阱——<b>分频值改变时，输出会有一个不完整的周期</b>。所以改分频必须先把模块停掉（关时钟门控），改完再开，否则可能发出一个「半个脉冲」，被外设当成有效沿。</p>
+
+    <h3>0.9 为什么要门控：不用的模块直接断时钟</h3>
+
+    <p>数字电路的动态功耗与「有没有在翻转」直接相关。一个模块即使不工作，只要时钟还在给它，内部的触发器就一直在翻转、一直在耗电。所以每个模块前面还有一个<b>与门</b>（叫时钟门控）：</p>
+
+    <div class="reg">// 门控的本质就是一个与门
+module_clk = pll_clk AND gate_enable
+
+gate_enable = 0  →  module_clk 恒为 0，模块内部完全不翻转，功耗接近 0
+gate_enable = 1  →  module_clk 跟着 pll_clk 跑</div>
+
+    <p>i.MX6ULL 里这个开关就是 <b>CCGR0–CCGR6</b> 七个寄存器，每个外设占 2 位。这就是为什么「外设寄存器写不进去」的第一嫌疑永远是门控没开——<b>时钟没到，寄存器里的触发器根本不会响应</b>。</p>
+
+    <div class="warn">
+      <b>门控的两个副作用</b>
+      ① 关掉时钟后再去读该模块的寄存器，可能返回全 0 或直接挂死总线（因为模块内部状态机停了）；② 重新打开后，模块往往需要重新初始化，不能假设它记得之前的状态。<b>「先关时钟再配置」是标准做法，「配置到一半关时钟」是事故。</b>
+    </div>
+
+    <h3>0.10 为什么时钟要画成「树」</h3>
+
+    <p>一颗 24MHz 晶振要驱动全芯片几万个触发器，直接连是不行的：驱动能力不够、走线太长、到达时间差太多。所以时钟是<b>一层层缓冲放大、分叉传递</b>的，形状像树：</p>
+
+    <div class="flow">
+      <span>晶振</span><span>→</span><span>PLL</span><span>→</span><span>根缓冲</span><span>→</span><span>一级缓冲</span><span>→</span><span>二级缓冲</span><span>→</span><span>各模块</span>
+    </div>
+
+    <p>树形带来两个专业名词，它们直接决定芯片能跑多快：</p>
+
+    <ul>
+      <li><b>时钟偏斜</b>：同一个沿到达不同触发器的时间差。偏斜太大，等于某些触发器「提前」看到了沿，建立时间就不够了。</li>
+      <li><b>时钟抖动</b>：同一个触发器，这个周期的沿比上个周期早/晚了一点（由电源噪声、PLL 噪声引起）。抖动会吃掉时序余量。</li>
+    </ul>
+
+    <div class="calc">
+      <h5>算一笔：抖动吃掉多少余量</h5>
+      <div class="line">周期 1.89ns（528MHz），关键路径 1.6ns，理论上余量 0.29ns</div>
+      <div class="line">时钟抖动 ±100ps（±0.1ns）、偏斜 80ps → 实际余量只剩 0.29 − 0.1 − 0.08 ≈ <b>0.11ns</b></div>
+      <div class="line">所以「标称 528MHz」必须按最坏抖动与偏斜留够余量，不能按理想值设计</div>
+      <div class="line">这也是为什么超频会「看起来能跑、偶尔算错」：余量被吃光了</div>
+    </div>
+
+    <div class="tip">
+      <b>回到你最初的疑问</b>
+      「为什么需要时钟」的完整答案是三层：<b>①</b> 组合逻辑有传播延迟，需要一个统一时刻来判断「算完了」；<b>②</b> 触发器靠时钟沿采样，才能让全芯片同步推进；<b>③</b> 不同模块对频率、精度、相位的需求不同，所以要用 PLL 生成、分频裁剪、门控开关，最终形成一棵树。
+    </div>
+
+    <h2 id="s2">1. 时钟树：从一颗晶振到几十路时钟</h2>
+
+
+    <p>i.MX6ULL 板上通常只有一颗 <b>24MHz</b> 晶振（外加一颗 32.768kHz 给 RTC）。所有其他频率都从它派生。路径是固定的四段：</p>
+
+    <div class="flow">
+      <span>晶振 24MHz</span><span>→</span><span>PLL（倍频）</span><span>→</span><span>选择器（多路选一）</span><span>→</span><span>分频器（PODF）</span><span>→</span><span>门控（CCGR）</span><span>→</span><span>外设</span>
+    </div>
+
+    <table>
+      <thead><tr><th>PLL</th><th>典型频率</th><th>主要去向</th></tr></thead>
+      <tbody>
+        <tr><td><b>PLL1</b>（ARM PLL）</td><td>528MHz（24 × 22）</td><td>CPU 核（再经 CACRR 分频）</td></tr>
+        <tr><td><b>PLL2</b>（System PLL）</td><td>528MHz，带 4 路 PFD</td><td>AHB、IPG、UART、eMMC、I2C 等大部分外设</td></tr>
+        <tr><td><b>PLL3</b>（USB PLL）</td><td>480MHz</td><td>USB PHY（必须精确 480M）</td></tr>
+        <tr><td><b>PLL4</b></td><td>音频用</td><td>SAI/I2S</td></tr>
+        <tr><td><b>PLL5</b></td><td>视频用</td><td>LCD/CSI</td></tr>
+        <tr><td><b>PLL6</b></td><td>网络用</td><td>ENET 的 25/50/125MHz 参考</td></tr>
+        <tr><td><b>PLL7</b></td><td>USB OTG</td><td>另一路 USB</td></tr>
+      </tbody>
+    </table>
+
+    <p>为什么要这么多 PLL 而不是一个高频再分频？因为<b>某些外设对频率精度和抖动极其敏感</b>：USB 必须精确 480MHz（否则枚举失败）、音频必须低抖动（否则有噪声）、以太网 RMII 需要精确的 50MHz。用同一个 PLL 分出所有频率，无法同时满足这些约束。</p>
+
+    <h3>1.1 三个关键环节的寄存器</h3>
+
+    <p>CCM（Clock Controller Module）基址 <b>0x020C_4000</b>。你只需要认识下面几个：</p>
+
+    <table>
+      <thead><tr><th>寄存器</th><th>偏移</th><th>管什么</th></tr></thead>
+      <tbody>
+        <tr><td><code>CCM_CCR</code></td><td>0x00</td><td>各 PLL 的使能与锁定状态</td></tr>
+        <tr><td><code>CCM_CACRR</code></td><td>0x10</td><td>ARM 核分频（1/2/4/8）</td></tr>
+        <tr><td><code>CCM_CBCDR</code></td><td>0x14</td><td>AHB / IPG / PERCLK 分频与选择</td></tr>
+        <tr><td><code>CCM_CSCDR1</code></td><td>0x24</td><td><b>UART 时钟</b>的选择与分频</td></tr>
+        <tr><td><code>CCM_CCGR0–6</code></td><td>0x68–0x80</td><td><b>外设时钟门控</b>，每个寄存器管 16 个外设</td></tr>
+      </tbody>
+    </table>
+
+    <p><code>CCGR</code> 的编码规则必须记住：<b>每个外设占 2 位</b>，取值含义：</p>
+
+    <div class="reg">00  = 时钟关闭（最省电）
+01  = 仅运行模式开（保留）
+10  = 仅等待模式开（保留）
+11  = 全开（除停止模式外都开）  ← 绝大多数情况写这个</div>
+
+    <p>所以「打开 GPIO1 时钟」就是在对应 CCGR 的对应 2 位上写 <code>0b11</code>。这也是 T10 强调的「先开时钟再碰寄存器」的具体操作。</p>
+
+    <div class="calc">
+      <h5>算一笔：528MHz 怎么一路分到 IPG 132MHz</h5>
+      <div class="line">PLL1 = 24MHz × 22 = <b>528MHz</b>（ARM PLL）</div>
+      <div class="line">CACRR = 1（不分频）→ ARM 核 = 528MHz</div>
+      <div class="line">CBCDR 的 AHB_PODF = 2 → AHB = 528/2 = <b>264MHz</b></div>
+      <div class="line">CBCDR 的 IPG_PODF = 2 → IPG = 264/2 = <b>132MHz</b></div>
+      <div class="line">IPG 是大部分 APB 外设的基准（GPIO、I2C 等都靠它）</div>
+    </div>
+
+    <h2 id="s3">2. 波特率：为什么改主频会让串口乱码</h2>
+    <div class="viz" data-kind="matrix" data-title="七路 PLL，各喂一摊活" data-sub="不是所有外设都吃同一路时钟" data-json='{"corner":"PLL","cols":["频率","主要喂谁"],"rows":[{"n":"PLL1","cells":[{"v":"528 MHz","c":"cy"},{"v":"ARM 核（经 PODF 分频）","c":"gray"}]},{"n":"PLL2","cells":[{"v":"528 MHz","c":"vi"},{"v":"AXI/AHB，系统总线","c":"gray"}]},{"n":"PLL3","cells":[{"v":"480 MHz","c":"or"},{"v":"USB PHY","c":"gray"}]},{"n":"PLL4","cells":[{"v":"音频","c":"gr"},{"v":"SAI/I2S","c":"gray"}]},{"n":"PLL5","cells":[{"v":"以太网","c":"cy"},{"v":"ENET 的 25/50MHz","c":"gray"}]},{"n":"PLL6","cells":[{"v":"DDR","c":"vi"},{"v":"DDR 控制器","c":"gray"}]},{"n":"PLL7","cells":[{"v":"USB","c":"or"},{"v":"USB OTG","c":"gray"}]}],"note":"改 ARM 主频只动 PLL1+PODF，但会连带改变 UART 的分频基数——这就是「超频后串口乱码」的机制。"}'></div>
+
+
+    <p>UART 的波特率不是「设一个数就完事」，它是由<b>输入时钟分频</b>得来的。i.MX6ULL 的 UART 时钟通常来自 PLL2 的 PFD，配到 80MHz，然后：</p>
+
+    <div class="reg">divisor = UART_CLK / (16 × baudrate)
+波特率误差 = |实际 - 目标| / 目标   （一般要求 &lt; 2%）</div>
+
+    <div class="calc">
+      <h5>算一笔：80MHz 出 115200</h5>
+      <div class="line">divisor = 80,000,000 / (16 × 115,200) = 80,000,000 / 1,843,200 = <b>43.40</b></div>
+      <div class="line">取整 43：实际波特率 = 80,000,000 / (16 × 43) = 116,279 → 误差 <b>+0.94%</b></div>
+      <div class="line">取整 44：实际 = 113,636 → 误差 −1.36%</div>
+      <div class="line">两者都在 ±2% 内，可通；但若时钟被改到 66MHz，误差会放大到 4% 以上，开始丢字节</div>
+      <div class="line">这就是「改了主频，串口突然乱码」的根因：<b>时钟变了，分频值没跟着重算</b></div>
+    </div>
+
+    <p>所以改时钟树时有一条铁律：<b>凡是从被改动的 PLL 派生的外设，都要重新核对分频</b>。串口、SD 卡、I2C 速率、LCD 像素时钟全在内。这也是为什么 Linux 用 clock framework 统一管理——驱动通过 <code>clk_get_rate()</code> 动态算分频，而不是写死。</p>
+
+    <h2 id="s4">3. RTC：断电之后时间靠什么走</h2>
+
+    <p>i.MX6ULL 的实时时钟在 <b>SNVS</b>（Secure Non-Volatile Storage）模块里，基址 0x020C_C000。它有三个特殊之处：</p>
+
+    <ul>
+      <li><b>用独立的 32.768kHz 晶振</b>。这个数字不是随便选的：32768 = 2<sup>15</sup>，用 15 级二分频就能得到精确 1Hz，硬件实现最省。</li>
+      <li><b>有独立的电源域</b>（VDD_SNVS，通常接纽扣电池或超级电容）。主电源断了，它继续走。</li>
+      <li><b>有独立的「防拆」逻辑</b>（tamper），一旦检测到入侵就清掉密钥——这也是它叫 Secure 的原因。</li>
+    </ul>
+
+    <p>关键寄存器：</p>
+
+    <table>
+      <thead><tr><th>寄存器</th><th>偏移</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td><code>HPCR</code></td><td>0x00</td><td>高功率域配置（含 RTC 时钟源选择、日历使能）</td></tr>
+        <tr><td><code>LPCR</code></td><td>0x04</td><td>低功率域配置（闹钟使能、RTC 使能）</td></tr>
+        <tr><td><code>LPSRTCMR</code></td><td>0x10</td><td>RTC 计数器高位</td></tr>
+        <tr><td><code>LPSRTCLR</code></td><td>0x14</td><td>RTC 计数器低位</td></tr>
+      </tbody>
+    </table>
+
+    <p>计数器按 32.768kHz 递增，所以读出来的原始值要换算成秒：</p>
+
+    <div class="reg">秒数 = ((MR &lt;&lt; 15) | (LR &gt;&gt; 17))
+原理：MR 存的是「已经满 2^15 个 tick 的次数」，LR 的低 15 位是「不满一秒的剩余 tick」</div>
+
+    <p>这个换算最容易出错的地方是<b>移位方向</b>。写错就是时间差几百倍。实际项目里不要手算，用驱动或 <code>hwclock</code>。</p>
+
+    <p>Linux 里 RTC 是标准设备类：<code>/dev/rtc0</code> 提供 <code>RTC_RD_TIME</code> 等 ioctl，<code>hwclock -r</code> 从 RTC 读、<code>hwclock -w</code> 把系统时间写回 RTC。开机时通常是 init 脚本调 <code>hwclock -s</code> 把 RTC 时间同步给系统。</p>
+
+    <div class="note">
+      <b>RTC 也会走不准的两个真实原因</b>
+      ① 晶振负载电容选错，频率偏几十 ppm，一天差几秒；② 电池电压不足时进入「低电压检测」，计数器行为异常。遇到「每次断电后时间都回到 1970」，先量电池电压，再查驱动有没有真的读到 SNVS 而不是某个假 RTC。
+    </div>
+
+    <h2 id="s5">4. 看门狗：专门用来对付「程序卡死」</h2>
+
+    <p>看门狗（WDOG）本质是一个<b>只减不增的计数器</b>：启动后它从设定值往下数，数到 0 就拉复位。软件必须定期「喂」它（把计数器重置回满值），喂得不够快就重启。它的设计意图很明确：<b>软件如果失去「定期执行」的能力，硬件就替你重启。</b></p>
+
+    <p>i.MX6ULL 有 WDOG1/2/3，WDOG1 基址 <b>0x020B_C000</b>。关键寄存器：</p>
+
+    <table>
+      <thead><tr><th>寄存器</th><th>偏移</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td><code>WCR</code></td><td>0x00</td><td>控制：使能、时钟源、分频、是否允许关闭</td></tr>
+        <tr><td><code>WSR</code></td><td>0x02</td><td>服务（喂狗），<b>必须写序列 0x5555 → 0xAAAA</b></td></tr>
+        <tr><td><code>WRSR</code></td><td>0x08</td><td>复位状态：记录上次是不是看门狗导致的复位</td></tr>
+      </tbody>
+    </table>
+
+    <p>超时时间由三个量决定：</p>
+
+    <div class="calc">
+      <h5>算一笔：超时时间怎么算</h5>
+      <div class="line">超时 = (计数器初值 + 1) × 分频系数 / 时钟频率</div>
+      <div class="line">例：时钟 32.768kHz、分频 256、初值 0x0FFF（4095）</div>
+      <div class="line">= 4096 × 256 / 32768 = 32 秒</div>
+      <div class="line">若把分频改成 1024：= 4096 × 1024 / 32768 = 128 秒</div>
+      <div class="line">工程取值原则：<b>超时 &gt; 最长一次正常任务耗时 × 2</b>，否则会误复位</div>
+    </div>
+
+    <p><b>为什么喂狗要写两个特定值？</b> 因为「写一个值就能喂狗」太容易被误触发：任何一次野指针写到这个地址都会意外喂狗，看门狗就形同虚设。要求连续写 0x5555 与 0xAAAA，把误触发概率降到极低。这是硬件层面的防误操作设计，和 T10 讲的寄存器语义一脉相承。</p>
+
+    <p>还有两条工程经验：</p>
+
+    <ul>
+      <li><b>不要在中断里喂狗</b>。主循环已经卡死、只剩中断还在跑时，中断里喂狗会让看门狗完全失效。正确做法是<b>在主循环里喂</b>，让「活着」和「在干正事」等价。</li>
+      <li><b>一旦启动往往不能关</b>。很多 SoC 的看门狗一旦使能就无法用软件关闭（WCR 的 WDA 位控制），这是故意的——防止程序「为了不出问题先把狗关了」。</li>
+    </ul>
+
+    <h2 id="s6">5. 复位与电源域：上电那几百毫秒</h2>
+    <div class="viz" data-kind="timeline" data-title="看门狗：32 秒是怎么算出来的" data-sub="4096 × 256 ÷ 32768 = 32 秒" data-json='{"items":[{"t":"0s","n":"喂狗","d":"写 WCR 重装计数器","c":"gr"},{"t":"8s","n":"不喂","d":"计数器过半，仍安全","c":"cy"},{"t":"31s","n":"临界","d":"下次必须喂了","c":"or"},{"t":"32s","n":"超时","d":"WDOG 拉复位，整机重启","c":"rd"}],"note":"所以喂狗必须放在「主循环能活到」的地方，不能放在中断里——中断还在跑、主循环死了，看门狗反而被喂活，设备就卡死不重启。"}'></div>
+
+
+    <p>「复位」不只是「按一下复位键」。i.MX6ULL 的复位源有多种，它们都会把系统拉回初始状态，但<b>留下的线索不同</b>：</p>
+
+    <table>
+      <thead><tr><th>复位源</th><th>触发</th><th>怎么判断</th></tr></thead>
+      <tbody>
+        <tr><td><b>POR</b>（上电复位）</td><td>电源上电、电压跌到阈值以下</td><td>复位状态寄存器里无其他标志</td></tr>
+        <tr><td><b>外部复位</b></td><td>RESET 引脚被拉低（复位键 / 外部芯片）</td><td>同上，通常难以区分</td></tr>
+        <tr><td><b>看门狗复位</b></td><td>WDOG 超时</td><td>WRSR 里有 WDOG 标志</td></tr>
+        <tr><td><b>软件复位</b></td><td>写 SRC 的复位控制位</td><td>SRC 的复位状态位</td></tr>
+        <tr><td><b>温度/电压异常复位</b></td><td>内部保护触发</td><td>相关状态寄存器</td></tr>
+      </tbody>
+    </table>
+
+    <p>排查「设备老是莫名重启」时，<b>先读复位原因寄存器</b>，能省掉大量猜测。如果每次都是看门狗复位，说明软件有卡死；如果是 POR，则查电源（纹波、跌落、上电斜率）。</p>
+
+    <p>电源域管理（PMU）解决的是另一个问题：<b>不用的部分要断电</b>。i.MX6ULL 支持运行、待机、暂停、断电等模式，各模式下不同电源域的状态不同。做低功耗产品时，你要知道自己关掉的是哪个域、唤醒源是什么（GPIO、RTC 闹钟、USB 等）。这部分细节多、和具体板子强相关，实操时对照手册的 PMU 章节逐项验证。</p>
+
+    <h2 id="s7">6. 八个常见误解</h2>
+
+    <table>
+      <thead><tr><th>误解</th><th>真相</th></tr></thead>
+      <tbody>
+        <tr><td>「CPU 主频就是 PLL 频率」</td><td>PLL 之后还有 CACRR 分频，ARM 核拿到的是分频后的频率。</td></tr>
+        <tr><td>「改了 PLL 只影响 CPU」</td><td>同一 PLL 派生的外设全部受影响，串口/SD/I2C 都要重算分频。</td></tr>
+        <tr><td>「CCGR 写 1 就开」</td><td>每个外设占 2 位，要写 <code>0b11</code> 才是全开。</td></tr>
+        <tr><td>「波特率设个数字就行」</td><td>是由输入时钟分频得来的，时钟变了必须重算，误差要控制在 2% 内。</td></tr>
+        <tr><td>「RTC 靠主电源供电」</td><td>靠独立电源域（纽扣电池/超级电容），否则断电就不走时。</td></tr>
+        <tr><td>「32.768kHz 是随便选的」</td><td>是 2<sup>15</sup>，便于精确二分频到 1Hz，且功耗低。</td></tr>
+        <tr><td>「看门狗喂得越勤越好」</td><td>喂得太勤会掩盖「任务没跑完」的问题；应该在主循环按周期喂，且超时要大于最长任务耗时。</td></tr>
+        <tr><td>「看门狗可以在中断里喂」</td><td>那样主循环死了照样被喂，看门狗失去意义。</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s8">7. 自检：能答出来才算懂</h2>
+
+    <div class="q"><span class="n">1</span><p>24MHz 晶振到 ARM 528MHz，中间经过哪些环节？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>晶振 → PLL1 倍频（×22 得 528MHz）→ CACRR 分频（1/2/4/8）→ 门控 → CPU。ARM 核拿的是最后一级的产物。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>为什么需要多个 PLL，而不是一个高频再分频？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>因为 USB（480MHz 精确）、音频（低抖动）、以太网（50MHz 精确）对频率精度与抖动要求各不相同，单一 PLL 分频无法同时满足。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>CCGR 里一个外设占几位？写什么值表示开？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>2 位，<code>0b11</code> 表示除停止模式外全开（最常用）；<code>00</code> 关闭。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>UART 时钟 80MHz 要 115200，分频值多少、误差多少？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>divisor = 80,000,000/(16×115,200) = 43.40；取 43 得 116,279（+0.94%），取 44 得 113,636（−1.36%），都在 ±2% 内。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>改了 CPU 主频后串口乱码，原因是什么？怎么避免？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>UART 的输入时钟跟着变了，但分频值没重算，实际波特率偏离超限。避免方式：用 clock framework 动态取频率算分频，不要写死。</p>
+    </div></details>
+
+    <div class="q"><span class="n">6</span><p>RTC 计数器怎么换算成秒？为什么要独立供电？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>秒 = ((MR &lt;&lt; 15) | (LR &gt;&gt; 17))，因为计数按 32.768kHz 走。独立供电（纽扣电池/超级电容）是为了主电源断开后仍继续计时。</p>
+    </div></details>
+
+    <div class="q"><span class="n">7</span><p>看门狗超时时间怎么算？取值的工程原则是什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>超时 = (初值+1) × 分频 / 时钟频率。原则：超时大于「最长一次正常任务耗时」的 2 倍，既不误复位，也不让故障拖太久。</p>
+    </div></details>
+
+    <div class="q"><span class="n">8</span><p>为什么喂狗要写 0x5555 再写 0xAAAA？为什么不能在中断里喂？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>双写序列防止野指针误喂狗。不能在中断里喂，是因为主循环卡死时中断可能还在跑，看门狗就检测不到「主程序已死」。</p>
+    </div></details>
+
+    <h2 id="s9">8. 这一章要动手的命令</h2>
+
+    <div class="steps">
+      <ol>
+        <li><code>cat /sys/kernel/debug/clk/clk_summary</code> —— 看整棵时钟树的频率与使能状态。</li>
+        <li><code>cat /proc/interrupts | grep -i rtc</code> —— 确认 RTC 闹钟中断是否注册。</li>
+        <li><code>hwclock -r</code> 与 <code>date</code> —— 对比 RTC 与系统时间，判断谁不准。</li>
+        <li><code>cat /sys/class/rtc/rtc0/since_epoch</code> —— 直接读 RTC 的秒值，验证第 3 节的换算。</li>
+        <li><code>dmesg | grep -i -E "rtc|snvs|wdog"</code> —— 看 RTC 与看门狗驱动的加载情况。</li>
+        <li>U-Boot 里 <code>md 0x020BC000 4</code> —— 读 WDOG 寄存器，看它是否已启动。</li>
+        <li>故意死循环并停止喂狗，复位后读 WRSR，确认看门狗标志。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一章预告</b>
+      T12 进入「最小系统外设」上半部分：DDR 控制器、中断控制器、定时器、GPIO 与 IOMUX、UART —— 每个都给出寄存器级初始化顺序。
+    </div>
+
+
+    <!--IVIZ--><div class="iviz" data-kind="slider" data-iviz="1" data-json='{"title":"一个 24 MHz 晶振怎么变成十几路时钟","label":"PLL 倍频比","unit":" 倍","min":10,"max":40,"step":1,"value":22,"out":[{"k":"ARM 主频","expr":"v*24","unit":" MHz"},{"k":"AHB 总线（四分频）","expr":"v*24/4","unit":" MHz"},{"k":"IPG 外设时钟（八分频）","expr":"v*24/8","unit":" MHz"},{"k":"UART 波特率误差（按 115200 算）","expr":"(v*24/8*1000000/115200 - 434) * 100 / 434","unit":" %"}],"presets":[{"v":22,"t":"22 倍 → 528MHz"},{"v":29,"t":"29 倍 → 696MHz"},{"v":33,"t":"33 倍 → 792MHz"}],"note":"倍频比不是随便填的：PLL 有锁定范围，分频系数又只有有限档位。改主频要连带改 DDR 时序，否则跑着跑着就死机。"}'></div>
+  
+
+<nav class="pager">
+  <a href="course-th10.html"><span>← 上一篇</span><b>总线体系：AXI / AHB / APB 与 I2C / SPI / CAN</b></a>
+  <a class="nx" href="course-th12.html"><span>下一篇 →</span><b>最小系统必需外设（上）：DDR、中断、定时器、GPIO、UART</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

@@ -1,0 +1,328 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>网络与远程开发 · 卷 00 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j00.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 00 · 起步 · Linux 与实验台</div>
+<ol><li><a href="course-ch01.html">
+  <span class="no">01</span><span>Linux 全景认知<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="course-ch02.html">
+  <span class="no">02</span><span>搭好实验台<span class="sub">约 10 小时</span></span></a></li>
+<li><a href="course-ch03.html">
+  <span class="no">03</span><span>命令行与文件系统<span class="sub">约 16 小时</span></span></a></li>
+<li><a href="course-ch04.html">
+  <span class="no">04</span><span>系统管理四件事<span class="sub">约 16 小时</span></span></a></li>
+<li><a href="course-ch05.html">
+  <span class="no">05</span><span>Vim 与 Shell 脚本<span class="sub">约 14 小时</span></span></a></li>
+<li><a href="course-ch06.html" class="active">
+  <span class="no">06</span><span>网络与远程开发<span class="sub">约 10 小时 · 当前</span></span></a></li></ol>
+<div class="vol-nav">
+  <span></span>
+  <a href="../juan/j01.html">卷 01 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 00<span>·</span>起步 · Linux 与实验台<span>·</span>第 06 篇</div>
+  <h1>网络与远程开发</h1>
+  <p class="lede">嵌入式开发的黄金组合是：内核和根文件系统放在 PC 上，板子通过网络去取。改一行代码不用重新烧写整块板子——这就是 NFS 存在的意义。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 10 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+    <div class="viz" data-kind="bits" data-title="192.168.1.100/24 里那个 24 是什么" data-sub="子网掩码就是「哪些位属于网络号」" data-json='{"w":32,"fields":[{"n":"网络号 前 24 位","lo":8,"hi":31,"c":"cy","t":"192.168.1，同一个网段必须相同"},{"n":"主机号 后 8 位","lo":0,"hi":7,"c":"or","t":"0-255，其中 .0 是网络地址，.255 是广播"}],"note":"/24 等于掩码 255.255.255.0。两台机器只有在网络号完全一致时才能直接通信，否则必须过网关。板子 ping 不通 PC，八成是先查这一位。"}'></div>
+
+
+    <div class="card">
+      <h4>本章目标</h4>
+      <p>① 理解 IP、掩码、网关、端口；② 给 Ubuntu 配静态 IP；③ 配通 SSH / NFS / TFTP 三个服务；④ 板子能挂载 PC 目录直接跑程序；⑤ 网络不通时有一套排查顺序。</p>
+    </div>
+
+    <div class="anim2" data-json='{"title":"四条通道把开发机和板子连起来","hint":"各有各的用途，别混","nodes":[{"k":"开发机","s":"Ubuntu 虚拟机"},{"k":"SSH","s":"登录与传文件"},{"k":"TFTP","s":"U-Boot 拉内核"},{"k":"NFS","s":"挂根文件系统"},{"k":"板子","s":"跑起来"}],"frames":[{"i":0,"d":"开发机上有源码、工具链、镜像，所有编译都在这里完成。"},{"i":1,"d":"SSH 用来执行命令与 scp 传文件，一条 22 端口最通用。"},{"i":2,"d":"U-Boot 阶段还没有完整网络栈，用最简的 tftp 把 zImage 与 dtb 拉进内存。"},{"i":3,"d":"NFS 把开发机目录挂成板子的 rootfs：改代码不用重烧，重启就生效。"},{"i":4,"d":"四条都通，迭代速度能快一个数量级；断一条就会在别处浪费一整晚。"}],"kind":"flow"}'></div>
+
+    <h2 id="s1">6.1 四个概念，一张表</h2>
+
+    <table>
+      <thead><tr><th>概念</th><th>是什么</th><th>举例</th></tr></thead>
+      <tbody>
+        <tr><td>IP 地址</td><td>机器在网络里的门牌号</td><td><code>192.168.1.100</code></td></tr>
+        <tr><td>子网掩码</td><td>说明哪几位是网络号，同网络号才算同网段</td><td><code>255.255.255.0</code> = <code>/24</code></td></tr>
+        <tr><td>网关</td><td>出本网段时找谁转发</td><td><code>192.168.1.1</code></td></tr>
+        <tr><td>端口</td><td>一台机器上不同服务的编号</td><td>SSH 22、TFTP 69、NFS 2049、HTTP 80</td></tr>
+      </tbody>
+    </table>
+
+    <p><strong>怎么判断两台机器同网段？</strong> 看掩码为 1 的那些位是否相同。<code>192.168.1.100</code> 和 <code>192.168.1.101</code> 前 24 位都是 <code>192.168.1</code>，同网段，网线直连就能通；<code>192.168.2.5</code> 不同网段，必须过网关，网关没配对，ping 一定不通——这和「网线通不通」是两回事。</p>
+
+    <div class="key">
+      <b>嵌入式最常用的拓扑</b>
+      PC 或虚拟机 <code>192.168.1.100</code> ←→ 板子 <code>192.168.1.101</code>，同网段、网线直连。不需要路由器，两边都配静态 IP 即可。速度最快，也最少受公司网络策略干扰。
+    </div>
+
+    <h2 id="s2">6.2 必备网络命令</h2>
+
+    <pre><code><span class="c"># 看 IP、网卡状态、路由表</span>
+$ ip addr
+$ ip link
+$ ip route
+
+<span class="c"># 临时改 IP（重启失效，正式配置见 6.3）</span>
+$ sudo ip addr add 192.168.1.100/24 dev ens33
+$ sudo ip link set ens33 up
+
+<span class="c"># 测连通性</span>
+$ ping -c 4 192.168.1.101
+
+<span class="c"># 看端口是否在监听、被谁监听</span>
+$ ss -lntp
+$ ss -lntp | grep 2049
+
+<span class="c"># 测端口通不通（比 ping 更准，能测到服务层）</span>
+$ nc -zv 192.168.1.100 2049</code></pre>
+
+    <div class="tip">
+      <b>ping 通不等于服务能用</b>
+      ping 走 ICMP，服务走 TCP/UDP 端口。ping 通但 SSH 连不上，问题一定在端口、防火墙或服务本身，不在网线。
+    </div>
+
+    <h2 id="s3">6.3 配静态 IP（Ubuntu 22.04 的 netplan）</h2>
+    <div class="viz" data-kind="pipe" data-title="ssh 登录：数据在几层之间被包了又拆" data-sub="一次按键，六个阶段" data-json='{"stages":[{"n":"终端","d":"键盘字符","c":"or"},{"n":"加密","d":"AES 会话密钥","c":"rd"},{"n":"TCP","d":"三次握手后传输","c":"vi"},{"n":"sshd","d":"解密 + 鉴权","c":"cy"},{"n":"pty+shell","d":"分配伪终端执行","c":"gr"}],"note":"所以 ssh 卡住时要分层查：TCP 通不通（nc -vz）、鉴权过不过（-v 看协商）、pty 有没有（服务端 /etc/ssh/sshd_config）。"}'></div>
+
+
+    <p>Ubuntu 17 以后网络配置统一交给 <strong>netplan</strong>，配置文件在 <code>/etc/netplan/</code> 下，YAML 格式，<strong>缩进必须用空格，不能用 Tab</strong>。</p>
+
+    <pre><code>$ sudo vim /etc/netplan/01-network-manager-all.yaml</code></pre>
+
+    <pre><code>network:
+  version: 2
+  ethernets:
+    ens33:
+      dhcp4: no
+      addresses: [192.168.1.100/24]
+      routes:
+        - to: default
+          via: 192.168.1.1
+      nameservers:
+        addresses: [8.8.8.8, 114.114.114.114]</code></pre>
+
+    <pre><code>$ sudo netplan try      <span class="c"># 试应用，120 秒内不确认会自动回滚（推荐）</span>
+$ sudo netplan apply
+$ ip addr show ens33</code></pre>
+
+    <div class="warn">
+      <b>网卡名不是 ens33？</b>
+      用 <code>ip link</code> 看真实名字（可能是 <code>ens160</code>、<code>eth0</code>、<code>enp3s0</code>）。写错名字，netplan 会直接报错或配置无效。另外 22.04 已弃用 <code>gateway4</code> 写法，用上面的 <code>routes</code>。
+    </div>
+
+    <h2 id="s4">6.4 SSH：远程操作的基础</h2>
+
+    <pre><code>$ sudo apt install -y openssh-server
+$ sudo systemctl enable --now ssh
+$ sudo systemctl status ssh
+
+<span class="c"># 从另一台机器登录</span>
+$ ssh ubuntu@192.168.1.100
+<span class="c"># 传文件</span>
+$ scp app ubuntu@192.168.1.101:/home/ubuntu/
+$ scp ubuntu@192.168.1.101:/home/ubuntu/app ./
+<span class="c"># 传整个目录</span>
+$ scp -r work/ ubuntu@192.168.1.101:/home/ubuntu/</code></pre>
+
+    <h3>免密登录（省事，也让脚本能自动跑）</h3>
+
+    <pre><code>$ ssh-keygen -t rsa -b 4096       <span class="c"># 一路回车</span>
+$ ssh-copy-id ubuntu@192.168.1.101
+$ ssh ubuntu@192.168.1.101        <span class="c"># 不再问密码</span></code></pre>
+
+    <h3>常用服务端配置（可选）</h3>
+
+    <pre><code>$ sudo vim /etc/ssh/sshd_config
+<span class="c"># 改端口（降低扫描风险）</span>
+Port 2222
+<span class="c"># 允许密码登录（调试期建议开着，免密配好后再关）</span>
+PasswordAuthentication yes
+$ sudo systemctl restart ssh</code></pre>
+
+    <div class="warn">
+      <b>改完必须 restart</b>
+      且改端口后旧连接不会自动断开，新连接要用 <code>ssh -p 2222</code>。<b>关掉密码登录前，先确认密钥登录真的能进</b>，否则会把自己锁在外面。
+    </div>
+
+    <h2 id="s5">6.5 NFS：板子直接跑 PC 上的程序</h2>
+
+    <p>NFS 让板子把 PC 的一个目录「挂」成自己的目录。<strong>好处是：你在 PC 上用交叉编译器编出新程序，板子上立刻就能跑，不用 scp、不用重烧。</strong>这是嵌入式开发效率的关键。</p>
+
+    <h3>PC 端（服务端）</h3>
+
+    <pre><code>$ sudo apt install -y nfs-kernel-server
+$ sudo mkdir -p /home/ubuntu/nfsroot
+$ sudo chmod 777 /home/ubuntu/nfsroot
+
+$ sudo vim /etc/exports
+<span class="c"># 追加一行：允许 192.168.1.0/24 网段读写</span>
+/home/ubuntu/nfsroot 192.168.1.0/24(rw,sync,no_subtree_check,no_root_squash)
+
+$ sudo exportfs -ra                  <span class="c"># 重新加载导出表</span>
+$ sudo systemctl restart nfs-kernel-server
+$ showmount -e localhost             <span class="c"># 确认导出生效</span></code></pre>
+
+    <table>
+      <thead><tr><th>参数</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td><code>rw</code></td><td>读写（只读用 <code>ro</code>）</td></tr>
+        <tr><td><code>sync</code></td><td>写入即同步落盘，更安全</td></tr>
+        <tr><td><code>no_subtree_check</code></td><td>不检查子目录，性能更好</td></tr>
+        <tr><td><code>no_root_squash</code></td><td>板子上的 root 保留 root 权限（调试期需要）</td></tr>
+      </tbody>
+    </table>
+
+    <h3>客户端（板子或另一台虚拟机）</h3>
+
+    <pre><code><span class="c"># 手动挂载测试</span>
+$ mkdir -p /mnt/nfs
+$ mount -t nfs -o nfsvers=3 192.168.1.100:/home/ubuntu/nfsroot /mnt/nfs
+$ ls /mnt/nfs
+$ df -h | grep nfs
+
+<span class="c"># 卸载</span>
+$ umount /mnt/nfs</code></pre>
+
+    <div class="key">
+      <b>用 NFS 当根文件系统（第 8 章会用到）</b>
+      U-Boot 的 bootargs 里这样写，板子就直接从 PC 启动，根目录全是 PC 上的文件：
+      <pre><code>root=/dev/nfs rw nfsroot=192.168.1.100:/home/ubuntu/nfsroot,nfsvers=3 \
+ip=192.168.1.101:192.168.1.100:192.168.1.1:255.255.255.0::eth0:off</code></pre>
+      含义依次是：板子 IP : 服务器 IP : 网关 : 掩码 : 主机名 : 网卡 : 关闭自动配置。
+    </div>
+
+    <div class="warn">
+      <b>NFS 挂载失败的排查顺序</b>
+      ① <code>ping 192.168.1.100</code> 通不通 ② <code>showmount -e 192.168.1.100</code> 能不能列出来 ③ <code>/etc/exports</code> 里的网段写对没 ④ 防火墙 111/2049 端口放行了没 ⑤ <code>sudo systemctl status nfs-kernel-server</code> 是否真在跑。<b>顺序别乱，从下往上查会浪费很久。</b>
+    </div>
+
+    <h2 id="s6">6.6 TFTP：给 U-Boot 下载文件</h2>
+    <div class="viz" data-kind="timeline" data-title="板子 ping 不通，按这个顺序查" data-sub="从物理到应用，一层层排除" data-json='{"items":[{"t":"1","n":"网线/灯","d":"link 灯亮不亮","c":"gr"},{"t":"2","n":"IP","d":"ip a 是否同网段","c":"cy"},{"t":"3","n":"路由","d":"ip route / 默认网关","c":"vi"},{"t":"4","n":"DNS","d":"cat /etc/resolv.conf","c":"or"},{"t":"5","n":"端口","d":"nc -vz host port","c":"rd"},{"t":"6","n":"防火墙","d":"ufw status","c":"gray"}],"note":"桥接模式下最常见的是「虚拟机换网段后 IP 没变」，先 ip a 一眼就能抓到。"}'></div>
+
+
+    <p>U-Boot 阶段网络协议栈很简单，只支持 TFTP。所以「用 U-Boot 从 PC 下载内核或设备树」这条调试路径，必须配 TFTP。</p>
+
+    <pre><code>$ sudo apt install -y tftpd-hpa
+$ sudo mkdir -p /home/ubuntu/tftpboot
+$ sudo chmod 777 /home/ubuntu/tftpboot
+
+$ sudo vim /etc/default/tftpd-hpa
+TFTP_USERNAME="tftp"
+TFTP_DIRECTORY="/home/ubuntu/tftpboot"
+TFTP_ADDRESS=":69"
+TFTP_OPTIONS="--secure --create"
+
+$ sudo systemctl restart tftpd-hpa
+$ echo test &gt; /home/ubuntu/tftpboot/t.txt
+$ tftp 192.168.1.100 -c get t.txt     <span class="c"># 本机自测</span></code></pre>
+
+    <p>板子 U-Boot 里这样下载（第 9 章细讲）：</p>
+
+    <pre><code>=&gt; setenv serverip 192.168.1.100
+=&gt; setenv ipaddr 192.168.1.101
+=&gt; ping 192.168.1.100
+=&gt; tftp 80800000 zImage
+=&gt; tftp 83000000 imx6ull-14x14-evk.dtb</code></pre>
+
+    <div class="tip">
+      <b>为什么是 TFTP 不是 FTP/HTTP</b>
+      U-Boot 的 NET 栈体积受限，只实现了最精简的 UDP + TFTP。用对协议，别硬上。
+    </div>
+
+    <h2 id="s7">6.7 防火墙：先把门打开再谈连通</h2>
+
+    <pre><code>$ sudo ufw status                 <span class="c"># 看状态</span>
+$ sudo ufw allow 22/tcp
+$ sudo ufw allow 2049
+$ sudo ufw allow 69/udp
+$ sudo ufw allow from 192.168.1.0/24
+$ sudo ufw enable</code></pre>
+
+    <div class="warn">
+      <b>远程操作时开防火墙要小心</b>
+      先 <code>allow 22</code> 再 <code>enable</code>，顺序反了会把自己 SSH 踢下线。云主机上尤其注意。
+    </div>
+
+    <h2 id="s8">6.8 不通？按这个顺序查</h2>
+
+    <ol class="steps">
+      <li><strong>物理层</strong>：网线插好没、网口灯亮不亮、交换机通电没。</li>
+      <li><strong>IP 层</strong>：<code>ip addr</code> 两边是否同网段、有没有 IP 冲突。</li>
+      <li><strong>路由</strong>：<code>ip route</code> 有没有本网段的路由。</li>
+      <li><strong>连通</strong>：<code>ping</code> 对方 IP。不通就是上面三步的问题。</li>
+      <li><strong>端口</strong>：<code>nc -zv IP 端口</code>。ping 通但端口不通 → 防火墙或服务没起。</li>
+      <li><strong>服务</strong>：<code>systemctl status 服务名</code> + <code>journalctl -u 服务名</code>。</li>
+      <li><strong>配置</strong>：服务端配置文件的网段、路径、权限是否有误。</li>
+    </ol>
+
+    <h2 id="s9">6.9 动手任务</h2>
+    <ul class="steps">
+      <li>给虚拟机配静态 IP，重启后用 <code>ip addr</code> 确认仍然是那个地址。</li>
+      <li>复制一份虚拟机（或开第二台），两台互相 ping 通、ssh 免密登录成功。</li>
+      <li>在 PC 上导出 <code>/home/ubuntu/nfsroot</code>，在第二台机器上挂载，新建一个文件，回到服务端确认能看到。</li>
+      <li>配好 TFTP，用 <code>tftp</code> 客户端从本机取一个文件；如果板子在手，进 U-Boot 用 <code>tftp</code> 下载一次 zImage。</li>
+      <li>故意把 <code>/etc/exports</code> 的网段写错，体验一次 <code>mount</code> 失败，再用 <code>exportfs -ra</code> 修好。</li>
+      <li>用 <code>ss -lntp</code> 找出本机所有监听端口，说出 22、2049、69 分别是哪个服务。</li>
+    </ul>
+
+    <h2 id="s10">6.10 验收标准</h2>
+    <ul class="checklist">
+      <li>能解释 IP、掩码、网关三者的作用，并判断两个地址是否同网段</li>
+      <li>会 netplan 配静态 IP，且配置能持久生效</li>
+      <li>能配好 SSH 免密，并用 scp 双向传文件</li>
+      <li>能配 NFS 并在客户端挂载成功，能写对 <code>/etc/exports</code> 的权限参数</li>
+      <li>能说出 bootargs 里 nfsroot 那串参数每一段的含义</li>
+      <li>网络问题能按「物理 → IP → 路由 → ping → 端口 → 服务 → 配置」顺序排查</li>
+    </ul>
+
+    <footer id="pager"></footer>
+  
+    <!--IVIZ--><div class="iviz" data-kind="pick" data-iviz="1" data-json='{"title":"四条常用通道，各干什么","items":[{"b":"SSH","d":"远程登录执行命令，能传文件（scp）。最通用，一条 22 端口就够。"},{"b":"NFS","d":"把开发机的目录挂到板子上当根文件系统。改代码不用重新烧，重启就生效。"},{"b":"TFTP","d":"U-Boot 阶段用来下载内核与 dtb 的极简协议，无认证、开销小。"},{"b":"Samba","d":"把目录共享给 Windows，方便拖文件。比 scp 直观，但慢一些。"}],"note":"调试阶段的标准组合：串口看日志 + SSH 执行 + NFS 挂 rootfs + TFTP 送内核。四条都通，迭代速度能快一个数量级。"}'></div>
+  
+
+<nav class="pager">
+  <a href="course-ch05.html"><span>← 上一篇</span><b>Vim 与 Shell 脚本</b></a>
+  <a class="nx" href="course-00.html"><span>下一篇 →</span><b>计算机只是一台会照抄指令的机器</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

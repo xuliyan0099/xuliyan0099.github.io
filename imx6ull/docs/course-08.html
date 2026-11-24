@@ -1,0 +1,236 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>时钟与触发器 · 卷 01 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j01.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 01 · 机器与指令</div>
+<ol><li><a href="course-00.html">
+  <span class="no">01</span><span>计算机只是一台会照抄指令的机器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-01.html">
+  <span class="no">02</span><span>为什么偏偏是二进制<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-02.html">
+  <span class="no">03</span><span>一个字节能装什么<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-03.html">
+  <span class="no">04</span><span>从按键到屏幕<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-04.html">
+  <span class="no">05</span><span>一个开关能做什么<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-05.html">
+  <span class="no">06</span><span>与、或、非<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-06.html">
+  <span class="no">07</span><span>从半加器到全加器<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-07.html">
+  <span class="no">08</span><span>补码与减法器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-08.html" class="active">
+  <span class="no">09</span><span>时钟与触发器<span class="sub">◆ · 约 1 小时 · 当前</span></span></a></li>
+<li><a href="course-09.html">
+  <span class="no">10</span><span>冯诺依曼五件事<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-10.html">
+  <span class="no">11</span><span>PC 与指令寄存器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-11.html">
+  <span class="no">12</span><span>ALU 与标志位<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-12.html">
+  <span class="no">13</span><span>一条指令的完整旅程<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-13.html">
+  <span class="no">14</span><span>流水线<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-14.html">
+  <span class="no">15</span><span>机器码的位段<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-15.html">
+  <span class="no">16</span><span>九种寻址方式<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-16.html">
+  <span class="no">17</span><span>汇编只有四类动作<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-17.html">
+  <span class="no">18</span><span>函数调用与 ABI<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-18.html">
+  <span class="no">19</span><span>从 C 到汇编<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th18.html">
+  <span class="no">20</span><span>CPU 是怎么执行一行代码的（详解）<span class="sub">约 3 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j00.html">← 卷 00</a>
+  <a href="../juan/j02.html">卷 02 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 01<span>·</span>机器与指令<span>·</span>第 09 篇</div>
+  <h1>时钟与触发器</h1>
+  <p class="lede">前面所有门都是「组合逻辑」：输入变，输出立刻跟着变，什么也记不住。可 CPU 必须记得「现在执行到第几条指令」——这份记忆由触发器提供，「什么时候更新」由时钟决定。这一课是数字设计的分界线：从这一刻起，电路有了状态。</p>
+  <div class="doc-chips">
+    <span class="hot">◆ 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+
+    <div class="viz" data-kind="seq" data-title="D 触发器：只在时钟上升沿「拍照」" data-sub="其余时间输入怎么变，输出都不动" data-json='{"slots":30,"sigs":[{"n":"CLK","w":"0101010101010101","c":"gray","note":"节拍"},{"n":"D 输入","w":"0011110000111100","c":"cy","note":"随时变化"},{"n":"Q 输出","w":"0001111000011110","c":"or","note":"只在上升沿跟随"},{"n":"采样时刻","w":"0100010001000100","c":"rd","note":"边沿瞬间"}],"note":"注意 Q 的变化总比 D 晚半步、且只在时钟边沿发生——这就是「寄存器」的最简模型。CPU 里几万个这样的单元在同一拍一起更新，就构成了「状态推进」。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 组合逻辑为什么不能记忆？② 交叉耦合为什么能锁住一个比特？③ 为什么必须「边沿触发」而不是「电平触发」？④ 建立时间、保持时间是什么，超了会怎样？⑤ 24MHz 晶振怎么变成 528MHz 主频，时钟门控怎么省电？</p>
+    </div>
+
+    <h2 id="s1">1. 直觉：两个反相器首尾相接</h2>
+
+    <p>把两个反相器串成一个环：A 的输出接 B 的输入，B 的输出接 A 的输入。假设 A 输出 1 → B 输入 1 → B 输出 0 → A 输入 0 → A 输出 1，稳定。假设 A 输出 0，同样稳定。于是这个环<b>能停在任意一侧</b>——它记住了上一次的状态。</p>
+
+    <p>这就是锁存器（latch）的原理。加上「控制端」允许它在某些时刻改变，就得到受控的存储单元。</p>
+
+    <p><b>失效处</b>：纯电平触发的锁存器在控制信号为高的整段时间都「透明」，多个锁存器串起来会出现「数据一路穿透」的竞态。解决办法是<b>边沿触发</b>——只在跳变那一瞬间采样。</p>
+
+    <h2 id="s2">2. 硬件上：主从结构与边沿触发</h2>
+
+    <p>一个 D 触发器内部是「主-从两个锁存器」串接，时钟反相后分别控制：</p>
+
+    <ul>
+      <li>CLK 低电平：主锁存器透明（采 D），从锁存器保持（输出不变）。</li>
+      <li>CLK 上升沿：主锁存器关闭（锁住 D 的值），从锁存器打开（把主的值送到 Q）。</li>
+      <li>结果：<b>Q 只在上升沿更新一次</b>，一个周期内只前进一格。</li>
+    </ul>
+
+    <div class="viz" data-kind="timeline" data-title="建立时间与保持时间：边沿附近的禁区" data-sub="D 必须在边沿前 t_setup 稳定，并在边沿后 t_hold 内保持不变" data-json='{"items":[{"t":"t_setup","n":"边沿前窗口","d":"D 必须先稳定，否则采到中间值","c":"or"},{"t":"上升沿","n":"采样瞬间","d":"Q 在此刻更新","c":"rd"},{"t":"t_hold","n":"边沿后窗口","d":"D 不能马上变，否则锁不住","c":"cy"},{"t":"t_pd","n":"传播延迟","d":"Q 到稳定输出的时间","c":"vi"}],"note":"时序违例的后果不是「算错一点」，而是「随机错」：这一拍对、下一拍错，温度一变就变。这是嵌入式调试里最难查的一类问题，也是静态时序分析 STA 存在的理由。"}'></div>
+
+    <h2 id="s3">3. 时钟：全局节拍从哪来</h2>
+
+    <p>i.MX6ULL 的时钟链路是典型的多级 PLL 结构：</p>
+
+    <table>
+      <thead><tr><th>环节</th><th>典型值</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td>外部晶振 XTAL</td><td>24 MHz</td><td>稳定但慢，成本低</td></tr>
+        <tr><td>PLL1（ARM PLL）</td><td>528 MHz（或 996 MHz 再二分频）</td><td>给 CPU 高主频</td></tr>
+        <tr><td>PLL2（528 PLL）</td><td>528 MHz</td><td>给 AHB/AXI 与外设分频</td></tr>
+        <tr><td>PLL3（USB PLL）</td><td>480 MHz</td><td>USB PHY 专用</td></tr>
+        <tr><td>CCGR 门控</td><td>逐模块开关</td><td>不用的模块断时钟，动态功耗趋零</td></tr>
+      </tbody>
+    </table>
+
+    <p>你在设备树和驱动里会反复遇到这些东西：<code>assigned-clock-rates</code> 改频率、<code>clocks</code> 声明依赖、<code>clk_prepare_enable()</code> 打开时钟。<b>「打开时钟」不是「给电」，而是「让这块逻辑开始翻转」</b>——这解释了为什么漏掉 <code>clk_prepare_enable</code> 时，寄存器读出来全是 0 或全是 1。</p>
+
+    <div class="viz" data-kind="layers" data-title="从晶振到 CPU 内核：时钟要过五道处理" data-sub="每一道都为了「频率对、相位稳、能关掉」" data-json='{"items":[{"n":"晶振 24MHz","d":"压电谐振，精度约 ±20ppm","c":"gray"},{"n":"PLL 倍频","d":"锁相环把 24M 变成 528M","c":"cy"},{"n":"分频器","d":"按模块需求分出 132M / 66M","c":"vi"},{"n":"时钟门控 CCGR","d":"每模块一个开关，关掉即省电","c":"or"},{"n":"时钟树 H-tree","d":"等长布线，全芯片同时收到边沿","c":"gr"}],"note":"时钟树是芯片里功耗最大的网络之一，可占动态功耗的 20%~40%，所以「门控」和「动态调频 DVFS」是移动芯片省电的两把主刀。"}'></div>
+
+    <h2 id="s4">4. 亚稳态：为什么跨时钟域要同步器</h2>
+
+    <p>如果 D 恰好在建立/保持窗口内变化，触发器可能进入一个既非 0 也非 1 的中间电平，并在不确定时间后随机落到某一侧——这叫<b>亚稳态</b>。它不烧芯片，但会让下游采到「不确定值」。</p>
+
+    <p>工程解法是两级或多级触发器串联做同步器：第一级可能亚稳态，但概率随等待时间指数衰减，第二级采样时几乎一定已稳定。代价是多一拍延迟。</p>
+
+    <p>这条知识在 Linux 驱动里同样有影子：中断跨域、DMA 与 CPU 的可见性、<code>readl()</code> 后的内存屏障，本质都是「两边时钟/顺序不一致，必须显式同步」。</p>
+
+    <h2 id="s5">5. 实验：模拟触发器、算清时钟预算</h2>
+
+    <pre><code># ① 模拟 D 触发器：只在 clock 上升沿采样
+class DFF:
+    def __init__(self):
+        self.q = 0
+        self.last = 0
+    def tick(self, d, clk):
+        if self.last == 0 and clk == 1:
+            self.q = d
+        self.last = clk
+        return self.q
+
+ff = DFF()
+seq = [(0,0),(1,0),(0,0),(1,1),(0,1),(1,0),(1,1),(0,0)]
+for d, c in seq:
+    print("D=%d CLK=%d -> Q=%d" % (d, c, ff.tick(d, c)))
+
+# ② 一个周期的预算有多长
+for f in (528e6, 792e6, 1.2e9, 3.0e9):
+    print("%.0f MHz -> 每周期 %.3f ns" % (f/1e6, 1e9/f))
+
+# ③ 24MHz 晶振要倍频多少倍才到 528MHz
+print("倍频倍数 =", 528 / 24)
+
+# ④ UART 波特率是怎么分频出来的（115200 从 80MHz 来）
+print("分频值 =", round(80000000 / (16 * 115200)))</code></pre>
+
+    <p>第②条值得盯着看：528MHz 一个周期只有 <b>1.89 纳秒</b>。光在 1.89 纳秒里只能走 57 厘米——这就是为什么 CPU 的物理尺寸与主频是强相关的，也是为什么芯片不能无脑做大。</p>
+
+    <h2 id="s6">6. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于时钟与存储的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["时钟就是「处理器速度」，越快越好","寄存器就是一块内存，想读就读","关掉时钟等于断电"]},"good":{"t":"实际","items":["主频受关键路径限制：太快就会时序违例、随机出错","寄存器只在边沿更新，读它得到的永远是上一拍的值","关时钟只停翻转，供电仍在（漏电流仍在），所以还有电源域开关"]},"note":"「读寄存器得到上一拍的值」这条，解释了流水线里为什么需要旁路（forwarding）——否则 add 完马上用结果，会读到旧值。"}'></div>
+
+    <h2 id="s7">7. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>为什么纯组合逻辑无法实现「计数」？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>计数需要「记住上一次的值」，而组合逻辑的输出只依赖当前输入，没有状态。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>边沿触发相比电平触发解决了什么问题？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>避免「透明期穿透」：电平触发在高电平期间输入会一路传到输出，串级时出现竞态；边沿触发每周期只采样一次。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>建立时间违例会有什么现象？为什么难查？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>随机性错误：与温度、电压、数据模式相关，仿真正常、实机偶发。需要用 STA 工具在时序上保证，而非靠测试碰运气。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p><code>clk_prepare_enable</code> 漏调用，读寄存器会看到什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>模块时钟没开，逻辑不翻转，读回固定值（常为 0 或全 1），写也没效果——很像「硬件坏了」，实则时钟没开。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>528MHz 下一周期多少纳秒？光能走多远？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>约 1.89 ns；光速约 30cm/ns，故约 57cm（芯片内信号速度更慢，实际更短）。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li>跑 Python 脚本，把 DFF 的 Q 序列与 CLK/D 对齐画成波形（纸上即可）。</li>
+        <li>查 i.MX6ULL 参考手册 CCM 章节，找出 ARM PLL 的倍频寄存器字段。</li>
+        <li>在板子上 <code>cat /sys/kernel/debug/clk/clk_summary</code>，看各时钟实际频率。</li>
+        <li>写一个驱动，故意不调 <code>clk_prepare_enable</code>，观察读寄存器结果。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      门有了、加法器有了、记忆有了。把它们按「冯诺依曼的五件事」组装起来，就是一台计算机。第 09 课讲这五件事，以及为什么这个 1945 年的结构至今没有被推翻。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="switch" data-iviz="1" data-json='{"title":"时钟只做一件事：决定什么时候更新","hint":"切换时钟状态","note":"触发器不看输入长什么样，只看边沿。上升沿那一刻输入是什么，Q 就变成什么，之后输入怎么变都不管。","views":[{"b":"CLK = 0","items":[{"t":"Q 保持不变","d":"时钟为低时，输入 D 随便怎么变，Q 都不动。"}]},{"b":"上升沿 0 → 1","items":[{"t":"Q ← D","d":"就在这一瞬间采样：D 是 1 就存 1，是 0 就存 0。之后想改，得等下一个上升沿。"}]},{"b":"CLK = 1","items":[{"t":"Q 保持不变","d":"时钟为高时同样锁住。所以「高电平有效」和「边沿有效」是两件事，触发器是后者。"}]}]}'></div>
+  
+
+<nav class="pager">
+  <a href="course-07.html"><span>← 上一篇</span><b>补码与减法器</b></a>
+  <a class="nx" href="course-09.html"><span>下一篇 →</span><b>冯诺依曼五件事</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

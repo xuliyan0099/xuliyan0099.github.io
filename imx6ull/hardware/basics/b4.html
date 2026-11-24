@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第 04 章 · 数字电路的骨架：电平、门、组合、时序 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/doc-compat.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+<link rel="stylesheet" href="../../assets/asm.css">
+</head><body style="--acc:#ffb545">
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="index.html">☰ 硬件基础目录</a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">硬件是怎么工作的 · 9 篇</div>
+    <ol>
+      <li><a href="index.html"><span class="no">⌂</span><span>路口目录<span class="sub">篇目总览与读法</span></span></a></li>
+      <li><a href="b0.html"><span class="no">00</span><span>先修：怎么学才算学会<span class="sub">三条判断标准，和一条错的路径</span></span></a></li>
+      <li><a href="b1.html"><span class="no">01</span><span>电的四个字：电压、电流、电阻、功率<span class="sub">欧姆定律、串并联、LED 限流实算</span></span></a></li>
+      <li><a href="b2.html"><span class="no">02</span><span>无源五件套：电阻、电容、电感、二极管、晶振<span class="sub">每个元件都在解决一个具体问题</span></span></a></li>
+      <li><a href="b3.html"><span class="no">03</span><span>有源器件：三极管与 MOS 管<span class="sub">为什么一个「开关」需要三个脚</span></span></a></li>
+      <li><a href="b4.html" class="active"><span class="no">04</span><span>数字电路的骨架：电平、门、组合、时序<span class="sub">五种门、真值表、加法器、触发器</span></span></a></li>
+      <li><a href="b5.html"><span class="no">05</span><span>时间：时钟、建立保持、抖动、消抖<span class="sub">为什么电路需要「等一会儿」</span></span></a></li>
+      <li><a href="b6.html"><span class="no">06</span><span>总线到底是什么<span class="sub">地址、数据、控制，与片选、时序</span></span></a></li>
+      <li><a href="b7.html"><span class="no">07</span><span>回到这块板子：元件对号入座<span class="sub">电源树、晶振、DDR、eMMC、按键、LED</span></span></a></li>
+      <li><a href="b8.html"><span class="no">08</span><span>工具与六个实验<span class="sub">万用表、示波器、逻辑分析仪怎么用</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="../index.html">硬件入口</a><a href="../../juan/index.html">十四卷总览</a></div>
+  </aside>
+  <main class="doc">
+    <div class="doc-kicker">硬件基础课 · 从一颗电阻开始 <span>·</span> 第 04 章</div>
+    <div class="ch-head">
+      <h1>数字电路的骨架：电平、门、组合、时序</h1>
+      <div class="ch-meta"><span class="hot">第 04 章</span><span>约 28 分钟</span><span>★★ 核心</span><span>含互动工具</span></div>
+    </div>
+<h2 id="s1">电平不是一个点，是一个范围</h2>
+<p>数字电路看起来只有 0 和 1，物理上却是连续的电压。所以规范用「范围」定义：</p>
+<table class="regtbl"><thead><tr><th>术语</th><th>含义</th></tr></thead><tbody><tr><td class="nm">VOH</td><td>输出高电平时，保证不低于这个电压</td></tr><tr><td class="nm">VOL</td><td>输出低电平时，保证不高于这个电压</td></tr><tr><td class="nm">VIH</td><td>输入认「高」的最低电压</td></tr><tr><td class="nm">VIL</td><td>输入认「低」的最高电压</td></tr></tbody></table>
+<p>中间那块「VIH 与 VIL 之间」是<b>禁止区</b>：输入落在这里，输出不确定，还可能有振荡电流。</p>
+<p>工程上必须满足：</p>
+<div class="fm">V<sub>OH(驱动)</sub> &gt; V<sub>IH(接收)</sub>　　V<sub>OL(驱动)</sub> &lt; V<sub>IL(接收)</sub></div>
+<p>这就是「3.3V 器件能不能直接驱动 1.8V 器件」这类问题的唯一判断依据，不是看谁标称多少伏。</p>
+<h2 id="s2">门电路：所有逻辑的原子</h2>
+<table class="regtbl"><thead><tr><th>门</th><th>表达式</th><th>一句话</th></tr></thead><tbody><tr><td class="nm">AND</td><td>y = a·b</td><td>全 1 才 1</td></tr><tr><td class="nm">OR</td><td>y = a+b</td><td>有 1 就 1</td></tr><tr><td class="nm">NOT</td><td>y = ā</td><td>反过来</td></tr><tr><td class="nm">NAND</td><td>y = ¬(a·b)</td><td>AND 取反（<b>最常用</b>，因为 CMOS 里做起来最省）</td></tr><tr><td class="nm">NOR</td><td>y = ¬(a+b)</td><td>OR 取反</td></tr><tr><td class="nm">XOR</td><td>y = a⊕b</td><td>不同为 1</td></tr></tbody></table>
+<p>CMOS 工艺里 NAND 与 NOR 是最基础的单元，AND/OR 反而要「NAND + NOT」拼出来。这也是为什么芯片内部的逻辑综合偏爱 NAND。</p>
+<div class="tool">
+  <h4>真值表小工具 · 六种门</h4>
+  <div class="sim-row">
+    <select id="gateSel">
+      <option value="and">AND 与</option>
+      <option value="or">OR 或</option>
+      <option value="not">NOT 非</option>
+      <option value="nand">NAND 与非</option>
+      <option value="nor">NOR 或非</option>
+      <option value="xor">XOR 异或</option>
+    </select>
+  </div>
+  <div class="out" id="gateOut"></div>
+</div>
+<h2 id="s3">组合逻辑：门一排排接起来</h2>
+<p>把门连起来，输出只取决于当前输入，这叫组合逻辑。三个必须能自己画出来的例子：</p>
+<p><b>半加器</b>（两个 1 位相加）：</p>
+<pre class="asm"><code>和   = a ⊕ b
+进位 = a · b</code></pre>
+<p><b>全加器</b> = 两个半加器 + 一个 OR（多一个进位输入）。八位加法器 = 八个全加器串起来（进位逐级传，所以叫「行波进位」，速度受限于进位链）。</p>
+<p><b>译码器</b>（n 位输入 → 2ⁿ 根输出，只有一根为 1）。地址译码、片选都用它——<b>「片选」本质上就是一个译码器的输出</b>。</p>
+<p><b>多路选择器（MUX）</b>：n 位选择信号决定「哪一路输入接到输出」。CPU 内部的寄存器堆读写、总线的数据选择，全是 MUX。这也是为什么「多路复用」这个词会出现在引脚复用上——原理一模一样，只是物理上换成「一个脚接多个内部功能」。</p>
+<h2 id="s4">时序逻辑：加上「记住」</h2>
+<p>组合逻辑有个根本限制：<b>它不记得过去</b>。加上一个「时钟控制的状态保持元件」，就有了时序逻辑。</p>
+<p><b>D 触发器</b>是最基本的存储单元：在时钟沿采样 D，输出 Q 保持到下一个沿。它的两条规矩，就是整门课的难点：</p>
+<ol>
+<li><b>建立时间（setup）</b>：数据必须在时钟沿之前稳定这么久。</li>
+<li><b>保持时间（hold）</b>：时钟沿之后还要保持这么久。</li>
+</ol>
+<p>违反了会怎样？输出可能进入<b>亚稳态</b>——既不是 0 也不是 1，持续一段不确定时间后随机落定。这是硬件层的「偶发 bug」，软件层根本看不到原因。</p>
+<p><b>寄存器 = 一组 D 触发器 + 一个公共时钟。</b> CPU 里的 r0–r15 就是这样一个寄存器组。</p>
+<h2 id="s5">从门到时序：一条完整的链</h2>
+<pre class="asm"><code>门 → 组合逻辑（加法器/译码器/MUX）
+  → 加时钟（D 触发器）→ 寄存器
+  → 寄存器 + 组合逻辑 + 控制 → 状态机
+  → 状态机 + 数据通路 → CPU</code></pre>
+<p><b>这条链是「数字电路」的全部内容。</b> 你在软件里看到的「每个时钟周期执行一条指令」，就是这条链在跑。</p>
+<h2 id="s6">三个必须记住的结论</h2>
+<ul>
+<li><b>电平是范围，不是点。</b> 接口能不能直连，看 VOH/VOL 与 VIH/VIL。</li>
+<li><b>组合逻辑无记忆，时序逻辑靠时钟。</b> 「为什么需要时钟」不是玄学，是为了给「记住」一个统一的时刻。</li>
+<li><b>所有复杂数字系统 = 门 + 触发器 + 连线。</b> CPU 也不例外，只是数量级不同。</li>
+</ul>
+<h2 id="s7">本篇验收</h2>
+<ul>
+<li>能说出 VOH/VOL/VIH/VIL 四个词的含义，并写出互连的判定不等式。</li>
+<li>能默画半加器与全加器的逻辑（用 XOR 与 AND 表示）。</li>
+<li>能解释「片选就是一个译码器输出」。</li>
+<li>能说出 setup/hold 违反的后果（亚稳态），以及为什么它在软件层表现为偶发。</li>
+<li>能把「门 → 组合 → 触发器 → 状态机 → CPU」这条链讲一遍。</li>
+</ul>
+<h2 id="s8">下一篇</h2>
+<p>数字电路有了骨架，但它还有一个隐含前提：<b>所有动作都发生在「时钟沿」</b>。时钟准不准、快不快、边沿干不干净，直接决定电路能不能工作。05 篇讲时间。</p>
+<div class="pager">
+      <a href="b3.html"><span>上一篇</span><b>← 03 有源器件：三极管与 MOS 管</b></a>
+      <a href="index.html"><span>目录</span><b>篇目总览</b></a>
+      <a class="nx" href="b5.html"><span>下一篇</span><b>05 时间：时钟、建立保持、抖动、消抖 →</b></a>
+    </div>
+  </main>
+</div>
+<script src="../../assets/hw-tools.js"></script>
+</body>
+</html>

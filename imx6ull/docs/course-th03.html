@@ -1,0 +1,395 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>虚拟内存与地址翻译（详解） · 卷 03 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j03.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 03 · 存储与地址</div>
+<ol><li><a href="course-20.html">
+  <span class="no">01</span><span>存储层次<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-21.html">
+  <span class="no">02</span><span>Cache 三参数<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-22.html">
+  <span class="no">03</span><span>内存墙与局部性<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-23.html">
+  <span class="no">04</span><span>用 perf 量化<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="course-24.html">
+  <span class="no">05</span><span>虚拟地址是什么<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-25.html">
+  <span class="no">06</span><span>页表与 MMU<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-26.html">
+  <span class="no">07</span><span>缺页与换页<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th03.html" class="active">
+  <span class="no">08</span><span>虚拟内存与地址翻译（详解）<span class="sub">约 4 小时 · 当前</span></span></a></li>
+<li><a href="course-th14.html">
+  <span class="no">09</span><span>内存管理进阶：分页、回收与 OOM<span class="sub">◆ · 约 5 小时</span></span></a></li>
+<li><a href="viz-mmu.html">
+  <span class="no">10</span><span>互动台：MMU 页表翻译<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="viz-cache.html">
+  <span class="no">11</span><span>互动台：Cache 层次与命中<span class="sub">💻 · 约 1 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j02.html">← 卷 02</a>
+  <a href="../juan/j04.html">卷 04 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 03<span>·</span>存储与地址<span>·</span>第 08 篇</div>
+  <h1>虚拟内存与地址翻译（详解）</h1>
+  <p class="lede">这一章是「内存」这条线的地基：硬件怎么把一个虚地址拆成三段、页表里每个位代表什么权限、缺页时有几种完全不同的处理、为什么你 malloc 了 1MB 却几乎不占物理内存。不把这一章啃下来，后面所有「段错误」「OOM」「内存泄漏」都只能是猜。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 4 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+    <div class="viz" data-kind="bits" data-title="一个 32 位虚拟地址的拆法" data-sub="MMU 拿前两段查表，最后一段原样不动" data-json='{"w":32,"fields":[{"n":"页目录索引","lo":22,"hi":31,"c":"cy","t":"10 位，1024 个页目录项"},{"n":"页表索引","lo":12,"hi":21,"c":"vi","t":"10 位，1024 个页表项"},{"n":"页内偏移","lo":0,"hi":11,"c":"or","t":"12 位，4096 字节"}],"note":"地址不是「一个数」，是三个字段拼起来的。所以页大小必然是 2 的幂——4096 正好是 12 位能表示的范围。"}'></div>
+
+
+    <div class="key" style="border-left-color:var(--vi)">
+      <h4 style="margin-top:0">▶ 动手看它怎么翻译：MMU 页表互动台</h4>
+      <p style="margin:6px 0 10px">输入任意虚拟地址，实时看它被拆成 10/10/12 三段，逐级扫过一级页表和二级页表，最后拼出物理地址；还可以对比 TLB 命中、关掉 MMU、空指针触发 abort 三种情况。</p>
+      <p style="margin:0"><a href="#" style="display:inline-block;padding:8px 18px;border:1px solid rgba(139,123,255,.4);border-radius:999px;background:rgba(139,123,255,.14);color:#b9b0ff;text-decoration:none;font-weight:600">打开互动实验台 →</a></p>
+    </div>
+
+    <div class="card">
+      <h4>本章要解决的问题</h4>
+      <p>① 为什么必须有虚拟地址，物理地址直接用会死在哪；② 一个 32 位地址怎么被拆开去查表；③ 页表描述符的每个位是什么意思；④ 缺页到底分几种，各走什么路径；⑤ 页表的空间开销有多大，大页为什么能救 TLB。</p>
+    </div>
+
+    <div class="card">
+      <h4>读完你应该能回答</h4>
+      <ul>
+        <li>一个 4KB 页表项（PTE）里，权限位、缓存位、有效位分别在管什么？</li>
+        <li>进程切换后为什么 TLB 不必全刷？靠什么区分不同进程的条目？</li>
+        <li><code>malloc(1MB)</code> 返回了地址，为什么 RSS 几乎没涨？</li>
+        <li>为什么访问一个没映射的地址是 SIGSEGV，而访问一个已映射但没调入的页只是变慢？</li>
+        <li>用 1MB 大页和 4KB 小页，TLB 能覆盖的范围差多少倍？</li>
+      </ul>
+    </div>
+
+    <div class="anim2" data-json='{"title":"一个虚拟地址怎么变成物理地址","hint":"两级查表，最后一段原样不动","nodes":[{"k":"CPU 发 VA","s":"32 位地址"},{"k":"TLB","s":"先查快表"},{"k":"一级页表","s":"取 12 位索引"},{"k":"二级页表","s":"再取 8 位"},{"k":"物理页","s":"拼出 PA"}],"frames":[{"i":0,"d":"MMU 收到 32 位虚拟地址，先按 10/8/12 或 10/10/12 切成三段，低 12 位原地不动。"},{"i":1,"d":"TLB 里若已有这条映射，一个周期就出结果；没有才会走下面的慢路径。"},{"i":2,"d":"用高 10 位作索引，从页表基址寄存器指向的一级表里取出二级表基址。"},{"i":3,"d":"再用中间位作索引，从二级表里取出页帧号与权限位，顺带检查有效位。"},{"i":4,"d":"页帧号与低 12 位偏移拼成物理地址，Cache 与内存才真正被访问。"}],"kind":"flow"}'></div>
+
+    <h2 id="s1">1. 三个死结：为什么非虚拟地址不可</h2>
+
+    <p>假设没有 MMU，程序直接操作物理地址，会立刻撞上三堵墙：</p>
+
+    <p><b>第一堵：互相踩踏。</b> 你的程序算出一个越界下标，写到了 0x8000_1000，那里正好是另一个程序的变量。对方算错了，你根本不知道是自己干的。没有任何机制能拦住你——因为物理地址是「公共场所」。</p>
+
+    <p><b>第二堵：地址写死。</b> 程序编译时函数地址就定了。如果这个程序被加载到物理地址 0x8000_0000，那没问题；换一台机器加载到 0x8100_0000，所有绝对地址全错。你不可能为每个加载地址编一份程序。</p>
+
+    <p><b>第三堵：装不下。</b> 物理内存 512MB，你要跑 3 个各需 300MB 的程序，直接用物理地址就绝无可能。但其中两个程序大部分时间在睡觉，它们的代码页其实可以不在内存里。</p>
+
+    <p>虚拟内存一次解决三个：<b>每个进程有自己独立的地址世界</b>（第一堵）、<b>程序永远认为自己从固定地址开始</b>（第二堵）、<b>虚拟页可以不在物理内存里</b>（第三堵）。代价是每次访存都要多一次（或几次）地址翻译——这个代价由硬件 MMU 承担。</p>
+
+    <h2 id="s2">2. MMU 怎么翻译一个地址（ARMv7 细节）</h2>
+
+    <p>以最常见的 <b>4KB 页 + 两级页表</b>（ARMv7 短描述符格式）为例。一个 32 位虚拟地址被切成三段：</p>
+
+    <div class="reg"> 31              20 19        12 11          0
+┌──────────────────┬────────────┬─────────────┐
+│  L1 索引（12位）  │ L2 索引(8位)│ 页内偏移(12位) │
+│  0..4095         │ 0..255     │ 0..4095      │
+└──────────────────┴────────────┴─────────────┘
+   ↓ 查第一级表            ↓ 查第二级表        ↓ 直接用作偏移</div>
+
+    <p>三步走：</p>
+
+    <ol>
+      <li><b>用 L1 索引查一级表</b>：一级表有 4096 项、每项 4 字节，所以它必须 16KB 对齐，基址放在 <code>TTBR0</code>（低地址）或 <code>TTBR1</code>（高地址）。</li>
+      <li><b>拿到 L2 表的基址，用 L2 索引查二级表</b>：二级表 256 项、每项 4 字节，共 1KB，1KB 对齐。</li>
+      <li><b>拿到物理页基址，加上 12 位页内偏移</b>，得到最终物理地址。</li>
+    </ol>
+
+    <p>所以「一个 4KB 页的映射」在内存里要花掉 <b>4 字节（L2 表项）</b>，而它依赖的那张 1KB 的二级表，会被同一 1MB 区间内的所有页共享。</p>
+
+    <h3>2.1 页表项里到底有哪些位</h3>
+
+    <p>一个 L2 小页描述符（4 字节）的关键位：</p>
+
+    <table>
+      <thead><tr><th>位</th><th>名字</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td>[1:0]</td><td>类型</td><td><code>0b10</code> = 小页（4KB）；<code>0b01</code> = 大页（64KB）；<code>0b00</code> = 无效（访问即触发缺页）</td></tr>
+        <tr><td>[11:10]</td><td>AP</td><td>访问权限：<code>00</code> 仅内核读写；<code>01</code> 全可读写；<code>10</code> 内核读写/用户只读；<code>11</code> 全只读</td></tr>
+        <tr><td>[3:2]</td><td>C / B</td><td>Cache 与写缓冲策略：写通、写回、强序。直接影响外设寄存器访问是否正确</td></tr>
+        <tr><td>[8:5]</td><td>domain</td><td>域，用于把一组页的权限整体切换（Linux 用得很克制）</td></tr>
+        <tr><td>[0]（第二字）</td><td>XN</td><td>执行禁止。标了它，这块页只能读写不能取指——这是防「数据被当代码执行」的关键</td></tr>
+      </tbody>
+    </table>
+
+    <div class="key">
+      <b>为什么驱动里访问寄存器要专门 ioremap</b>
+      因为普通内存映射的 C/B 位是「可缓存」，CPU 可能把你的读操作合并、把你的写操作延后。而外设寄存器要求「每次访问都真的到硬件」。所以 <code>ioremap()</code> 会给你一块标为「强序、不缓存」的映射。用普通指针去访问寄存器地址，症状是「写没生效」「读到的值不变」。
+    </div>
+
+    <h3>2.2 TLB：翻译结果的缓存</h3>
+
+    <p>如果每次访存都走上面三步，程序会慢到无法接受（每次要 2~3 次额外内存访问）。所以 MMU 里有一小块缓存叫 <b>TLB</b>，存「虚页号 → 物理页号 + 权限」的翻译结果。</p>
+
+    <p>问题来了：进程切换时，另一个进程的虚地址含义完全不同，TLB 里的旧条目必须失效。如果每次都全刷，切换代价高得离谱。ARM 的解法是给每个 TLB 条目打上 <b>ASID</b>（地址空间标识），切换进程时只改 ASID 寄存器，<b>TLB 里不同 ASID 的条目天然互不干扰</b>。这就是「进程切换不必刷 TLB」的技术基础。</p>
+
+    <p>还有一个必须知道的点：<b>改了页表之后必须让对应 TLB 条目失效</b>。内核为此提供 <code>flush_tlb_*</code> 一族函数。你在驱动里动态改映射却忘了刷 TLB，症状是「代码明明改了，行为还是旧的」——这种 bug 极难查。</p>
+
+    <h2 id="s3">3. 缺页：同名不同命的三种情况</h2>
+    <div class="viz" data-kind="flow" data-title="三种缺页，三条完全不同的路" data-sub="同一个 data abort，处理可以差很远" data-json='{"steps":[{"n":"① 匿名页首写","d":"malloc 后首次写：分配零页、清标志"},{"n":"② 文件页读入","d":"mmap/read：从页缓存或磁盘取"},{"n":"③ 栈自动增长","d":"sp 越过边界：扩 vma 再分配"}],"note":"还有第四种：地址不在任何 vma 里——那不是缺页，是野指针，内核直接递 SIGSEGV。"}'></div>
+
+
+    <p>「缺页」这个词容易误导，以为只有一种。实际上 CPU 只报告一件极简的事：「这次访问，我没法完成」。内核拿到这个报告后，必须自己判断原因，可能是完全不同的三件事：</p>
+
+    <table>
+      <thead><tr><th>类型</th><th>根本原因</th><th>内核动作</th><th>用户态看到</th><th>耗时量级</th></tr></thead>
+      <tbody>
+        <tr><td><b>无效访问</b>（bad area）</td><td>这个地址根本不在任何 VMA 里，或权限不符（写只读页）</td><td>给进程发 SIGSEGV</td><td>段错误，进程被杀</td><td>微秒</td></tr>
+        <tr><td><b>次要缺页</b>（minor）</td><td>地址合法，页也已在内存里，只是页表项还没建（如 COW、匿名页首次写）</td><td>分配/复用物理页，填页表项，刷 TLB</td><td>毫无感觉</td><td>几微秒</td></tr>
+        <tr><td><b>主要缺页</b>（major）</td><td>页不在内存：要么在 swap，要么在文件里还没读进来</td><td>发起 IO 读入、可能要先回收一页</td><td>明显卡顿（几十毫秒到几百毫秒）</td><td>毫秒级</td></tr>
+      </tbody>
+    </table>
+
+    <p>内核的处理路径（ARM 上从异常向量进 <code>do_page_fault</code>）大致是：</p>
+
+    <div class="flow">
+      <span>MMU 报 Abort</span><span>→</span><span>读 FAR（出错地址）</span><span>→</span><span>查 VMA 树</span><span>→</span><span>落在 VMA 内？</span><span>→</span><span>handle_mm_fault</span><span>→</span><span>建页表项</span><span>→</span><span>返回重试该指令</span>
+    </div>
+
+    <p>注意最后一句：<b>内核不是「跳过」那条指令，而是返回用户态重新执行它</b>。所以「缺页」对程序是透明的——只要这次能修好，程序根本不知道发生过。</p>
+
+    <div class="calc">
+      <h5>同一个地址，三次不同的结局</h5>
+      <div class="line">① 访问 0x0000_0000（NULL 附近）：不在任何 VMA → SIGSEGV，进程死</div>
+      <div class="line">② 访问刚 malloc 的地址：VMA 有，页表项空 → minor fault，分配 4KB 页，继续跑</div>
+      <div class="line">③ 访问被换出到 eMMC 的页：VMA 有，页在磁盘 → major fault，读盘（几毫秒），继续跑</div>
+      <div class="line">差别不在「地址」本身，而在<b>页表和 VMA 的状态</b></div>
+    </div>
+
+    <p>由此可以解释一个很常见的困惑：<b>为什么「空指针」几乎总是崩在 0 附近？</b> 因为内核刻意让低地址区间（通常是前 4KB 到 128KB，由 <code>mmap_min_addr</code> 控制）没有任何映射。这是故意的：如果 0 地址可访问，那么「结构体指针为 NULL 但访问其成员」这种经典 bug 就不会崩，而是悄悄读到垃圾数据，后果更难查。</p>
+
+    <h2 id="s4">4. malloc 的真相：虚拟内存的「空头支票」</h2>
+
+    <p><code>malloc(1024*1024)</code> 立刻返回一个合法指针，但这时<b>物理内存一个字节都没给</b>。它只做了两件事：</p>
+
+    <ol>
+      <li>让内核在进程的 VMA 链表里加一段「这段虚拟地址归你用」的登记（若是大块，走 <code>mmap</code>；小块走 <code>brk</code> 抬高堆顶）。</li>
+      <li>返回这段虚拟地址的起始位置。</li>
+    </ol>
+
+    <p>页表项呢？<b>没建</b>。所以真正第一次写这 1MB 里的某个字节时，才会触发 minor fault，内核才分配一个 4KB 物理页、填一个页表项。这个「用多少给多少」的策略叫<b>延迟分配（demand paging）</b>。</p>
+
+    <div class="calc">
+      <h5>算一笔：malloc 1MB，只写第一个字节</h5>
+      <div class="line">malloc 之后：VSS（虚拟大小）+1MB，RSS（常驻）几乎不变</div>
+      <div class="line">写第一个字节：触发 1 次 minor fault，分配 1 个 4KB 页</div>
+      <div class="line">RSS 增加：<b>4KB</b>（不是 1MB）</div>
+      <div class="line">若之后逐页写满：再触发 255 次 minor fault，RSS 才涨到 1MB</div>
+      <div class="line">结论：VSS 是「许愿」，RSS 是「兑现」，PSS 是「按共享比例分摊后的兑现」</div>
+    </div>
+
+    <p>这三个指标必须分清，否则内存排查全错：</p>
+
+    <ul>
+      <li><b>VSS</b>（Virtual Set Size）：虚拟地址空间总量。<b>虚高是正常的</b>，不代表真占内存。</li>
+      <li><b>RSS</b>（Resident Set Size）：真正在物理内存里的页。<b>但它会重复计算共享页</b>（比如 10 个进程共用一份 libc，每个进程的 RSS 都算上那几 MB）。</li>
+      <li><b>PSS</b>（Proportional Set Size）：把共享页按使用进程数平摊。多进程环境下用它判断真实占用更准。</li>
+    </ul>
+
+    <p>还有一个高频疑问：<b>为什么 free 之后 RSS 不降？</b> 因为 glibc 的分配器（arena）把内存留在自己手里，方便下次复用，不还给内核。只有大块（默认 &gt;128KB，由 <code>M_MMAP_THRESHOLD</code> 控制）才走 <code>mmap</code>/<code>munmap</code> 真正归还。</p>
+
+    <h2 id="s5">5. 页表的成本，与大页为什么存在</h2>
+
+    <p>页表本身也要占内存，而且可能占得惊人。算两个具体数：</p>
+
+    <div class="calc">
+      <h5>算一：把 1GB 虚拟空间用 4KB 页映射满</h5>
+      <div class="line">1 张 L2 表覆盖 1 个 1MB 区间（256 项 × 4KB）</div>
+      <div class="line">1GB = 1024 个 1MB 区间 → 需要 1024 张 L2 表</div>
+      <div class="line">每张 L2 表 = 256 × 4 字节 = 1KB</div>
+      <div class="line">页表总开销 = 1024 × 1KB = <b>1MB</b>（还没算 L1 那 16KB）</div>
+      <div class="line">占被映射内存的 0.1% —— 可以接受，但 TLB 会受不了</div>
+    </div>
+
+    <div class="calc">
+      <h5>算二：同样 1GB，改用 1MB 段（大页）</h5>
+      <div class="line">一段 = 直接在 L1 表里写一项，<b>不需要 L2 表</b></div>
+      <div class="line">1GB = 1024 项 L1 → 占 1024 × 4 字节 = <b>4KB</b></div>
+      <div class="line">相比 4KB 页方案，省下约 1MB 页表内存</div>
+      <div class="line">代价：映射粒度粗，1MB 里只要有一小块要不同权限，就整段拆开</div>
+    </div>
+
+    <p>比省内存更重要的是<b>省 TLB</b>。TLB 条目数是固定的（Cortex-A7 一级 TLB 约 64 项），能覆盖的地址范围直接由页大小决定：</p>
+
+    <table>
+      <thead><tr><th>页大小</th><th>TLB 项数</th><th>能覆盖的范围</th></tr></thead>
+      <tbody>
+        <tr><td>4KB</td><td>64</td><td>256KB</td></tr>
+        <tr><td>64KB</td><td>64</td><td>4MB</td></tr>
+        <tr><td>1MB（段）</td><td>64</td><td><b>64MB</b></td></tr>
+      </tbody>
+    </table>
+
+    <p>这就是内核为什么用 1MB 段映射 DDR：512MB 的物理内存用 4KB 页映射要 512 张 L2 表、TLB 覆盖率只有 256KB，几乎每次访存都 TLB miss；用 1MB 段只需要 512 个 L1 项，TLB 一次命中覆盖 64MB。对大块连续内存（DDR、显存、DMA 缓冲），大页是唯一合理选择。</p>
+
+    <h2 id="s6">6. 三种地址必须分清：虚拟、物理、总线</h2>
+    <div class="viz" data-kind="matrix" data-title="虚拟、物理、总线：三种地址别混" data-sub="谁翻译、谁可见，决定你调错误时该看哪个" data-json='{"corner":"地址","cols":["谁生成","过 MMU","典型值"],"rows":[{"n":"虚拟地址","cells":[{"v":"编译器/程序","c":"cy"},{"v":"是","c":"gr"},{"v":"0x0812_3456","c":"gray"}]},{"n":"物理地址","cells":[{"v":"MMU 输出","c":"vi"},{"v":"出口","c":"gr"},{"v":"0x3F00_0456","c":"gray"}]},{"n":"总线地址","cells":[{"v":"互连/译码","c":"or"},{"v":"否","c":"rd"},{"v":"0x0219_0000","c":"gray"}]}],"note":"最常犯的错：把 datasheet 上的总线地址当成物理地址直接 memcpy，中间还隔着 NoC 与地址译码。"}'></div>
+
+
+    <p>这是嵌入式 Linux 最容易搞混的一组概念，混错了就会写出「在 x86 能跑、在 ARM 上崩」的代码：</p>
+
+    <table>
+      <thead><tr><th>名字</th><th>给谁用</th><th>例子（i.MX6ULL）</th><th>注意</th></tr></thead>
+      <tbody>
+        <tr><td><b>虚拟地址</b></td><td>CPU 执行指令时用的地址</td><td>内核直接映射区 0xC000_0000 起（3G）</td><td>所有指针都是这个</td></tr>
+        <tr><td><b>物理地址</b></td><td>内存控制器看到的地址</td><td>DDR 0x8000_0000；OCRAM 0x0090_0000；CCM 0x020C_4000</td><td>MMU 关掉时 CPU 直接用它</td></tr>
+        <tr><td><b>总线地址</b></td><td>DMA 控制器、外设主设备用的地址</td><td>多数 ARM SoC 上与物理地址相同，但不保证</td><td><b>不能假设相等</b>，要走 DMA API</td></tr>
+      </tbody>
+    </table>
+
+    <p>几个具体事实（对照 i.MX6ULL 手册的 memory map）：</p>
+
+    <ul>
+      <li>DDR 起始 0x8000_0000，i.MX6ULL 通常 512MB，到 0x9FFF_FFFF。</li>
+      <li>内部 OCRAM 0x0090_0000，128KB，U-Boot 常把栈、关键变量放这里。</li>
+      <li>BootROM 在 0x0000_0000，只读，复位后 CPU 从这里取第一条指令。</li>
+      <li>AIPS1 外设区 0x0200_0000 起：CCM（时钟）0x020C_4000、GPIO1 0x0209_C000、UART1 0x0202_0000 都在这一带。</li>
+      <li>GIC 中断控制器 0x00A0_0000。</li>
+    </ul>
+
+    <p>内核启动后打开 MMU，从此 CPU 眼里只有虚拟地址。你要访问 0x020C_4000 这个时钟寄存器，必须先用 <code>ioremap(0x020C4000, size)</code> 拿到一个虚拟地址，再用它访问。若你直接把 0x020C4000 赋给指针，在 MMU 开启后会访问到一块完全无关的内存（通常是直接映射区里某个偏移），轻则读垃圾，重则改坏内核数据。</p>
+
+    <p>另外两条必须记的换算规则：</p>
+
+    <p><b>① 直接映射区的换算</b>：内核把物理 0x8000_0000 起的 DDR 直接映射到虚拟 0xC000_0000 起，所以 <code>virt = phys - 0x80000000 + 0xC0000000</code>。宏 <code>__va()</code> / <code>__pa()</code> 干的就是这个（只在直接映射区成立）。</p>
+
+    <p><b>② DMA 必须给物理地址</b>：外设的 DMA 引擎不懂虚拟地址。所以你要用 <code>dma_map_single()</code> 把虚拟地址转成设备能用的地址，用完 <code>dma_unmap_single()</code>。直接 <code>__pa()</code> 在简单 SoC 上能凑合，在有 IOMMU 或多级总线的系统上就是错的。</p>
+
+    <h2 id="s7">7. 十个常见误解</h2>
+
+    <table>
+      <thead><tr><th>误解</th><th>真相</th></tr></thead>
+      <tbody>
+        <tr><td>「虚拟地址是假的，访问它要额外时间」</td><td>TLB 命中时翻译几乎零开销，与物理地址访问同速。只有 TLB miss 才需要走表（多几次内存访问）。</td></tr>
+        <tr><td>「页表只有一张，全系统共用」</td><td>每个进程一张用户页表；内核页表是所有进程共享的那一半。</td></tr>
+        <tr><td>「段错误都是野指针造成的」</td><td>还可能是：写只读页（代码段、字符串常量）、栈溢出、访问已 munmap 的地址、非对齐访问。</td></tr>
+        <tr><td>「free 之后内存就还给系统了」</td><td>glibc 保留 arena 复用；只有大块 mmap 才真还。</td></tr>
+        <tr><td>「RSS 大就是内存泄漏」</td><td>RSS 含共享库页且重复计数。要看 PSS 或 smaps 里的私有部分。</td></tr>
+        <tr><td>「4KB 页一定最好」</td><td>大块内存用大页能省页表和 TLB；4KB 只在细粒度权限/共享时有优势。</td></tr>
+        <tr><td>「ioremap 只是把地址加个偏移」</td><td>它建立新映射并设置「不缓存、强序」属性，还会占用 vmalloc 虚拟空间。</td></tr>
+        <tr><td>「物理地址等于总线地址」</td><td>多数 ARM SoC 恰好相等，但有 IOMMU 的系统不等。规范做法是走 DMA API。</td></tr>
+        <tr><td>「缺页一定很慢」</td><td>minor fault 几微秒，major fault 才毫秒级，性能影响差上千倍。</td></tr>
+        <tr><td>「栈不会缺页」</td><td>栈是自动增长的 VMA，每次大幅下探都会触发缺页；栈溢出则是越过 VMA 边界触发 SIGSEGV。</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s8">8. 自检：能答出来才算懂</h2>
+
+    <div class="q"><span class="n">1</span><p>一个 32 位虚拟地址在两级页表下被切成哪三段？各多少位？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>L1 索引 12 位（bit 31–20）、L2 索引 8 位（bit 19–12）、页内偏移 12 位（bit 11–0）。对应 4096 项一级表、256 项二级表、4KB 页。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>L1 表为什么必须 16KB 对齐？L2 表为什么 1KB 对齐？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>L1 是 4096 项 × 4 字节 = 16KB，L2 是 256 项 × 4 字节 = 1KB。硬件把地址高位直接替换低位来定位表基址，所以要求表按自身大小对齐。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>页表项里的 C/B 位如果配错，会看到什么现象？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>访问外设寄存器时「写不进去」「读到的值不变」或「连续写只生效最后一次」。因为缓存与写缓冲把多次访问合并或延后了。正确做法是 ioremap 得到不缓存、强序的映射。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>进程切换后为什么可以不刷整个 TLB？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>靠 <b>ASID</b>。每个 TLB 条目带 ASID 标记，切换时只改 ASID 寄存器，不同进程的条目互不干扰，无需整表刷。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>minor fault 与 major fault 的本质区别是什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>minor：页已在物理内存，只缺页表项，纯内存操作，几微秒。major：页不在内存，要从 eMMC/swap 读入，涉及块设备 IO，毫秒级。差 1000 倍源于「内存 vs 存储」的量级差。</p>
+    </div></details>
+
+    <div class="q"><span class="n">6</span><p>为什么 malloc 1MB 之后 RSS 几乎不变？什么时候才会涨？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>malloc 只登记 VMA，不建页表、不给物理页（延迟分配）。第一次<b>写</b>某个页时才触发 minor fault 分配 4KB，RSS 按页增长，写满 1MB 才涨满。</p>
+    </div></details>
+
+    <div class="q"><span class="n">7</span><p>1GB 空间用 4KB 页映射，页表要多少内存？改用 1MB 段呢？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>4KB 页：1024 张 L2 表 × 1KB = 1MB。1MB 段：1024 个 L1 项 × 4 字节 = 4KB。更重要的是 TLB 覆盖率从 256KB 变成 64MB。</p>
+    </div></details>
+
+    <div class="q"><span class="n">8</span><p>为什么内核要在 0 地址附近留一块「绝不允许映射」的区域？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>为了让「NULL 指针解引用」立刻崩溃，而不是悄悄读到合法数据。这是用「保证故障可见」换「故障难查」，由 <code>mmap_min_addr</code> 控制。</p>
+    </div></details>
+
+    <div class="q"><span class="n">9</span><p>举一个「物理地址 ≠ 总线地址」会出问题的场景。</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>带 IOMMU 的系统，或某些 SoC 的 PCIe 窗口、多级总线桥。CPU 视角的物理地址与设备发起 DMA 时的地址需要经过翻译，直接用 <code>__pa()</code> 会写错位置。正确做法是 <code>dma_map_single()</code>。</p>
+    </div></details>
+
+    <div class="q"><span class="n">10</span><p>写只读页为什么会 SIGSEGV，而 COW 写只读页却不会？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>因为 COW 页在 VMA 里被标为「可写、但当前共享」，缺页处理发现是 COW 就复制一份并授权写；而代码段/常量区的 VMA 本身标为不可写，缺页处理判为非法访问，直接发 SIGSEGV。区别在 VMA 的语义，不在页表当下的只读位。</p>
+    </div></details>
+
+    <h2 id="s9">9. 这一章要动手的命令</h2>
+
+    <div class="steps">
+      <ol>
+        <li><code>cat /proc/self/maps</code> —— 看自己地址空间的各段区间与权限。</li>
+        <li><code>pmap -x &lt;pid&gt;</code> 或 <code>cat /proc/&lt;pid&gt;/smaps</code> —— 逐段看 RSS/PSS/私有/共享，找出「看起来很大其实没占」的那段。</li>
+        <li><code>cat /proc/meminfo | head -20</code> —— PageTables 就是本章第 5 节那笔开销。</li>
+        <li><code>vmstat 1</code> —— si/so 是换入换出（major fault 的直接体现）。</li>
+        <li>写一个 <code>malloc(100MB)</code> 但只写 1 字节的程序，看 RSS 验证延迟分配。</li>
+        <li><code>echo 3 &gt; /proc/sys/vm/drop_caches</code> 后读大文件，用 <code>time</code> 观察 major fault 的代价。</li>
+        <li><code>slabtop -o</code> —— 看内核对象缓存占了多少，排查「内核内存去哪了」。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一章预告</b>
+      T04 讲 VFS：一个 <code>open()</code> 如何在完全不认识 ext4 的情况下打开文件、inode 与 dentry 缓存了什么、为什么「删了文件空间没释放」。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="slider" data-iviz="1" data-json='{"title":"一个虚拟地址怎么被拆成页号与页内偏移","label":"虚拟地址","unit":"","min":0,"max":16777215,"step":4096,"value":40960,"out":[{"k":"十六进制","expr":"hex(v,8)"},{"k":"页号（高 20 位）","expr":"hex(v>>12,5)"},{"k":"页内偏移（低 12 位）","expr":"hex(v&4095,3)"},{"k":"偏移换算成字节","expr":"v&4095"}],"presets":[{"v":4096,"t":"0x001000"},{"v":8388608,"t":"0x800000"},{"v":16777215,"t":"0xFFFFFF"}],"note":"低 12 位原样不动，因为它就是页内位置；高 20 位才是页表要翻译的部分。所以页大小固定 4KB 时，地址永远按 4KB 对齐才有意义。"}'></div>
+  
+
+<nav class="pager">
+  <a href="course-26.html"><span>← 上一篇</span><b>缺页与换页</b></a>
+  <a class="nx" href="course-th14.html"><span>下一篇 →</span><b>内存管理进阶：分页、回收与 OOM</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

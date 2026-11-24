@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>互动 · 时钟树与门控（i.MX6ULL）</title>
+<style>
+:root{
+  --bg:#080c18;--bg2:#0d1426;
+  --panel:rgba(255,255,255,.045);--panel-2:rgba(255,255,255,.07);
+  --line:rgba(255,255,255,.09);--line-2:rgba(255,255,255,.16);
+  --txt:#dfe6f5;--txt-dim:#93a1bd;--txt-faint:#66738c;
+  --cy:#3ddbd9;--vi:#8b7bff;--or:#ffb35c;--gr:#5ce1a0;--rd:#ff6b81;
+  --radius:16px;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;color:var(--txt);
+  background:
+    radial-gradient(1100px 700px at 12% -10%,rgba(124,92,255,.20),transparent 60%),
+    radial-gradient(900px 600px at 95% 5%,rgba(61,219,217,.13),transparent 60%),
+    linear-gradient(180deg,var(--bg) 0%,var(--bg2) 45%,#070a12 100%);
+  background-attachment:fixed;
+  font:15px/1.7 "Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+}
+a{color:var(--cy)}
+header{
+  position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;
+  padding:12px 24px;background:rgba(8,12,24,.8);backdrop-filter:blur(18px);
+  border-bottom:1px solid var(--line);
+}
+header .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--cy),var(--vi));box-shadow:0 0 14px rgba(61,219,217,.8)}
+header h1{font-size:16px;margin:0;font-weight:700;letter-spacing:.4px}
+header .tag{font-size:11px;color:var(--txt-faint);letter-spacing:2px;text-transform:uppercase}
+header .sp{flex:1}
+header .back{color:var(--txt-dim);text-decoration:none;font-size:13px;padding:6px 14px;border:1px solid var(--line-2);border-radius:999px}
+header .back:hover{color:#fff;border-color:var(--cy)}
+header .back{white-space:nowrap;flex:none}
+@media (max-width:900px){
+  header{flex-wrap:wrap;row-gap:8px;gap:8px;padding:10px 12px}
+  header .dot,header .sp,header .tag{display:none}
+  header h1{flex:1 1 100%;font-size:15px}
+}
+main{max-width:1280px;margin:0 auto;padding:22px 24px 80px}
+.grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:18px}
+@media(max-width:1000px){.grid{grid-template-columns:1fr}}
+.card{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px 18px;box-shadow:0 14px 40px rgba(0,0,0,.4);
+}
+.card h2{margin:0 0 4px;font-size:14px;letter-spacing:.5px;color:var(--cy)}
+.card h2 small{color:var(--txt-faint);font-weight:400;letter-spacing:0;margin-left:8px;font-size:11.5px}
+.card p.hint{margin:2px 0 14px;font-size:12.5px;color:var(--txt-faint)}
+svg#tree{width:100%;height:auto;display:block}
+.ctrl{display:flex;align-items:center;gap:12px;margin:10px 0 4px}
+.ctrl label{font-size:12.5px;color:var(--txt-dim);flex:none}
+input[type=range]{flex:1;height:22px;accent-color:var(--cy)}
+.val{font-variant-numeric:tabular-nums;font-size:13px;color:var(--or);min-width:82px;text-align:right}
+.rowp{display:flex;justify-content:space-between;font-size:12.5px;padding:6px 10px;border-radius:9px;background:rgba(255,255,255,.03);margin-bottom:6px}
+.rowp b{font-variant-numeric:tabular-nums;color:var(--cy)}
+.gates{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:8px}
+.gate{
+  border:1px solid var(--line);border-radius:11px;padding:9px 10px;cursor:pointer;
+  background:rgba(92,225,160,.07);transition:.18s;user-select:none;
+}
+.gate:hover{border-color:var(--line-2)}
+.gate.off{background:rgba(255,107,129,.09);border-color:rgba(255,107,129,.3)}
+.gate .nm{font-size:12.5px;font-weight:600}
+.gate .st{font-size:11px;color:var(--txt-faint);font-variant-numeric:tabular-nums}
+.gate.off .nm{color:var(--rd)}
+.gate.on .st{color:var(--gr)}
+select,input[type=number]{
+  background:#0b1120;color:var(--txt);border:1px solid var(--line-2);border-radius:9px;
+  padding:6px 10px;font-size:13px;font-family:inherit;
+}
+.calcbox{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0 12px}
+.res{font-size:13px;line-height:2;font-variant-numeric:tabular-nums}
+.res .k{color:var(--txt-faint)}
+.res .v{color:var(--or);font-weight:600}
+.ok{color:var(--gr)}.bad{color:var(--rd)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--txt-faint);margin-top:10px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:1px}
+footer{max-width:1280px;margin:0 auto;padding:0 24px 60px;font-size:12px;color:var(--txt-faint)}
+</style>
+</head>
+<body>
+<header>
+  <span class="dot"></span>
+  <h1>时钟树与门控 · 互动实验台</h1>
+  <span class="tag">i.MX6ULL</span>
+  <span class="sp"></span>
+  <a class="back" href="../ref/th11.html">← 回 T11 时钟、复位、RTC</a> <a class="back" href="index.html">← 互动台目录</a> <a class="back" href="../index.html">⌂ 学习站入口</a> <a class="back" href="../../index.html">⌂ 知识库</a>
+</header>
+<main>
+<div class="grid">
+  <section class="card">
+    <h2>一棵活的时钟树 <small>拖动倍频系数，看全树的频率与脉冲速度一起变</small></h2>
+    <p class="hint">一个周期就是一次「允许触发器抄数据」的鼓点。点越密，说明这个域跑得越快。</p>
+    <svg id="tree" viewBox="0 0 900 560" preserveAspectRatio="xMidYMid meet"></svg>
+    <div class="ctrl">
+      <label>PLL1 倍频系数 N</label>
+      <input type="range" id="mult" min="18" max="24" step="1" value="22">
+      <span class="val" id="multVal">22 → 528 MHz</span>
+    </div>
+    <div class="ctrl">
+      <label>AXI 总线分频</label>
+      <input type="range" id="axiDiv" min="1" max="4" step="1" value="2">
+      <span class="val" id="axiVal">÷2 → 264 MHz</span>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--cy)"></i>核 / 高速域</span>
+      <span><i style="background:var(--vi)"></i>总线域</span>
+      <span><i style="background:var(--or)"></i>外设域</span>
+      <span><i style="background:var(--rd)"></i>已关断</span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>各域实时数值 <small>周期 = 1 / 频率</small></h2>
+    <p class="hint">这些数字就是你写代码时算分频值要用的输入。</p>
+    <div id="rows"></div>
+  </section>
+</div>
+
+<div class="grid" style="margin-top:18px">
+  <section class="card">
+    <h2>CCGR 门控面板 <small>每个外设 2 位，写 0b11 才全开</small></h2>
+    <p class="hint">点一下关掉它。注意：时钟断了，这个外设的寄存器就读不出来——这是新手最常见的「写不进去」原因。</p>
+    <div class="gates" id="gates"></div>
+    <div class="rowp" style="margin-top:12px">
+      <span>当前受门控影响的外设数</span><b id="gateCount">0</b>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>UART 波特率分频算例 <small>把公式真正算一遍</small></h2>
+    <p class="hint">UART 模块时钟固定 80MHz，分频值 = 模块时钟 ÷ (16 × 目标波特率)，取最近的整数。</p>
+    <div class="calcbox">
+      <label style="font-size:12.5px;color:var(--txt-dim)">目标波特率</label>
+      <select id="baud">
+        <option value="9600">9600</option>
+        <option value="19200">19200</option>
+        <option value="38400">38400</option>
+        <option value="57600">57600</option>
+        <option value="115200" selected>115200</option>
+        <option value="921600">921600</option>
+      </select>
+    </div>
+    <div class="res" id="uartRes"></div>
+  </section>
+</div>
+</main>
+<footer>本页为纯前端互动演示，可离线打开。数值按 i.MX6ULL 参考手册取值，用于理解机制，不做量产校准。</footer>
+<script>
+/* ========== 数据 ========== */
+var XTAL = 24;               /* 24MHz 晶振 */
+var state = { mult: 22, axiDiv: 2, gates: {} };
+
+var GATES = [
+  { id:'uart1',  name:'UART1',   clk:80   },
+  { id:'uart2',  name:'UART2',   clk:80   },
+  { id:'i2c1',   name:'I2C1',    clk:66   },
+  { id:'gpio1',  name:'GPIO1',   clk:66   },
+  { id:'epit1',  name:'EPIT1',   clk:66   },
+  { id:'gpt1',   name:'GPT1',    clk:66   },
+  { id:'sdmmc1', name:'SD/eMMC', clk:198  },
+  { id:'enet',   name:'ENET',    clk:100  },
+  { id:'csi',    name:'CSI',     clk:132  },
+  { id:'usb',    name:'USB PHY', clk:480  },
+  { id:'wdog1',  name:'WDOG1',   clk:0.032768 },
+  { id:'rtc',    name:'SNVS/RTC',clk:0.032768 }
+];
+
+/* ========== 频率推导 ========== */
+function freqs(){
+  var pll1 = XTAL * state.mult;        /* 528 */
+  var arm  = pll1 / 1;
+  var axi  = pll1 / state.axiDiv;
+  var ahb  = axi / 2;
+  var ipg  = ahb / 2;
+  var ipgPer = ipg / 2;
+  return { XPLL:pll1, ARM:arm, AXI:axi, AHB:ahb, IPG:ipg, IPGP:ipgPer };
+}
+function fmt(f){
+  if (f>=1) return (Math.round(f*1000)/1000)+' MHz';
+  return (Math.round(f*100000)/100)+' kHz';
+}
+function period(f){ return f>=1 ? (1000/f).toFixed(2)+' ns' : (1000000/f/1000).toFixed(1)+' μs'; }
+
+/* ========== SVG 常量 ========== */
+var NS = 'http://www.w3.org/2000/svg';
+var ROWS = [
+  { key:'ARM',  label:'ARM Cortex-A7', sub:'核域 · 决定算力',   y: 70, color:'var(--cy)' },
+  { key:'AXI',  label:'AXI 总线 / MMDC', sub:'内存与 DMA 通道', y:180, color:'var(--vi)' },
+  { key:'AHB',  label:'AHB 总线',        sub:'高速外设挂载',    y:290, color:'var(--or)' },
+  { key:'IPG',  label:'IPG 总线',        sub:'寄存器访问',      y:400, color:'var(--or)' },
+  { key:'IPGP', label:'IPG_PER',         sub:'慢速外设分频源',  y:500, color:'var(--or)' }
+];
+var svg = document.getElementById('tree');
+var gLines, gNodes, gDots;
+var paths = [];      /* {x1,y1,x2,y2,f,color,len,dots:[]} */
+var phase = 0, lastT = 0;
+
+function el(tag, attrs){
+  var e = document.createElementNS(NS, tag);
+  for (var k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+function txt(x, y, s, attrs){
+  var t = el('text', Object.assign({x:x, y:y, 'font-family':'Segoe UI, Microsoft YaHei, sans-serif', 'text-anchor':'middle'}, attrs||{}));
+  t.textContent = s;
+  return t;
+}
+
+/* 建一次静态骨架 */
+function build(){
+  gLines = el('g',{}); gDots = el('g',{}); gNodes = el('g',{});
+  svg.appendChild(gLines); svg.appendChild(gNodes); svg.appendChild(gDots);
+
+  /* 晶振 */
+  var c = el('circle',{cx:90, cy:280, r:34, fill:'rgba(61,219,217,.12)', stroke:'var(--cy)', 'stroke-width':1.5});
+  gNodes.appendChild(c);
+  gNodes.appendChild(txt(90, 275, '24', {'font-size':15, fill:'var(--cy)', 'font-weight':700}));
+  gNodes.appendChild(txt(90, 293, 'MHz', {'font-size':11, fill:'var(--txt-dim)'}));
+  gNodes.appendChild(txt(90, 340, '主晶振', {'font-size':12, fill:'var(--txt-dim)'}));
+  gNodes.appendChild(txt(90, 358, '板上唯一高频源', {'font-size':11, fill:'var(--txt-faint)'}));
+
+  /* PLL1 */
+  var p = el('rect',{x:206, y:236, width:126, height:88, rx:12, fill:'rgba(139,123,255,.13)', stroke:'var(--vi)', 'stroke-width':1.5});
+  gNodes.appendChild(p);
+  gNodes.appendChild(txt(269, 265, 'PLL1', {'font-size':15, fill:'var(--vi)', 'font-weight':700}));
+  gNodes.appendChild(txt(269, 288, '锁相倍频', {'font-size':11, fill:'var(--txt-dim)'}));
+  var pm = txt(269, 308, '× N', {'font-size':12, fill:'var(--or)'});
+  pm.id = 'pllMult';
+  gNodes.appendChild(pm);
+
+  /* 分频器与外设框 */
+  ROWS.forEach(function(r){
+    var d = el('rect',{x:470, y:r.y-30, width:126, height:60, rx:10, fill:'rgba(255,255,255,.05)', stroke:'var(--line-2)'});
+    gNodes.appendChild(d);
+    var dv = txt(533, r.y-4, '÷ ?', {'font-size':13, fill:'var(--txt-dim)', 'font-weight':600});
+    dv.id = 'div-' + r.key;
+    gNodes.appendChild(dv);
+    gNodes.appendChild(txt(533, r.y+18, '分频器', {'font-size':10.5, fill:'var(--txt-faint)'}));
+
+    var e = el('rect',{x:700, y:r.y-30, width:186, height:60, rx:10, fill:'rgba(255,255,255,.04)', stroke:'var(--line)'});
+    gNodes.appendChild(e);
+    gNodes.appendChild(txt(793, r.y-6, r.label, {'font-size':12.5, fill:'var(--txt)', 'font-weight':600}));
+    var fq = txt(793, r.y+19, '', {'font-size':11.5, fill:r.color, 'font-weight':600});
+    fq.id = 'fq-' + r.key;
+    gNodes.appendChild(fq);
+  });
+
+  /* 连线条（先画线，再画点） */
+  var links = [ {x1:124,y1:280,x2:206,y2:280,f:24} ];
+  ROWS.forEach(function(r){
+    links.push({x1:332,y1:280,x2:470,y2:r.y,f:0,row:r.key});
+    links.push({x1:596,y1:r.y,x2:700,y2:r.y,f:0,row:r.key});
+  });
+  links.forEach(function(L){
+    var len = Math.hypot(L.x2-L.x1, L.y2-L.y1);
+    var line = el('line',{x1:L.x1,y1:L.y1,x2:L.x2,y2:L.y2, stroke:'rgba(255,255,255,.18)', 'stroke-width':1.6});
+    gLines.appendChild(line);
+    paths.push({L:L, len:len, dots:[]});
+  });
+}
+
+/* ========== 频率与分频 ========== */
+function divOf(key){
+  if (key==='ARM')  return 1;
+  if (key==='AXI')  return state.axiDiv;
+  if (key==='AHB')  return state.axiDiv*2;
+  if (key==='IPG')  return state.axiDiv*4;
+  if (key==='IPGP') return state.axiDiv*8;
+  return 1;
+}
+function fOf(key){ return freqs().XPLL / divOf(key); }
+
+/* ========== 更新数值 ========== */
+function update(){
+  var f = freqs();
+  document.getElementById('pllMult').textContent = '× ' + state.mult;
+
+  ROWS.forEach(function(r){
+    var d = divOf(r.key), fq = fOf(r.key);
+    document.getElementById('div-'+r.key).textContent = '÷ ' + d;
+    document.getElementById('fq-'+r.key).textContent = fmt(fq) + ' · ' + period(fq);
+  });
+
+  /* 右侧数值卡 */
+  var rows = document.getElementById('rows');
+  rows.textContent = '';
+  var items = [
+    ['PLL1 输出', f.XPLL],
+    ['ARM 核',    f.ARM],
+    ['AXI 总线',  f.AXI],
+    ['AHB 总线',  f.AHB],
+    ['IPG 总线',  f.IPG],
+    ['IPG_PER',   f.IPGP],
+    ['RTC 独立',  0.032768]
+  ];
+  items.forEach(function(it){
+    var div = document.createElement('div');
+    div.className = 'rowp';
+    var a = document.createElement('span'); a.textContent = it[0];
+    var b = document.createElement('b'); b.textContent = fmt(it[1]) + '  /  ' + period(it[1]);
+    div.appendChild(a); div.appendChild(b);
+    rows.appendChild(div);
+  });
+
+  rebuildDots();
+  updateUart();
+}
+
+/* ========== 脉冲点 ========== */
+function speedOf(f){ return Math.min(2.4, 0.35 + 1.6 * Math.pow(f/528, 0.45)); }
+
+function rebuildDots(){
+  gDots.textContent = '';
+  paths.forEach(function(p){
+    var rowKey = p.L.row;
+    var fq = rowKey ? fOf(rowKey) : 24;
+    var color = 'var(--cy)';
+    if (rowKey==='AXI') color = 'var(--vi)';
+    else if (rowKey)    color = 'var(--or)';
+    p.fq = fq;
+    p.color = color;
+    var cnt = Math.max(2, Math.floor(p.len/64));
+    p.dots = [];
+    for (var i=0;i<cnt;i++){
+      var c = el('circle',{r:3.4, fill:color, opacity:.95});
+      gDots.appendChild(c);
+      p.dots.push({node:c, off:i/cnt});
+    }
+  });
+}
+
+function tick(now){
+  if (!lastT) lastT = now;
+  var dt = Math.min(0.05, (now - lastT)/1000);
+  lastT = now;
+  phase += dt;
+  paths.forEach(function(p){
+    var s = speedOf(p.fq);
+    var L = p.L;
+    p.dots.forEach(function(d){
+      var t = (phase*s + d.off) % 1;
+      d.node.setAttribute('cx', L.x1 + (L.x2-L.x1)*t);
+      d.node.setAttribute('cy', L.y1 + (L.y2-L.y1)*t);
+    });
+  });
+  requestAnimationFrame(tick);
+}
+
+/* ========== 门控面板 ========== */
+function buildGates(){
+  var host = document.getElementById('gates');
+  GATES.forEach(function(g){
+    state.gates[g.id] = true;
+    var d = document.createElement('div');
+    d.className = 'gate on';
+    d.dataset.id = g.id;
+    var nm = document.createElement('div'); nm.className='nm'; nm.textContent = g.name;
+    var st = document.createElement('div'); st.className='st';
+    d.appendChild(nm); d.appendChild(st);
+    d.addEventListener('click', function(){
+      state.gates[g.id] = !state.gates[g.id];
+      renderGate(d, g);
+      updateUart();
+      var off = 0; for (var k in state.gates) if (!state.gates[k]) off++;
+      document.getElementById('gateCount').textContent = off;
+    });
+    host.appendChild(d);
+    renderGate(d, g);
+  });
+}
+function renderGate(d, g){
+  var on = state.gates[g.id];
+  d.className = 'gate ' + (on ? 'on' : 'off');
+  var st = d.querySelector('.st');
+  st.textContent = on ? '0b11 · ' + fmt(g.clk) : '0b00 · 时钟断';
+}
+
+/* ========== UART 算例 ========== */
+function updateUart(){
+  var baud = parseInt(document.getElementById('baud').value, 10);
+  var clk = 80;                       /* MHz */
+  var ideal = (clk*1e6)/(16*baud);
+  var n = Math.round(ideal);
+  var real = (clk*1e6)/(16*n);
+  var err = (real - baud)/baud*100;
+  var alive = state.gates['uart1'];
+
+  var host = document.getElementById('uartRes');
+  host.textContent = '';
+  function line(k, v, cls){
+    var d = document.createElement('div');
+    var s1 = document.createElement('span'); s1.className='k'; s1.textContent = k + '：';
+    var s2 = document.createElement('span'); s2.className='v ' + (cls||''); s2.textContent = v;
+    d.appendChild(s1); d.appendChild(s2);
+    host.appendChild(d);
+  }
+  line('模块时钟', fmt(clk));
+  line('理想分频值 = 80MHz ÷ (16 × ' + baud + ')', ideal.toFixed(3));
+  line('取整后的分频值', '÷ ' + n);
+  line('实际波特率', Math.round(real) + ' bps');
+  line('误差', (err>=0?'+':'') + err.toFixed(3) + ' %', Math.abs(err)<1 ? 'ok' : 'bad');
+  line('用 UBIR / UBMR 分数分频', '可把误差压到 0.1% 以下');
+  if (!alive){
+    var w = document.createElement('div');
+    w.style.cssText = 'margin-top:8px;font-size:12.5px;color:var(--rd)';
+    w.textContent = '注意：UART1 门控已关，模块拿不到时钟，上面这些数一个也用不上——寄存器都写不进去。';
+    host.appendChild(w);
+  }
+}
+
+/* ========== 绑定 ========== */
+document.getElementById('mult').addEventListener('input', function(e){
+  state.mult = parseInt(e.target.value,10);
+  document.getElementById('multVal').textContent = state.mult + ' → ' + (24*state.mult) + ' MHz';
+  update();
+});
+document.getElementById('axiDiv').addEventListener('input', function(e){
+  state.axiDiv = parseInt(e.target.value,10);
+  document.getElementById('axiVal').textContent = '÷' + state.axiDiv + ' → ' + (528/state.axiDiv) + ' MHz';
+  update();
+});
+document.getElementById('baud').addEventListener('change', updateUart);
+
+build();
+buildGates();
+update();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

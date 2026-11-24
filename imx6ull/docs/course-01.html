@@ -1,0 +1,241 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>为什么偏偏是二进制 · 卷 01 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j01.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 01 · 机器与指令</div>
+<ol><li><a href="course-00.html">
+  <span class="no">01</span><span>计算机只是一台会照抄指令的机器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-01.html" class="active">
+  <span class="no">02</span><span>为什么偏偏是二进制<span class="sub">约 1 小时 · 当前</span></span></a></li>
+<li><a href="course-02.html">
+  <span class="no">03</span><span>一个字节能装什么<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-03.html">
+  <span class="no">04</span><span>从按键到屏幕<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-04.html">
+  <span class="no">05</span><span>一个开关能做什么<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-05.html">
+  <span class="no">06</span><span>与、或、非<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-06.html">
+  <span class="no">07</span><span>从半加器到全加器<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-07.html">
+  <span class="no">08</span><span>补码与减法器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-08.html">
+  <span class="no">09</span><span>时钟与触发器<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-09.html">
+  <span class="no">10</span><span>冯诺依曼五件事<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-10.html">
+  <span class="no">11</span><span>PC 与指令寄存器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-11.html">
+  <span class="no">12</span><span>ALU 与标志位<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-12.html">
+  <span class="no">13</span><span>一条指令的完整旅程<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-13.html">
+  <span class="no">14</span><span>流水线<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-14.html">
+  <span class="no">15</span><span>机器码的位段<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-15.html">
+  <span class="no">16</span><span>九种寻址方式<span class="sub">◆ · 约 1 小时</span></span></a></li>
+<li><a href="course-16.html">
+  <span class="no">17</span><span>汇编只有四类动作<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-17.html">
+  <span class="no">18</span><span>函数调用与 ABI<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-18.html">
+  <span class="no">19</span><span>从 C 到汇编<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th18.html">
+  <span class="no">20</span><span>CPU 是怎么执行一行代码的（详解）<span class="sub">约 3 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j00.html">← 卷 00</a>
+  <a href="../juan/j02.html">卷 02 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 01<span>·</span>机器与指令<span>·</span>第 02 篇</div>
+  <h1>为什么偏偏是二进制</h1>
+  <p class="lede">上一课说内存里全是 0 和 1。这一课要回答更底层的问题：这些 0 和 1 在物理上到底是什么？为什么不用十进制？电压抖动、温度变化、线缆干扰，凭什么不会把 0 读成 1？</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+
+    <div class="viz" data-kind="seq" data-title="一根线上的数字信号：时钟在「什么时候看」" data-sub="高电平=1，低电平=0；只在时钟边沿采样，中间怎么抖都不管" data-json='{"slots":24,"sigs":[{"n":"CLK","w":"010101010101","c":"vi","note":"节拍"},{"n":"D0","w":"001111000011","c":"cy","note":"数据"},{"n":"采样","w":"000100010001","c":"gr","note":"只在边沿取值"}],"note":"数字电路的全部秘密在这一张图里：它不追求电压精确，只要求在采样那一刻电压落在「足够高」或「足够低」的区间里。中间那段模糊区，被时钟和门限一起绕过去了。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① 0 和 1 是「没有电」和「有电」吗？② 为什么不用十进制，省得换算？③ 噪声容限是什么，为什么它决定了整个计算机的可靠性？④ 一个字节为什么是 8 位而不是 10 位？</p>
+    </div>
+
+    <h2 id="s1">1. 直觉：不是「有电没电」，是「两个能被稳定区分的状态」</h2>
+
+    <p>最常见的说法是「0 是没电，1 是有电」。这个说法会让你在第一次看到 3.3V、1.8V、1.2V 这些数字时彻底混乱——因为芯片里同时存在好几种「有电」。</p>
+
+    <p>准确的说法是：<b>0 和 1 是两个区间，不是两个点。</b>比如 3.3V 系统里，通常规定：</p>
+
+    <table>
+      <thead><tr><th>含义</th><th>电压区间</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>逻辑 0</td><td>0V ~ 0.8V</td><td>「足够低」，输入端认定是 0</td></tr>
+        <tr><td>不确定区</td><td>0.8V ~ 2.0V</td><td>禁止停留区，输出端绝不会主动给这个电压</td></tr>
+        <tr><td>逻辑 1</td><td>2.0V ~ 3.3V</td><td>「足够高」，输入端认定是 1</td></tr>
+      </tbody>
+    </table>
+
+    <p>中间那 1.2V 宽的「不确定区」，就是<b>噪声容限（noise margin）</b>。它意味着：哪怕信号被干扰、被衰减、被温度漂移，只要没跌进这个区间，读出来还是对的。<b>计算机能可靠工作，靠的不是电压准，是这段余量。</b></p>
+
+    <p><b>类比的失效处</b>：水龙头开关的类比（开=1 关=0）容易让人以为「要么有水流要么没有」。真实电路里始终有电流在流动（CMOS 只是在两个状态下功耗极低），0 和 1 的区别是「哪个管子导通」，不是「有没有电」。</p>
+
+    <h2 id="s2">2. 为什么不是十进制：三个硬理由</h2>
+
+    <div class="viz" data-kind="matrix" data-title="为什么工程上选了二进制" data-sub="不是「简单」，是「在物理上最便宜、最可靠」" data-json='{"corner":"方案","cols":["物理实现","可靠性","代价"],"rows":[{"n":"二进制（2 态）","c":"cy","cells":["一个 MOS 管导通/截止，天然两态","门限宽、余量大、可级联几百级","每位只需 1 根线 + 1 个管子"]},{"n":"三进制（3 态）","c":"vi","cells":["需要区分三个电平，器件复杂","余量变小，误判率上升","苏联 Setun 做过，成本与维护压不住"]},{"n":"十进制（10 态）","c":"rd","cells":["要在一条线上分 10 个电平","余量只有二进制的几分之一","早期继电器/机械计算机可行，电子时代不可行"]},{"n":"模拟连续值","c":"rd","cells":["电压可以取任意值","每级运算都引入误差且会累积","精度无法保证，无法无限级联"]}],"note":"核心逻辑：数字电路要把成千上万个门级联起来，每一级都会引入误差。只有「把误差截断成两个状态」才能无限级联而不失真——这就是二进制的本质优势。"}'></div>
+
+    <p>第三行值得多看一眼：模拟计算机在 1930–1960 年代真的存在（用电压连续值算微分方程），但它算三步之后误差就滚起来了，而且没法存、没法重算。数字计算机赢的不是精度，是<b>「可以无限级联」</b>。</p>
+
+    <h2 id="s3">3. 硬件上：0/1 怎么被产生、又被读回来</h2>
+
+    <p>以一个最基础的 CMOS 反相器为例（第 04 课会细讲）：</p>
+
+    <ul>
+      <li><b>输出 1</b>：上面的 PMOS 导通，把输出拉到 VDD（3.3V），下面 NMOS 截止，没有电流从电源到地——所以静态功耗几乎为零。</li>
+      <li><b>输出 0</b>：下面的 NMOS 导通，把输出拉到 GND（0V），上面截止。</li>
+      <li><b>翻转的瞬间</b>：两个管子短暂同时导通，产生一个尖峰电流——这就是为什么 CPU 的频率越高越费电，也是为什么降频能省电。</li>
+    </ul>
+
+    <p>读的一方（接收门）做的事很简单：比较输入电压与门限。它不关心「准确值是 3.28V 还是 3.31V」，只关心「过了 2.0V 没有」。<b>而这个「只关心有没有过线」的动作，正是把连续世界切成离散世界的那一刀。</b></p>
+
+    <p>顺便解释一个你会遇到的现实：i.MX6ULL 的 IO 有 3.3V 域，核内有 1.2V 域，DDR 有 1.35V/1.5V 域。跨域连接必须用电平转换器，否则 1.2V 的「1」送到 3.3V 的门上，会因为达不到 2.0V 门限而被读成 0——不是「信号弱」，是<b>门限判断失败</b>。</p>
+
+    <h2 id="s4">4. 软件上：一个字节为什么是 8 位</h2>
+
+    <p>8 位不是物理定律，是历史与工程的折中：</p>
+
+    <ul>
+      <li>早期有 6 位、7 位、9 位、12 位字节的机器（IBM 700 系列用 6 位字符）；</li>
+      <li>8 位刚好能装下 ASCII 的 128 个字符 + 校验位，且是 2 的幂，方便用十六进制两位表示；</li>
+      <li>8 位一个字节 → 32 位一个字装 4 个字节，地址按字节编址，一切对齐都自然。</li>
+    </ul>
+
+    <p>所以你会在代码里反复看到这些数字：</p>
+
+    <table>
+      <thead><tr><th>量</th><th>值</th><th>为什么是这个数</th></tr></thead>
+      <tbody>
+        <tr><td>1 字节</td><td>8 位 = 256 种</td><td>2 的幂，两位十六进制</td></tr>
+        <tr><td>1 页（Linux）</td><td>4096 字节</td><td>2 的 12 次方，MMU 最小映射单位</td></tr>
+        <tr><td>32 位地址空间</td><td>4GB</td><td>2 的 32 次方字节</td></tr>
+        <tr><td>一个字（ARM32）</td><td>4 字节</td><td>一条指令正好一个字</td></tr>
+      </tbody>
+    </table>
+
+    <p>还有一个必须建立的直觉：<b>十六进制是给人看的二进制</b>。一个十六进制位 = 4 个比特，两个 = 1 字节。看到 <code>0xE3A00001</code> 你能立刻拆成 <code>1110 0011 1010 0000 …</code>，以后拆机器码全靠这个转换。</p>
+
+    <h2 id="s5">5. 实验：三条命令，把「0/1 是真的」变成手感</h2>
+
+    <p>在一台 Ubuntu 虚拟机上就能做：</p>
+
+    <pre><code># ① 看一个文件的真实字节，不是字符
+xxd -l 32 /bin/ls
+
+# ② 十进制、十六进制、二进制互换
+python3 -c "n=0xE3A00001; print(bin(n)); print(hex(n)); print(n)"
+
+# ③ 位运算：取低 4 位（模拟译码器切位段）
+python3 -c "print(hex(0xE3A00001 &amp; 0xF)); print(hex((0xE3A00001 &gt;&gt; 28) &amp; 0xF))"</code></pre>
+
+    <p>你会看到：<code>xxd</code> 打出来的是 <code>7f 45 4c 46 …</code>，而文件在编辑器里显示的是「ELF」——同一份数据，两种看法。第三行输出 <code>0x1</code> 和 <code>0xe</code>：低 4 位是 1（那就是 <code>mov r0,#1</code> 的立即数），高 4 位是 0xe（cond=AL）。</p>
+
+    <p><b>再加一个反向实验，最能建立敬畏</b>：复制一张 PNG，用十六进制编辑器把某个字节改掉 1 个比特，再打开——图片会直接报错或花掉。一个比特而已。</p>
+
+    <h2 id="s6">6. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于二进制与电压的误解" data-sub="左边是常见说法，右边是工程实际" data-json='{"bad":{"t":"听起来合理","items":["0 就是没电，1 就是有电","二进制是因为电脑只会数两个数，比较笨","电压越准越可靠，所以要精确到毫伏","八位一个字节是天经地义的"]},"good":{"t":"实际如此","items":["0 和 1 是两个电压区间；芯片里同时存在 1.2V/1.8V/3.3V 的「1」","二进制是因为两态器件最便宜、余量最大、可无限级联——是优势不是缺陷","可靠性来自门限与噪声容限，不来自精度；过度追求精度反而更贵更脆","是历史折中（6/7/9 位都出现过），8 位胜在是 2 的幂且能装下 ASCII"]},"note":"把「懂二进制」当成「会换算」是不够的。真正的理解是：知道它为什么必须在物理层是两态，以及这段余量如何决定了整机的可靠性。"}'></div>
+
+    <h2 id="s7">7. 自测：五道题</h2>
+
+    <div class="q"><span class="n">1</span><p>3.3V 系统里，输入读到 1.5V，硬件会判成 0、1，还是不确定？为什么电路要避免这种情况？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>落在不确定区，结果不可靠（不同门可能判不同，且随温度漂移）。工程上要求输出端永远不许停留在这个区间，输入端也不能长期处于此区间。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>为什么模拟计算机在历史上失败了？用「级联」这个词解释。</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>每一级运算都引入误差，误差会累积放大，级联几级后结果不可信；数字电路把每级输出重新截断到两个状态，误差不会累积，所以能级联上亿个门。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>一个十六进制位对应几个比特？为什么工程师偏爱十六进制？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>4 个比特。因为二进制太长不好读，十六进制刚好 4 位一组、两个字符表示一字节，转换是纯机械的。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p><code>0xE3A00001</code> 的高 4 位和低 4 位各是什么？分别代表什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>高 4 位 0xE = 1110，是条件码 AL（无条件执行）；低 4 位 0x1，是立即数 1。整条是 <code>mov r0, #1</code>。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>如果一条信号线上的噪声容限只有 0.2V，会发生什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>稍有干扰就会跌进不确定区，误判率上升，表现为偶发数据错误、系统不稳定——这类问题极难排查，因为它依赖温度、供电与走线。</p>
+    </div></details>
+
+    <h2 id="s8">8. 动手清单</h2>
+
+    <div class="steps">
+      <ol>
+        <li>跑上面三条命令，记下 <code>xxd</code> 输出的前 16 个字节。</li>
+        <li>把 <code>0xE3A00001</code> 写成 32 位二进制，按 4 位一组断开，标出哪几位是 cond。</li>
+        <li>复制一张图片，改掉一个字节里的 1 个比特，观察打不开的现象。</li>
+        <li>查你手上开发板的原理图：找出一处 3.3V 器件连到 1.8V 器件的线，看有没有电平转换。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      第 02 课讲一个字节能装什么：正数、负数（补码）、字符、地址。你会看到「−1」在内存里其实是 255，以及为什么这个设计让减法可以直接用加法器做。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="slider" data-iviz="1" data-json='{"title":"拖动电压，看它被判成 0 还是 1","hint":"判决点 1.65V","label":"导线上的电压","unit":" ×10mV","min":0,"max":330,"step":5,"value":100,"presets":[{"t":"接近 0V","v":10},{"t":"刚过判决点","v":170},{"t":"接近 3.3V","v":320}],"note":"判决点固定在 1.65V 附近。噪声只要不超过这段余量，读数就不会翻。这就是数字电路抗干扰的全部秘密。","out":[{"k":"判决结果","expr":"v >= 165 ? 1 : 0"},{"k":"离判决点","expr":"Math.abs(v - 165) / 100","unit":" V"},{"k":"可容忍噪声","expr":"Math.abs(v - 165) / 100","unit":" V"}]}'></div>
+  
+
+<nav class="pager">
+  <a href="course-00.html"><span>← 上一篇</span><b>计算机只是一台会照抄指令的机器</b></a>
+  <a class="nx" href="course-02.html"><span>下一篇 →</span><b>一个字节能装什么</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>

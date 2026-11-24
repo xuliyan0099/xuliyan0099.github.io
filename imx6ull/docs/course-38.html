@@ -1,0 +1,185 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>总线 · 卷 07 | i.MX6ULL 学习手册</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/viz.css">
+<link rel="stylesheet" href="../assets/iviz.css">
+<link rel="stylesheet" href="../assets/anim2.css">
+<link rel="stylesheet" href="../assets/anim.css">
+<link rel="stylesheet" href="../assets/cpu3.css">
+<link rel="stylesheet" href="../assets/ikit.css">
+<link rel="stylesheet" href="../assets/doc-compat.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<script src="../assets/readmode.js"></script>
+<script src="../assets/ikit.js" defer></script>
+<script src="../assets/anime.iife.min.js" defer></script>
+<script src="../assets/viz.js" defer></script>
+<script src="../assets/iviz.js" defer></script>
+<script src="../assets/anim2.js" defer></script>
+<script src="../assets/cpu3.js" defer></script>
+<script src="../assets/cpu-cycle.js" defer></script>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+    <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+    <div class="spacer"></div>
+    <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home hide-sm" href="../juan/j07.html">☰ 本卷目录</a>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+<aside id="sidebar">
+<div class="vol-h">卷 07 · 芯片与硬件底座</div>
+<ol><li><a href="course-th07.html">
+  <span class="no">01</span><span>ARM 架构与 Cortex-A7<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-35.html">
+  <span class="no">02</span><span>i.MX6ULL 最小系统<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th10.html">
+  <span class="no">03</span><span>总线体系：AXI / AHB / APB 与 I2C / SPI / CAN<span class="sub">约 4 小时</span></span></a></li>
+<li><a href="course-th11.html">
+  <span class="no">04</span><span>时钟树、复位、电源域、RTC 与看门狗<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-th12.html">
+  <span class="no">05</span><span>最小系统必需外设（上）：DDR、中断、定时器、GPIO、UART<span class="sub">约 6 小时</span></span></a></li>
+<li><a href="course-th13.html">
+  <span class="no">06</span><span>最小系统必需外设（下）：存储、DMA、以太网、USB<span class="sub">约 5 小时</span></span></a></li>
+<li><a href="course-37.html">
+  <span class="no">07</span><span>设备树<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-th16.html">
+  <span class="no">08</span><span>BSP 与设备树原理<span class="sub">约 6 小时</span></span></a></li>
+<li><a href="course-38.html" class="active">
+  <span class="no">09</span><span>总线<span class="sub">约 1 小时 · 当前</span></span></a></li>
+<li><a href="course-39.html">
+  <span class="no">10</span><span>GIC 与定时器<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="course-40.html">
+  <span class="no">11</span><span>存储与外设<span class="sub">约 1 小时</span></span></a></li>
+<li><a href="viz-clock-tree.html">
+  <span class="no">12</span><span>互动台：时钟树与门控<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="viz-gpio.html">
+  <span class="no">13</span><span>互动台：GPIO 与 IOMUX 配置<span class="sub">💻 · 约 1 小时</span></span></a></li>
+<li><a href="viz-nvic.html">
+  <span class="no">14</span><span>互动台：中断优先级与抢占<span class="sub">💻 · 约 1 小时</span></span></a></li></ol>
+<div class="vol-nav">
+  <a href="../juan/j06.html">← 卷 06</a>
+  <a href="../juan/j08.html">卷 08 →</a>
+</div>
+</aside>
+<main class="doc">
+  <div class="doc-kicker">卷 07<span>·</span>芯片与硬件底座<span>·</span>第 09 篇</div>
+  <h1>总线</h1>
+  <p class="lede">CPU 与 DDR、外设之间不是「直连」，而是一条共享的公路——总线。总线有宽度、有频率、有仲裁，所以带宽是有限的。当你觉得「CPU 明明很快，为什么处理数据还是慢」，答案常常在总线上。</p>
+  <div class="doc-chips">
+    <span class="hot">★ 一读</span>
+    <span>纯读约 1 小时</span>
+    <span>左侧是本卷目录</span>
+    <span>理论为主 · 实作可跳</span>
+  </div>
+
+
+
+    
+    
+
+    <div class="viz" data-kind="layers" data-title="i.MX6ULL 的三层总线" data-sub="越快越贵，挂在越靠近 CPU 的位置" data-json='{"items":[{"n":"AXI（64 位）","d":"CPU ↔ L2 ↔ DDR，最高带宽","c":"gr"},{"n":"AHB（32 位）","d":"DMA、LCD、USB 等高速外设","c":"cy"},{"n":"APB / IPG（32 位）","d":"UART、I2C、GPIO、定时器等低速外设","c":"or"},{"n":"外设内部寄存器","d":"每个模块自己的小总线","c":"gray"}],"note":"为什么分三层：把慢速外设与高速内存分开，避免一个 UART 读寄存器把整条内存通道堵住。这就是「总线分层」的全部目的。"}'></div>
+
+    <div class="card">
+      <h4>这一课要回答的问题</h4>
+      <p>① AXI / AHB / APB 各服务谁？② 带宽怎么算？③ 地址译码怎么找到目标设备？④ 为什么多个主设备会「抢总线」？⑤ DMA 为什么比 CPU 拷贝快？</p>
+    </div>
+
+    <h2 id="s1">1. 带宽怎么算</h2>
+
+    <pre><code>带宽 = 位宽 × 频率（单边）
+# 例：64 位 AXI @ 132MHz
+64 bit = 8 字节 × 132M = 1056 MB/s ≈ 1 GB/s
+
+# 但真实可用带宽远低于理论值：
+#   - 读写切换开销
+#   - 非连续访问（每次都要发新地址）
+#   - 仲裁与等待
+# 实际能到 50%~70% 就已不错</code></pre>
+
+    <p>这条算式很实用：<b>算清「你的应用需要多少带宽」与「总线能给多少」</b>，就能预判是否会卡。比如 800×480 RGB565、60fps 的屏幕，需要约 46MB/s——占 AXI 带宽的 5% 左右，没问题；但若同时做摄像头采集 + 存储写入，就可能挤爆。</p>
+
+    <h2 id="s2">2. 地址译码：谁来接这一单</h2>
+
+    <p>每个外设在总线上有一个地址范围。CPU 发出地址，译码器比较高位，决定由哪个从设备响应：</p>
+
+    <pre><code>0x8000_0000 - 0x9FFF_FFFF  → DDR 控制器
+0x0209_C000 - 0x0209_CFFF  → GPIO1
+0x0219_0000 - 0x0219_3FFF  → UART1
+0x0000_0000 - 0x0001_FFFF  → Boot ROM / OCRAM
+
+# 地址空间就这么被切开了
+cat /proc/iomem</code></pre>
+
+    <p>这也解释了「访问一个不存在的地址会怎样」：总线会返回一个 abort（第 29 课的 data abort），内核据此判定「非法访问」。</p>
+
+    <h2 id="s3">3. 仲裁：多个主设备抢一条路</h2>
+
+    <div class="viz" data-kind="compare" data-title="CPU 拷贝 vs DMA 拷贝" data-sub="同样的数据搬运，代价差一个数量级" data-json='{"bad":{"t":"CPU 拷贝（memcpy）","items":["每个字都要走「读-写」两次总线事务","占用 CPU 时间与寄存器","拷贝期间不能干别的","1MB 数据可能要几毫秒"]},"good":{"t":"DMA 拷贝","items":["DMA 控制器直接读写内存，CPU 只发指令","CPU 可以同时做别的计算","大数据块效率高得多","代价：Cache 一致性要处理（第 21 课）"]},"note":"DMA 也走同一条总线，所以「DMA 不占 CPU」不等于「不占带宽」。如果带宽已饱和，DMA 同样会变慢——只是 CPU 空出来了而已。"}'></div>
+
+    <h2 id="s4">4. 时钟域与异步</h2>
+
+    <p>不同总线段可能跑不同频率（AXI 132M、IPG 66M）。跨时钟域传输必须同步（第 08 课的亚稳态问题），硬件上用异步 FIFO 或握手协议解决。</p>
+
+    <p>软件侧能感知的现象：<b>访问慢速外设时，一次读写要等好几个周期</b>。所以驱动里连续读同一个寄存器要谨慎，能批量读就批量读（burst）。</p>
+
+    <h2 id="s5">5. 三条常见误解</h2>
+
+    <div class="viz" data-kind="compare" data-title="关于总线的误解" data-sub="左边是想当然，右边是实际" data-json='{"bad":{"t":"想当然","items":["总线带宽 = 位宽 × 频率，能达到理论值","CPU 访问任何外设的速度都一样","DMA 完全不占系统资源"]},"good":{"t":"实际","items":["实际带宽常只有理论的 50%~70%，受仲裁与访问模式影响","高速设备在 AXI、低速在 APB，访问延迟差几倍","DMA 占总线带宽，且需要 Cache 同步"]},"note":"第一条在做视频、音频项目时特别关键：算出来「带宽够」但实测掉帧，往往是突发访问模式导致的效率下降。"}'></div>
+
+    <h2 id="s6">6. 自测与动手</h2>
+
+    <div class="q"><span class="n">1</span><p>64 位 @132MHz 的 AXI 理论带宽？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>8 字节 × 132M ≈ 1056 MB/s，约 1 GB/s。</p>
+    </div></details>
+
+    <div class="q"><span class="n">2</span><p>为什么要把总线分三层？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>隔离慢速外设与高速内存，避免低速访问拖累整体带宽。</p>
+    </div></details>
+
+    <div class="q"><span class="n">3</span><p>地址译码的依据是什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>比较地址高位与各设备分配的范围，决定由哪个从设备响应。</p>
+    </div></details>
+
+    <div class="q"><span class="n">4</span><p>DMA 为什么快？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>由专用控制器搬数据，CPU 只发指令即可并行做别的事。</p>
+    </div></details>
+
+    <div class="q"><span class="n">5</span><p>访问不存在的地址会发生什么？</p></div>
+    <details class="ans"><summary>看答案</summary><div class="body">
+      <p>总线返回 abort，CPU 触发 data abort 异常，内核判为非法访问。</p>
+    </div></details>
+
+    <div class="steps">
+      <ol>
+        <li><code>cat /proc/iomem</code>，列出三块不同性质地址范围。</li>
+        <li>算你的 LCD 分辨率下需要的带宽，与 AXI 理论值比。</li>
+        <li>用 memcpy 与 DMA 各拷 1MB，比较耗时。</li>
+        <li>读手册的总线章节，找出 AXI 与 IPG 的频率。</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <b>下一课预告</b>
+      设备挂在总线上，但它们要「打断」CPU 时走哪条路？第 39 课讲 GIC 与定时器——中断的硬件调度中心。
+    </div>
+
+  
+    <!--IVIZ--><div class="iviz" data-kind="slider" data-iviz="1" data-json='{"title":"拉高总线时钟，看理论带宽","hint":"32 位 AHB 示意","label":"总线时钟","unit":" MHz","min":10,"max":528,"step":2,"value":132,"presets":[{"t":"APB 66MHz","v":66},{"t":"AHB 132MHz","v":132},{"t":"最高 528MHz","v":528}],"note":"带宽 = 频率 × 位宽 ÷ 8。理论值是上限，实际还要扣掉仲裁、等待周期、DDR 行切换——真实带宽常常只有一半。","out":[{"k":"带宽","expr":"v * 4","unit":" MB/s"},{"k":"每周期搬","expr":"4","unit":" B"},{"k":"传 1MB 用时","expr":"(1024 / (v * 4)).toFixed(3)","unit":" ms"}]}'></div>
+  
+
+<nav class="pager">
+  <a href="course-th16.html"><span>← 上一篇</span><b>BSP 与设备树原理</b></a>
+  <a class="nx" href="course-39.html"><span>下一篇 →</span><b>GIC 与定时器</b></a>
+</nav>
+<footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
+</main>
+</div>
+</body></html>
