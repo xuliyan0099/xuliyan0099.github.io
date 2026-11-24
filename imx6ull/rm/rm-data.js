@@ -211,7 +211,7 @@ window.RM =
           "ready": true,
           "line": "十页把显示链与音频链画清楚，先看它再进各外设。",
           "pts": ["显示与图形：LCDIF/PXP/EPDC/CSI 分工", "音频：SAI/ESAI/ASRC/SPDIF/MQS 分工"] },
-        { "n": 16, "zh": "异步采样率转换 ASRC", "en": "Asynchronous Sample Rate Converter", "pp": "505–562", "pages": 58, "pri": "opt", "batch": 4,
+        { "n": 16, "zh": "异步采样率转换 ASRC", "en": "Asynchronous Sample Rate Converter", "pp": "505–562", "pages": 58, "pri": "opt", "batch": 4, "ready": true,
           "line": "48kHz 对 44.1kHz 这种「不同步」的场合，靠它做无损重采样。",
           "pts": ["通道对与比率设置", "启动流程与 FIFO 水位"] },
         { "n": 17, "zh": "NAND ECC 加速器 BCH", "en": "40-BIT Correcting ECC Accelerator", "pp": "563–624", "pages": 62, "pri": "read", "batch": 3,
