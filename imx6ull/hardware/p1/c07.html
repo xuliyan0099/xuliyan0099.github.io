@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1.7 三极管与 MOS | 第一篇 · 电学与器件基础 | i.MX6ULL 学习手册</title>
+<meta name="description" content="用 MINI 板的 SS8550、SS8050 与核心板 2SK3018 讲三极管开关、基极电阻计算、MOS 阈值与导通电阻、以及 MOS 做电平转换。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">第一篇 · 电学与器件基础</div>
+    <ol id="sideList"></ol>
+    <div class="vol-nav" id="volNav"></div>
+  </aside>
+
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第一篇 · 电学基础</span><span class="sep">/</span>第 7 章<span class="sep">/</span>约 26 分钟</div>
+    <h1>三极管与 MOS：两种开关</h1>
+    <p class="lede">板子上需要「用小信号控制大电流」的地方，用的都是这两种器件：<b>三极管（BJT）靠电流控制，MOS 靠电压控制</b>。GPIO 只能出几毫安，而蜂鸣器、灯带、继电器要几十到几百毫安——中间这一级，就是它们的工作。</p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>说出 NPN、PNP、N-MOS、P-MOS 四种器件的开关条件与常见接法</li>
+        <li>用「饱和条件」算出基极电阻，并解释为什么不能直接用 GPIO 驱动负载</li>
+        <li>说出 V<sub>gs(th)</sub>、R<sub>ds(on)</sub>、Q<sub>g</sub> 三个参数各自影响什么</li>
+        <li>看懂核心板上 2SK3018 做电平/使能开关的那几处电路</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">1.7.1</span>四种器件，一句话记住</h2>
+    <table>
+      <thead><tr><th>器件</th><th>导通条件</th><th>常见位置</th><th>MINI / 核心板实例</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">NPN（SS8050）</td><td>基极比发射极高 0.7V，且要有足够基极电流</td><td>低边开关（负载接在电源与集电极之间）</td><td>Q4：RS485 自动收发方向控制</td></tr>
+        <tr><td class="nm">PNP（SS8550）</td><td>基极比发射极低 0.7V</td><td>高边开关（负载接在集电极与地之间）</td><td>Q1：蜂鸣器驱动（R21 1k 基极电阻）</td></tr>
+        <tr><td class="nm">N-MOS（2SK3018）</td><td>V<sub>gs</sub> &gt; V<sub>gs(th)</sub>，通常要 2.5V 以上</td><td>低边开关、电平转换、电源切换</td><td>核心板 Q5–Q8：使能/放电/电平转换</td></tr>
+        <tr><td class="nm">P-MOS</td><td>V<sub>gs</sub> &lt; −V<sub>gs(th)</sub>（栅极比源极低）</td><td>高边开关、防反接</td><td>本板未用，常见于电源入口</td></tr>
+      </tbody>
+    </table>
+
+    <figure class="fig">
+      <svg viewBox="0 0 900 380" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <!-- NPN 低边 -->
+        <rect x="30" y="26" width="270" height="230" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="46" y="50" fill="#eaf3ff" font-size="11.5">NPN 低边开关</text>
+        <line x1="120" y1="70" x2="120" y2="96" stroke="#ffb84d" stroke-width="1.4"/>
+        <text x="128" y="66" fill="#ffd79a" font-size="9.5">负载电源 3.3V</text>
+        <rect x="100" y="96" width="40" height="34" rx="4" fill="rgba(95,241,239,.1)" stroke="#5ff1ef"/>
+        <text x="120" y="118" fill="#9df5f4" font-size="9" text-anchor="middle">负载</text>
+        <line x1="120" y1="130" x2="120" y2="152" stroke="#5ff1ef" stroke-width="1.2"/>
+        <line x1="104" y1="152" x2="136" y2="152" stroke="#c8c0ff" stroke-width="1.6"/>
+        <line x1="120" y1="152" x2="120" y2="176" stroke="#c8c0ff" stroke-width="1.2"/>
+        <line x1="112" y1="182" x2="128" y2="176" stroke="#c8c0ff" stroke-width="1.4"/>
+        <line x1="112" y1="194" x2="128" y2="188" stroke="#c8c0ff" stroke-width="1.4"/>
+        <line x1="120" y1="194" x2="120" y2="216" stroke="#6f7f9c"/>
+        <line x1="106" y1="216" x2="134" y2="216" stroke="#6f7f9c"/>
+        <line x1="60" y1="176" x2="104" y2="176" stroke="#5ce1a0" stroke-width="1.2"/>
+        <rect x="42" y="166" width="18" height="30" rx="3" fill="rgba(92,225,160,.15)" stroke="#5ce1a0"/>
+        <text x="34" y="160" fill="#9df3c2" font-size="9">Rb</text>
+        <text x="46" y="222" fill="#9fb0c7" font-size="9.5">GPIO → Rb → 基极</text>
+        <text x="46" y="242" fill="#6f7f9c" font-size="9">GPIO 只需 mA 级电流</text>
+
+        <!-- PNP 高边 -->
+        <rect x="320" y="26" width="270" height="230" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="336" y="50" fill="#eaf3ff" font-size="11.5">PNP 高边开关（蜂鸣器）</text>
+        <line x1="410" y1="70" x2="410" y2="96" stroke="#ffb84d" stroke-width="1.4"/>
+        <text x="418" y="80" fill="#ffd79a" font-size="9.5">3.3V</text>
+        <line x1="394" y1="96" x2="426" y2="96" stroke="#c8c0ff" stroke-width="1.6"/>
+        <line x1="410" y1="96" x2="410" y2="120" stroke="#c8c0ff" stroke-width="1.2"/>
+        <line x1="402" y1="126" x2="418" y2="120" stroke="#c8c0ff" stroke-width="1.4"/>
+        <line x1="402" y1="138" x2="418" y2="132" stroke="#c8c0ff" stroke-width="1.4"/>
+        <line x1="410" y1="138" x2="410" y2="158" stroke="#5ff1ef" stroke-width="1.2"/>
+        <text x="436" y="108" fill="#9fb0c7" font-size="9">E → 3.3V</text>
+        <text x="436" y="142" fill="#9fb0c7" font-size="9">C → 蜂鸣器</text>
+        <text x="336" y="212" fill="#6f7f9c" font-size="9">基极拉低 → 导通</text>
+        <line x1="410" y1="158" x2="410" y2="176" stroke="#5ff1ef" stroke-width="1.2"/>
+        <rect x="388" y="176" width="44" height="30" rx="4" fill="rgba(95,241,239,.1)" stroke="#5ff1ef"/>
+        <text x="410" y="196" fill="#9df5f4" font-size="9" text-anchor="middle">蜂鸣器</text>
+        <line x1="410" y1="206" x2="410" y2="226" stroke="#6f7f9c"/>
+        <line x1="396" y1="226" x2="424" y2="226" stroke="#6f7f9c"/>
+        <line x1="366" y1="130" x2="402" y2="130" stroke="#5ce1a0" stroke-width="1.2"/>
+        <rect x="348" y="120" width="18" height="26" rx="3" fill="rgba(92,225,160,.15)" stroke="#5ce1a0"/>
+        <text x="336" y="112" fill="#9df3c2" font-size="9">R21 1k</text>
+
+        <!-- MOS -->
+        <rect x="610" y="26" width="260" height="230" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="626" y="50" fill="#eaf3ff" font-size="11.5">N-MOS：看电压，不看电流</text>
+        <text x="626" y="80" fill="#9df3c2" font-size="10.5">Vgs(th)：开启阈值</text>
+        <text x="626" y="98" fill="#9fb0c7" font-size="9.5">2SK3018 约 0.8–1.5V，3.3V 可完全开通</text>
+        <text x="626" y="126" fill="#9df3c2" font-size="10.5">Rds(on)：导通电阻</text>
+        <text x="626" y="144" fill="#9fb0c7" font-size="9.5">决定发热：1Ω 过 1A 就是 1W</text>
+        <text x="626" y="172" fill="#9df3c2" font-size="10.5">Qg：栅极电荷</text>
+        <text x="626" y="190" fill="#9fb0c7" font-size="9.5">决定开关速度与驱动电流</text>
+        <text x="626" y="218" fill="#ff9c9c" font-size="9.5">栅极不能悬空：会半开通而烧毁</text>
+        <text x="626" y="240" fill="#6f7f9c" font-size="9">必须加 10k–100k 下拉到源极</text>
+
+        <text x="30" y="300" fill="#9fb0c7" font-size="10.5">为什么 GPIO 不能直接驱动负载：一颗 GPIO 通常只能出 4–8mA，而蜂鸣器要 20–30mA、继电器要 50mA 以上。</text>
+        <text x="30" y="324" fill="#6f7f9c" font-size="10">直接驱动轻则电压掉到 1V 不工作，重则永久损伤 IO。中间必须加一级开关。</text>
+      </svg>
+      <figcaption><b>图 1-6</b>　三种最常见的开关接法。高边用 PNP/P-MOS，低边用 NPN/N-MOS。</figcaption>
+    </figure>
+
+    <h2><span class="n">1.7.2</span>基极电阻：不是随便放个 1k</h2>
+    <p>三极管做开关时必须进入<b>饱和区</b>（V<sub>ce</sub> 接近 0.2V），否则它会变成一个发热的电阻。饱和的条件是：</p>
+    <p style="text-align:center">I<sub>b</sub> ≥ ( I<sub>c</sub> / h<sub>FE(min)</sub> ) × (2–5 倍过驱动系数)</p>
+    <p>所以基极电阻：R<sub>b</sub> = (V<sub>drive</sub> − V<sub>be</sub>) / I<sub>b</sub>。以 MINI 板的蜂鸣器为例：Q1（SS8550，PNP），负载约 20mA，SS8550 的 h<sub>FE</sub> 最小约 120（大电流下会降到几十）。取 I<sub>c</sub> = 20mA、过驱动 3 倍，I<sub>b</sub> ≈ 0.5mA，则 R<sub>b</sub> = (3.3 − 0.7)/0.0005 ≈ 5.2k。板上取 1k，相当于给了 2.6mA 基极电流——远超需求，保证深度饱和。</p>
+    <p>为什么宁可选小一点？因为 h<sub>FE</sub> 随温度、批次、电流下降，留大余量比「刚好够」稳。</p>
+
+    <div class="demo">
+      <div class="dh"><b>基极电阻计算器</b><span>按饱和条件算 Rb，并提示「过大不饱和 / 过小浪费」</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
+          <div><div style="font-size:12px;color:#9fb0c7">驱动电压 <b id="dv" style="color:#5ff1ef">3.3</b> V</div><input id="dv2" type="range" min="1.8" max="5" step="0.1" value="3.3" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">负载电流 <b id="cv" style="color:#5ff1ef">20</b> mA</div><input id="ci" type="range" min="1" max="500" step="1" value="20" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">hFE(min) <b id="hv" style="color:#5ff1ef">120</b></div><input id="hf" type="range" min="20" max="400" step="10" value="120" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">过驱动 <b id="ov" style="color:#5ff1ef">3</b> 倍</div><input id="od" type="range" min="1" max="5" step="0.5" value="3" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="bjOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h2><span class="n">1.7.3</span>核心板上的 2SK3018：只当开关，不当放大</h2>
+    <p>i.MX6ULL 核心板第 1 页有 <b>Q5–Q8（2SK3018，N 沟道 MOS）</b>，分别控制 <code>DISCHG_EN</code>、<code>SD1_VSELECT</code> 这类信号。它们的用法都很单一：<b>栅极给高 → 漏源导通 → 把某个信号拉到地或短接</b>。</p>
+    <p>为什么这里用 MOS 而不是三极管？因为 MOS 是电压驱动，栅极几乎不取电流，可以直接由 SoC 的 GPIO 控制，也不需要计算基极电阻；而且导通电阻小（2SK3018 约几 Ω），短接信号时压降可以忽略。</p>
+    <div class="box pit">
+      <h5>MOS 电路的三个常见错误</h5>
+      <p><b>1. 栅极悬空。</b>上电瞬间栅极电压不确定，MOS 可能半开通，变成一个大电阻并迅速过热。必须加下拉（10k–100k）。</p>
+      <p><b>2. 用 3.3V 逻辑驱动「逻辑电平」不兼容的 MOS。</b>有些 MOS 的 V<sub>gs(th)</sub> 是 4.5V 规格，3.3V 只能让它半开。选型要挑「逻辑电平（logic level）」型号。</p>
+      <p><b>3. 忽略体二极管。</b>N-MOS 内部有一个从源到漏的二极管，做「双向开关」时它会让反向电流照样通过，电平转换电路正是利用这一点。</p>
+    </div>
+
+    <div class="box deep">
+      <h5>MOS 做电平转换的原理（核心板那种接法）</h5>
+      <p>一个 N-MOS，栅极接低压侧电源（如 1.8V），源极接低压侧信号，漏极接高压侧信号，两侧各有一个上拉。当低压侧拉低时，MOS 导通把高压侧也拉低；当高压侧拉低时，靠体二极管先把低压侧拉低，MOS 再完全导通。<b>双向、无需方向控制</b>——这就是为什么 SD 卡电压切换、I2C 跨电压域都用这种小 MOS。</p>
+    </div>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>蜂鸣器 30mA、hFE(min)=100、3.3V 驱动，Rb 取 10k 会怎样？</summary><div class="ans">Ib=(3.3−0.7)/10k≈0.26mA，最多只能驱动 26mA（还没算余量），三极管会停在放大区，Vce 升高、发热，蜂鸣器声音变小甚至不响。应取 1k 左右。</div></details>
+    <details class="quiz"><summary>为什么 MOS 的栅极要加下拉电阻？</summary><div class="ans">因为上电时 GPIO 通常是高阻态，栅极电荷无处泄放，电压可能停在中点，MOS 半开通、功耗很大。下拉保证默认关断。</div></details>
+    <details class="quiz"><summary>同样做开关，什么时候必须用 MOS 而不是三极管？</summary><div class="ans">三种情况：需要极低导通损耗（大电流）、需要电压控制（驱动源不能提供电流）、需要双向导通或高频开关。三极管适合小电流、低成本、对压降不敏感的场合。</div></details>
+
+    <div class="ch-nav">
+      <a href="c06.html"><span>上一章</span><b>← 1.6 二极管家族</b></a>
+      <a class="nx" id="chNavNext" href="c08.html"><span>下一章</span><b>1.8 运放与比较器 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p1','c07.html');
+(function(){
+  function calc(){
+    var v=+document.getElementById('dv2').value, ic=+document.getElementById('ci').value/1000;
+    var hfe=+document.getElementById('hf').value, od=+document.getElementById('od').value;
+    document.getElementById('dv').textContent=v.toFixed(1);
+    document.getElementById('cv').textContent=(ic*1000).toFixed(0);
+    document.getElementById('hv').textContent=hfe;
+    document.getElementById('ov').textContent=od.toFixed(1);
+    var ib=ic/hfe*od, rb=(v-0.7)/ib;
+    document.getElementById('bjOut').innerHTML=
+      '<b style="color:#eaf3ff;font-size:15px">需要 Ib ≈ '+(ib*1000).toFixed(2)+' mA　→ Rb ≈ '+Math.round(rb)+' Ω</b><br>'+
+      '就近取 1k / 2.2k / 4.7k；基极电流 '+(ib*1000).toFixed(2)+' mA 时 GPIO 负担很小<br>'+
+      '<span style="color:'+(v<=1?'#ff9c9c':'#9df3c2')+'">'+(v<=1?'驱动电压低于 Vbe，三极管根本打不开':'驱动电压足够')+'</span><br>'+
+      '<span style="color:#6f7f9c;font-size:11.5px">hFE 请用规格书的「最小值」而不是典型值；大电流时 hFE 会明显下降，过驱动系数就是为它留的余量。</span>';
+  }
+  ['dv2','ci','hf','od'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+</body>
+</html>

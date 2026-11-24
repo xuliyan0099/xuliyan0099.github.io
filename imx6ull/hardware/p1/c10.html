@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1.10 四种小电阻 | 第一篇 · 电学与器件基础 | i.MX6ULL 学习手册</title>
+<meta name="description" content="上拉、下拉、串联、终端四种电阻的分工与取值；逐个对应 MINI 板 R40/R42/R57、R1–R5、R12、R4–R24、R27、R79、120Ω 终端。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">第一篇 · 电学与器件基础</div>
+    <ol id="sideList"></ol>
+    <div class="vol-nav" id="volNav"></div>
+  </aside>
+
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第一篇 · 电学基础</span><span class="sep">/</span>第 10 章<span class="sep">/</span>约 26 分钟</div>
+    <h1>四种小电阻：一片板子上最多的元件</h1>
+    <p class="lede">打开 MINI 板的原理图，电阻数量远超芯片。它们不是「随便放的」：<b>上拉给默认状态，下拉给确定电平，串联改信号质量，终端吸收反射</b>。这一章把四种用途和板上真实位号一一对上，学完你看任何一张图都能说出「这颗是干什么的」。</p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>看到一颗电阻，先判断它属于上拉、下拉、串联还是终端</li>
+        <li>说出上拉/下拉的取值逻辑（电流、速度、功耗三角）</li>
+        <li>解释串联电阻为什么常取 22Ω、33Ω，以及 0Ω 电阻存在的意义</li>
+        <li>说清 RS485/CAN 终端电阻为什么是 120Ω，以及什么时候要加、什么时候不能加</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">1.10.1</span>一眼分辨四种电阻</h2>
+    <table>
+      <thead><tr><th>类型</th><th>接法特征</th><th>取值逻辑</th><th>MINI 板实例</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">上拉</td><td>一端接电源轨，一端接信号</td><td>够小以拉得住（对速度/漏电），够大以省电</td><td>R40/R42/R57 <b>4.7k</b>（I2C）、R4–R24 <b>4.7k</b>（BOOT_CFG）、R1–R5 <b>47k</b>（TF 卡信号）</td></tr>
+        <tr><td class="nm">下拉</td><td>一端接 GND，一端接信号</td><td>保证上电默认低、防止悬空误触发</td><td>R43–R50 <b>10k</b>（BOOT_CFG 另一组）、R59–R62 <b>10k</b>（JTAG）</td></tr>
+        <tr><td class="nm">串联</td><td>串在信号路径中</td><td>抑制过冲/振铃、限流、留调试位</td><td>R27 <b>22Ω</b>（RS485）、R6 <b>510Ω</b>（LED 限流）、R79 <b>0Ω</b>（USB 配置选择）</td></tr>
+        <tr><td class="nm">终端</td><td>跨在差分对两端</td><td>等于线缆特性阻抗，消除反射</td><td>RS485 的 <b>120Ω</b>、CAN 的 120Ω（分两端）</td></tr>
+      </tbody>
+    </table>
+    <p>还有第五类容易被忽略：<b>DNP（不贴）位</b>。原理图上标 <code>DNP</code> 或 <code>NC</code> 的电阻（如 MINI 第 4 页的 <b>R58、R76</b>），是为兼容不同配置预留的，默认不焊。看到 DNP 就要想：<b>它在什么配置下会被贴上？</b></p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 900 360" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <!-- 上拉 -->
+        <rect x="30" y="26" width="200" height="180" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="46" y="50" fill="#eaf3ff" font-size="11">上拉</text>
+        <line x1="100" y1="64" x2="100" y2="80" stroke="#ffb84d"/>
+        <text x="108" y="72" fill="#ffd79a" font-size="9">3.3V</text>
+        <rect x="88" y="80" width="24" height="30" rx="3" fill="rgba(255,184,77,.15)" stroke="#ffb84d"/>
+        <line x1="100" y1="110" x2="100" y2="150" stroke="#5ff1ef"/>
+        <line x1="100" y1="150" x2="170" y2="150" stroke="#5ff1ef"/>
+        <text x="120" y="144" fill="#9df5f4" font-size="9">到芯片/总线</text>
+        <text x="46" y="176" fill="#9fb0c7" font-size="9">默认高；开漏器件拉低</text>
+        <text x="46" y="194" fill="#6f7f9c" font-size="9">4.7k @3.3V ≈ 0.7mA</text>
+
+        <!-- 下拉 -->
+        <rect x="250" y="26" width="200" height="180" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="266" y="50" fill="#eaf3ff" font-size="11">下拉</text>
+        <line x1="330" y1="64" x2="330" y2="96" stroke="#5ff1ef"/>
+        <line x1="330" y1="96" x2="400" y2="96" stroke="#5ff1ef"/>
+        <text x="352" y="90" fill="#9df5f4" font-size="9">来自芯片/开关</text>
+        <rect x="318" y="96" width="24" height="30" rx="3" fill="rgba(92,225,160,.15)" stroke="#5ce1a0"/>
+        <line x1="330" y1="126" x2="330" y2="146" stroke="#6f7f9c"/>
+        <line x1="316" y1="146" x2="344" y2="146" stroke="#6f7f9c"/>
+        <text x="266" y="176" fill="#9fb0c7" font-size="9">默认低；上电不悬空</text>
+        <text x="266" y="194" fill="#6f7f9c" font-size="9">10k 常用于配置脚/使能脚</text>
+
+        <!-- 串联 -->
+        <rect x="470" y="26" width="200" height="180" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="486" y="50" fill="#eaf3ff" font-size="11">串联</text>
+        <line x1="500" y1="110" x2="530" y2="110" stroke="#5ff1ef"/>
+        <rect x="530" y="96" width="30" height="28" rx="3" fill="rgba(95,241,239,.15)" stroke="#5ff1ef"/>
+        <line x1="560" y1="110" x2="640" y2="110" stroke="#5ff1ef"/>
+        <text x="498" y="96" fill="#9fb0c7" font-size="9">源</text>
+        <text x="600" y="96" fill="#9fb0c7" font-size="9">负载</text>
+        <text x="486" y="176" fill="#9fb0c7" font-size="9">22Ω 阻尼过冲；0Ω 当跳线</text>
+        <text x="486" y="194" fill="#6f7f9c" font-size="9">也用于限流、方便割线调试</text>
+
+        <!-- 终端 -->
+        <rect x="690" y="26" width="180" height="180" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="706" y="50" fill="#eaf3ff" font-size="11">终端 120Ω</text>
+        <line x1="720" y1="90" x2="840" y2="90" stroke="#5ff1ef"/>
+        <line x1="720" y1="126" x2="840" y2="126" stroke="#5ce1a0"/>
+        <rect x="772" y="90" width="20" height="36" rx="3" fill="rgba(255,154,154,.15)" stroke="#ff9c9c"/>
+        <text x="724" y="84" fill="#9df5f4" font-size="9">A / CANH</text>
+        <text x="724" y="144" fill="#9df3c2" font-size="9">B / CANL</text>
+        <text x="706" y="176" fill="#9fb0c7" font-size="9">跨在差分对两端</text>
+        <text x="706" y="194" fill="#6f7f9c" font-size="9">只在总线两端各放一个</text>
+
+        <text x="30" y="248" fill="#9fb0c7" font-size="10.5">取值三角：上拉要「拉得住」→ 小；要「省电」→ 大；要「上升快」→ 小。三者冲突，按场景取舍。</text>
+        <text x="30" y="272" fill="#6f7f9c" font-size="10">口诀：配置脚 10k 级别、I2C 4.7k 级别、LED 几百 Ω、差分终端 120Ω、串联阻尼 22–33Ω。</text>
+        <text x="30" y="300" fill="#ff9c9c" font-size="10">反例：给 I2C 上拉 10k 又在 400kHz 下跑，示波器上看到的是一条爬不完的斜线。</text>
+      </svg>
+      <figcaption><b>图 1-9</b>　四种电阻的接法特征与取值。</figcaption>
+    </figure>
+
+    <h2><span class="n">1.10.2</span>上拉到底取多大：三条约束一起算</h2>
+    <p>以 I2C 的 4.7k 为例，三条约束同时在跑：</p>
+    <ul>
+      <li><b>低电平电流：</b>I = (3.3 − V<sub>OL</sub>)/R ≈ 0.7mA，器件能吸收，OK。</li>
+      <li><b>上升时间：</b>t<sub>r</sub> ≈ 0.8 × R × C。总线电容 100pF 时，4.7k → 约 0.38µs，满足 400kHz 的 300ns 级要求。</li>
+      <li><b>功耗：</b>平均几乎为 0（只在低电平期间流），可忽略。</li>
+    </ul>
+    <p>如果换成 47k，上升时间变 10 倍直接超限；换成 1k，低电平时每根线多耗 3mA，多设备叠加发热。</p>
+    <div class="box tip">
+      <h5>BOOT_CFG 为什么用 4.7k 而不是 10k</h5>
+      <p>因为启动时这些脚要在复位释放的极短时间内被稳定采样，上拉/下拉阻值大、走线长、引脚电容叠加后，建立时间变长，可能出现「偶发启动到错误介质」。4.7k 是速度与功耗的折中。</p>
+    </div>
+
+    <h2><span class="n">1.10.3</span>串联电阻：22Ω 这个数字从哪来</h2>
+    <p>高速信号在阻抗不连续处会反射，表现为上升沿上的尖峰/振铃。串联一个几十欧的电阻，相当于给源端加阻尼，把过冲压下去。取值经验：<b>与驱动器的输出阻抗之和接近走线特性阻抗的一半左右</b>，常见 22Ω、27Ω、33Ω。</p>
+    <p>MINI 板 RS485 的 <b>R27（22Ω）</b>串在收发器输出到接插件之间，作用是限流 + 抑制边沿；USB 的 <b>R79（0Ω）</b>不是阻尼，而是「配置跳线」——不同底板版本靠贴/不贴它来选择 VBUS 供电路径。</p>
+    <p><b>0Ω 电阻的三种真实用途：</b>① 单点连接地（数字地与模拟地只在一处连），② 预留割线调试位，③ 版本配置跳线。它不是「偷懒」，而是把硬件改版成本降到「换一颗 0Ω」。</p>
+
+    <h2><span class="n">1.10.4</span>终端电阻：加错比不加更糟</h2>
+    <p>RS485/CAN 是差分总线，线缆特性阻抗约 120Ω。总线两端各并一个 120Ω，吸收到达终端的能量，防止反射叠加。规则很硬：</p>
+    <ol class="steps">
+      <li><b>只在物理两端各放一个</b>，中间节点不放。</li>
+      <li><b>短距离、低速率可以不加</b>（桌面上 1m 以内跑 9600 通常没事）。</li>
+      <li><b>多个终端同时贴 = 并联变小</b>，例如 4 个 120Ω 并成 30Ω，驱动器带不动、幅度塌陷——这是现场「越接越不通」的典型原因。</li>
+    </ol>
+    <div class="box pit">
+      <h5>调试时的判据</h5>
+      <p>断电用万用表量 A/B 之间：<b>约 60Ω</b> 说明两端各有一个 120Ω（正常）；<b>约 120Ω</b> 说明只贴了一个；<b>约 30Ω 或更低</b>说明贴多了；<b>开路</b>说明一个没贴。这个测量 30 秒就能定位一半的总线故障。</p>
+    </div>
+
+    <div class="demo">
+      <div class="dh"><b>电阻用途速判</b><span>选场景，看该用哪类、取什么值、为什么</span></div>
+      <div class="db">
+        <select id="scn" style="width:100%;max-width:520px;padding:9px 12px;border-radius:10px;background:#0f1524;color:#eaf3ff;border:1px solid #3a4560;font-size:13px">
+          <option value="0">I2C 总线（400kHz，100pF）</option>
+          <option value="1">芯片配置脚（BOOT/使能）</option>
+          <option value="2">LED 指示（3.3V，Vf 2.0V）</option>
+          <option value="3">RS485 差分总线</option>
+          <option value="4">高速信号过冲（几十 MHz）</option>
+        </select>
+        <div id="rOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>一颗电阻一端接 DCDC_3V3、一端接 BOOT_CFG0，它是什么？取 4.7k 的理由？</summary><div class="ans">上拉。作用是给启动配置脚一个确定的高电平；4.7k 是兼顾「复位释放后被快速采样」与「低功耗」的折中，比 10k 建立更快。</div></details>
+    <details class="quiz"><summary>为什么 120Ω 终端不能每个节点都贴？</summary><div class="ans">因为并联会降低等效阻抗：4 个并联成 30Ω，驱动器输出电流不够、差分幅度下降，通信距离和抗扰都变差。终端只该在总线两个物理端点。</div></details>
+    <details class="quiz"><summary>0Ω 电阻和一根导线有什么区别？</summary><div class="ans">电气上几乎一样，但 0Ω 是「可贴可不贴」的元件位：能当配置跳线、能当地平面单点连接、能当未来割线点，改版时只动贴片不改 PCB。</div></details>
+
+    <div class="ch-nav">
+      <a href="c09.html"><span>上一章</span><b>← 1.9 数字电平</b></a>
+      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>第二篇 元器件深度解剖 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p1','c10.html');
+(function(){
+  var S=[
+    {t:'上拉 · 4.7k', why:'400kHz 下 4.7k 配 100pF 总线，上升时间约 0.38µs，够用；低电平电流约 0.7mA 可接受。', note:'换成 10k 以上，示波器上会看到爬不完的斜坡。'},
+    {t:'上拉/下拉 · 4.7k–10k', why:'配置脚要在复位释放后极短时间内稳定，阻值不能太大；同时不能太小以免常态耗电。', note:'BOOT_CFG 用 4.7k，普通使能脚常用 10k。'},
+    {t:'串联限流 · 430–510Ω', why:'R=(3.3−2.0)/2.5mA≈510Ω，指示灯 1–3mA 已足够亮。', note:'照明用途要改恒流驱动，不能用电阻硬限。'},
+    {t:'终端 · 120Ω，只在两端', why:'匹配线缆特性阻抗，吸收终端反射。', note:'断电量 A/B：约 60Ω 为正常（两端各一个）。'},
+    {t:'串联阻尼 · 22–33Ω', why:'与驱动器输出阻抗相加，抑制上升沿振铃和过冲。', note:'取值靠实测：示波器看过冲，逐步加到干净为止。'}
+  ];
+  function upd(){
+    var s=S[+document.getElementById('scn').value];
+    document.getElementById('rOut').innerHTML='<b style="color:#eaf3ff;font-size:15px">'+s.t+'</b><br>'+s.why+'<br><span style="color:#9fb0c7">'+s.note+'</span>';
+  }
+  document.getElementById('scn').addEventListener('change',upd); upd();
+})();
+</script>
+</body>
+</html>

@@ -10,11 +10,11 @@ window.PARTS = [
       { n: '1.3', t: '功率、发热与降额', s: '一颗 0402 到底能扛多少毫安', f: 'c03.html', ready: true },
       { n: '1.4', t: '电容', s: '充放电、RC 时间常数、两种容值为什么并存', f: 'c04.html', ready: true },
       { n: '1.5', t: '电感与磁珠', s: '储能和滤波不是一回事', f: 'c05.html', ready: true },
-      { n: '1.6', t: '二极管家族', s: '整流、肖特基、齐纳、TVS、LED', f: 'c06.html', ready: false },
-      { n: '1.7', t: '三极管与 MOS', s: '开关、放大、栅极电荷', f: 'c07.html', ready: false },
-      { n: '1.8', t: '运放与比较器', s: '虚短虚断、跟随、迟滞', f: 'c08.html', ready: false },
-      { n: '1.9', t: '数字电平', s: '3.3V 与 5V 能不能直连', f: 'c09.html', ready: false },
-      { n: '1.10', t: '四种小电阻', s: '上拉、下拉、串阻、终端各治什么病', f: 'c10.html', ready: false }
+      { n: '1.6', t: '二极管家族', s: '整流、肖特基、齐纳、TVS、LED', f: 'c06.html', ready: true },
+      { n: '1.7', t: '三极管与 MOS', s: '开关、放大、栅极电荷', f: 'c07.html', ready: true },
+      { n: '1.8', t: '运放与比较器', s: '虚短虚断、跟随、迟滞', f: 'c08.html', ready: true },
+      { n: '1.9', t: '数字电平', s: '3.3V 与 5V 能不能直连', f: 'c09.html', ready: true },
+      { n: '1.10', t: '四种小电阻', s: '上拉、下拉、串阻、终端各治什么病', f: 'c10.html', ready: true }
     ]
   },
   {
