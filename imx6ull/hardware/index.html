@@ -2,7 +2,7 @@
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>硬件全书 · 六篇 52 章 | i.MX6ULL 学习手册</title>
-<meta name="description" content="以正点原子 ALPHA 底板 V2.8 与 CORE V2.0 核心板原理图为教材，从电学基础、元器件、逐页读图、设计计算、PCB 制造到 EMC 的完整硬件课程。">
+<meta name="description" content="以正点原子 MINI 底板 V2.2 与 CORE V2.0 核心板原理图为教材，从电学基础、元器件、逐页读图、设计计算、PCB 制造到 EMC 的完整硬件课程。">
 <link rel="stylesheet" href="../assets/style.css">
 <link rel="stylesheet" href="../assets/book.css">
 <link rel="stylesheet" href="../assets/mobile.css">
@@ -43,15 +43,15 @@ li.pending div .cm{color:#8fa3c4}
   </aside>
 
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">硬件全书</span><span class="sep">/</span>六篇 52 章<span class="sep">/</span>教材：ALPHA V2.8 + CORE V2.0</div>
+    <div class="ch-meta"><span class="lv">硬件全书</span><span class="sep">/</span>六篇 52 章<span class="sep">/</span>教材：MINI V2.2 + CORE V2.0</div>
     <h1>硬件：从一块板子到能自己画板</h1>
-    <p class="lede">这一套课不再讲「板子上大致有什么」，而是<b>拿两块真实的原理图当教材，一个元件一个元件地过</b>。核心板 8 页、底板 8 页，每一页都拆开讲：这根线叫什么、这个电阻为什么取这个值、拆掉它会怎样、拿万用表和示波器该看到什么。目标很具体：给你一块空板，你能自己画出一块能点亮的板子。</p>
+    <p class="lede">这一套课不再讲「板子上大致有什么」，而是<b>拿两块真实的原理图当教材，一个元件一个元件地过</b>。核心板 8 页、MINI 底板 4 页，每一页都拆开讲：这根线叫什么、这个电阻为什么取这个值、拆掉它会怎样、拿万用表和示波器该看到什么。目标很具体：给你一块空板，你能自己画出一块能点亮的板子。</p>
 
     <div class="goals">
       <h4>教材基准（不是示意图，是这两份 PDF）</h4>
       <ul>
         <li><b>核心板</b>：<code>IMX6ULL_CORE_V2.0</code>，8 页 —— 电源 / SoC 电源脚 / DDR3L / Flash / LCD 与 GPIO / 控制与复位与晶振 / 启动配置 / 连接器。</li>
-        <li><b>底板</b>：<code>IMX6ULL_ALPHA_V2.8</code> —— 输入保护、外设供电、USB、以太网、串口与 CAN、LCD 与触摸、按键与 LED、扩展排针。</li>
+        <li><b>MINI 底板</b>：<code>IMX6ULL_MINI_V2.2</code>，4 页 —— 第 1 页核心板连接与拨码/JTAG、第 2 页 TF 卡与低速外设（LED/按键/蜂鸣器/RS485/CAN/摄像头）、第 3 页以太网与扩展排针、第 4 页输入电源与 USB 串口。</li>
         <li>文中出现的位号（U3、L2、C12、R33…）都来自这两份图，可逐页对照；重绘图只画讲解相关的部分，并保留位号与网络名。</li>
         <li>每个值都配一个算法或判据；每个结论都落在「量哪里、看到多少」上。</li>
       </ul>
