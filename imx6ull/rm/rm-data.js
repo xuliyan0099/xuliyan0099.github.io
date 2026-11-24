@@ -90,7 +90,7 @@ window.RM =
       "sub": "总线、DMA、DDR、NAND、eMMC、QSPI",
       "intro": "这一篇是「让系统能跑起来」的部分：总线权限、DMA 引擎、DDR 校准、NAND 与 ECC、SD/eMMC 命令流、QSPI 映射读取。篇幅大、寄存器多，策略是「只讲一条正确路径 + 一张查表图」，不做全量抄录。",
       "chapters": [
-        { "n": 12, "zh": "Cortex-A7 平台配置", "en": "ARM Cortex A7 Platform", "pp": "387–390", "pages": 4, "pri": "opt", "batch": 6,
+        { "n": 12, "zh": "Cortex-A7 平台配置", "en": "ARM Cortex A7 Platform", "pp": "387–390", "pages": 4, "pri": "opt", "batch": 6, "ready": true,
           "line": "只有 4 页：平台配置寄存器与低功耗入口。",
           "pts": ["平台配置与性能计数", "WFI 与平台级低功耗"] },
         { "n": 14, "zh": "外设总线权限 AIPSTZ", "en": "AHB to IP Bridge", "pp": "443–464", "pages": 22, "pri": "opt", "batch": 6,
@@ -136,7 +136,7 @@ window.RM =
       "sub": "从点灯到定时、采样、按键、背光",
       "intro": "这一篇是「能摸到结果」的部分：先 IOMUXC 把脚配出来，再 GPIO 点灯，然后定时器、PWM、ADC、触摸、键盘、看门狗。642 页的 IOMUXC 不硬读，配一台引脚搜索器：输入 pad 名或 GPIO 号，直接给 MUX_MODE 与 PAD_CTL 的值。",
       "chapters": [
-        { "n": 13, "zh": "ADC：通道、触发与转换", "en": "Analog-to-Digital Converter", "pp": "391–442", "pages": 52, "pri": "read", "batch": 2,
+        { "n": 13, "zh": "ADC：通道、触发与转换", "en": "Analog-to-Digital Converter", "pp": "391–442", "pages": 52, "pri": "read", "batch": 2, "ready": true,
           "line": "12 位 ADC 的采样流程、硬件触发与结果读取。",
           "pts": ["通道映射与外部引脚", "硬件触发、平均与比较中断"] },
         { "n": 24, "zh": "EPIT：最省事的周期定时器", "en": "Enhanced Periodic Interrupt Timer", "pp": "1167–1178", "pages": 12, "pri": "read", "batch": 2,
