@@ -19,7 +19,7 @@
 
 <div class="shell">
   <aside id="sidebar">
-    <div class="vol-h">硬件篇 · 这块板子</div>
+    <div class="vol-h">第一篇 · 硬件</div>
     <ol>
       <li><a href="ch01.html"><span class="no">1.1</span><span>这块板子是什么<span class="sub">五块拼图</span></span></a></li>
       <li><a href="ch02.html"><span class="no">1.2</span><span>板子地图<span class="sub">认元件、看丝印</span></span></a></li>
@@ -30,6 +30,15 @@
       <li><a href="ch07.html"><span class="no">1.7</span><span>硬件故障对照<span class="sub">现象倒查</span></span></a></li>
       <li><a href="ch08.html"><span class="no">1.8</span><span>上手清单<span class="sub">今天就能做</span></span></a></li>
     </ol>
+    <div class="vol-h" style="margin-top:18px">第二篇 · 电路与画板</div>
+    <ol>
+      <li><a href="ch09.html"><span class="no">2.1</span><span>读原理图<span class="sub">从符号到一根信号</span></span></a></li>
+      <li><a href="ch10.html"><span class="no">2.2</span><span>电源与电流预算<span class="sub">一棵电源树</span></span></a></li>
+      <li><a href="ch11.html"><span class="no">2.3</span><span>复位、时钟、启动<span class="sub">板子的心跳</span></span></a></li>
+      <li><a href="ch12.html"><span class="no">2.4</span><span>接口电路<span class="sub">一根线的电气真相</span></span></a></li>
+      <li><a href="ch13.html"><span class="no">2.5</span><span>PCB 与布线<span class="sub">叠层、阻抗、等长</span></span></a></li>
+      <li><a href="ch14.html"><span class="no">2.6</span><span>打样到首板点亮<span class="sub">把板子做出来</span></span></a></li>
+    </ol>
     <div class="vol-nav"><a href="../index.html">← 学习站入口</a><a href="../juan/j00.html">卷 00 →</a></div>
   </aside>
 
@@ -37,7 +46,7 @@
     <div class="part-head">
       <div class="kicker">第一篇 · hardware</div>
       <h1>硬件：从一块板子到一门手艺</h1>
-      <p class="lede">软件跑不起来，九成不是代码问题，是板子上的某一环没到位。这一篇把「看板子」练成手艺：八章，每章一个独立页面，从「这块绿板子是什么」一路走到「照着清单能把环境搭起来」。</p>
+      <p class="lede">软件跑不起来，九成不是代码问题，是板子上的某一环没到位。这一篇分两层：<b>第一篇认板子</b>（八章，从「这块绿板子是什么」到「照着清单把环境搭起来」）；<b>第二篇看电路、画板子</b>（六章，从读懂原理图到打样点亮自己的第一块板）。</p>
     </div>
 
     <div class="goals">
@@ -47,10 +56,12 @@
         <li>凭串口最后一行判断问题卡在电源、Boot ROM、u-boot、内核还是根文件系统</li>
         <li>看懂原理图里的引脚名，知道 IOMUXC 怎么把一个物理脚接到某个外设上</li>
         <li>自己完成一次上电、接串口、拨码启动、点灯、联网的完整闭环</li>
+        <li>读懂一块 i.MX6ULL 板的原理图，算出电源与接口电路的关键参数</li>
+        <li>独立走完「画原理图 → 布 PCB → 出图打样 → 首板点亮」的完整流程</li>
       </ul>
     </div>
 
-    <h2><span class="n">1</span>八章怎么排的</h2>
+    <h2><span class="n">1</span>第一篇：八章怎么排的</h2>
     <p>顺序就是认知顺序：先承认它是台小电脑（1.1），再学会一眼认出零件（1.2），然后把心脏拆开（1.3），接着看它如何醒来（1.4）、从哪儿醒（1.5）、手脚怎么接（1.6），最后学会判断它为什么没醒（1.7），并动手做一遍（1.8）。</p>
 
     <ol class="chapters">
@@ -94,11 +105,46 @@
         <span class="ct"><b>上手清单</b><span>六件事：认电源、接串口、玩拨码、认存储、点一个灯、插一次网线。做完这块板子才真正属于你。</span></span>
         <span class="cm">动手 · 60 分钟</span>
       </a></li>
+    <h2><span class="n">2</span>第二篇：六章怎么排的</h2>
+    <p>第一篇解决「它会怎么坏」，第二篇解决「它为什么这么设计」。顺序是：先会读图（2.1），再算它吃什么电（2.2），然后看它靠什么活（2.3），接着一根根接口看电气条件（2.4），最后把图变成铜（2.5）并做成实物（2.6）。走完这一遍，你就有了「自己画一块最小系统板」的完整能力。</p>
+
+    <ol class="chapters">
+      <li><a href="ch09.html">
+        <span class="cn">2.1</span>
+        <span class="ct"><b>读原理图：从符号到一根信号</b><span>位号、网络标号、电源符号、分页连接；五步读图法；把 UART1_TXD 从 SoC 球一路追到排针。</span></span>
+        <span class="cm">基础 · 25 分钟</span>
+      </a></li>
+      <li><a href="ch10.html">
+        <span class="cn">2.2</span>
+        <span class="ct"><b>电源与电流预算</b><span>电源树、LDO 与 DCDC 怎么选、总功耗与输入电流怎么算、去耦为什么是缩回路、上电时序。</span></span>
+        <span class="cm">核心 · 30 分钟</span>
+      </a></li>
+      <li><a href="ch11.html">
+        <span class="cn">2.3</span>
+        <span class="ct"><b>复位、时钟与启动</b><span>RC 复位脉宽怎么算、晶振负载电容怎么定、24MHz 怎么变成 528MHz、BOOT 脚与 eFuse 的优先级。</span></span>
+        <span class="cm">核心 · 28 分钟</span>
+      </a></li>
+      <li><a href="ch12.html">
+        <span class="cn">2.4</span>
+        <span class="ct"><b>接口电路：一根线的电气真相</b><span>UART 三兄弟、I2C 上拉怎么算、SPI、USB 与以太网的阻抗与隔离、SD 卡上拉与卡检测。</span></span>
+        <span class="cm">进阶 · 30 分钟</span>
+      </a></li>
+      <li><a href="ch13.html">
+        <span class="cn">2.5</span>
+        <span class="ct"><b>PCB 与布线</b><span>叠层怎么选、布局六个动作、微带阻抗估算、回流路径、DDR 等长、交付前十二项自检。</span></span>
+        <span class="cm">进阶 · 35 分钟</span>
+      </a></li>
+      <li><a href="ch14.html">
+        <span class="cn">2.6</span>
+        <span class="ct"><b>打样到首板点亮</b><span>五个制板文件、成本估算、回流曲线、分段上电十步法、六种首板故障。</span></span>
+        <span class="cm">实战 · 30 分钟 + 打样</span>
+      </a></li>
     </ol>
 
     <div class="box tip">
       <h5>读法建议</h5>
       <p>第一次接触这块板子，按 1.1 → 1.8 顺序读，不要跳。已经能烧系统、只想补概念，从 1.4 开始。手上没有板子也能读，但 1.2、1.6、1.8 会明显吃亏——这三章最好对着实物看。</p>
+      <p>第二篇不必等第一篇读完：只要你能看懂 1.2 的板子地图，就可以从 2.1 开始读图；2.2 与 2.3 是电源与时钟，和 1.4 的「五段路」互相印证；2.5、2.6 是给真要画板的人准备的，读完 2.4 再动。</p>
     </div>
 
     <div class="box deep">

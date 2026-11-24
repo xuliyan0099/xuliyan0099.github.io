@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2.1 读原理图：从符号到一根信号 | 电路与画板 | i.MX6ULL 学习手册</title>
+<meta name="description" content="读懂 i.MX6ULL 开发板原理图：位号、网络标号、电源符号、分页连接、追一根信号的完整路径与四个常见误读。">
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">第二篇 · 电路与画板</div>
+    <ol>
+      <li><a href="ch09.html" class="active"><span class="no">2.1</span><span>读原理图<span class="sub">从符号到一根信号</span></span></a></li>
+      <li><a href="ch10.html"><span class="no">2.2</span><span>电源与电流预算<span class="sub">一棵电源树</span></span></a></li>
+      <li><a href="ch11.html"><span class="no">2.3</span><span>复位、时钟、启动<span class="sub">板子的心跳</span></span></a></li>
+      <li><a href="ch12.html"><span class="no">2.4</span><span>接口电路<span class="sub">一根线的电气真相</span></span></a></li>
+      <li><a href="ch13.html"><span class="no">2.5</span><span>PCB 与布线<span class="sub">叠层、阻抗、等长</span></span></a></li>
+      <li><a href="ch14.html"><span class="no">2.6</span><span>打样到首板点亮<span class="sub">把板子做出来</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="index.html">☰ 篇目录</a><a href="ch08.html">第一篇 1.8 →</a></div>
+  </aside>
+
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第二篇 · 电路与画板</span><span class="sep">/</span>第 1 章<span class="sep">/</span>约 25 分钟</div>
+    <h1>读原理图：从符号到一根信号</h1>
+    <p class="lede">原理图不是画给人欣赏的图，是一张<b>连接关系的说明书</b>。它唯一要回答的问题是：这个球（引脚）上，接了谁。学会读它，你就能把「板子上有个电阻」变成「这个 22Ω 电阻在 UART 的 TX 上，作用是抑制过冲」——这是从玩家变成设计者的分界线。</p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>说出位号、网络标号、电源符号、分页连接各自的作用，以及它们为什么能「不用画线也连上」</li>
+        <li>用五步法在十分钟内读懂一页陌生原理图</li>
+        <li>把一根信号从 SoC 的球追到连接器，途中每个器件都说出它为什么在那</li>
+        <li>识别四种典型误读：同名不同页、0Ω 跳线、NC 位号、多电源域</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">2.1.1</span>四个基本记号</h2>
+    <table>
+      <thead><tr><th>记号</th><th>长什么样</th><th>作用</th><th>新手最容易错的点</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">位号</td><td><code>R37</code> <code>C105</code> <code>U2</code> <code>J4</code></td><td>元件的唯一身份证，和 BOM 一一对应</td><td>把位号当作「第几个」，其实顺序不连续</td></tr>
+        <tr><td class="nm">网络标号</td><td><code>UART1_TXD</code> <code>DDR_DQ0</code></td><td><b>隐形导线</b>：同名即相连，跨页也连</td><td>以为必须看到线；其实看名字</td></tr>
+        <tr><td class="nm">电源符号</td><td><code>GND</code> <code>VDD_3V3</code> <code>VDD_SOC</code></td><td>全局网络，同名同电位</td><td>以为所有 GND 都一样（其实有模拟地/数字地之分）</td></tr>
+        <tr><td class="nm">分页连接</td><td>页框端口 / off-page connector</td><td>把一页的信号接到另一页</td><td>只看本页，漏掉另一页的负载</td></tr>
+      </tbody>
+    </table>
+    <p><b>核心一句：</b>原理图里「连没连」由<b>名字</b>决定，不由线决定。线只是让人好读的排版。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 900 420" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <!-- SoC 框 -->
+        <rect x="60" y="90" width="200" height="180" rx="10" fill="#141c2e" stroke="#5ff1ef"/>
+        <text x="160" y="118" fill="#9df5f4" font-size="12" text-anchor="middle">U1  i.MX6ULL</text>
+        <line x1="60" y1="132" x2="260" y2="132" stroke="#2a3550"/>
+        <text x="72" y="160" fill="#cfe0f7" font-size="11">UART1_TXD</text>
+        <text x="72" y="192" fill="#cfe0f7" font-size="11">UART1_RXD</text>
+        <text x="72" y="224" fill="#cfe0f7" font-size="11">BOOT_MODE0</text>
+        <text x="72" y="256" fill="#cfe0f7" font-size="11">POR_B</text>
+
+        <!-- 电阻 R37 -->
+        <rect x="330" y="146" width="54" height="18" rx="3" fill="rgba(255,184,77,.15)" stroke="#ffb84d"/>
+        <text x="357" y="140" fill="#ffd79a" font-size="10.5" text-anchor="middle">R37 22Ω</text>
+        <line x1="262" y1="155" x2="330" y2="155" stroke="#5ff1ef" stroke-width="1.3"/>
+        <line x1="384" y1="155" x2="470" y2="155" stroke="#5ff1ef" stroke-width="1.3"/>
+        <text x="300" y="172" fill="#6f7f9c" font-size="9.5">串阻</text>
+
+        <!-- 排针 -->
+        <rect x="470" y="80" width="120" height="200" rx="10" fill="#141c2e" stroke="#8b7bff"/>
+        <text x="530" y="106" fill="#c8c0ff" font-size="11.5" text-anchor="middle">J4 排针</text>
+        <circle cx="500" cy="155" r="4" fill="#5ff1ef"/><text x="514" y="159" fill="#cfe0f7" font-size="10.5">3</text>
+        <circle cx="500" cy="190" r="4" fill="#5ff1ef"/><text x="514" y="194" fill="#cfe0f7" font-size="10.5">4</text>
+        <circle cx="500" cy="225" r="4" fill="#ffb84d"/><text x="514" y="229" fill="#cfe0f7" font-size="10.5">5</text>
+        <circle cx="500" cy="260" r="4" fill="#ff9c9c"/><text x="514" y="264" fill="#cfe0f7" font-size="10.5">6</text>
+
+        <!-- 上拉 -->
+        <rect x="330" y="240" width="18" height="50" rx="3" fill="rgba(92,225,160,.15)" stroke="#5ce1a0"/>
+        <text x="300" y="272" fill="#9df3c2" font-size="10">R41 10k</text>
+        <line x1="339" y1="240" x2="339" y2="200" stroke="#5ce1a0" stroke-width="1.2"/>
+        <line x1="339" y1="290" x2="339" y2="310" stroke="#5ce1a0" stroke-width="1.2"/>
+        <text x="352" y="330" fill="#6f7f9c" font-size="9.5">VDD_3V3 上拉</text>
+
+        <!-- 网络标号注释 -->
+        <rect x="640" y="70" width="230" height="230" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="656" y="94" fill="#eaf3ff" font-size="11.5">同一张图里</text>
+        <text x="656" y="118" fill="#9fb0c7" font-size="10.5">UART1_TXD 出现两次</text>
+        <text x="656" y="138" fill="#9fb0c7" font-size="10.5">→ 它们就是同一根线</text>
+        <text x="656" y="166" fill="#eaf3ff" font-size="11.5">跨页也一样</text>
+        <text x="656" y="190" fill="#9fb0c7" font-size="10.5">第 3 页的 UART1_TXD</text>
+        <text x="656" y="210" fill="#9fb0c7" font-size="10.5">连到第 8 页的同一名字</text>
+        <text x="656" y="238" fill="#eaf3ff" font-size="11.5">但 GND 与 AGND</text>
+        <text x="656" y="262" fill="#ff9c9c" font-size="10.5">是两个网络，不要混</text>
+
+        <text x="90" y="352" fill="#6f7f9c" font-size="10">追信号顺序：SoC 球 → 串阻 → 连接器；途中还有上拉、ESD、测试点没画完</text>
+      </svg>
+      <figcaption><b>图 2-1</b>　一页原理图的骨架：器件框、位号、网络标号、连接器。真正把两端连起来的是名字。</figcaption>
+    </figure>
+
+    <h2><span class="n">2.1.2</span>五步读图法</h2>
+    <ol class="steps">
+      <li><b>先找电源页。</b>所有原理图的第一页通常是电源树：输入从哪来、经过哪几级、产生哪几个轨。这一步决定后面所有器件「靠什么活着」。</li>
+      <li><b>再找主控。</b>找到 U1（SoC），看它周围的去耦、晶振、复位、启动脚——这四组就是最小系统。</li>
+      <li><b>按功能块分页。</b>存储（eMMC/DDR/TF）、通信（UART/USB/网口/CAN）、人机（LED/按键/屏）、扩展（排针）。每页只解决一类事。</li>
+      <li><b>挑一根信号从头追到尾。</b>例如 <code>UART1_TXD</code>：SoC 球号 → 串阻 → 排针脚号。中途遇到上拉、TVS、电平转换、跳线，都要说出它为什么在。</li>
+      <li><b>写下你关心的三件事。</b>比如「这板子能不能接 5V 传感器」「这个口是不是 3.3V 电平」「这颗电阻能不能拆」。带着问题读，比通读快十倍。</li>
+    </ol>
+
+    <div class="box deep">
+      <h5>从「球号」开始，而不是从「名字」开始</h5>
+      <p>原理图上 SoC 的引脚通常标成 <code>UART1_TXD / GPIO1_IO04 / SD1_CMD</code> 这种斜杠列表——这不是三个引脚，<b>是一个球的多重身份</b>（第 1.6 章讲过 MUX）。读图时要问的是：出厂配置下它被复用成什么？这由设备树决定，不由原理图决定。原理图只告诉你「这个球接到了排针第 3 脚」。</p>
+    </div>
+
+    <h2><span class="n">2.1.3</span>追一根信号：完整路径</h2>
+    <p>以最常见的调试串口 <code>UART1_TXD</code> 为例，一条典型路径上有六个环节，每一个都有明确理由：</p>
+    <table>
+      <thead><tr><th>环节</th><th>典型值</th><th>为什么在这里</th><th>拆了会怎样</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">SoC 球</td><td>—</td><td>信号源，推挽输出</td><td>—</td></tr>
+        <tr><td class="nm">串阻</td><td>22–33Ω</td><td>抑制过冲与振铃，改善 EMI</td><td>长线时波形台阶变差，偶发误码</td></tr>
+        <tr><td class="nm">测试点</td><td>TP5</td><td>插针/焊盘，方便示波器抓波形</td><td>排查只能飞到球上，风险高</td></tr>
+        <tr><td class="nm">ESD 阵列</td><td>TVS</td><td>排针被静电打到时钳位</td><td>静电可能直接打死 SoC 的 IO</td></tr>
+        <tr><td class="nm">上拉</td><td>10k（可选）</td><td>空闲电平确定，防悬空误触发</td><td>悬空时接收端可能读到随机跳变</td></tr>
+        <tr><td class="nm">连接器</td><td>排针 J4-3</td><td>对外接口</td><td>—</td></tr>
+      </tbody>
+    </table>
+    <p>这六个环节不是每块板都有，但<b>每一个都有存在的理由</b>。读图的功力，就是看到器件能立刻说出这个理由；画板的功力，是能判断「我这块板需不需要它」。</p>
+
+    <div class="demo">
+      <div class="dh"><b>网络高亮</b><span>点一根信号，看它把哪些引脚连成一串</span></div>
+      <div class="db">
+        <div id="nets" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        <div style="margin-top:14px;display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:start">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div class="nb" data-pin="soc_tx" style="padding:8px 10px;border:1px solid rgba(120,150,200,.25);border-radius:9px;font-size:11.5px;color:#cfe0f7;text-align:center">U1 · UART1_TXD</div>
+            <div class="nb" data-pin="r37" style="padding:8px 10px;border:1px solid rgba(120,150,200,.25);border-radius:9px;font-size:11.5px;color:#cfe0f7;text-align:center">R37 22Ω</div>
+            <div class="nb" data-pin="j4" style="padding:8px 10px;border:1px solid rgba(120,150,200,.25);border-radius:9px;font-size:11.5px;color:#cfe0f7;text-align:center">J4 · 脚 3</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div class="nb" data-pin="soc_rx" style="padding:8px 10px;border:1px solid rgba(120,150,200,.25);border-radius:9px;font-size:11.5px;color:#cfe0f7;text-align:center">U1 · UART1_RXD</div>
+            <div class="nb" data-pin="r38" style="padding:8px 10px;border:1px solid rgba(120,150,200,.25);border-radius:9px;font-size:11.5px;color:#cfe0f7;text-align:center">R38 22Ω</div>
+            <div class="nb" data-pin="j4b" style="padding:8px 10px;border:1px solid rgba(120,150,200,.25);border-radius:9px;font-size:11.5px;color:#cfe0f7;text-align:center">J4 · 脚 4</div>
+          </div>
+        </div>
+        <div id="netOut" style="margin-top:13px;font-size:13px;line-height:1.85;color:#cfdcf7;min-height:70px"></div>
+      </div>
+    </div>
+
+    <h2><span class="n">2.1.4</span>四种典型误读</h2>
+    <h3><span class="n">①</span>同名不同页 → 以为没关系</h3>
+    <p><code>SD1_CMD</code> 在 SoC 页出现，在 TF 卡座页也出现——两处是同一根线。如果在 SoC 页加了个上拉，卡座页也必须有对应的上拉位置，否则总线上只有一个上拉，边沿会变慢。</p>
+    <h3><span class="n">②</span>0Ω 电阻 → 以为是装饰</h3>
+    <p>0Ω 不是电阻，是<b>可拆的跳线</b>。常见三种用途：隔离两个电源域（调试时断开量电流）、选择启动配置（焊哪个决定 BOOT 电平）、把同一网络分成两段方便布板。看到 0Ω 先问：它连的是哪两个名字？</p>
+    <h3><span class="n">③</span>NC / DNP 位号 → 以为坏了</h3>
+    <p><code>NC</code>（no connect）、<code>DNP</code>（do not populate）表示<b>这个位置留了焊盘但默认不装</strong>。它不是缺失元件，是设计预留。很多「我这板子少个电容」的疑问都出在这。</p>
+    <h3><span class="n">④</span>多电源域 → 以为都是 3.3V</h3>
+    <p>VDD_3V3、VDD_SNVS_3V0、VDD_HIGH_2V5、VDD_SOC_1V35 是不同轨，电压不同、上电时序不同。看到器件的电源脚，先确认它挂在哪一轨上，再看这轨什么时候建立。</p>
+
+    <div class="box pit">
+      <h5>读图时不要做的两件事</h5>
+      <p><b>不要按位置判断连接。</b>两条线在图上交叉但没圆点，就是不连；有圆点才连。</p>
+      <p><b>不要相信「看起来对称」。</b>TX 串阻 22Ω、RX 串阻 22Ω 看似对称，但 RXD 可能还挂了个 10k 上拉——漏掉它，你会误判空闲电平。</p>
+    </div>
+
+    <h2><span class="n">2.1.5</span>从读图到画图，只差这三问</h2>
+    <p>读懂一张图和画出第一张图之间，其实只差三问：</p>
+    <ul>
+      <li><b>这个信号需要什么电气条件？</b>电平（3.3V 还是 5V）、方向（单向还是双向）、速率（多少 MHz）、终端（要不要匹配）。</li>
+      <li><b>这个器件为什么在这里？</b>上拉、串阻、TVS、滤波，各自解决一个具体问题。说不出理由的，就是抄来的。</li>
+      <li><b>如果我拿掉它，最坏会发生什么？</b>能回答这个问题，说明你真的理解了这一环。</li>
+    </ul>
+    <p>这三问会贯穿后面五章：电源（第 2.2）、时钟复位（2.3）、接口（2.4）、PCB（2.5）、打样（2.6）。</p>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>原理图上两个 <code>UART1_TXD</code> 之间没有画线，它们连不连？</summary><div class="ans">连。<b>网络标号同名即相连</b>，这是原理图的语法，不是排版习惯。EDA 生成网表时就是按名字归并的，所以 PCB 上它们本来就是同一段铜。</div></details>
+    <details class="quiz"><summary>看到某个电阻位号标着 NC，说明什么？</summary><div class="ans">说明焊盘存在、默认不装（<code>DNP</code>）。它通常是设计预留：可能用于调试、可选上拉、或者将来改版用。不要把它当成「漏焊」或「板子坏了」。</div></details>
+    <details class="quiz"><summary>为什么读图要从电源页开始，而不是从 SoC 开始？</summary><div class="ans">因为电源决定了所有器件「活着的前提」，也决定了上电顺序。先看电源树，你就知道哪几路先建立、哪些器件依赖哪一路；直接从 SoC 看，会看不懂为什么有些信号要等电源好才有效。</div></details>
+
+    <div class="ch-nav">
+      <a href="ch08.html"><span>上一篇</span><b>← 1.8 上手清单</b></a>
+      <a class="nx" href="ch10.html"><span>下一章</span><b>2.2 电源与电流预算 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  var N=[
+    {k:'tx',n:'UART1_TXD',pins:['soc_tx','r37','j4'],d:'SoC 推挽输出 → 22Ω 串阻 → 排针 J4-3。串阻压过冲，排针这侧才是你能用示波器看的地方。'},
+    {k:'rx',n:'UART1_RXD',pins:['soc_rx','r38','j4b'],d:'外部设备 → 22Ω → SoC 输入。注意这侧通常还有 10k 上拉，空闲时为高；如果你外接的设备是开漏输出，缺上拉就收不到。'}
+  ];
+  var b=document.getElementById('nets'),o=document.getElementById('netOut');
+  b.innerHTML=N.map(function(x){return '<button data-k="'+x.k+'" style="cursor:pointer;padding:9px 12px;border-radius:9px;border:1px solid rgba(120,150,200,.26);background:rgba(255,255,255,.04);color:#cfdcf7;font-size:12.5px">'+x.n+'</button>'}).join('');
+  function show(k){
+    var s=N.filter(function(x){return x.k===k})[0];
+    Array.prototype.forEach.call(document.querySelectorAll('.nb'),function(el){
+      var on=s.pins.indexOf(el.dataset.pin)>=0;
+      el.style.borderColor=on?'#5ff1ef':'rgba(120,150,200,.25)';
+      el.style.background=on?'rgba(95,241,239,.12)':'transparent';
+      el.style.color=on?'#eaf3ff':'#8fa3c4';
+    });
+    Array.prototype.forEach.call(b.querySelectorAll('button'),function(x){
+      var on=x.dataset.k===k; x.style.borderColor=on?'#5ff1ef':'rgba(120,150,200,.26)'; x.style.background=on?'rgba(95,241,239,.12)':'rgba(255,255,255,.04)';
+    });
+    o.innerHTML='<b style="color:#eaf3ff">'+s.n+'</b><br>'+s.d;
+  }
+  b.addEventListener('click',function(e){var x=e.target.closest('button[data-k]'); if(x) show(x.dataset.k)});
+  show('tx');
+})();
+</script>
+</body>
+</html>
