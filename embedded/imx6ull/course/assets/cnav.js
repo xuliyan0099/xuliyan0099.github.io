@@ -67,9 +67,9 @@ document.addEventListener('DOMContentLoaded', function () {
     top.innerHTML = '<button class="nav-toggle" id="navBtn" type="button" aria-label="打开目录" aria-expanded="false">☰</button>' +
       '<div class="brand"><span class="dot"></span>从零学计算机' +
       '<small>比特 → 电路 → CPU → 内核 → 板子</small></div><div class="spacer"></div>' +
-      '<a class="home" href="index.html"><span class="lg">⌂ 课程总览</span><span class="sm">☰ 目录</span></a>' +
-      '<a class="home" href="../juan/index.html"><span class="lg">📚 卷总览</span><span class="sm">📚</span></a>' +
-      '<a class="home" href="../index.html"><span class="lg">⌂ 手册总入口</span><span class="sm">⌂ 入口</span></a>';
+      '<a class="home" href="index.html"><span class="lg">☰ 课程目录</span><span class="sm">☰ 课程</span></a>' +
+      '<a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>' +
+      '<a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>';
   }
 
   const sb = document.getElementById('sidebar');

@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>嵌入式学习档案 · 从寄存器到驱动</title>
-<meta name="description" content="i.MX6ULL 从裸机到 Linux 驱动的公开学习笔记：手写 ARM 汇编、芯片手册研读、硬件基础、可视化演示。">
+<title>个人知识库</title>
+<meta name="description" content="个人知识分享：按主题归档，每个主题一个入口。">
 <meta name="theme-color" content="#08090c">
 <style>
 :root{
-  --bg:#08090c; --bg2:#0d0f14; --line:#20242e; --line2:#2b3140;
+  --bg:#08090c; --line:#20242e; --line2:#2b3140;
   --fg:#e7eaf0; --muted:#98a1b2; --dim:#6b7385;
   --ac:#7c9cff; --ac2:#43d6a8;
   --mono:ui-monospace,SFMono-Regular,"Cascadia Mono","Consolas",monospace;
@@ -16,15 +16,15 @@
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{
-  margin:0;background:var(--bg);color:var(--fg);
+  margin:0;min-height:100vh;background:var(--bg);color:var(--fg);
   font:16px/1.75 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
   overflow-x:hidden;
 }
 .bg{
   position:fixed;inset:0;z-index:0;pointer-events:none;
   background:
-    radial-gradient(900px 520px at 12% -10%, rgba(124,156,255,.16), transparent 70%),
-    radial-gradient(760px 460px at 92% 8%, rgba(67,214,168,.10), transparent 72%),
+    radial-gradient(900px 520px at 12% -10%, rgba(124,156,255,.15), transparent 70%),
+    radial-gradient(760px 460px at 92% 8%, rgba(67,214,168,.09), transparent 72%),
     linear-gradient(180deg,#0a0c11 0%,#08090c 46%,#07080a 100%);
 }
 .bg::after{
@@ -33,7 +33,7 @@ body{
   background-size:64px 64px;
   mask-image:radial-gradient(70% 55% at 50% 0%,#000 30%,transparent 100%);
 }
-.wrap{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:clamp(28px,6vw,84px) clamp(18px,4vw,40px) 40px}
+.wrap{position:relative;z-index:1;max-width:880px;margin:0 auto;padding:clamp(30px,7vw,92px) clamp(18px,4vw,40px) 40px}
 
 .hero .badge{
   display:inline-flex;align-items:center;gap:8px;
@@ -43,65 +43,45 @@ body{
 }
 .hero .badge::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ac2);box-shadow:0 0 10px var(--ac2)}
 h1{
-  margin:22px 0 0;font-size:clamp(30px,6vw,58px);line-height:1.18;letter-spacing:-.01em;font-weight:800;
+  margin:24px 0 0;font-size:clamp(30px,6vw,56px);line-height:1.18;letter-spacing:-.01em;font-weight:800;
   background:linear-gradient(96deg,#ffffff 8%,#cfd8ff 46%,#8fe9cf 92%);
   -webkit-background-clip:text;background-clip:text;color:transparent;
 }
-.hero .lead{margin:20px 0 0;max-width:62ch;color:#b6bfcd;font-size:clamp(15px,1.7vw,17.5px)}
-.hero .lead code{font-family:var(--mono);font-size:.92em;color:#cfe0ff;background:rgba(124,156,255,.10);border:1px solid rgba(124,156,255,.22);border-radius:5px;padding:1px 5px}
-.cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
-.btn{
-  display:inline-flex;align-items:center;gap:8px;text-decoration:none;
-  padding:11px 18px;border-radius:9px;border:1px solid var(--line2);
-  color:var(--fg);font-size:14.5px;font-weight:600;background:rgba(255,255,255,.03);
-  transition:border-color .18s,background .18s,transform .18s;
-}
-.btn:hover{border-color:#3d4a66;background:rgba(255,255,255,.055);transform:translateY(-1px)}
-.btn.primary{border-color:transparent;background:linear-gradient(96deg,#5f7dfb,#3fbfa0);color:#06101a}
-.btn.primary:hover{filter:brightness(1.06)}
+.hero .lead{margin:18px 0 0;max-width:56ch;color:#b6bfcd;font-size:clamp(15px,1.7vw,17px)}
 
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(272px,1fr));gap:16px;margin:clamp(38px,6vw,64px) 0 0}
-.card{
-  position:relative;display:block;text-decoration:none;color:inherit;
-  padding:22px 22px 20px;border:1px solid var(--line);border-radius:14px;
-  background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012));
+.list{margin:clamp(40px,7vw,68px) 0 0;padding:0;list-style:none}
+.item{
+  display:flex;align-items:center;gap:clamp(14px,2.4vw,22px);
+  padding:clamp(18px,2.6vw,26px);border:1px solid var(--line);border-radius:14px;margin:0 0 12px;
+  text-decoration:none;color:inherit;
+  background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.012));
   transition:border-color .2s,transform .2s,background .2s;
 }
-.card:hover{border-color:#3a4560;transform:translateY(-2px);background:linear-gradient(180deg,rgba(124,156,255,.07),rgba(255,255,255,.012))}
-.card .no{font:700 11px/1 var(--mono);letter-spacing:.14em;color:var(--dim)}
-.card h2{margin:12px 0 8px;font:700 18.5px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;letter-spacing:.01em;text-transform:none;color:var(--fg)}
-.card p{margin:0;color:#a5aebd;font-size:14px;line-height:1.7}
-.card .more{display:block;margin-top:16px;font:600 12px/1 var(--mono);color:#8fb0ff;letter-spacing:.04em}
-.card .more::after{content:"  ↗"}
-
-section{margin-top:clamp(44px,7vw,76px)}
-section > h2{
-  margin:0 0 16px;font:700 12px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:#8b95a8;
+.item:hover{border-color:#3a4560;transform:translateY(-2px);background:linear-gradient(180deg,rgba(124,156,255,.07),rgba(255,255,255,.012))}
+.item .no{flex:none;align-self:flex-start;margin-top:5px;font:700 11px/1 var(--mono);letter-spacing:.14em;color:var(--dim)}
+.item .body{flex:1;min-width:0}
+.item .body b{display:block;font-size:clamp(17px,2.2vw,19.5px);line-height:1.4;letter-spacing:.01em}
+.item .body span{display:block;margin-top:6px;font-size:13.5px;line-height:1.7;color:#a5aebd}
+.item .cta{
+  flex:none;display:inline-flex;align-items:center;gap:7px;
+  font:600 12.5px/1.1 var(--mono);letter-spacing:.02em;color:#a9c2ff;
+  padding:8px 13px;border:1px solid rgba(124,156,255,.26);border-radius:9px;background:rgba(124,156,255,.06);
+  transition:border-color .2s,color .2s,background .2s;
 }
-section > h2::before{content:"#";margin-right:8px;color:#3f4a63}
-.about p{margin:0;max-width:74ch;color:#b3bccb}
-.tags{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 0;padding:0;list-style:none}
-.tags li{font:600 12px/1 var(--mono);color:#a9b6cf;border:1px solid var(--line2);border-radius:6px;padding:7px 10px;background:rgba(255,255,255,.02)}
-
-.updates ul{margin:0;padding:0;list-style:none;border-top:1px solid var(--line)}
-.updates li{display:flex;gap:16px;align-items:baseline;padding:13px 0;border-bottom:1px solid var(--line);font-size:14.5px;color:#b3bccb}
-.updates time{flex:0 0 58px;font:600 12px/1.5 var(--mono);color:var(--dim)}
-.updates code{font-family:var(--mono);font-size:.9em;color:#cfe0ff}
+.item:hover .cta{border-color:rgba(67,214,168,.55);color:#7ff0c9;background:rgba(67,214,168,.07)}
 
 footer{
   display:flex;flex-wrap:wrap;gap:10px 18px;justify-content:space-between;align-items:center;
-  margin-top:clamp(48px,8vw,86px);padding-top:20px;border-top:1px solid var(--line);
+  margin-top:clamp(52px,9vw,96px);padding-top:20px;border-top:1px solid var(--line);
   font-size:12.5px;color:var(--dim);
 }
-footer a{color:#8fb0ff;text-decoration:none}
-footer a:hover{text-decoration:underline}
 
-@media (max-width:520px){
-  .wrap{padding-top:34px}
-  .card{padding:18px}
-  .updates li{flex-direction:column;gap:4px}
-  .updates time{flex:none}
-  .cta .btn{flex:1 1 auto;justify-content:center}
+@media (max-width:560px){
+  .wrap{padding-top:36px}
+  .item{flex-wrap:wrap;gap:10px}
+  .item .no{order:1}
+  .item .body{flex:1 1 100%;order:2}
+  .item .cta{order:3;margin-left:auto}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -111,56 +91,26 @@ footer a:hover{text-decoration:underline}
 <div class="wrap">
 
   <header class="hero">
-    <div class="badge">embedded · automotive · firmware</div>
-    <h1>从寄存器<br>到驱动的学习档案</h1>
-    <p class="lead">把 i.MX6ULL 从一条 <code>mov</code> 重新走一遍：裸机点亮、时钟与引脚、DDR 与启动链、中断与内存、最后到 Linux 驱动。这里放的是原始笔记、踩坑记录，以及可以在浏览器里直接动手改的演示。</p>
-    <div class="cta">
-      <a class="btn primary" href="embedded/">进入学习站 →</a>
-      <a class="btn" href="https://github.com/xuliyan0099/xuliyan0099.github.io" target="_blank" rel="noopener">GitHub 仓库</a>
-    </div>
+    <div class="badge">knowledge base</div>
+    <h1>个人知识库</h1>
+    <p class="lead">个人知识分享</p>
   </header>
 
-  <section class="grid" aria-label="入口">
-    <a class="card" href="embedded/">
-      <span class="no">01</span>
-      <h2>i.MX6ULL 学习站</h2>
-      <p>27 篇独立成文：手写 ARM 汇编 10 篇、芯片手册研读 8 篇、硬件基础 9 篇。每篇都带验收标准，写完就能自查。</p>
-      <span class="more">embedded/</span>
-    </a>
-    <a class="card" href="embedded/imx6ull/viz/">
-      <span class="no">02</span>
-      <h2>可视化实验室</h2>
-      <p>启动链、MMU、Cache、GPIO、时钟树、NVIC 六件可以点的演示，配 49 课正课一起看。</p>
-      <span class="more">imx6ull/viz/</span>
-    </a>
-    <a class="card" href="embedded/imx6ull/juan/">
-      <span class="no">03</span>
-      <h2>十四卷总览</h2>
-      <p>按卷组织的长文目录：从 CPU 与汇编，到中断、内存、文件系统与驱动模型。</p>
-      <span class="more">imx6ull/juan/</span>
-    </a>
-  </section>
-
-  <section class="about">
-    <h2>关于</h2>
-    <p>多年车载软件与嵌入式开发，日常在 C/C++、ARM 架构、Linux 驱动、CAN/UDS 诊断与 FreeRTOS 之间来回。这个站点是学习过程的公开笔记本：写清楚"为什么"，也写清楚"哪里会错"。</p>
-    <ul class="tags">
-      <li>C / C++</li><li>ARM Cortex-A7</li><li>Linux 驱动</li><li>U-Boot / 设备树</li><li>CAN · UDS</li><li>FreeRTOS</li>
-    </ul>
-  </section>
-
-  <section class="updates">
-    <h2>最近更新</h2>
-    <ul>
-      <li><time>11-24</time><span>根站改为个人主页，整套学习站迁到 <code>/embedded/</code>，旧地址保留跳转</span></li>
-      <li><time>11-24</time><span>汇编 a1 补「DDR 在什么时候才需要初始化」与 OCRAM 验证路径</span></li>
-      <li><time>11-23</time><span>三条路线共 27 篇各自独立成文，全部带验收清单</span></li>
-    </ul>
-  </section>
+  <ul class="list">
+    <li>
+      <a class="item" href="embedded/imx6ull/index.html">
+        <span class="no">01</span>
+        <span class="body">
+          <b>i.MX6ULL · 从裸机到 Linux 驱动</b>
+          <span>手写汇编、芯片手册研读、板级硬件、互动演示与驱动主线</span>
+        </span>
+        <span class="cta">进入 →</span>
+      </a>
+    </li>
+  </ul>
 
   <footer>
     <span>静态页面 · 无统计脚本 · 无第三方请求</span>
-    <a href="https://github.com/xuliyan0099/xuliyan0099.github.io" target="_blank" rel="noopener">源码</a>
   </footer>
 
 </div>

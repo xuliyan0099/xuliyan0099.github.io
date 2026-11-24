@@ -49,8 +49,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="brand"><span class="dot"></span>' + siteTitle +
       '<small>理论 + 实践</small></div><div class="spacer"></div>' +
       (cur === 'index' ? '' : '<a class="home" href="index.html"><span class="lg">☰ 参考卷总目录</span><span class="sm">☰ 目录</span></a>') +
-      '<a class="home" href="../juan/index.html"><span class="lg">📚 卷总览</span><span class="sm">📚</span></a>' +
-      '<a class="home" href="../index.html"><span class="lg">⌂ 手册总入口</span><span class="sm">⌂ 入口</span></a>';
+      '<a class="home" href="../juan/index.html"><span class="lg">📚 卷总览</span><span class="sm">📚</span></a>';
   }
 
   /* ---------- 侧栏（按卷分组） ---------- */

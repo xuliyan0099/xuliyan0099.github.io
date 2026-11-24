@@ -35,6 +35,12 @@ header .tag{font-size:11px;color:var(--txt-faint);letter-spacing:2px;text-transf
 header .sp{flex:1}
 header .back{color:var(--txt-dim);text-decoration:none;font-size:13px;padding:6px 14px;border:1px solid var(--line-2);border-radius:999px}
 header .back:hover{color:#fff;border-color:var(--cy)}
+header .back{white-space:nowrap;flex:none}
+@media (max-width:900px){
+  header{flex-wrap:wrap;row-gap:8px;gap:8px;padding:10px 12px}
+  header .dot,header .sp,header .tag{display:none}
+  header h1{flex:1 1 100%;font-size:15px}
+}
 main{max-width:1280px;margin:0 auto;padding:22px 24px 80px}
 .grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:18px}
 @media(max-width:1000px){.grid{grid-template-columns:1fr}}
@@ -83,7 +89,7 @@ footer{max-width:1280px;margin:0 auto;padding:0 24px 60px;font-size:12px;color:v
   <h1>时钟树与门控 · 互动实验台</h1>
   <span class="tag">i.MX6ULL</span>
   <span class="sp"></span>
-  <a class="back" href="../ref/th11.html">← 回 T11 时钟、复位、RTC</a>
+  <a class="back" href="../ref/th11.html">← 回 T11 时钟、复位、RTC</a> <a class="back" href="index.html">← 互动台目录</a> <a class="back" href="../index.html">⌂ 学习站入口</a> <a class="back" href="../../../index.html">⌂ 知识库</a>
 </header>
 <main>
 <div class="grid">
