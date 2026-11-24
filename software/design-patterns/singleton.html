@@ -19,15 +19,46 @@
 
 <header class="topbar">
   <div class="topbar-in">
+    <label for="navChk" class="nav-toggle">☰ 目录</label>
     <a class="brand" href="index.html"><i></i>设计模式<small>C / C++ 双实现</small></a>
     <span class="tb-sp"></span>
-    <a class="tb" href="index.html">总览</a>
+    <a class="tb" href="index.html">导读</a>
     <a class="tb" href="../../index.html">知识库</a>
     <a class="tb" href="sitemap.html">目录</a>
   </div>
 </header>
 
-<div class="wrap">
+<input type="checkbox" id="navChk" class="nav-chk" hidden>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">设计模式 · C / C++<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
+    <ol>
+      <li><a href="index.html"><span class="no">00</span><span>导读<span class="sub">为什么用 · 怎么读</span></span></a></li>
+      <li><a href="c-oop.html"><span class="no">01</span><span>C 也能面向对象<span class="sub">手工虚表</span></span></a></li>
+      <li><a href="strategy.html"><span class="no">02</span><span>策略<span class="sub">三种 CAN 调度</span></span></a></li>
+      <li><a href="observer.html"><span class="no">03</span><span>观察者<span class="sub">通知名单解耦</span></span></a></li>
+      <li><a href="state.html"><span class="no">04</span><span>状态<span class="sub">转移表拒绝非法</span></span></a></li>
+      <li><a href="command.html"><span class="no">05</span><span>命令<span class="sub">队列与撤销</span></span></a></li>
+      <li><a href="chain.html"><span class="no">06</span><span>职责链<span class="sub">四道关</span></span></a></li>
+      <li><a href="adapter.html"><span class="no">07</span><span>适配器<span class="sub">两种传感器</span></span></a></li>
+      <li><a href="factory.html"><span class="no">08</span><span>工厂<span class="sub">注册表取驱动</span></span></a></li>
+      <li><a href="singleton.html" class="active"><span class="no">09</span><span>单例<span class="sub">一个入口一个对象</span></span></a>
+        <ol class="side-sub">
+          <li><a href="#s1"><i>01</i>问题：要么到处传，要么到处复制</a></li>
+          <li><a href="#s2"><i>02</i>结构：一个入口，一个对象</a></li>
+          <li><a href="#s3"><i>03</i>两份实现</a></li>
+          <li><a href="#s4"><i>04</i>点三次“取实例”，看初始化次数</a></li>
+          <li><a href="#s5"><i>05</i>C 与 C++：同一份唯一，两种保证</a></li>
+          <li><a href="#s6"><i>06</i>代价与坑</a></li>
+        </ol>
+      </li>
+    </ol>
+    <div class="vol-nav"><a href="sitemap.html">☰ 整节目录</a><a href="index.html">回导读 →</a></div>
+  </aside>
+
+  <div class="wrap">
   <div class="kicker"><b>创建型</b><span>·</span><span>09 / 09</span><span>·</span><span>Singleton</span></div>
   <h1>单例模式<span class="en">SINGLETON</span></h1>
   <p class="lede">配置、日志、诊断会话这类东西，一个进程里只能有一份。单例解决的是“唯一”和“第一次访问才构造”，不是“全局变量很方便”。它同时也是最难测的模式——因为所有测试共享同一份状态。</p>
@@ -36,19 +67,6 @@
     <span class="chip">C++ 局部静态天然线程安全</span>
     <span class="chip warn">测试之间会互相污染</span>
   </div>
-
-    <nav class="toc" aria-label="本页目录">
-    <div class="toc-h"><b>本页目录</b><span>6 节 · 点标题跳转</span><a class="toc-all" href="sitemap.html">整节目录 →</a></div>
-    <ul class="toc-l">
-      <li><a href="#s1"><i>01</i>问题：要么到处传，要么到处复制</a></li>
-      <li><a href="#s2"><i>02</i>结构：一个入口，一个对象</a></li>
-      <li><a href="#s3"><i>03</i>两份实现</a></li>
-      <li><a href="#s4"><i>04</i>点三次“取实例”，看初始化次数</a></li>
-      <li><a href="#s5"><i>05</i>C 与 C++：同一份唯一，两种保证</a></li>
-      <li><a href="#s6"><i>06</i>代价与坑</a></li>
-    </ul>
-  </nav>
-
 <section class="sec" id="s1">
     <h2><span class="n">01</span>问题：要么到处传，要么到处复制</h2>
     <div class="prose">
@@ -297,13 +315,15 @@ a 与 b 是同一块内存：是</pre>
 
   <nav class="pager">
     <a href="factory.html"><span class="k">← 08</span><b>工厂模式</b><i>名字到驱动的自注册表</i></a>
-    <a class="nx" href="index.html"><span class="k">回总览</span><b>九个模式</b><i>症状 → 模式对照表</i></a>
+    <a class="nx" href="sitemap.html"><span class="k">END →</span><b>整节目录</b><i>九章 · 23 个 GoF 模式</i></a>
   </nav>
 
   <footer class="foot">
     <p><b>设计模式 · C / C++ 双实现</b>　09 / 09　Singleton</p>
     <p>静态页面 · 无统计脚本 · 无第三方请求</p>
   </footer>
+</div>
+
 </div>
 
 <script src="assets/pd.js"></script>
@@ -358,5 +378,10 @@ a 与 b 是同一块内存：是</pre>
 </script>
 </body>
 </html>
+
+
+
+
+
 
 

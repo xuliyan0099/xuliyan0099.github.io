@@ -15,18 +15,18 @@
   <div class="topbar-in">
     <a class="brand" href="index.html"><i></i>设计模式<small>C / C++ 双实现</small></a>
     <span class="tb-sp"></span>
-    <a class="tb" href="index.html">总览</a>
+    <a class="tb" href="index.html">导读</a>
     <a class="tb" href="../../index.html">知识库</a>
     <a class="tb" href="sitemap.html">目录</a>
   </div>
 </header>
 
 <div class="wrap">
-  <div class="kicker"><b>整节目录</b><span>·</span><span>10 页</span><span>·</span><span>18 份源码</span></div>
+  <div class="kicker"><b>整节目录</b><span>·</span><span>导读 + 9 章</span><span>·</span><span>18 份源码</span></div>
   <h1>目录<span class="en">INDEX</span></h1>
-  <p class="lede">十页按顺序排在这里，每页下面挂着它自己的六个小节，点哪一条就直接跳到那一段。想按“症状”找模式，去总览页的症状表更快；想照着写代码，从 <a href="c-oop.html">C 也能面向对象</a> 那一页开始。</p>
+  <p class="lede">导读页现在只讲三件事：为什么用模式、三条读法、经典出处；九个模式各自成页，按顺序排在这里，每页下面挂着自己的六个小节。想按“症状”找模式，用导读页的映射表；想照着写代码，从 <a href="c-oop.html">C 也能面向对象</a> 开始。末尾附 23 个 GoF 模式的全表。</p>
   <div class="chips">
-    <span class="chip ok">10 页 · 每页 6 节</span>
+    <span class="chip ok">导读 + 9 章</span>
     <span class="chip">9 个模式 + 1 页地基</span>
     <span class="chip">C 与 C++ 各 9 份</span>
   </div>
@@ -38,16 +38,14 @@
     <div class="item">
       <a class="ent" href="index.html">
         <span class="no ov">00</span>
-        <span class="ti"><b>总览</b><em>OVERVIEW</em>
-          <span class="d">先按症状找模式：九条“我遇到的是这个毛病”直接映射到对应页；另附 9 张卡片与 23 个 GoF 模式的完整清单。</span></span>
+        <span class="ti"><b>导读</b><em>INTRO</em>
+          <span class="d">为什么用模式、怎么读、出处在哪；症状表是这一节唯一的“按问题找解”入口。</span></span>
         <span class="tag o">入口</span>
       </a>
       <div class="subs">
         <a href="index.html#s1"><i>01</i>先按症状找，别按名字背</a>
-        <a href="index.html#s2"><i>02</i>九个页面</a>
-        <a href="index.html#s3"><i>03</i>三分钟看完 23 个 GoF 模式</a>
-        <a href="index.html#s4"><i>04</i>三条读法</a>
-        <a href="index.html#s5"><i>05</i>经典出处与本节的取舍</a>
+        <a href="index.html#s2"><i>02</i>三条读法</a>
+        <a href="index.html#s3"><i>03</i>经典出处与本节的取舍</a>
       </div>
     </div>
 
@@ -231,16 +229,58 @@
     </div>
   </section>
 
+<section class="sec">
+    <h2><span class="n">03</span>23 个 GoF 模式：九个已展开，其余留一句话</h2>
+    <p class="subh">分类沿用 GoF 的三分法。已展开的直接给链接；没展开的也留一句话，方便你知道该往哪找。</p>
+    <table class="tbl">
+      <thead><tr><th style="width:80px">分类</th><th style="width:220px">模式</th><th>一句话</th><th style="width:132px">本站</th></tr></thead>
+      <tbody>
+        <tr><td rowspan="5">创建型</td><td><k>Singleton</k></td><td>保证唯一实例，并给一个全局访问点</td><td><a href="singleton.html">已展开</a></td></tr>
+        <tr><td><k>Factory Method</k></td><td>把“创建哪个具体类”推迟到子类或注册表</td><td><a href="factory.html">已展开</a></td></tr>
+        <tr><td><k>Abstract Factory</k></td><td>一次创建一整套相互配套的对象</td><td class="todo">未展开</td></tr>
+        <tr><td><k>Builder</k></td><td>把复杂对象的构造步骤拆开，分步组装</td><td class="todo">未展开</td></tr>
+        <tr><td><k>Prototype</k></td><td>复制现有对象，而不是重新构造</td><td class="todo">未展开</td></tr>
+
+        <tr><td rowspan="7">结构型</td><td><k>Adapter</k></td><td>把不兼容的接口翻译成上层要的那一个</td><td><a href="adapter.html">已展开</a></td></tr>
+        <tr><td><k>Decorator</k></td><td>在不改原对象的前提下，一层层加行为</td><td><a href="adapter.html">对照：适配器页</a></td></tr>
+        <tr><td><k>Proxy</k></td><td>用替身控制访问：延迟、权限、远程、计数</td><td><a href="adapter.html">对照：适配器页</a></td></tr>
+        <tr><td><k>Facade</k></td><td>给一坨子系统一个简单的统一入口</td><td class="todo">未展开</td></tr>
+        <tr><td><k>Bridge</k></td><td>把抽象和实现分开，各自独立变化</td><td class="todo">未展开</td></tr>
+        <tr><td><k>Composite</k></td><td>把“单个”和“一组”用同一接口处理</td><td class="todo">未展开</td></tr>
+        <tr><td><k>Flyweight</k></td><td>共享大量细粒度对象的公共部分</td><td class="todo">未展开</td></tr>
+
+        <tr><td rowspan="11">行为型</td><td><k>Strategy</k></td><td>一族算法封装起来，运行时可替换</td><td><a href="strategy.html">已展开</a></td></tr>
+        <tr><td><k>Observer</k></td><td>发布者广播，订阅者各自处理</td><td><a href="observer.html">已展开</a></td></tr>
+        <tr><td><k>State</k></td><td>对象按内部状态改变行为，转移显式化</td><td><a href="state.html">已展开</a></td></tr>
+        <tr><td><k>Command</k></td><td>把请求变成对象，可排队、记录、撤销</td><td><a href="command.html">已展开</a></td></tr>
+        <tr><td><k>Chain of Responsibility</k></td><td>请求沿链传递，谁处理谁负责</td><td><a href="chain.html">已展开</a></td></tr>
+        <tr><td><k>Template Method</k></td><td>父类定骨架，子类填其中几步</td><td class="todo">未展开</td></tr>
+        <tr><td><k>Iterator</k></td><td>不暴露内部结构地逐个访问元素</td><td class="todo">未展开</td></tr>
+        <tr><td><k>Mediator</k></td><td>把多对多的通信收拢到一个中介者</td><td class="todo">未展开</td></tr>
+        <tr><td><k>Memento</k></td><td>保存/恢复状态快照，且不暴露内部</td><td class="todo">未展开</td></tr>
+        <tr><td><k>Visitor</k></td><td>把“对一组对象的操作”抽出来单独扩展</td><td class="todo">未展开</td></tr>
+        <tr><td><k>Interpreter</k></td><td>用对象结构表示并执行一门小语法</td><td class="todo">未展开</td></tr>
+      </tbody>
+    </table>
+    <div class="prose">
+      <p>没展开的 14 个不是不重要，而是它们更适合在具体代码里“撞见”再学：抽象工厂与建造者常见于驱动框架，装饰器/代理/外观常见于日志与网络栈，模板方法与迭代器几乎每个库都有。真要补齐，照这九页的骨架写，成本可控。</p>
+    </div>
+  </section>
+
   <nav class="pager">
-    <a href="index.html"><span>ENTRY</span><b>← 回到总览</b></a>
+    <a href="index.html"><span>ENTRY</span><b>← 回到导读</b></a>
     <a class="nx" href="../../index.html"><span>HOME</span><b>个人知识库 →</b></a>
   </nav>
   <div class="foot">
     <p>这一节的入口在主页 <a href="../../index.html">xuliyan0099.github.io</a> 的“软件与工程”分组 ｜ 站点约定：文件放进目录即出现在这里，不用改导航。<br>
-    参考出处与取舍写在总览页最后一节：<a href="index.html#s5">经典出处与本节的取舍</a>。</p>
+    参考出处与取舍写在导读页最后一节：<a href="index.html#s3">经典出处与本节的取舍</a>。</p>
   </div>
 </div>
 
 <script src="assets/pd.js"></script>
 </body>
 </html>
+
+
+
+

@@ -26,15 +26,46 @@
 
 <header class="topbar">
   <div class="topbar-in">
+    <label for="navChk" class="nav-toggle">☰ 目录</label>
     <a class="brand" href="index.html"><i></i>设计模式<small>C / C++ 双实现</small></a>
     <span class="tb-sp"></span>
-    <a class="tb" href="index.html">总览</a>
+    <a class="tb" href="index.html">导读</a>
     <a class="tb" href="../../index.html">知识库</a>
     <a class="tb" href="sitemap.html">目录</a>
   </div>
 </header>
 
-<div class="wrap">
+<input type="checkbox" id="navChk" class="nav-chk" hidden>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">设计模式 · C / C++<label for="navChk" class="nav-x" aria-label="收起目录">✕</label></div>
+    <ol>
+      <li><a href="index.html"><span class="no">00</span><span>导读<span class="sub">为什么用 · 怎么读</span></span></a></li>
+      <li><a href="c-oop.html" class="active"><span class="no">01</span><span>C 也能面向对象<span class="sub">手工虚表</span></span></a>
+        <ol class="side-sub">
+          <li><a href="#s1"><i>01</i>问题：同一段代码，两种形状</a></li>
+          <li><a href="#s2"><i>02</i>结构：对象里只有一个指针是真的“类型信息”</a></li>
+          <li><a href="#s3"><i>03</i>两份实现：C 的手工虚表 vs C++ 的 virtual</a></li>
+          <li><a href="#s4"><i>04</i>单步看一次分派</a></li>
+          <li><a href="#s5"><i>05</i>四个零件，两种语言</a></li>
+          <li><a href="#s6"><i>06</i>代价与坑</a></li>
+        </ol>
+      </li>
+      <li><a href="strategy.html"><span class="no">02</span><span>策略<span class="sub">三种 CAN 调度</span></span></a></li>
+      <li><a href="observer.html"><span class="no">03</span><span>观察者<span class="sub">通知名单解耦</span></span></a></li>
+      <li><a href="state.html"><span class="no">04</span><span>状态<span class="sub">转移表拒绝非法</span></span></a></li>
+      <li><a href="command.html"><span class="no">05</span><span>命令<span class="sub">队列与撤销</span></span></a></li>
+      <li><a href="chain.html"><span class="no">06</span><span>职责链<span class="sub">四道关</span></span></a></li>
+      <li><a href="adapter.html"><span class="no">07</span><span>适配器<span class="sub">两种传感器</span></span></a></li>
+      <li><a href="factory.html"><span class="no">08</span><span>工厂<span class="sub">注册表取驱动</span></span></a></li>
+      <li><a href="singleton.html"><span class="no">09</span><span>单例<span class="sub">一个入口一个对象</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="sitemap.html">☰ 整节目录</a><a href="strategy.html">下一节 →</a></div>
+  </aside>
+
+  <div class="wrap">
   <div class="kicker"><b>地基</b><span>·</span><span>01 / 09</span><span>·</span><span>COOP</span></div>
   <h1>C 也能面向对象<span class="en">VTABLE</span></h1>
   <p class="lede">后面 8 个模式的 C 版，全部建立在这一页的三件东西上：<b>结构体首成员放函数表指针</b>、<b>派生类首成员嵌基类</b>、<b>把基类指针还原成派生类指针</b>。看懂这三步，C 里的“多态”就不再是玄学，而是一次普通的间接跳转。</p>
@@ -43,19 +74,6 @@
     <span class="chip">sizeof 实测：24 / 16</span>
     <span class="chip">无堆分配</span>
   </div>
-
-    <nav class="toc" aria-label="本页目录">
-    <div class="toc-h"><b>本页目录</b><span>6 节 · 点标题跳转</span><a class="toc-all" href="sitemap.html">整节目录 →</a></div>
-    <ul class="toc-l">
-      <li><a href="#s1"><i>01</i>问题：同一段代码，两种形状</a></li>
-      <li><a href="#s2"><i>02</i>结构：对象里只有一个指针是真的“类型信息”</a></li>
-      <li><a href="#s3"><i>03</i>两份实现：C 的手工虚表 vs C++ 的 virtual</a></li>
-      <li><a href="#s4"><i>04</i>单步看一次分派</a></li>
-      <li><a href="#s5"><i>05</i>四个零件，两种语言</a></li>
-      <li><a href="#s6"><i>06</i>代价与坑</a></li>
-    </ul>
-  </nav>
-
 <section class="sec" id="s1">
     <h2><span class="n">01</span>问题：同一段代码，两种形状</h2>
     <div class="prose">
@@ -334,13 +352,15 @@ sizeof(Rect)=24  sizeof(Circle)=16  sizeof(void*)=8
   </section>
 
   <nav class="pager">
-    <a href="index.html"><span>PREV</span><b>← 总览</b></a>
+    <a href="index.html"><span>PREV</span><b>← 导读</b></a>
     <a class="nx" href="strategy.html"><span>NEXT</span><b>策略模式 →</b></a>
   </nav>
   <div class="foot">
     <p>源码：<a href="src/coop.c">src/coop.c</a> · <a href="src/coop.cpp">src/coop.cpp</a> ｜ 编译：gcc / g++ 16.2.0（MinGW-W64 x86_64）｜ 输出为本机实测<br>
     <a href="../../index.html">← 返回个人知识库</a></p>
   </div>
+</div>
+
 </div>
 
 <script src="assets/pd.js"></script>
@@ -411,5 +431,9 @@ sizeof(Rect)=24  sizeof(Circle)=16  sizeof(void*)=8
 </script>
 </body>
 </html>
+
+
+
+
 
 
