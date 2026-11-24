@@ -20,6 +20,11 @@
     <div class="ch-meta"><span class="lv">第二篇 · 元器件</span><span class="sep">/</span>第 6 章<span class="sep">/</span>约 30 分钟</div>
     <h1>电源 IC：LDO 与 DCDC 的分工</h1>
     <p class="lede">这块板上有 5 种电源芯片：3 颗 DCDC（核心板 1.35V/1.35V/3.3V）、1 颗 LDO 供 SNVS、1 颗 2.8V LDO 供 CSI、1 颗 SD 电源开关，MINI 底板上还有两片 DCDC。它们不是随便选的：<b>大电流、高效率必须 DCDC；低噪声、小电流、常电用 LDO</b>。</p>
+    <figure class="fig">
+      <img src="../../assets/img/parts/ldo_sot235.jpg" alt="SOT-23-5 封装 LDO 实拍" loading="lazy">
+      <figcaption><b>实拍 · 2.6</b>　SOT-23-5 封装的 LDO / 电源芯片。<b>5 个脚的顺序不是标准</b>：同样 SOT-23-5，IN/GND/EN/NC/OUT 的排列各厂不同，接错直接烧。板上 U7(ME6209A33)、U12(XC6206P282MR)、U9(TMI6030) 都是这个尺寸，唯一可靠判据是手册里的 Pin Configuration 图。</figcaption>
+    </figure>
+
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>

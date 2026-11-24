@@ -90,6 +90,11 @@
     <details class="quiz"><summary>为什么 BOOT_CFG 的阻值要和复用功能的上拉阻值拉开数量级？</summary><div class="ans">避免分压改变采样电平。例如 4.7k 上拉与 47k 上拉并联，等效变化约 9%，仍在阈值内；若两者都是 10k，变化就是 50%，可能读错。</div></details>
     <details class="quiz"><summary>采样发生在什么时候？之后这些脚能当普通 IO 吗？</summary><div class="ans">在 POR_B 释放后的极短窗口内采样并锁存；之后可由软件复用为功能脚（GPIO/SD 等），所以同一脚既做配置又做功能。</div></details>
 
+        <h2>原页对照</h2>
+    <figure class="fig sch">
+      <div class="scroller"><a href="../../assets/img/sch/mini_p1.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/mini_p1.png" alt="MINI V2.2 原理图第 1 页" loading="lazy"></a></div>
+      <figcaption><b>原页 · MINI p1</b>　第 1 页 BOOT 区：8 位拨码 SW + R43–R50 各 10k 上拉到 DCDC_3V3。旁边那张对照表本身就是真值表：只有 D1 ON = USB，D1+D2 ON = MicroSD，D1+D3 ON = eMMC，D1+D4 ON = NAND。<a class="zoom" href="../../assets/img/sch/mini_p1.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
+    </figure>
     <div class="ch-nav"><a href="c06.html"><span>上一章</span><b>← 3.6 核心板第 6 页</b></a>
       <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.8 MINI 第 1 页 →</b></a></div>
   </main>

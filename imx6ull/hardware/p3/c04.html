@@ -44,7 +44,7 @@
     </table>
 
     <h2><span class="n">3.4.2</span>VREF：一颗电容决定的稳定性</h2>
-    <p>VREF 是 DDR 接收端判断 0/1 的门槛，等于 VDDQ/2 = 0.675V。分压电阻 1.5k/1.5k 的等效源阻抗是 750Ω，分压电流约 0.9mA（3.2 章的电流预算里能查到）。</p>
+    <p>VREF 是 DDR 接收端判断 0/1 的门槛，等于 VDDQ/2 = 0.675V。分压电阻 R54/R55 各 1.5k，总阻 3k，<b>分压电流 = 1.35V/3k = 0.45mA</b>，等效源阻抗 R1∥R2 = 750Ω（注意 750Ω 是内阻，不是总阻，别用它算电流）。</p>
     <p><b>C65 的 2µF 不是随便放的：</b>它与 750Ω 构成低通，截止频率 f = 1/(2π×750×2µF) ≈ 106Hz。也就是说，100Hz 以上的电源噪声被大幅衰减，VREF 保持干净。而 C66 的 0.1µF 负责更高的频段（几十 MHz），两者并联覆盖宽频。</p>
     <div class="box deep">
       <h5>为什么不能省掉分压电阻、直接用 DCDC 分两路</h5>
@@ -122,6 +122,11 @@
     <details class="quiz"><summary>为什么 VREF 电容取 2µF 而不是 0.1µF？</summary><div class="ans">因为分压源阻抗 750Ω 较大，需要大电容才能把截止频率压到 100Hz 级，滤掉电源的低频波动；0.1µF 单独用只能滤高频，低频噪声照样进来。两者并联覆盖全频段。</div></details>
     <details class="quiz"><summary>DDR3L 颗粒能焊到 1.5V 的 DDR3 板上吗？</summary><div class="ans">不能。DDR3L 额定 1.35V，长期 1.5V 会加速老化、发热，且时序参数不同，可能直接跑不起来。必须核对颗粒型号与板级电压。</div></details>
 
+        <h2>原页对照</h2>
+    <figure class="fig sch">
+      <div class="scroller"><a href="../../assets/img/sch/core_p3.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/core_p3.png" alt="CORE V2.0 原理图第 3 页" loading="lazy"></a></div>
+      <figcaption><b>原页 · CORE p3</b>　第 3 页：DDR3L（NT5CC256M16EP-EK）。DQ/DQS/DM 按 100Ω 差分走，地址线共享，ZQ 240Ω 1%，VREF 由 R54/R55 各 1.5k 分压 + C65 2µF/C66 0.1µF 滤波（右下角虚线框内就是它）。<a class="zoom" href="../../assets/img/sch/core_p3.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
+    </figure>
     <div class="ch-nav"><a href="c03.html"><span>上一章</span><b>← 3.3 核心板第 2 页</b></a>
       <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.5 核心板第 4 页 →</b></a></div>
   </main>

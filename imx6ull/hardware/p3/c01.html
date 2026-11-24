@@ -101,6 +101,11 @@
     <details class="quiz"><summary>为什么 SoC 常被拆成 U1A–U1E 五个符号？</summary><div class="ans">因为 BGA 封装有几百个脚，一张图放不下。按功能分组（电源、DDR、IO、时钟等）拆成多个符号，同名网络自动相连，读图更清晰。</div></details>
     <details class="quiz"><summary>图纸上某个信号只在两页出现，怎么确认是同一个网络？</summary><div class="ans">比对完整网络名（含大小写与后缀），再用万用表蜂鸣档实测两点是否连通。名字差一个字符就是两个网络。</div></details>
 
+        <h2>原页对照</h2>
+    <figure class="fig sch">
+      <div class="scroller"><a href="../../assets/img/sch/mini_p1.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/mini_p1.png" alt="MINI V2.2 原理图第 1 页" loading="lazy"></a></div>
+      <figcaption><b>原页 · MINI p1</b>　第 1 页：60pin 核心板接口、SDIO WiFi、I2C 上拉、JTAG、BOOT 拨码与 BOOT_CFG 上拉。读图五遍法就在这页练：先看框（CORE / WiFi / I2C / JTAG / BOOT），再看每框的电源与地，最后逐脚核对网络名。<a class="zoom" href="../../assets/img/sch/mini_p1.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
+    </figure>
     <div class="ch-nav"><a href="../index.html"><span>上一篇</span><b>← 返回总目录</b></a>
       <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.2 核心板第 1 页 →</b></a></div>
   </main>

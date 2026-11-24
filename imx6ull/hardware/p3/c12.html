@@ -94,6 +94,11 @@
     <details class="quiz"><summary>「认不到 TF 卡」的三步排查是什么？</summary><div class="ans">① 量 NVCC_SD 是否有电、电压是否正确；② 量 CMD 上拉（47k）是否存在；③ 查卡座与 DAT 线，最后才怀疑 SoC 控制器配置。</div></details>
     <details class="quiz"><summary>为什么说「这五处决定能不能跑起来」？</summary><div class="ans">因为它们直接决定 SoC 的上电、时钟、复位、启动介质与内存访问。任何一处错，系统根本进不到内核，后面所有软件调试都无从谈起。</div></details>
 
+        <h2>原页对照</h2>
+    <figure class="fig sch">
+      <div class="scroller"><a href="../../assets/img/sch/core_p1.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/core_p1.png" alt="CORE V2.0 原理图第 1 页" loading="lazy"></a></div>
+      <figcaption><b>原页 · CORE p1</b>　全板信号地图的第一块拼图：六路电源、TP1–TP8 测试点、电源容差表。剩下三块在 MINI p1（接口与配置）、p2（低速外设）、p3（以太网与排针）。四页拼起来才是完整的一块板。<a class="zoom" href="../../assets/img/sch/core_p1.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
+    </figure>
     <div class="ch-nav"><a href="c11.html"><span>上一章</span><b>← 3.11 MINI 第 4 页</b></a>
       <a class="nx" id="chNavNext" href="../index.html"><span>本篇完</span><b>进入第四篇 →</b></a></div>
   </main>

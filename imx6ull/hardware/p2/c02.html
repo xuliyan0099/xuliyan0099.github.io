@@ -23,6 +23,16 @@
     <div class="ch-meta"><span class="lv">第二篇 · 元器件</span><span class="sep">/</span>第 2 章<span class="sep">/</span>约 28 分钟</div>
     <h1>电容：容值只是开始</h1>
     <p class="lede">标称 10µF 的 0402 电容，在 3.3V 直流偏压下可能只剩 4µF——这就是为什么「图纸上一个 22µF 就够」的电源，实测纹波却超标。<b>电容的真实容值取决于材质、封装、偏压、温度和频率</b>。这一章把五个变量逐个讲清。</p>
+    <figure class="fig">
+      <img src="../../assets/img/parts/cap_mlcc.jpg" alt="0603 多层陶瓷电容实拍" loading="lazy">
+      <figcaption><b>实拍 · 2.2a</b>　0603 多层陶瓷电容（MLCC）。<b>本体上没有丝印</b>，容量、耐压、介质（C0G/X5R/X7R）全在料盘标签与料号里——这是电容与电阻最大的差别：电阻能读码，电容只能查 BOM。两端亮色是镍/锡镀层，中间是陶瓷体；同封装下容量越大、耐压越高，介质层越薄，机械应力下越容易裂。</figcaption>
+    </figure>
+
+    <figure class="fig">
+      <img src="../../assets/img/parts/ecap_smd.jpg" alt="贴片铝电解电容实拍" loading="lazy">
+      <figcaption><b>实拍 · 2.2b</b>　贴片铝电解电容。<b>顶部黑色半圆 = 负极</b>，丝印「220 / 35V」= 220µF/35V。它与 MLCC 是两种东西：容量大（µF–mF）、耐压高，但 ESR 大、寿命随温度指数下降（105°C/2000h 是常见规格），纹波电流有硬上限。板上输入 47µF/25V 就是它。</figcaption>
+    </figure>
+
 
     <div class="goals">
       <h4>读完这一章，你应该能</h4>

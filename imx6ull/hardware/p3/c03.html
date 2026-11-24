@@ -98,6 +98,11 @@
     <details class="quiz"><summary>NVCC_SD 固定接 3.3V 会有什么问题？</summary><div class="ans">SD 卡切到 1.8V 高速模式后，IO 上拉到 3.3V 会经 ESD 二极管持续灌电，卡或 SoC 都可能损坏，通信也不稳。必须跟随切换。</div></details>
     <details class="quiz"><summary>为什么每个电源脚都要一颗 0.1µF，而不是一个域共用一颗？</summary><div class="ans">因为引脚到共用电容之间有走线电感，高频电流来不及从远处补，只有「就近」的电容才有效。共用一颗等于放弃高频去耦。</div></details>
 
+        <h2>原页对照</h2>
+    <figure class="fig sch">
+      <div class="scroller"><a href="../../assets/img/sch/core_p2.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/core_p2.png" alt="CORE V2.0 原理图第 2 页" loading="lazy"></a></div>
+      <figcaption><b>原页 · CORE p2</b>　第 2 页：SoC 的全部电源脚。左侧 VDD_ARM_SOC_IN 与 VDD_HIGH_IN，右侧四组 VDD_ARM_CAP / VDD_SOC_CAP 的 22µF+0.1µF 就近去耦，下方 24 个 VSS 球。数一遍去耦电容，就明白「电源脚不是一只脚，是一组脚」。<a class="zoom" href="../../assets/img/sch/core_p2.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
+    </figure>
     <div class="ch-nav"><a href="c02.html"><span>上一章</span><b>← 3.2 核心板第 1 页</b></a>
       <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.4 核心板第 3 页 →</b></a></div>
   </main>

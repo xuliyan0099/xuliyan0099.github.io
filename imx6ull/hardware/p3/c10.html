@@ -90,6 +90,11 @@
     <details class="quiz"><summary>为什么 PHY 的模拟电源要加磁珠而不是直接连 3.3V？</summary><div class="ans">因为 PHY 内部的模拟电路（PLL、驱动）对电源噪声敏感；磁珠在高频呈高阻，配合电容把开关噪声隔离，提升链路裕量。</div></details>
     <details class="quiz"><summary>排针上的 UART 能直接接 5V 的 USB 转串口吗？</summary><div class="ans">不能直接接。SoC 的 IO 是 3.3V 域，5V 电平会灌入。要用 3.3V 电平的转串口，或加电平转换。</div></details>
 
+        <h2>原页对照</h2>
+    <figure class="fig sch">
+      <div class="scroller"><a href="../../assets/img/sch/mini_p3.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/mini_p3.png" alt="MINI V2.2 原理图第 3 页" loading="lazy"></a></div>
+      <figcaption><b>原页 · MINI p3</b>　第 3 页：以太网 U11 SR8201F + 25MHz 晶振 + 网络变压器，右侧 44pin 排针把 UART1–3、CAN、ENET、JTAG 引出。差分对与阻抗要求写在这一页的走线注释里。<a class="zoom" href="../../assets/img/sch/mini_p3.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
+    </figure>
     <div class="ch-nav"><a href="c09.html"><span>上一章</span><b>← 3.9 MINI 第 2 页</b></a>
       <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.11 MINI 第 4 页 →</b></a></div>
   </main>

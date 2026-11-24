@@ -20,6 +20,11 @@
     <div class="ch-meta"><span class="lv">第二篇 · 元器件</span><span class="sep">/</span>第 7 章<span class="sep">/</span>约 24 分钟</div>
     <h1>接口与逻辑 IC：板子的「翻译官」</h1>
     <p class="lede">SoC 只会 3.3V 的并行/串行信号，而外面是 ±12V 的 RS485、5V 的 CAN、差分以太网、USB。中间这些芯片负责<b>电平、协议、阻抗、隔离</b>四件事。看懂它们，你才知道一根线为什么这么接。</p>
+    <figure class="fig">
+      <img src="../../assets/img/parts/rj45_mag.jpg" alt="内置网络变压器的 RJ45 连接器实拍" loading="lazy">
+      <figcaption><b>实拍 · 2.7</b>　内置隔离变压器与共模电感的 RJ45 网口（HR911105A 类）。<b>为什么网口要带变压器</b>：① 电气隔离，防两边地电位差打坏 PHY；② 共模抑制，挡住双绞线上的共模噪声；③ 阻抗与电平匹配。板上 U11 SR8201F 是 PHY，ATK9111A 是网络变压器，两者之间差分对按 100Ω 走。</figcaption>
+    </figure>
+
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>

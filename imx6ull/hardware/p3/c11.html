@@ -96,6 +96,11 @@
     <details class="quiz"><summary>USB 插入电脑后板子不识别，但接 5V 电源正常，查什么？</summary><div class="ans">查 VBUS 切换与 D+/D− 的串阻/ESD：Host 模式下 VBUS 应由板供，OTG 模式下由主机供；切换逻辑错会导致枚举失败。也查 D+/D− 是否接反。</div></details>
     <details class="quiz"><summary>DNP 电阻贴上去会怎样？</summary><div class="ans">取决于它的位置：若在复位/使能脚，会改变默认电平（例如强制复位或强制关机）。贴之前必须确认该配置与当前固件/硬件版本匹配。</div></details>
 
+        <h2>原页对照</h2>
+    <figure class="fig sch">
+      <div class="scroller"><a href="../../assets/img/sch/mini_p4.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/mini_p4.png" alt="MINI V2.2 原理图第 4 页" loading="lazy"></a></div>
+      <figcaption><b>原页 · MINI p4</b>　第 4 页：DC IN（U6 DCJ5060T，R54 84.5k/R69 15k 反馈 → VBIN 约 5.1V）、DCDC_3V3（U4，49.9k/15k）、SS34 防反接、SMBJ5.0A/SMBJ3.3A 两颗 TVS；右侧 USB Host/OTG（U14 MT9700 + R81 1.3A 限流 + SI2302 放电）。<a class="zoom" href="../../assets/img/sch/mini_p4.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
+    </figure>
     <div class="ch-nav"><a href="c10.html"><span>上一章</span><b>← 3.10 MINI 第 3 页</b></a>
       <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.12 一页看全板 →</b></a></div>
   </main>

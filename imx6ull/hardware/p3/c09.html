@@ -94,6 +94,11 @@
     <details class="quiz"><summary>TF 卡识别不到，47k 上拉漏贴会有什么现象？</summary><div class="ans">CMD 线在初始化时无法保持高电平，卡不响应命令，表现为「完全不识别」或「偶发识别后读写失败」。</div></details>
     <details class="quiz"><summary>CAN 只在一端贴 120Ω 会怎样？</summary><div class="ans">另一端反射不被吸收，长线/高速率下误码率升高；示波器上能看到明显的振铃。标准做法是总线物理两端各一个。</div></details>
 
+        <h2>原页对照</h2>
+    <figure class="fig sch">
+      <div class="scroller"><a href="../../assets/img/sch/mini_p2.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/mini_p2.png" alt="MINI V2.2 原理图第 2 页" loading="lazy"></a></div>
+      <figcaption><b>原页 · MINI p2</b>　第 2 页 TF CARD 区：R1–R5 各 47k 上拉（CMD/DATA 在初始化阶段是开漏），卡座 CD 脚检测插拔。旁边还有 CAN(TJA1050)、RS485(SP3485)、LED、按键、蜂鸣器。<a class="zoom" href="../../assets/img/sch/mini_p2.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
+    </figure>
     <div class="ch-nav"><a href="c08.html"><span>上一章</span><b>← 3.8 MINI 第 1 页</b></a>
       <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.10 MINI 第 3 页 →</b></a></div>
   </main>

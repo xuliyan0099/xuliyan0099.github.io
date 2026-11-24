@@ -107,6 +107,11 @@
     <details class="quiz"><summary>晶振 CL=18pF，却只装了 18pF 两只电容，会怎样？</summary><div class="ans">实际 CL 只有约 12pF，负载偏轻 → 频率偏高（几十 ppm 量级），可能导致 USB/以太网超出容限，或起振裕度变化。应把电容加到约 30pF。</div></details>
     <details class="quiz"><summary>为什么示波器探头直接量晶振可能让振荡停止？</summary><div class="ans">探头有几十 pF 电容，并在晶振脚上等于额外增加负载电容，破坏谐振条件，振荡器可能停振或频率被拉偏。应使用高阻/低电容探头或间接测量。</div></details>
 
+        <h2>原页对照</h2>
+    <figure class="fig sch">
+      <div class="scroller"><a href="../../assets/img/sch/core_p6.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/core_p6.png" alt="CORE V2.0 原理图第 6 页" loading="lazy"></a></div>
+      <figcaption><b>原页 · CORE p6</b>　第 6 页下半部：RESET（U2 MAX809R，R31 0Ω、C13 104、POR_B 上拉 R33）+ XTAL（Y2 24MHz、C12/C14 18pF、R32 1M 并联反馈）。RTC 32.768kHz 在 B 区，配 C2/C3 18pF。<a class="zoom" href="../../assets/img/sch/core_p6.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
+    </figure>
     <div class="ch-nav"><a href="c05.html"><span>上一章</span><b>← 3.5 核心板第 4 页</b></a>
       <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.7 核心板第 7 页 →</b></a></div>
   </main>

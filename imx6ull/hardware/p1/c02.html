@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1.2 欧姆定律与分压 | 第一篇 · 电学与器件基础 | i.MX6ULL 学习手册</title>
-<meta name="description" content="用这块板子上的真实电阻讲欧姆定律与分压：BOOT_CFG 的 4.7k 上拉、eMMC 的 10k 上拉、DDR VREF 的 1.5k 分压、DCDC 反馈分压。">
+<title>1.2 欧姆定律与分压：板上一半的电阻都在干这件事 | 第一篇 · 电学与器件基础 | i.MX6ULL 学习手册</title>
+<meta name="description" content="从 U=IR 推到基尔霍夫与戴维南，再落到本板四个真实分压：BOOT 上拉（10k/4.7k）、eMMC 10k、DDR VREF 1.5k、DCDC 反馈 49.9k/15k；含负载效应计算器与实测判据。">
 <link rel="stylesheet" href="../../assets/style.css">
 <link rel="stylesheet" href="../../assets/book.css">
 <link rel="stylesheet" href="../../assets/mobile.css">
@@ -18,166 +18,205 @@
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
 
 <div class="shell">
-  <aside id="sidebar">
-    <div class="vol-h">第一篇 · 电学与器件基础</div>
-    <ol id="sideList"></ol>
-    <div class="vol-nav" id="volNav"></div>
-  </aside>
-
+  <aside id="sidebar"><div class="vol-h">第一篇 · 电学与器件基础</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第一篇 · 电学基础</span><span class="sep">/</span>第 2 章<span class="sep">/</span>约 24 分钟</div>
-    <h1>欧姆定律与分压：为什么是 10k</h1>
-    <p class="lede">原理图上到处都是电阻，取值看起来随意：4.7k、10k、240R、50R、1.5k。其实每一个都由同一个式子决定：<b>U = I·R，以及由它导出的分压公式。</b>这一章把这块板子上的四个真实电阻拿出来，逐个算出「为什么是这个值，换成别的会怎样」。</p>
+    <div class="ch-meta"><span class="lv">第一篇 · 电学基础</span><span class="sep">/</span>第 2 章<span class="sep">/</span>约 50 分钟</div>
+    <h1>欧姆定律与分压：板上一半的电阻都在干这件事</h1>
+    <p class="lede">打开原理图，你会发现大量电阻成对出现：两颗一串、从中点取一个电压——这就是<b>分压</b>。它既是「把 12V 缩到 3V 给 ADC 看」的手段，也是「给 DDR 一个 0.675V 参考」「给 DCDC 定住 3.3V」的核心。这一章从 U=IR 推到基尔霍夫，再推到「带载后分压为什么塌」，最后用本板四个真实电路验算一遍。</p>
+
+    <figure class="fig">
+      <img src="../../assets/img/sch/mini_p4_fb.png" alt="MINI V2.2 第 4 页 DCDC_3V3 反馈分压区" loading="lazy">
+      <figcaption><b>图 1-3</b>　MINI V2.2 第 4 页的真实一角：<b>U4 (DC JW5060T_6)</b> 把 DCDC_5V 降到 DCDC_3V3，靠的就是 FB 脚上那对电阻——<b>R55 = 49.9k 1%</b>（上臂）与 <b>R68 = 15k 1%</b>（下臂），另有 R52 1k + C11 102 做前馈。本章所有推导都将落在这几个位号上。<a class="zoom" href="../../assets/img/sch/mini_p4_fb.png" target="_blank" rel="noopener">原图 ↗</a></figcaption>
+    </figure>
 
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>用 U = I·R 解释上拉电阻的作用，并算出它的电流与功耗</li>
-        <li>用分压公式算出任意两电阻的输出电压，并反推需要的阻值</li>
-        <li>说清 BOOT_CFG 的 4.7k、eMMC 的 10k、DDR VREF 的 1.5k、DCDC 反馈分压各在算什么</li>
-        <li>判断「上拉取大了会慢、取小了会费电还会灌坏器件」的边界在哪</li>
+        <li>写出 U=IR、P=UI，并解释电阻为什么会发热（微观层面）</li>
+        <li>独立推导分压公式，说清「空载电压」与「带载电压」的差别</li>
+        <li>用戴维南等效算出分压点的内阻，判断它能不能带负载、能不能接 ADC</li>
+        <li>验算本板四个分压：BOOT 上拉、eMMC 10k、DDR VREF 1.5k、DCDC 反馈 49.9k/15k</li>
+        <li>在板上实测并用「上下电流是否相等」判断节点是否有额外支路</li>
       </ol>
     </div>
 
-    <h2><span class="n">1.2.1</span>一个式子，四种用法</h2>
-    <p>核心板第 7 页有一大片 4.7k 电阻（R4–R24），接在 <code>BOOT_CFG0..7</code> 到 <code>DCDC_3V3</code> 之间。这不是「随便拉一下」，而是有明确目的：<b>让这些配置脚在悬空时读到确定的高电平（逻辑 1）</b>。</p>
-    <p>上拉电阻的电流：</p>
-    <p style="text-align:center">I = (V<sub>DD</sub> − V<sub>in</sub>) / R，当输入为高阻时 I ≈ 0，仅在脚上有下拉或漏电时才有电流</p>
-    <p>功耗：P = I²R = (V<sub>DD</sub> − V<sub>in</sub>)² / R。4.7k 在 3.3V 上被拉低到 0V，就是 3.3²/4700 ≈ 2.3mW——完全无害。这就是上拉「越大越省电」的道理。</p>
+    <h2><span class="n">1.2.1</span>U=IR：一个式子的四种用法</h2>
+    <p>欧姆定律：<b>U = I × R</b>。前提是「线性电阻、稳态」。二极管、MOS、三极管不直接服从它，但可以在某个工作点附近线性化（后文讲小信号时会用到）。</p>
+    <p>它的三个变形在工程里各有专属用途：</p>
+    <ul>
+      <li><b>I = U/R</b>：知道压降和电阻算电流。这是「用采样电阻测电流」的全部原理。</li>
+      <li><b>U = IR</b>：知道电流和电阻算压降。这是「算 PCB 走线压降、算上拉能否拉到高电平」的依据。</li>
+      <li><b>R = U/I</b>：通电测出电压电流，反推电阻。万用表电阻档其实就是给一个已知电流、测电压。</li>
+      <li><b>P = UI = I²R = U²/R</b>：算发热。三者等价，选哪个取决于你已知什么——已知电流用 I²R 最省事。</li>
+    </ul>
 
-    <table>
-      <thead><tr><th>位置</th><th>阻值</th><th>算的是什么</th><th>取大 / 取小的后果</th></tr></thead>
-      <tbody>
-        <tr><td class="nm">BOOT_CFG0–7</td><td>4.7k</td><td>启动配置默认电平（悬空=1）</td><td>太大：易受干扰读错；太小：拨码短接到地时费电</td></tr>
-        <tr><td class="nm">eMMC CMD/DAT</td><td>10k</td><td>总线空闲电平 + 上拉保持</td><td>太大：高速边沿变慢；太小：驱动脚灌电流超标</td></tr>
-        <tr><td class="nm">DDR VREF</td><td>1.5k + 1.5k</td><td>1.35V 对半分出 0.675V 参考</td><td>阻值太小费电，太大易受噪声影响</td></tr>
-        <tr><td class="nm">DCDC 反馈</td><td>240R / 50R 一类</td><td>把输出电压按比例送回 FB 脚</td><td>算错一个数，整路电压就错</td></tr>
-      </tbody>
-    </table>
+    <div class="box deep">
+      <h5>电阻为什么发热：电子撞晶格</h5>
+      <p>电子在电场下加速，但平均自由程很短（铜里约几十纳米），每走一小段就撞上晶格原子，把动能交给晶格，表现为晶格振动加剧——宏观上就是温度上升。所以发热量取决于「单位时间有多少电子撞多少次」，也就是 <b>I²R</b>：电流翻倍，发热四倍。这是电源与功率设计里最常被低估的一项。</p>
+      <p>顺带解释「电阻为什么有阻值」：材料本身的晶格缺陷、杂质、声子散射，共同决定了电阻率 ρ。所以 R = ρL/S —— <b>越长越阻、越粗越通</b>。这条公式不只用于电阻，也用于算 PCB 走线。</p>
+    </div>
 
-    <figure class="fig">
-      <svg viewBox="0 0 900 380" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <!-- 上拉 -->
-        <rect x="30" y="30" width="250" height="150" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
-        <text x="46" y="54" fill="#eaf3ff" font-size="11.5">① 上拉：把悬空脚钉成高电平</text>
-        <line x1="70" y1="70" x2="70" y2="110" stroke="#ffb84d" stroke-width="1.4"/>
-        <text x="78" y="78" fill="#ffd79a" font-size="9.5">3.3V</text>
-        <rect x="58" y="110" width="24" height="40" rx="3" fill="rgba(255,184,77,.15)" stroke="#ffb84d"/>
-        <text x="94" y="134" fill="#ffd79a" font-size="9.5">4.7k</text>
-        <line x1="70" y1="150" x2="70" y2="176" stroke="#5ff1ef" stroke-width="1.4"/>
-        <rect x="56" y="176" width="60" height="24" rx="4" fill="#141c2e" stroke="#5ff1ef"/>
-        <text x="86" y="193" fill="#9df5f4" font-size="9" text-anchor="middle">BOOT_CFG0</text>
-        <text x="150" y="150" fill="#9fb0c7" font-size="9.5">空闲 = 1</text>
-        <text x="150" y="168" fill="#6f7f9c" font-size="9">拨码接地 → 0</text>
+    <h3>算例：PCB 走线的电阻与压降</h3>
+    <p>1oz 铜厚 35µm，走线宽 0.254mm（10mil），长 10mm。铜的 ρ ≈ 1.72×10<sup>-8</sup> Ω·m：</p>
+    <p style="text-align:center">S = 0.254×10<sup>-3</sup> × 35×10<sup>-6</sup> ≈ 8.89×10<sup>-9</sup> m²<br>R = 1.72×10<sup>-8</sup> × 0.01 / 8.89×10<sup>-9</sup> ≈ <b>19mΩ</b></p>
+    <p>看起来很小，但 1A 电流就是 19mV 压降、19mW 发热。若这条线要过 2A（比如 USB 5V 供电、DCDC 输出），压降 39mV；如果只走 0.2mm 宽、20mm 长，阻值翻倍到 76mΩ，2A 就是 152mV——<b>3.3V 的 IO 电源在板那头只剩 3.15V</b>，这就是为什么电源要走宽、要多打过孔、要铺铜。</p>
 
-        <!-- 分压 -->
-        <rect x="310" y="30" width="250" height="150" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
-        <text x="326" y="54" fill="#eaf3ff" font-size="11.5">② 分压：把高压按比例取出来</text>
-        <line x1="360" y1="66" x2="360" y2="86" stroke="#5ce1a0" stroke-width="1.4"/>
-        <text x="368" y="76" fill="#9df3c2" font-size="9.5">1.35V</text>
-        <rect x="348" y="86" width="24" height="34" rx="3" fill="rgba(92,225,160,.15)" stroke="#5ce1a0"/>
-        <text x="380" y="106" fill="#9df3c2" font-size="9.5">1.5k</text>
-        <line x1="360" y1="120" x2="360" y2="140" stroke="#5ff1ef" stroke-width="1.4"/>
-        <circle cx="360" cy="140" r="3.5" fill="#5ff1ef"/>
-        <text x="372" y="138" fill="#9df5f4" font-size="9.5">0.675V 给 VREF</text>
-        <rect x="348" y="140" width="24" height="34" rx="3" fill="rgba(92,225,160,.15)" stroke="#5ce1a0"/>
-        <text x="380" y="160" fill="#9df3c2" font-size="9.5">1.5k</text>
-        <line x1="360" y1="174" x2="360" y2="190" stroke="#6f7f9c" stroke-width="1.2"/>
-        <text x="366" y="188" fill="#6f7f9c" font-size="9">GND</text>
+    <h2><span class="n">1.2.2</span>串并联与基尔霍夫：所有电路题的通用解法</h2>
+    <p><b>串联：电流相同，电压相加。</b>R<sub>总</sub> = R1 + R2 + …，每个电阻上的压降按阻值比例分配。分压公式就是从这来的。</p>
+    <p><b>并联：电压相同，电流相加。</b>1/R<sub>总</sub> = 1/R1 + 1/R2 + …；两个电阻并联 R<sub>总</sub> = R1R2/(R1+R2)（积除以和）。</p>
+    <p>背后是两条比欧姆定律更根本的定律：</p>
+    <ul>
+      <li><b>KCL（节点电流守恒）</b>：流入节点的电流之和 = 流出之和。它来自电荷守恒。</li>
+      <li><b>KVL（回路电压守恒）</b>：沿任意闭合回路，电压升与电压降的代数和为零。它来自能量守恒。</li>
+    </ul>
+    <p>有了这两条，任何电阻网络都能解：设未知节点电压，对每个节点写一条 KCL（各支路电流用 (U<sub>i</sub>−U<sub>j</sub>)/R 表示），解方程组。手算两三个节点足够，多了就该上仿真。</p>
 
-        <!-- 公式 -->
-        <rect x="590" y="30" width="280" height="150" rx="10" fill="rgba(139,123,255,.07)" stroke="#8b7bff"/>
-        <text x="606" y="54" fill="#c8c0ff" font-size="11.5">两条式子，够用一辈子</text>
-        <text x="606" y="82" fill="#eaf3ff" font-size="11">U = I × R</text>
-        <text x="606" y="106" fill="#eaf3ff" font-size="11">Vout = Vin × R2 / (R1 + R2)</text>
-        <text x="606" y="130" fill="#9fb0c7" font-size="9.5">分压的前提：输出端几乎不取电流</text>
-        <text x="606" y="150" fill="#ff9c9c" font-size="9.5">若后级要 mA 级电流，分压值会塌</text>
+    <h3>算例：两节点网络</h3>
+    <p>3.3V 经 R1=10k 到节点 A，A 经 R2=10k 到 GND，A 还经 R3=10k 到节点 B，B 经 R4=10k 到 GND。求 A、B 电压。</p>
+    <p>对 A 写 KCL：(3.3−V<sub>A</sub>)/10k = V<sub>A</sub>/10k + (V<sub>A</sub>−V<sub>B</sub>)/10k；对 B：(V<sub>A</sub>−V<sub>B</sub>)/10k = V<sub>B</sub>/10k。第二式给出 V<sub>A</sub>=2V<sub>B</sub>，代入第一式：3.3−2V<sub>B</sub> = 2V<sub>B</sub>+V<sub>B</sub> → 3.3 = 5V<sub>B</sub> → <b>V<sub>B</sub>=0.66V，V<sub>A</sub>=1.32V</b>。检查：A 点电流入 0.198mA，出 0.132+0.066=0.198mA ✓。</p>
 
-        <!-- 错误 -->
-        <rect x="30" y="200" width="840" height="150" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
-        <text x="46" y="224" fill="#eaf3ff" font-size="11.5">三个真实坑</text>
-        <text x="46" y="250" fill="#9fb0c7" font-size="10.5">1. 上拉并联：同一网络两处上拉，等效值变小、电流变大，还会改变边沿速度。</text>
-        <text x="46" y="274" fill="#9fb0c7" font-size="10.5">2. 分压当电源用：用两个电阻分压给芯片供电，一加载就塌，必须用 LDO/DCDC 或缓冲。</text>
-        <text x="46" y="298" fill="#9fb0c7" font-size="10.5">3. 反馈分压算错：把 FB 脚的电压算错 0.1V，输出就偏几百 mV，CPU 直接不稳。</text>
-        <text x="46" y="326" fill="#6f7f9c" font-size="9.5">判据：分压电阻的电流应远大于后级输入电流（一般 10 倍以上），否则公式失效。</text>
-      </svg>
-      <figcaption><b>图 1-2</b>　上拉与分压：同一个式子的两种用法。上拉算「电流够不够小」，分压算「比例对不对」。</figcaption>
-    </figure>
+    <h2><span class="n">1.2.3</span>分压：公式、带载塌陷与戴维南等效</h2>
+    <p>电源 U<sub>in</sub>，上臂 R1，下臂 R2，中点输出：</p>
+    <p style="text-align:center">I = U<sub>in</sub> / (R1 + R2)　→　U<sub>out</sub> = I × R2 = U<sub>in</sub> × R2 / (R1 + R2)</p>
+    <p>这就是<b>空载分压</b>。它的成立前提是：中点没有接任何负载。一旦接上负载 R<sub>L</sub>，R2 与 R<sub>L</sub> 并联，等效下臂变小，输出立刻下降——<b>「算对了但不工作」的经典根源</b>。</p>
+    <p>把分压点看成一个「电源 + 内阻」（戴维南等效）：</p>
+    <ul>
+      <li>开路电压 U<sub>oc</sub> = U<sub>in</sub>×R2/(R1+R2)；</li>
+      <li>等效内阻 R<sub>th</sub> = R1∥R2 = R1R2/(R1+R2)（把 U<sub>in</sub> 短路到地后，从输出点看进去的电阻）；</li>
+      <li>接负载后 U<sub>out</sub> = U<sub>oc</sub> × R<sub>L</sub>/(R<sub>th</sub>+R<sub>L</sub>)，误差 = R<sub>th</sub>/(R<sub>th</sub>+R<sub>L</sub>)。</li>
+    </ul>
+    <p>结论很直接：<b>要带负载，R<sub>th</sub> 必须远小于 R<sub>L</sub></b>。工程判据取 R<sub>th</sub> ≤ 0.1×R<sub>L</sub> 时误差约 9%，≤0.05 时约 5%。想更准，就只能加运放跟随器（输入阻抗高、输出阻抗低），或者干脆用 LDO。</p>
 
     <div class="demo">
-      <div class="dh"><b>分压计算器</b><span>给 Vin 与两个电阻，算出中点电压、电流与功耗</span></div>
+      <div class="dh"><b>分压 + 负载误差计算器</b><span>拖动四个滑块，同时看空载电压、带载电压、内阻与三路电流</span></div>
       <div class="db">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
-          <div><div style="font-size:12.5px;color:#9fb0c7">Vin = <b id="iv" style="color:#5ff1ef">1.35</b> V</div>
-            <input id="vin" type="range" min="1" max="12" step="0.05" value="1.35" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12.5px;color:#9fb0c7">R1（上）= <b id="i1" style="color:#5ff1ef">1.5</b> kΩ</div>
-            <input id="r1" type="range" min="0.1" max="100" step="0.1" value="1.5" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12.5px;color:#9fb0c7">R2（下）= <b id="i2" style="color:#5ff1ef">1.5</b> kΩ</div>
-            <input id="r2" type="range" min="0.1" max="100" step="0.1" value="1.5" style="width:100%;accent-color:#5ff1ef"></div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+          <div><div style="font-size:12px;color:#9fb0c7">Uin <b id="iv" style="color:#5ff1ef">3.3</b> V</div><input id="vin" type="range" min="0.5" max="24" step="0.1" value="3.3" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">R1 <b id="r1v" style="color:#5ff1ef">10</b> kΩ</div><input id="r1" type="range" min="0.1" max="200" step="0.1" value="10" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">R2 <b id="r2v" style="color:#5ff1ef">10</b> kΩ</div><input id="r2" type="range" min="0.1" max="200" step="0.1" value="10" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">负载 <b id="rlv" style="color:#5ff1ef">1000</b> kΩ</div><input id="rl" type="range" min="0.1" max="2000" step="0.1" value="1000" style="width:100%;accent-color:#5ff1ef"></div>
         </div>
         <div id="divOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
       </div>
     </div>
 
-    <h2><span class="n">1.2.2</span>为什么上拉取 10k，不取 100Ω 或 10MΩ</h2>
-    <p>三个约束同时存在，取值就是它们夹出来的区间：</p>
-    <ol class="steps">
-      <li><b>不能太大（边沿太慢）。</b>上拉电阻和总线电容构成 RC：t<sub>r</sub> ≈ 2.2RC。一根 20cm 走线约 20pF，10k 上拉的时间常数就是 200ns 级——100kHz I2C 还能用，400kHz 就危险了。</li>
-      <li><b>不能太小（灌电流超标）。</b>器件把线拉低时，电流 I = V<sub>DD</sub>/R。3.3V / 100Ω = 33mA，多数 IO 的绝对最大灌电流只有 10–20mA，会烧。</li>
-      <li><b>不能太大（抗干扰差、漏电敏感）。</b>10MΩ 上拉时，1µA 的漏电就能产生 10V 压降（当然实际被钳位），噪声也更容易把电平带跑。</li>
+    <h2><span class="n">1.2.4</span>本板四个真实分压：逐个验算</h2>
+
+    <h3>例 1：BOOT 拨码的上拉（10k × 2 + 4.7k × 6）</h3>
+    <p>先纠正一个常见误记：MINI 的 BOOT 上拉<b>不是清一色 4.7k</b>。看原图——R43/R44 是 <b>10k</b>，喂 BOOT_MODE1/BOOT_MODE0；R45–R50 是 <b>4.7k</b>，喂 LCD_DATA11、LCD_DATA3/4/5/6 与 BOOT_DATA7（这些脚在启动瞬间被采样为 BOOT_CFG）。</p>
+    <figure class="fig">
+      <img src="../../assets/img/sch/mini_p1_boot.png" alt="MINI V2.2 第 1 页 BOOT 拨码与上拉电阻" loading="lazy">
+      <figcaption><b>图 1-4</b>　MINI V2.2 第 1 页 BOOT 区原图：<b>R43/R44 = 10K</b>，<b>R45–R50 = 4.7K</b>，全部上拉到 DCDC_3V3，再经 8 位拨码接地（ON = 拉低）。拨码右侧的对照表就是真值表：只有 D1 ON = USB，D1+D2 ON = MicroSD，D1+D3 ON = eMMC，D1+D4 ON = NAND。<a class="zoom" href="../../assets/img/sch/mini_p1_boot.png" target="_blank" rel="noopener">原图 ↗</a></figcaption>
+    </figure>
+    <p>算电流：10k 那两根 I = 3.3/10k = 0.33mA；4.7k 那六根 I = 3.3/4.7k = 0.70mA。全 OFF 时总电流 = 2×0.33 + 6×0.70 ≈ <b>4.9mA</b>。这个数不大，但它是「常驻」的：只要上电就存在，做待机电流预算时必须算进去（第 4.1 章）。</p>
+    <p>为什么 10k 与 4.7k 不一样？BOOT_MODE 只在上电复位那一刻被采样，之后不再关心速度，用 10k 省电；BOOT_CFG 脚同时是 LCD 数据线，启动后要当普通 IO 用，需要更强的上拉保证上升沿，因此用 4.7k。这是本板少见的「同一功能、两种阻值」的例子，读图时要看网络名而不是凭印象。</p>
+
+    <h3>例 2：eMMC 的 10k 上拉</h3>
+    <p>CMD 与 DATA0–7 共 9 根，各 10k 上拉到 DCDC_3V3（CORE p4 的 R9/R10/R38 一组）。常态电流 3.3/10k = 0.33mA/根 → 9 根约 <b>3.0mA</b>。</p>
+    <p>为什么是 10k 而不是 100k？因为初始化阶段（开漏模式，400kHz）要靠上拉把线拉起来。上升时间近似 t<sub>r</sub> ≈ 2.2×R×C。若线容 C≈20pF：</p>
+    <ul>
+      <li>R = 10k → t<sub>r</sub> ≈ 440ns，占 400kHz 半周期（1.25µs）的 35%，可接受；</li>
+      <li>R = 100k → t<sub>r</sub> ≈ 4.4µs，超过半周期，通信直接失败；</li>
+      <li>R = 1k → t<sub>r</sub> ≈ 44ns，速度够但常态耗 3.3mA/根 → 30mA，不可接受。</li>
+    </ul>
+    <p>所以 10k 是「速度 vs 功耗」的折中。这类「算上升时间选上拉」的题，面试和实战都会考。</p>
+
+    <h3>例 3：DDR 的 VREF（1.5k / 1.5k）</h3>
+    <p>CORE p3 右下角虚线框：DRAM_1V35 经 R54、R55 各 1.5k 分压，中点即 DRAM_VREF，并挂 C65 2µF 与 C66 0.1µF。</p>
+    <ul>
+      <li>U<sub>REF</sub> = 1.35 × 1.5k/(1.5k+1.5k) = <b>0.675V</b>（正好一半，DDR 的读参考就是电源中点）；</li>
+      <li>分压电流 I = 1.35/3k = <b>0.45mA</b>（注意不是 0.9mA——总阻是 3k，750Ω 是并联后的等效内阻）；</li>
+      <li>R<sub>th</sub> = 750Ω；每颗电阻功耗 P = I²R = (0.45mA)²×1.5k ≈ <b>0.30mW</b>，可忽略；</li>
+      <li>VREF 输入是高阻（内部比较器），750Ω 内阻不影响直流精度，但<b>影响噪声</b>——所以并联 2µF + 0.1µF，把交流阻抗压到几十 mΩ 级（第 3.4 章有推导）。</li>
+    </ul>
+
+    <h3>例 4：DCDC 反馈（49.9k / 15k）：反向推出芯片基准</h3>
+    <p>回到图 1-3。FB 脚内部把分压中点稳到一个固定基准 V<sub>ref</sub>，于是：</p>
+    <p style="text-align:center">U<sub>out</sub> = V<sub>ref</sub> × (1 + R55/R68) = V<sub>ref</sub> × (1 + 49.9k/15k) = V<sub>ref</sub> × <b>4.327</b></p>
+    <p>手册不写 V<sub>ref</sub> 时怎么办？用板上另一路反推：U6 那颗（DC IN 侧）上臂 R54=84.5k、下臂 R69=15k，比值 6.633。两路输出分别是 3.3V 与 5V 附近，于是：</p>
+    <ul>
+      <li>若 V<sub>ref</sub>=0.768V：3.3V 路 = 0.768×4.327 = <b>3.32V</b>；5V 路 = 0.768×6.633 = <b>5.09V</b>。两个都对得上。</li>
+      <li>若 V<sub>ref</sub>=0.8V：3.46V 与 5.31V，偏高约 5%，不像设计值。</li>
+      <li>若 V<sub>ref</sub>=0.6V：2.60V 与 3.98V，明显偏低。</li>
+    </ul>
+    <p><b>这就是「读图 + 计算 + 交叉验证」的完整闭环</b>：不是背一个 V<sub>ref</sub>，而是用两路互相印证把芯片参数逼出来。实测时在 TP 点量到 3.32V，就说明这个推断成立。</p>
+    <p>另外注意 R52（1k）与 C11（102 = 1nF）串在 FB 上臂旁，这叫<b>前馈（feedforward）</b>：高频时 C11 相当于短路，把上臂「短路」，瞬间提高反馈比例、加快环路响应。拐点约 f = 1/(2π×1k×1nF) ≈ 160kHz，正好落在开关频率（几百 kHz）之下。少了它也能工作，但负载阶跃时过冲会更大。</p>
+
+    <div class="box tip">
+      <h5>速算技巧：只记「下臂占比」</h5>
+      <p>分压比 = R2/(R1+R2) = 1/(1+R1/R2)。心算时先算 R1/R2：49.9/15 ≈ 3.33 → 输出 = V<sub>ref</sub>×(1+3.33)=4.33×V<sub>ref</sub>。反馈电路都用这个形式，因为它直接对应「放大倍数」。</p>
+    </div>
+
+    <h2><span class="n">1.2.5</span>上拉电阻到底怎么选：四个约束</h2>
+    <p>板上每一颗上拉都在同时满足四件事，选值就是在这四件事之间取交集：</p>
+    <ol>
+      <li><b>拉得动</b>：开漏输出低时，I<sub>OL</sub> = (V<sub>DD</sub>−V<sub>OL</sub>)/R 必须小于器件允许的 I<sub>OL</sub>（比如 3mA），且 V<sub>OL</sub> 要在逻辑低门限以下。</li>
+      <li><b>拉得快</b>：t<sub>r</sub> ≈ 2.2RC 必须小于协议规定的上升时间（I2C 100kHz 是 1µs，400kHz 是 300ns）。</li>
+      <li><b>不漏电</b>：节点上的漏电流（IO 漏电 + PCB 表面漏电 + 电容漏电）在 R 上产生的压降不能把电平拉低。</li>
+      <li><b>不费电</b>：常态电流 × 路数 × 24h 要能接受。</li>
     </ol>
-    <p>所以工程上落在 <b>2.2k–10k</b> 这个区间：低速总线用 10k（省电），高速或长线用 2.2k–4.7k（边沿快）。这块板的选择就是按这个逻辑：启动配置脚只需静态电平 → 4.7k；eMMC CMD 是高速双向 → 10k 配 SoC 内部可调上拉。</p>
+    <p>算一个 I2C 的例子：MINI p1 的 R40/R42/R57 是 <b>4.7k</b>，若总线电容 100pF，t<sub>r</sub> ≈ 2.2×4.7k×100pF ≈ <b>1.03µs</b>。这对 100kHz（上限 1µs）刚好卡线，对 400kHz（上限 300ns）就<b>不合格</b>——所以高速 I2C 要么降到 2.2k，要么减少总线电容（少挂器件、短走线）。板上写 4.7k 不代表它能跑 400kHz，这是读图时最容易忽略的一层。</p>
 
-    <h2><span class="n">1.2.3</span>反馈分压：DCDC 输出是怎么被「定住」的</h2>
-    <p>DCDC 芯片内部有一个基准（常见 0.6V 或 0.8V），它把输出电压分压后与基准比较，差多少就调多少占空比。所以输出电压完全由两个电阻的比值决定：</p>
-    <p style="text-align:center">V<sub>out</sub> = V<sub>ref</sub> × (1 + R1/R2)</p>
-    <p>这块板的核心 1.35V 由 <b>U6（MT3420B）</b>产生，反馈网络就是一对电阻分压；3.3V 由另一路同型号芯片产生。两颗芯片型号相同、输出不同，<b>唯一区别就是反馈电阻的比值</b>——这就是为什么第四篇要把反馈计算单独列一章。</p>
+    <h2><span class="n">1.2.6</span>实测三步：断电测 R、上电测 U、再反算 I</h2>
+    <ol class="steps">
+      <li><b>断电测电阻</b>：红黑笔点 R1（或 R2）两端，读阻值。注意<b>在路测量会被并联支路拉低</b>：若读数明显小于标称（比如 10k 读出 5k），说明该节点还有别的直流通路；要确认就拆一端。</li>
+      <li><b>上电测电压</b>：黑笔固定 GND，红笔点中点读 U<sub>out</sub>；再量 U<sub>in</sub> 与 R1 两端压降。注意万用表输入阻抗 10MΩ，对 10k 级分压影响约 0.1%，可忽略；对 1MΩ 级分压就有 10% 误差——这也是「高阻节点不能直接拿表测」的原因。</li>
+      <li><b>反算电流</b>：I<sub>上</sub> = (U<sub>in</sub>−U<sub>out</sub>)/R1；I<sub>下</sub> = U<sub>out</sub>/R2。两者应当相等（空载时）。<b>若 I<sub>上</sub> 明显大于 I<sub>下</sub>，说明中点有额外电流流去了别处</b>——漏电、某个芯片输入电流过大、或者你漏看了一条支路。</li>
+    </ol>
+    <p>第三步是整套流程里最有价值的一步：它把「电压对不对」升级成「电流从哪来、到哪去」，直接把故障范围缩到一个节点。</p>
+
     <div class="box pit">
-      <h5>改输出电压时的三个动作</h5>
-      <p><b>①</b> 先查这颗芯片的 V<sub>ref</sub> 与 FB 脚结构（有的芯片是内部固定分压，只有 FB 一个脚，不能改）。</p>
-      <p><b>②</b> 按比值反算 R1/R2，并选 1% 精度电阻；误差 5% 的电阻会让输出偏几十 mV。</p>
-      <p><b>③</b> 改完必须带载复测：空载对、带载塌，说明电感或输出电容不够，不是电阻的问题。</p>
+      <h5>真实事故：100k/100k 分压监测 12V</h5>
+      <p>某板用 100k/100k 分压把 12V 缩到 6V 给 ADC，空载计算完全正确。实测 ADC 读数随采样率跳变，误差 15%。原因：100k∥100k = 50k 的源阻抗，遇上 ADC 采样瞬间接入的几 pF 采样电容，采样窗口内充不满。改成 10k/10k 并在中点加 0.1µF 后恢复。<b>「算对了」不等于「能用」，中间隔着一个源阻抗。</b></p>
     </div>
 
-    <div class="box deep">
-      <h5>VREF 为什么用两个 1.5k 对半分</h5>
-      <p>DDR3L 的判决门限是 V<sub>DDQ</sub>/2：1.35V 的一半就是 0.675V。核心板第 3 页用 <b>R54、R55 两个 1.5k</b> 从 <code>DRAM_1V35</code> 分压得到 <code>DRAM_VREF</code>，并在旁边放 <b>C65 2µF + C66 0.1µF</b> 滤波。为什么阻值不能太大？因为 VREF 要给 DDR 内部比较器提供参考，需要一定的抗噪能力；1.5k 让分压点对地阻抗约 750Ω，噪声不容易带偏。</p>
-    </div>
+    <h2><span class="n">1.2.7</span>五个设计陷阱</h2>
+    <ol>
+      <li><b>用分压直接给负载供电。</b>内阻太大，一加载就塌。要驱动负载就加跟随器或用 LDO。</li>
+      <li><b>为省电把阻值选得过大。</b>R<sub>th</sub> 变大后，噪声、漏电、ADC 采样电容全都开始影响精度。</li>
+      <li><b>忽略电阻精度。</b>两颗 1% 最坏带来约 ±2% 的比例误差；再叠加基准电压容差（通常 ±1~2%）就超标。要求高的地方用 0.1% 薄膜。</li>
+      <li><b>忽略温漂。</b>厚膜 100ppm/°C，85°C 时再偏 0.6%，与 1% 精度同量级；精密分压必须选 25ppm 薄膜，且两颗同批同向。</li>
+      <li><b>分压点走线太长。</b>高阻节点像天线，容易拾取 DCDC 的开关噪声；要走短线、就近加电容、远离电感与开关节点（SW、BST）。</li>
+    </ol>
 
-    <h3>自测</h3>
-    <details class="quiz"><summary>1.35V 经 1.5k 与 1.5k 分压，中点是多少？电流多大？</summary><div class="ans">0.675V；电流 1.35/3000 = 0.45mA，两个电阻各耗 0.15mW 左右。这也是「分压电阻不能太小」的原因：太小会白耗电流。</div></details>
-    <details class="quiz"><summary>某网络本应 10k 上拉，实测对 3.3V 只有 4.5k，可能是什么？</summary><div class="ans">两种可能：一是这颗电阻装错（装成 4.7k）；二是同一网络上还有另一处上拉并联（比如 SoC 内部上拉或底板重复上拉），并联后等效变小。要区分就断电、把电阻一端翘起再量。</div></details>
-    <details class="quiz"><summary>为什么用两个电阻分压给一颗芯片供电是错的？</summary><div class="ans">因为分压器的输出阻抗很高（这里是 kΩ 级），芯片一取电流，输出电压立刻塌下去。分压只能用于「高阻抗输入」的参考电压；供电必须用 LDO/DCDC 或有缓冲的基准源。</div></details>
+    <h3>练习（答案在折叠里）</h3>
+    <details class="quiz"><summary>1. 3.3V 经 10k/10k 分压，中点空载电压多少？</summary><div class="ans">1.65V。比值 10k/(10k+10k)=0.5。</div></details>
+    <details class="quiz"><summary>2. 上题中点接一个 10k 负载，电压变多少？误差多大？</summary><div class="ans">R2∥R<sub>L</sub>=10k∥10k=5k，U=3.3×5k/(10k+5k)=1.1V，误差 −33%。R<sub>th</sub>=5k 与 R<sub>L</sub>=10k 同量级，不能这么用。</div></details>
+    <details class="quiz"><summary>3. 1.35V 用 1.5k/1.5k 分压，电流是 0.45mA 还是 0.9mA？为什么容易错？</summary><div class="ans">0.45mA。总阻 3k，I=1.35/3k。0.9mA 是把并联等效 750Ω 误当成总阻算出来的——「内阻」和「总阻」是两个概念。</div></details>
+    <details class="quiz"><summary>4. 反馈分压 49.9k/15k、V<sub>ref</sub>=0.768V，输出多少？若实测 3.15V，先怀疑什么？</summary><div class="ans">1+49.9/15=4.327，U=0.768×4.327≈3.32V。实测偏低先查下臂电阻是否偏大/虚焊、FB 脚是否有漏电、以及负载是否过重导致环路压降。</div></details>
+    <details class="quiz"><summary>5. 实测中点电压比计算值低 20%，怎么用「电流法」定位？</summary><div class="ans">分别算 I<sub>上</sub> 与 I<sub>下</sub>：若 I<sub>上</sub>≫I<sub>下</sub>，说明中点有额外负载/漏电把电流带走；若两者相等但电压偏低，说明 U<sub>in</sub> 本身偏低或 R1 偏大。</div></details>
+    <details class="quiz"><summary>6. eMMC 的 10k 上拉若换成 100k，为什么初始化会失败？</summary><div class="ans">10k 时 t<sub>r</sub>≈2.2RC≈440ns，能在 400kHz 半周期内拉起来；100k 时约 4.4µs，超过半周期，采样点还没到高电平，命令/数据被判错。</div></details>
 
-    <div class="ch-nav">
-      <a href="c01.html"><span>上一章</span><b>← 1.1 三种基本量</b></a>
-      <a class="nx" id="chNavNext" href="c03.html"><span>下一章</span><b>1.3 功率、发热与降额 →</b></a>
-    </div>
+    <div class="ch-nav"><a href="c01.html"><span>上一章</span><b>← 1.1 三种基本量</b></a>
+      <a class="nx" id="chNavNext" href="c03.html"><span>下一章</span><b>1.3 功率、发热与降额 →</b></a></div>
   </main>
 </div>
-
-<script src="../../assets/parts.js"></script>
-<script src="../../assets/part.js"></script>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
 <script>
 renderPart('p1','c02.html');
 (function(){
   function calc(){
-    var v=+document.getElementById('vin').value;
-    var r1=+document.getElementById('r1').value*1000;
-    var r2=+document.getElementById('r2').value*1000;
-    var vo=v*r2/(r1+r2), i=v/(r1+r2);
-    document.getElementById('iv').textContent=v.toFixed(2);
-    document.getElementById('i1').textContent=(r1/1000).toFixed(1);
-    document.getElementById('i2').textContent=(r2/1000).toFixed(1);
+    var vin=+document.getElementById('vin').value, r1=+document.getElementById('r1').value*1000;
+    var r2=+document.getElementById('r2').value*1000, rl=+document.getElementById('rl').value*1000;
+    document.getElementById('iv').textContent=vin.toFixed(1);
+    document.getElementById('r1v').textContent=(r1/1000).toFixed(1);
+    document.getElementById('r2v').textContent=(r2/1000).toFixed(1);
+    document.getElementById('rlv').textContent=(rl/1000).toFixed(1);
+    var voc=vin*r2/(r1+r2);
+    var rth=r1*r2/(r1+r2);
+    var rp=r2*rl/(r2+rl);
+    var vload=vin*rp/(r1+rp);
+    var err=(vload-voc)/voc*100;
+    var i1=(vin-vload)/r1*1000, i2=vload/r2*1000, il=vload/rl*1000;
+    var ok=Math.abs(err)<10;
     document.getElementById('divOut').innerHTML=
-      '<b style="color:#eaf3ff;font-size:15px">中点电压 '+(vo*1000).toFixed(0)+' mV</b>（分压比 '+((r2/(r1+r2))*100).toFixed(1)+'%）<br>'+
-      '分压电流 '+(i*1000).toFixed(2)+' mA　R1 功耗 '+(i*i*r1*1000).toFixed(2)+' mW　R2 功耗 '+(i*i*r2*1000).toFixed(2)+' mW<br>'+
-      '<span style="color:'+(i*1000>1?'#ffb84d':'#9df3c2')+'">'+(i*1000>1?'电流偏大，长期耗电，建议把阻值加大一个数量级':'电流很小，适合做参考电压')+'</span><br>'+
-      '<span style="color:#6f7f9c;font-size:11.5px">前提：输出端不取电流。若后级要 mA 级电流，实际电压会明显低于计算值。</span>';
+      '<b style="color:#eaf3ff;font-size:15px">空载 '+voc.toFixed(3)+' V　带载 '+vload.toFixed(3)+' V　误差 '+err.toFixed(1)+'%</b><br>'+
+      'Rth = '+(rth/1000).toFixed(2)+' kΩ　Rth/Rload = '+(rth/rl).toFixed(2)+'　'+(ok?'<span style="color:#9df3c2">可接受</span>':'<span style="color:#ff9c9c">不可接受（加跟随器或降低阻值）</span>')+'<br>'+
+      '电流：R1 '+(i1*1000).toFixed(0)+' µA　R2 '+(i2*1000).toFixed(0)+' µA　负载 '+(il*1000).toFixed(0)+' µA<br>'+
+      '<span style="color:#6f7f9c;font-size:11.5px">三者应满足 I1 = I2 + Iload；实测不符就说明节点还有别的支路。</span>';
   }
-  ['vin','r1','r2'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  ['vin','r1','r2','rl'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
   calc();
 })();
 </script>
-</body>
-</html>
+</body></html>

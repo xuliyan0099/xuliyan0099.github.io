@@ -20,6 +20,16 @@
     <div class="ch-meta"><span class="lv">第二篇 · 元器件</span><span class="sep">/</span>第 3 章<span class="sep">/</span>约 24 分钟</div>
     <h1>电感：三个电流参数决定生死</h1>
     <p class="lede">电容看电压，电感看电流。一颗电感的规格书里，真正决定能不能用的不是「感值」，而是<b>饱和电流 I<sub>sat</sub>、温升电流 I<sub>rms</sub>、直流电阻 DCR</b>。选错这三个，DCDC 会在满载瞬间「掉压」甚至烧毁。</p>
+    <figure class="fig">
+      <img src="../../assets/img/parts/ind_wound.jpg" alt="绕线贴片电感实拍" loading="lazy">
+      <figcaption><b>实拍 · 2.3b</b>　绕线电感（半屏蔽）。能看见铜线与磁芯，丝印「2R2」= 2.2µH。<b>漏磁明显</b>：靠近它的高阻节点、晶振、模拟走线容易被干扰，线圈在高 di/dt 下还会「唱歌」。选型除电感量，必须看饱和电流 I<sub>sat</sub> 与温升电流 I<sub>rms</sub>。</figcaption>
+    </figure>
+
+    <figure class="fig">
+      <img src="../../assets/img/parts/ind_molded.jpg" alt="一体成型贴片功率电感实拍" loading="lazy">
+      <figcaption><b>实拍 · 2.3a</b>　一体成型（合金粉压铸）功率电感。<b>丝印读法与电阻相同</b>：「4R7」= 4.7µH、「6R8」= 6.8µH、「100」= 10µH。磁芯把线圈完全包住，漏磁小、直流电阻低、抗饱和强，是 DCDC 输出电感的主流选择（本板 L1/L3 4.7µH、L2 2.2µH 都是这个家族）。</figcaption>
+    </figure>
+
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>

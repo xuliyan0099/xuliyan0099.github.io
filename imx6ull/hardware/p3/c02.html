@@ -112,6 +112,11 @@
     <details class="quiz"><summary>为什么 1.35V 轨用电感 2.2µH，而底板 5V 小轨用 4.7µH？</summary><div class="ans">因为 1.35V 轨电流大、开关频率下需要更大饱和电流，感值小可以在同样体积下获得更高 I<sub>sat</sub>；小电流轨用大感值换取更低纹波。</div></details>
     <details class="quiz"><summary>NVCC_SD 为什么不用固定 3.3V？</summary><div class="ans">因为 SD 卡支持 1.8V 高速模式，卡协商后会要求切换 IO 电压。用可控电源开关（U9）跟随卡的状态切换，既满足协议也避免 3.3V 灌入 1.8V 器件。</div></details>
 
+        <h2>原页对照</h2>
+    <figure class="fig sch">
+      <div class="scroller"><a href="../../assets/img/sch/core_p1.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/core_p1.png" alt="CORE V2.0 原理图第 1 页" loading="lazy"></a></div>
+      <figcaption><b>原页 · CORE p1</b>　第 1 页：SNVS(U7 3.3V)、NVCC_CSI(U12 2.8V)、ARM/SOC(U6 1.345V)、VDD_HIGH/DCDC_3V3(U8 3.32V)、NVCC_SD(U9)、LVDDR3(U11 1.35V)，右下角还印着官方电源容差表（MIN/TYP/MAX）。五路电源的证据链全在这一页。<a class="zoom" href="../../assets/img/sch/core_p1.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
+    </figure>
     <div class="ch-nav"><a href="c01.html"><span>上一章</span><b>← 3.1 图纸怎么读</b></a>
       <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.3 核心板第 2 页 →</b></a></div>
   </main>
