@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2.1 电阻 | 第二篇 · 元器件深度解剖 | i.MX6ULL 学习手册</title>
+<meta name="description" content="封装与额定功率、精度与阻值系列、温漂、降额曲线、排阻与 0Ω；配阻值/温漂/降额计算器。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第二篇 · 元器件深度解剖</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第二篇 · 元器件</span><span class="sep">/</span>第 1 章<span class="sep">/</span>约 24 分钟</div>
+    <h1>电阻：选型只看四个数</h1>
+    <p class="lede">同一个 10k，可以是 0402 厚膜 5%、也可以是 0603 薄膜 0.1%——价格差十倍，性能差一个量级。选型要盯的只有四个数：<b>阻值与精度、额定功率与降额、温漂、封装</b>。这一章把它们逐个拆开，并算清 MINI 板上那几颗 4.7k 到底余量多少。</p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>看到「0402 1/16W 1% 100ppm」这串参数，说出它在什么场景够用、什么场景不够</li>
+        <li>算出高温环境下电阻的实际阻值偏移，并判断是否影响分压/采样精度</li>
+        <li>理解降额曲线：为什么 70°C 以上必须按比例减功率</li>
+        <li>说清排阻与 0Ω 电阻的工程价值</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">2.1.1</span>封装 = 功率 + 散热能力</h2>
+    <table>
+      <thead><tr><th>封装</th><th>尺寸（长×宽）</th><th>典型额定功率</th><th>适用</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">0201</td><td>0.6 × 0.3 mm</td><td>1/20 W</td><td>手机类高密度，手工焊接几乎不可行</td></tr>
+        <tr><td class="nm">0402</td><td>1.0 × 0.5 mm</td><td>1/16 W（0.0625W）</td><td>本板主力，绝大多数上拉/串阻</td></tr>
+        <tr><td class="nm">0603</td><td>1.6 × 0.8 mm</td><td>1/10 W</td><td>稍大功率、手工焊友好</td></tr>
+        <tr><td class="nm">0805</td><td>2.0 × 1.25 mm</td><td>1/8 W</td><td>LED 限流、电源反馈分压</td></tr>
+        <tr><td class="nm">1206</td><td>3.2 × 1.6 mm</td><td>1/4 W</td><td>采样电阻、较大电流路径</td></tr>
+      </tbody>
+    </table>
+    <p>注意「额定功率」是在<b>特定焊盘与散热条件</b>下测的，悬空细走线时会打折。工程习惯：<b>实际功耗不超过额定的 50%（高温环境 30%）</b>。</p>
+
+    <h2><span class="n">2.1.2</span>精度、系列与温漂：三个不同的误差源</h2>
+    <p>「1%」只是<b>常温下的初始偏差</b>，它不代表全温区误差。完整的误差是三部分叠加：</p>
+    <ul>
+      <li><b>初始精度</b>：出厂偏差，1% / 0.5% / 0.1%。</li>
+      <li><b>温漂（ppm/°C）</b>：厚膜常见 ±100~200ppm/°C，薄膜可到 ±25ppm/°C。100ppm/°C 在 85°C（温升 60°C）就再偏 0.6%。</li>
+      <li><b>长期漂移与焊接应力</b>：回流后阻值可能偏移 0.1–0.3%。</li>
+    </ul>
+    <p>所以一个「1% 100ppm」的 10k，在 85°C 最坏情况可能是 10k×(1+1%+0.6%) ≈ 10.16k。做<b>精密分压或 ADC 基准</b>时必须把这一项算进去；只做上拉、限流则完全不用管。</p>
+    <div class="box tip">
+      <h5>E24 与 E96：为什么常用值是 4.7k、5.1k、10k</h5>
+      <p>E24 系列每十倍 24 个值（步进约 10%），E96 每十倍 96 个值（步进约 2.5%）。1% 精度电阻通常按 E96 供货，所以你会看到 4.99k、5.1k 这种「奇怪」的值——它们才是标准点；4.7k 属于 E24，之所以常见，是因为兼容 5% 时代的设计习惯。</p>
+    </div>
+
+    <figure class="fig">
+      <svg viewBox="0 0 900 340" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="30" y="26" width="410" height="200" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="46" y="52" fill="#eaf3ff" font-size="11.5">降额曲线（厚膜贴片电阻典型）</text>
+        <line x1="70" y1="80" x2="400" y2="80" stroke="#3a4560"/>
+        <line x1="70" y1="196" x2="400" y2="196" stroke="#3a4560"/>
+        <text x="60" y="86" fill="#6f7f9c" font-size="9">100%</text>
+        <text x="66" y="200" fill="#6f7f9c" font-size="9">0</text>
+        <path d="M90 84 L200 84 L370 196" stroke="#5ff1ef" stroke-width="2" fill="none"/>
+        <line x1="200" y1="84" x2="200" y2="196" stroke="#ffb84d" stroke-dasharray="4 3"/>
+        <text x="176" y="214" fill="#ffd79a" font-size="9">70°C</text>
+        <text x="350" y="214" fill="#9fb0c7" font-size="9">155°C</text>
+        <text x="70" y="112" fill="#9fb0c7" font-size="9.5">70°C 以下：可满额</text>
+        <text x="70" y="132" fill="#9fb0c7" font-size="9.5">70°C 以上：线性降到 0</text>
+        <text x="70" y="168" fill="#ff9c9c" font-size="9.5">155°C 时额定功率为 0</text>
+
+        <rect x="470" y="26" width="400" height="200" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="486" y="52" fill="#eaf3ff" font-size="11.5">误差叠加：10k / 1% / 100ppm 在 85°C</text>
+        <text x="486" y="82" fill="#9fb0c7" font-size="10">初始 1%　→ ±100Ω</text>
+        <text x="486" y="104" fill="#9fb0c7" font-size="10">温漂 100ppm×60°C　→ ±0.6% → ±60Ω</text>
+        <text x="486" y="126" fill="#9fb0c7" font-size="10">焊接应力　→ 约 ±0.2% → ±20Ω</text>
+        <text x="486" y="152" fill="#9df3c2" font-size="10.5">最坏合计 ≈ ±180Ω（±1.8%）</text>
+        <text x="486" y="180" fill="#ff9c9c" font-size="9.5">做 1% 精度的分压，这个组合就直接超标</text>
+        <text x="486" y="204" fill="#6f7f9c" font-size="9">精密场合要换 0.1% / 25ppm 薄膜电阻</text>
+
+        <text x="30" y="266" fill="#9fb0c7" font-size="10.5">功率判据：P = I²R 或 V²/R；再对照「降额后的额定功率」留 2 倍余量。</text>
+        <text x="30" y="290" fill="#6f7f9c" font-size="10">0402 上 4.7k 接 3.3V：P = 3.3²/4700 ≈ 2.3mW，占额定的 3.7%，安全。</text>
+        <text x="30" y="314" fill="#ff9c9c" font-size="10">反例：0402 上 100Ω 接 5V：P = 250mW，是额定的 4 倍——会烧出焦痕。</text>
+      </svg>
+      <figcaption><b>图 2-1</b>　降额曲线与误差叠加：标称 1% 不等于全温区 1%。</figcaption>
+    </figure>
+
+    <div class="demo">
+      <div class="dh"><b>电阻工况计算器</b><span>给阻值、电压、环境温度，算功耗占比与最坏偏差</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
+          <div><div style="font-size:12px;color:#9fb0c7">阻值 <b id="rv" style="color:#5ff1ef">4.7</b> kΩ</div><input id="r" type="range" min="0.1" max="100" step="0.1" value="4.7" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">跨压 <b id="vv" style="color:#5ff1ef">3.3</b> V</div><input id="v" type="range" min="0.5" max="24" step="0.1" value="3.3" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">环境温度 <b id="tv" style="color:#5ff1ef">25</b> °C</div><input id="t" type="range" min="-20" max="125" step="5" value="25" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">精度 <b id="av" style="color:#5ff1ef">1</b> %</div><input id="a" type="range" min="0.05" max="5" step="0.05" value="1" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="rOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h2><span class="n">2.1.3</span>排阻：省空间，还更一致</h2>
+    <p>MINI 板上 BOOT_CFG、JTAG 那几组 4.7k/10k 是「成排出现」的。用<b>排阻（电阻阵列）</b>把 4 个或 8 个同值电阻封在一个壳里，好处有两个：占位面积减少一半以上；同一封装内温漂一致，做分压/匹配时比 4 颗独立电阻更稳。代价是<b>一个烧了可能整排失效</b>，且不能单独改值。</p>
+
+    <h2><span class="n">2.1.4</span>0Ω 电阻：不是「假元件」</h2>
+    <p>0Ω 电阻实际是 10–50mΩ 的导体，额定电流取决于封装（0603 常见 1A，0805 约 2A）。用法前面提过：单点接地、割线调试位、版本配置。设计时若要过大电流，必须核对<b>额定电流</b>而不是只看「0Ω」。</p>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>一颗 0402 1/16W 的 100Ω 电阻接在 5V 上，会怎样？</summary><div class="ans">P=5²/100=250mW，是额定的 4 倍。常温下会明显发热、阻值漂移，长期会变色甚至开路。应换 1206（1/4W）或改用多颗并联/更大阻值。</div></details>
+    <details class="quiz"><summary>分压采样要求 1% 精度，选「1% 100ppm」够吗？</summary><div class="ans">不够。85°C 时温漂再加 0.6%，叠加焊接偏移后最坏接近 1.8%。应选 0.1% + 25ppm 的薄膜电阻，或做软件标定。</div></details>
+    <details class="quiz"><summary>为什么要用排阻做 BOOT_CFG 上拉？</summary><div class="ans">省面积、贴装效率高，且同封装内一致性/温漂一致，避免不同批次电阻造成个别配置脚电平差异；同时减少 BOM 行数。</div></details>
+
+    <div class="ch-nav">
+      <a href="../index.html"><span>上一篇</span><b>← 返回总目录</b></a>
+      <a class="nx" id="chNavNext" href="c02.html"><span>下一章</span><b>2.2 电容 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p2','c01.html');
+(function(){
+  function calc(){
+    var r=+document.getElementById('r').value*1000, v=+document.getElementById('v').value;
+    var t=+document.getElementById('t').value, a=+document.getElementById('a').value;
+    document.getElementById('rv').textContent=(r/1000).toFixed(1);
+    document.getElementById('vv').textContent=v.toFixed(1);
+    document.getElementById('tv').textContent=t;
+    document.getElementById('av').textContent=a.toFixed(2);
+    var p=v*v/r, pmax=0.0625;
+    var derate = t<=70 ? 1 : Math.max(0,(155-t)/85);
+    var cap=pmax*derate;
+    var use=p/cap*100;
+    var drift=(a + 0.001*Math.max(0,t-25))/100;
+    var lo=r*(1-drift), hi=r*(1+drift);
+    var ok = use<=50;
+    document.getElementById('rOut').innerHTML=
+      '<b style="color:#eaf3ff;font-size:15px">功耗 '+(p*1000).toFixed(1)+' mW（'+(p/v*1000).toFixed(2)+' mA）</b>　降额后可用 '+(cap*1000).toFixed(1)+' mW<br>'+
+      '占额比例 <b style="color:'+(ok?'#9df3c2':'#ff9c9c')+'">'+use.toFixed(1)+'%</b> '+(ok?'（≤50%，安全）':'（超过 50%，换大封装或改值）')+'<br>'+
+      '全温区最坏阻值 '+Math.round(lo)+' – '+Math.round(hi)+' Ω（±'+(drift*100).toFixed(2)+'%）<br>'+
+      '<span style="color:#6f7f9c;font-size:11.5px">按 0402 1/16W、100ppm/°C、70°C 起线性降额估算。实际请以规格书降额曲线为准。</span>';
+  }
+  ['r','v','t','a'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+</body>
+</html>
