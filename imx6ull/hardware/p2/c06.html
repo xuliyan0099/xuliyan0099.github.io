@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2.6 电源 IC | 第二篇 · 元器件深度解剖 | i.MX6ULL 学习手册</title>
+<meta name="description" content="LDO 的压差、静态电流、PSRR 与稳定性；DCDC 的 fsw、效率、反馈分压、软启动与保护；对应 U7/U12/U9 与 U1/U6/U9。">
+<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第二篇 · 元器件深度解剖</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第二篇 · 元器件</span><span class="sep">/</span>第 6 章<span class="sep">/</span>约 30 分钟</div>
+    <h1>电源 IC：LDO 与 DCDC 的分工</h1>
+    <p class="lede">这块板上有 5 种电源芯片：3 颗 DCDC（核心板 1.35V/1.35V/3.3V）、1 颗 LDO 供 SNVS、1 颗 2.8V LDO 供 CSI、1 颗 SD 电源开关，MINI 底板上还有两片 DCDC。它们不是随便选的：<b>大电流、高效率必须 DCDC；低噪声、小电流、常电用 LDO</b>。</p>
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>用压差、静态电流、效率三个数判断「该用 LDO 还是 DCDC」</li>
+        <li>算 LDO 的耗散与结温，判断是否能贴在板上不烫</li>
+        <li>用反馈电阻算出 DCDC 输出，并解释为什么反馈点要靠近芯片</li>
+        <li>说清软启动、使能、电源良好（PG）三个脚的作用</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">2.6.1</span>LDO：三个参数决定能不能用</h2>
+    <table>
+      <thead><tr><th>参数</th><th>含义</th><th>板上实例</th><th>陷阱</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">V<sub>dropout</sub></td><td>维持稳压所需的最小输入输出差</td><td>ME6209A33（U7）约 100–200mV @ 小电流</td><td>输入 3.4V 供 3.3V 时余量极小，负载一跳就跌出稳压</td></tr>
+        <tr><td class="nm">I<sub>q</sub></td><td>静态电流（无负载时的自耗）</td><td>SNVS 常电轨要求 µA 级</td><td>常电轨用了 mA 级 I<sub>q</sub> 的 LDO，电池几天就空</td></tr>
+        <tr><td class="nm">PSRR</td><td>对输入纹波的抑制（dB，随频率下降）</td><td>模拟/CSI 供电</td><td>1MHz 以上 PSRR 往往只剩 20dB，高频纹波照样透过去</td></tr>
+        <tr><td class="nm">稳定性</td><td>对输出电容 ESR 有要求</td><td>老式 LDO 需 ESR 0.1–10Ω</td><td>用超低 ESR 的 MLCC 反而振荡</td></tr>
+      </tbody>
+    </table>
+    <p>LDO 的核心缺点是效率 = V<sub>out</sub>/V<sub>in</sub>，多余能量全变热。3.3V 降到 2.8V（U12 XC6206P282MR 供 NVCC_CSI）只损失 15%，可以接受；但 5V 降到 1.35V 就只有 27% 效率、73% 变热——所以大电流降压一律用 DCDC。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 860 300" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="24" y="20" width="400" height="180" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="40" y="44" fill="#eaf3ff" font-size="11">LDO 与 DCDC 的效率分界</text>
+        <line x1="60" y1="160" x2="380" y2="160" stroke="#3a4560"/>
+        <line x1="60" y1="60" x2="60" y2="160" stroke="#3a4560"/>
+        <path d="M64 150 C 120 148 180 140 240 124 C 300 108 340 96 376 92" stroke="#5ff1ef" stroke-width="2" fill="none"/>
+        <text x="180" y="146" fill="#9fb0c7" font-size="9">LDO：效率 = Vout/Vin，线性下降</text>
+        <path d="M64 90 C 120 82 200 78 376 76" stroke="#5ce1a0" stroke-width="2" fill="none" stroke-dasharray="5 3"/>
+        <text x="200" y="70" fill="#9df3c2" font-size="9">DCDC：85–95% 几乎恒定</text>
+        <text x="60" y="176" fill="#6f7f9c" font-size="9">横轴：输入输出压差</text>
+
+        <rect x="450" y="20" width="386" height="180" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="466" y="44" fill="#eaf3ff" font-size="11">DCDC 的三个关键外围</text>
+        <text x="466" y="74" fill="#9df5f4" font-size="10">反馈分压：定输出</text>
+        <text x="466" y="94" fill="#9fb0c7" font-size="9.5">Vout = Vref×(1+R1/R2)，反馈点必须靠近 FB 脚</text>
+        <text x="466" y="120" fill="#9df5f4" font-size="10">软启动：限上电冲击</text>
+        <text x="466" y="140" fill="#9fb0c7" font-size="9.5">SS 脚电容决定爬升时间，太小会触发过流</text>
+        <text x="466" y="166" fill="#9df5f4" font-size="10">PG / EN：时序与联锁</text>
+        <text x="466" y="186" fill="#9fb0c7" font-size="9.5">保证「1.35V 先稳、3.3V 后起」这类顺序</text>
+
+        <text x="24" y="230" fill="#9fb0c7" font-size="10.5">MINI 第 4 页两片 DCJ5060T-6：输入 47µF/25V + 104，输出 4.7µH + 反馈 49.9k/15k（1%），配 SS34 续流、SMBJ TVS 保护。</text>
+        <text x="24" y="254" fill="#6f7f9c" font-size="10">这些外围不是「参考设计抄来的」：47µF 决定输入纹波，4.7µH 决定输出纹波，49.9k/15k 决定输出电压。</text>
+        <text x="24" y="278" fill="#ff9c9c" font-size="10">反例：反馈分压走线绕到板子另一头，开关噪声耦合进 FB，输出抖动甚至振荡。</text>
+      </svg>
+      <figcaption><b>图 2-6</b>　LDO 与 DCDC 的效率分界，以及 DCDC 的三个关键外围。</figcaption>
+    </figure>
+
+    <div class="demo">
+      <div class="dh"><b>LDO 还是 DCDC</b><span>给输入输出与电流，比较耗散与效率</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div><div style="font-size:12px;color:#9fb0c7">Vin <b id="iv" style="color:#5ff1ef">5</b> V</div><input id="vin" type="range" min="1.8" max="24" step="0.1" value="5" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">Vout <b id="ov" style="color:#5ff1ef">3.3</b> V</div><input id="vout" type="range" min="1" max="12" step="0.1" value="3.3" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">Iout <b id="cvv" style="color:#5ff1ef">0.3</b> A</div><input id="iout" type="range" min="0.01" max="3" step="0.01" value="0.3" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="psOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h2><span class="n">2.6.2</span>LDO 的热：算完再决定贴不贴</h2>
+    <p>耗散 P = (V<sub>in</sub> − V<sub>out</sub>) × I<sub>out</sub> + V<sub>in</sub> × I<sub>q</sub>。以 U12（3.3V→2.8V，假设 100mA）为例：P = 0.5×0.1 = 50mW，SOT-23 的 R<sub>θJA</sub> 约 200°C/W，温升 10°C——没问题。但若同样的封装做 5V→1.8V、300mA：P=0.96W，温升 190°C，直接烧。</p>
+    <div class="box tip">
+      <h5>散热三招</h5>
+      <p>① 换更大封装（SOT-89/DFN 带散热焊盘）；② 加大铜箔并与地平面多点过孔连接；③ 把压差降下来——先用 DCDC 降到接近目标，再用 LDO 做最后净化。</p>
+    </div>
+
+    <h2><span class="n">2.6.3</span>读一颗 DCDC 的规格书顺序</h2>
+    <ol class="steps">
+      <li><b>输入范围与输出能力</b>：是否覆盖 5V 输入、1.35V/2A？</li>
+      <li><b>开关频率</b>：决定电感与电容取值，也决定 EMI 频段。</li>
+      <li><b>反馈基准 V<sub>ref</sub></b>：算分压；注意规格书给的 V<sub>ref</sub> 容差（±1% 常见）。</li>
+      <li><b>保护</b>：过流、短路、过温、欠压锁定（UVLO）。</li>
+      <li><b>热阻与布局要求</b>：规格书常附「推荐 Layout」，那是最低要求，不是建议。</li>
+    </ol>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>5V 降到 1.2V、1A，为什么不能用 LDO？</summary><div class="ans">耗散 (5−1.2)×1=3.8W，效率只有 24%。任何小封装都散不掉这个热，必须用 DCDC（效率 85%+，耗散约 0.2W）。</div></details>
+    <details class="quiz"><summary>反馈分压的电阻为什么要用 1% 甚至 0.5%？</summary><div class="ans">因为输出电压精度直接由分压比决定：1% 电阻最坏会带来约 2% 的输出偏差，叠加 V<sub>ref</sub> 容差就超标。精密轨常用 0.5% / 25ppm。</div></details>
+    <details class="quiz"><summary>软启动电容取太小会怎样？</summary><div class="ans">上电时输出爬升太快，输入电容被瞬间抽空，触发过流保护或造成输入电压跌落，表现为「上电重启」或「带大容载起不来」。</div></details>
+
+    <div class="ch-nav"><a href="c05.html"><span>上一章</span><b>← 2.5 三极管与 MOS</b></a>
+      <a class="nx" id="chNavNext" href="c07.html"><span>下一章</span><b>2.7 接口与逻辑 IC →</b></a></div>
+  </main>
+</div>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+<script>
+renderPart('p2','c06.html');
+(function(){
+  function calc(){
+    var vin=+document.getElementById('vin').value, vout=+document.getElementById('vout').value, io=+document.getElementById('iout').value;
+    document.getElementById('iv').textContent=vin.toFixed(1);
+    document.getElementById('ov').textContent=vout.toFixed(1);
+    document.getElementById('cvv').textContent=io.toFixed(2);
+    var pl=(vin-vout)*io, eff=vout/vin*100;
+    var pout=vout*io, pdcdc=pout*(1/0.9-1);
+    var tj=25+pl*200;
+    var rec = (eff>=80 && vin>vout) ? 'DCDC 更合适' : 'LDO 可接受（但核对热）';
+    document.getElementById('psOut').innerHTML=
+      '<b style="color:#eaf3ff;font-size:15px">LDO：耗散 '+(pl*1000).toFixed(0)+' mW，效率 '+(eff>0?eff.toFixed(1):'—')+'%</b><br>'+
+      'DCDC（按 90%）：耗散约 '+(pdcdc*1000).toFixed(0)+' mW，效率 90%<br>'+
+      'SOT-23（RθJA≈200°C/W）估算结温 ≈ '+(tj>0?tj.toFixed(0):'—')+' °C　'+(tj>125?'<span style="color:#ff9c9c">过热，必须改方案</span>':'<span style="color:#9df3c2">可接受</span>')+'<br>'+
+      '<span style="color:#eaf3ff">结论：'+rec+'</span><br>'+
+      '<span style="color:#6f7f9c;font-size:11.5px">判据：压差大 + 电流大 → DCDC；压差小（&lt;0.6V）或电流小（&lt;50mA）或要低噪声 → LDO。</span>';
+  }
+  ['vin','vout','iout'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+</body></html>

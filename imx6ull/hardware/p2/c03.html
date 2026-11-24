@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2.3 电感 | 第二篇 · 元器件深度解剖 | i.MX6ULL 学习手册</title>
+<meta name="description" content="饱和电流、直流电阻 DCR、屏蔽与耦合、DCDC 电感取值与纹波；MINI 板 4.7µH 与核心板 2.2µH 的对照。">
+<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第二篇 · 元器件深度解剖</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第二篇 · 元器件</span><span class="sep">/</span>第 3 章<span class="sep">/</span>约 24 分钟</div>
+    <h1>电感：三个电流参数决定生死</h1>
+    <p class="lede">电容看电压，电感看电流。一颗电感的规格书里，真正决定能不能用的不是「感值」，而是<b>饱和电流 I<sub>sat</sub>、温升电流 I<sub>rms</sub>、直流电阻 DCR</b>。选错这三个，DCDC 会在满载瞬间「掉压」甚至烧毁。</p>
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>区分 I<sub>sat</sub> 与 I<sub>rms</sub>，说清各自对应的失效模式</li>
+        <li>用 ΔI = V<sub>out</sub>(V<sub>in</sub>−V<sub>out</sub>)/(L·f<sub>s</sub>·V<sub>in</sub>) 算出纹波电流，并选感值</li>
+        <li>解释 DCR 如何变成铜损，以及为什么屏蔽电感更贵</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">2.3.1</span>三个电流参数</h2>
+    <table>
+      <thead><tr><th>参数</th><th>含义</th><th>超了会怎样</th><th>选型余量</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">I<sub>sat</sub></td><td>感值跌到标称 70–80%（或 90%）时的电流</td><td>感值骤降、纹波暴涨、DCDC 失控过流</td><td>峰值电流 ≤ 0.7×I<sub>sat</sub></td></tr>
+        <tr><td class="nm">I<sub>rms</sub>（I<sub>heat</sub>）</td><td>温升到规定值（常 40°C）的等效电流</td><td>持续过热、绝缘老化、焊点疲劳</td><td>有效值 ≤ 0.8×I<sub>rms</sub></td></tr>
+        <tr><td class="nm">DCR</td><td>绕线直流电阻</td><td>铜损 P=I²·DCR，效率下降、发热</td><td>按效率目标反算</td></tr>
+      </tbody>
+    </table>
+    <p>MINI 板第 4 页的两片 <b>DCJ5060T-6（U6、U9）</b>各配一颗 <b>4.7µH（L1、L2）</b>；核心板的 <b>2.2µH（L2）</b>服务 1.35V 大电流轨。同样是「几 µH」，差别在电流能力：1.35V 轨的输出电流远大于 5V 小轨，所以感值更小、饱和电流更大。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 860 300" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="24" y="22" width="390" height="170" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="40" y="46" fill="#eaf3ff" font-size="11">降压 DCDC 的电流三角波</text>
+        <line x1="60" y1="140" x2="380" y2="140" stroke="#3a4560"/>
+        <path d="M60 140 L120 140 L180 100 L240 140 L300 100 L360 140" stroke="#5ff1ef" stroke-width="1.6" fill="none"/>
+        <line x1="60" y1="120" x2="380" y2="120" stroke="#ffb84d" stroke-dasharray="4 3"/>
+        <text x="66" y="114" fill="#ffd79a" font-size="9">峰值 = Iout + ΔI/2</text>
+        <text x="180" y="160" fill="#9fb0c7" font-size="9">谷值 = Iout − ΔI/2</text>
+        <text x="40" y="186" fill="#6f7f9c" font-size="9">峰值必须低于 I sat，否则每周期都进入饱和</text>
+
+        <rect x="440" y="22" width="390" height="170" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="456" y="46" fill="#eaf3ff" font-size="11">感值怎么定：纹波与体积的折中</text>
+        <text x="456" y="76" fill="#9fb0c7" font-size="10">ΔI = Vout(Vin−Vout)/(L·fs·Vin)</text>
+        <text x="456" y="102" fill="#9fb0c7" font-size="10">L 大 → ΔI 小 → 纹波小、但体积大、响应慢</text>
+        <text x="456" y="124" fill="#9fb0c7" font-size="10">L 小 → ΔI 大 → 体积小、但峰值高易饱和</text>
+        <text x="456" y="152" fill="#9df3c2" font-size="10">经验目标：ΔI ≈ 0.2–0.4 × Iout</text>
+        <text x="456" y="176" fill="#6f7f9c" font-size="9">本板 4.7µH 属「小电流、要低纹波」的取值</text>
+      </svg>
+      <figcaption><b>图 2-3</b>　电感电流三角波与感值取舍。</figcaption>
+    </figure>
+
+    <div class="demo">
+      <div class="dh"><b>电感选型计算器</b><span>输入工况，算纹波、峰值与最小感值</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
+          <div><div style="font-size:12px;color:#9fb0c7">Vin <b id="iv" style="color:#5ff1ef">12</b> V</div><input id="vin" type="range" min="3" max="24" step="0.1" value="12" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">Vout <b id="ov" style="color:#5ff1ef">5</b> V</div><input id="vout" type="range" min="1" max="20" step="0.1" value="5" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">Iout <b id="il" style="color:#5ff1ef">1</b> A</div><input id="iout" type="range" min="0.1" max="5" step="0.05" value="1" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">L <b id="lv" style="color:#5ff1ef">4.7</b> µH</div><input id="l" type="range" min="0.5" max="22" step="0.1" value="4.7" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="indOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h2><span class="n">2.3.2</span>DCR 与屏蔽：看不见的两个成本项</h2>
+    <p>DCR 直接变成铜损：1A 通过 50mΩ 就是 50mW，看似不多，但在 1.35V/2A 的轨上就明显了。选型经验：<b>大电流轨优先低 DCR（&lt;20mΩ），小电流轨可放宽</b>。</p>
+    <p><b>屏蔽电感</b>（带金属壳）比开放式贵，但漏磁小。在 SoC 旁边、DDR 旁边、晶振旁边，漏磁会耦合进高阻节点（VREF、晶振、ADC），表现为「电源一加载，采样就抖」。这就是为什么核心板靠近 DDR 的那颗用的是屏蔽型。</p>
+    <div class="box pit">
+      <h5>三个常见错误</h5>
+      <p><b>1. 只按 Iout 选 I<sub>sat</sub>。</b>峰值是 Iout+ΔI/2，且启动/负载跳变时还有过冲，余量要按峰值算。</p>
+      <p><b>2. 两颗电感靠太近同向。</b>互感让有效感值变化，纹波与环路都变。</p>
+      <p><b>3. 用电感的「额定电流」当饱和电流。</b>很多厂商标的是 I<sub>rms</sub>，饱和点可能只有它的 1.3 倍。</p>
+    </div>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>Vin=5V、Vout=1.35V、Iout=2A、fs=1MHz、L=2.2µH，峰值电流约多少？</summary><div class="ans">ΔI = 1.35×(5−1.35)/(2.2µ×1M×5) ≈ 0.45A，峰值 ≈ 2.22A。所以 I<sub>sat</sub> 至少要 3A 以上才安全。</div></details>
+    <details class="quiz"><summary>为什么 I<sub>sat</sub> 通常标在「感值下降 30%」而不是「完全饱和」？</summary><div class="ans">因为工程上以感值明显下降为失效判据：此时纹波已大幅超出设计值，环路可能失稳。标 30% 下降点比标「彻底饱和」更接近实际可用边界。</div></details>
+    <details class="quiz"><summary>屏蔽电感解决的是什么问题？</summary><div class="ans">漏磁耦合。开放式电感的磁力线外泄，会干扰邻近的晶振、VREF、ADC 等高阻/高灵敏节点，表现为噪声与漂移。</div></details>
+
+    <div class="ch-nav"><a href="c02.html"><span>上一章</span><b>← 2.2 电容</b></a>
+      <a class="nx" id="chNavNext" href="c04.html"><span>下一章</span><b>2.4 二极管与 TVS →</b></a></div>
+  </main>
+</div>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+<script>
+renderPart('p2','c03.html');
+(function(){
+  function calc(){
+    var vin=+document.getElementById('vin').value, vout=+document.getElementById('vout').value;
+    var io=+document.getElementById('iout').value, L=+document.getElementById('l').value*1e-6;
+    var fs=1e6;
+    document.getElementById('iv').textContent=vin.toFixed(1);
+    document.getElementById('ov').textContent=vout.toFixed(1);
+    document.getElementById('il').textContent=io.toFixed(2);
+    document.getElementById('lv').textContent=(L*1e6).toFixed(1);
+    var dI = vout*(vin-vout)/(L*fs*vin);
+    var ipk = io + dI/2;
+    var ratio = dI/io;
+    var minL = vout*(vin-vout)/(0.4*io*fs*vin);
+    var ok = vin>vout && ratio<0.5;
+    document.getElementById('indOut').innerHTML =
+      '<b style="color:'+(ok?'#9df3c2':'#ff9c9c')+';font-size:15px">ΔI ≈ '+dI.toFixed(2)+' A　峰值 ≈ '+ipk.toFixed(2)+' A</b><br>'+
+      '纹波比 ΔI/Iout = '+ratio.toFixed(2)+'　'+(ratio>0.4?'偏大，建议加大感值':'合理（目标 0.2–0.4）')+'<br>'+
+      '按 ΔI=0.4×Iout 反算，最小感值 ≈ '+(minL*1e6).toFixed(2)+' µH<br>'+
+      (vin<=vout?'<span style="color:#ff9c9c">Vout ≥ Vin：这是升压拓扑，本章公式不适用</span><br>':'')+
+      '<span style="color:#6f7f9c;font-size:11.5px">再核对：峰值 ≤ 0.7×I sat；有效值 ≤ 0.8×I rms；DCR 造成的铜损 = Iout²×DCR。</span>';
+  }
+  ['vin','vout','iout','l'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+</body></html>

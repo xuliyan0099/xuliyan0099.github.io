@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2.4 二极管与 TVS 的规格书 | 第二篇 · 元器件深度解剖 | i.MX6ULL 学习手册</title>
+<meta name="description" content="Vf-If 曲线、漏电随温度、Vbr/Vc/Ipp 与结电容；SMB 封装功率降额；D1/D2/D3 的选型核算。">
+<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第二篇 · 元器件深度解剖</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第二篇 · 元器件</span><span class="sep">/</span>第 4 章<span class="sep">/</span>约 22 分钟</div>
+    <h1>二极管与 TVS：怎么从规格书里选对一颗</h1>
+    <p class="lede">第 1.6 章讲清了「谁是谁」，这一章讲「怎么选」。同样是 SMB 封装，一颗是 5V 的 TVS、一颗是 30V 的肖特基——它们的极限、曲线、失效方式完全不同。选型不是抄参考设计，是<b>把四个工作点对上</b>。</p>
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>用 Vf–If 曲线而不是「0.7V」这个数来估压降与发热</li>
+        <li>说清 V<sub>br</sub>、V<sub>c</sub>、I<sub>pp</sub>、C<sub>j</sub> 四个 TVS 参数怎么互相约束</li>
+        <li>按封装功率降额，判断一颗 SMB 的 TVS 能吸收多少能量</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">2.4.1</span>正向：Vf 是电流的函数</h2>
+    <p>规格书写 Vf = 0.45V，通常是在 <b>I<sub>f</sub> = 1A</b>、25°C 条件下的值。电流变小，Vf 也变小（对数关系）；电流变大、温度升高，Vf 反而下降（硅的负温度系数）。所以：</p>
+    <ul>
+      <li>估<b>压降</b>时按实际工作电流查曲线，不要用 0.7V 硬套；</li>
+      <li>估<b>发热</b>时用 P = Vf × I<sub>f</sub>（平均值，不是峰值）；</li>
+      <li>做<b>低温启动</b>时注意：冷态 Vf 更高，余量更小。</li>
+    </ul>
+    <p>MINI 板的 <b>D3（RB521S-30）</b>串在 <code>DCDC_5V</code> 到 USB VBUS 之间，正常电流 100mA 级：Vf 约 0.3V，损耗 30mW，可忽略；但如果外接设备吃 500mA，Vf 会升到 0.4V 以上，压降与发热都要重算。</p>
+
+    <h2><span class="n">2.4.2</span>反向：漏电随温度翻倍</p>
+    <p>肖特基的反向漏电 I<sub>R</sub> 是最容易被忽略的参数：25°C 时 10µA，到 85°C 可能变成 100µA 以上（大约每升 10°C 翻一倍）。在「电池待机」「高阻采样」这类电路里，一颗肖特基的漏电就能毁掉微安级预算。</p>
+    <div class="box tip">
+      <h5>替代方案：理想二极管</h5>
+      <p>需要「防反接 + 低损耗 + 低漏电」时，用 P-MOS 或专用理想二极管控制器。导通时压降只有 I×R<sub>ds(on)</sub>（几 mV 到几十 mV），反向时完全关断，漏电是 nA 级。</p>
+    </div>
+
+    <h2><span class="n">2.4.3</span>TVS 四个参数的互相约束</h2>
+    <table>
+      <thead><tr><th>参数</th><th>典型值（SMBJ5.0A）</th><th>选型判据</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">V<sub>RWM</sub></td><td>5.0V</td><td>≥ 被保护线路的最高工作电压（含 10% 余量）</td></tr>
+        <tr><td class="nm">V<sub>br</sub></td><td>6.4–7.0V</td><td>不能低于正常工作电压，否则平时就漏电发热</td></tr>
+        <tr><td class="nm">V<sub>c</sub></td><td>9.2V @ I<sub>pp</sub></td><td>必须低于后级器件的绝对最大额定（并留 20% 余量）</td></tr>
+        <tr><td class="nm">I<sub>pp</sub> / P<sub>pp</sub></td><td>按 10/1000µs 波形标</td><td>按实际浪涌波形折算能量，不能只看峰值功率</td></tr>
+        <tr><td class="nm">C<sub>j</sub></td><td>几百 pF 到几 nF</td><td>高速线（USB/以太网）必须选低电容型号</td></tr>
+      </tbody>
+    </table>
+    <p>典型矛盾：想要低钳位（保护后级）就得选低 V<sub>br</sub>，但低 V<sub>br</sub> 在正常工作电压下漏电大、甚至误触发；想要低电容就得牺牲浪涌能力。<b>没有一颗 TVS 能同时最优</b>，只能按场景取舍。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 860 280" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="24" y="20" width="400" height="150" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="40" y="44" fill="#eaf3ff" font-size="11">TVS 的工作区间</text>
+        <line x1="60" y1="130" x2="390" y2="130" stroke="#3a4560"/>
+        <path d="M60 130 L150 130 C 180 128 200 110 215 90 L 300 46" stroke="#ff9c9c" stroke-width="1.8" fill="none"/>
+        <line x1="150" y1="60" x2="150" y2="130" stroke="#ffb84d" stroke-dasharray="4 3"/>
+        <line x1="215" y1="60" x2="215" y2="130" stroke="#5ce1a0" stroke-dasharray="4 3"/>
+        <text x="112" y="54" fill="#ffd79a" font-size="9">V RWM</text>
+        <text x="196" y="54" fill="#9df3c2" font-size="9">V br</text>
+        <text x="40" y="160" fill="#6f7f9c" font-size="9">正常区几乎不导通；击穿后电流陡增、电压被钳住</text>
+
+        <rect x="450" y="20" width="386" height="150" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="466" y="44" fill="#eaf3ff" font-size="11">选型四步</text>
+        <text x="466" y="72" fill="#9fb0c7" font-size="10">① 定最高工作电压 → 选 V RWM</text>
+        <text x="466" y="94" fill="#9fb0c7" font-size="10">② 查后级绝对最大 → 约束 Vc</text>
+        <text x="466" y="116" fill="#9fb0c7" font-size="10">③ 估浪涌波形 → 定 Ipp/功率</text>
+        <text x="466" y="138" fill="#9fb0c7" font-size="10">④ 高速线 → 查 Cj 与插入损耗</text>
+        <text x="466" y="160" fill="#6f7f9c" font-size="9">顺序不能反：先满足保护，再谈余量</text>
+
+        <text x="24" y="206" fill="#9fb0c7" font-size="10.5">封装功率降额：SMB（约 5W 峰值 @10/1000µs）在 85°C 环境要按曲线打折，别拿 25°C 的数直接用。</text>
+        <text x="24" y="230" fill="#6f7f9c" font-size="10">MINI 的 D1（SMBJ5.0A）挡 5V 入口，D2（SMBJ3.3A）挡 3.3V 轨，两级分工正是「入口吸收大能量、内部吸收残余」。</text>
+        <text x="24" y="254" fill="#ff9c9c" font-size="10">反例：把 5V 的 TVS 用在 12V 线上，正常工作时就一直击穿导通，几分钟就烧。</text>
+      </svg>
+      <figcaption><b>图 2-4</b>　TVS 工作区间与四步选型。</figcaption>
+    </figure>
+
+    <h2><span class="n">2.4.4</span>三颗器件，三套判据</h2>
+    <table>
+      <thead><tr><th>位号</th><th>类型</th><th>关键核算</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">D1 SMBJ5.0A</td><td>TVS（5V 档）</td><td>V<sub>c</sub>=9.2V 是否低于后级（DCDC 输入）绝对最大；浪涌能量是否在 SMB 降额内</td></tr>
+        <tr><td class="nm">D2 SMBJ3.3A</td><td>TVS（3.3V 档）</td><td>V<sub>c</sub> 是否低于 SoC IO 绝对最大（3.6V 级）；注意 3.3V 档 TVS 的 V<sub>br</sub> 与 3.3V 工作电压的间隙很小</td></tr>
+        <tr><td class="nm">D3 RB521S-30</td><td>肖特基 30V/200mA</td><td>正向压降与电流、反向漏电（尤其高温）、反向耐压 30V 是否够</td></tr>
+      </tbody>
+    </table>
+    <div class="box pit">
+      <h5>两个真实翻车点</h5>
+      <p><b>1. 3.3V 轨用 3.3V TVS。</b>V<sub>RWM</sub>=3.3V 的型号在 3.3V±5% 供电下已接近击穿，漏电大、发热。工程上常用 5V 档 TVS 保护 3.3V 轨，靠后级的耐压余量兜住钳位电压。</p>
+      <p><b>2. TVS 前面没有限流。</b>持续过压时 TVS 会烧毁甚至起火。正确顺序是保险丝/自恢复保险 → TVS。</p>
+    </div>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>后级芯片绝对最大 6V，TVS 钳位 9.2V，怎么补救？</summary><div class="ans">三种做法：换更低钳位的 TVS（但要注意正常工作电压）；在 TVS 与后级之间加限流电阻/磁珠，把残余能量消耗掉；或加一级 LDO/负载开关，让后级看到的是稳压后的电压。</div></details>
+    <details class="quiz"><summary>为什么 USB 数据线的 TVS 要看结电容？</summary><div class="ans">几 nF 的结电容并在差分线上，会严重破坏 90Ω 差分阻抗、削弱眼图。必须选 C<sub>j</sub> 小于 1pF 量级的专用型号。</div></details>
+    <details class="quiz"><summary>肖特基在 85°C 下漏电翻倍，对什么电路影响最大？</summary><div class="ans">微安级待机电路、高阻采样/保持电路、电池电压检测。漏电会变成「假负载」，把待机电流抬高一个量级。</div></details>
+
+    <div class="ch-nav"><a href="c03.html"><span>上一章</span><b>← 2.3 电感</b></a>
+      <a class="nx" id="chNavNext" href="c05.html"><span>下一章</span><b>2.5 三极管与 MOS 规格 →</b></a></div>
+  </main>
+</div>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+<script>renderPart('p2','c04.html');</script>
+</body></html>

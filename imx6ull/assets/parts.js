@@ -24,12 +24,12 @@ window.PARTS = [
     chapters: [
       { n: '2.1', t: '电阻', s: '封装、精度、温漂、额定功率、排阻与 0Ω', f: 'c01.html', ready: true },
       { n: '2.2', t: '电容', s: 'MLCC 材质、直流偏压降容、钽与聚合物、ESR', f: 'c02.html', ready: true },
-      { n: '2.3', t: '电感', s: '饱和电流、DCR、屏蔽、DCDC 电感怎么选', f: 'c03.html', ready: false },
-      { n: '2.4', t: '二极管与 TVS', s: '正向压降、反向漏电、钳位电压、结电容', f: 'c04.html', ready: false },
-      { n: '2.5', t: '三极管与 MOS', s: 'Vgs(th)、Rds(on)、Qg、热阻', f: 'c05.html', ready: false },
-      { n: '2.6', t: '电源 IC', s: 'LDO 与 DCDC 规格书的关键页', f: 'c06.html', ready: false },
-      { n: '2.7', t: '接口与逻辑 IC', s: '电平转换、缓冲、模拟开关、ESD 阵列', f: 'c07.html', ready: false },
-      { n: '2.8', t: '怎么读数据手册', s: '绝对最大值、推荐条件、时序表、封装图', f: 'c08.html', ready: false }
+      { n: '2.3', t: '电感', s: '饱和电流、DCR、屏蔽、DCDC 电感怎么选', f: 'c03.html', ready: true },
+      { n: '2.4', t: '二极管与 TVS', s: '正向压降、反向漏电、钳位电压、结电容', f: 'c04.html', ready: true },
+      { n: '2.5', t: '三极管与 MOS', s: 'Vgs(th)、Rds(on)、Qg、热阻', f: 'c05.html', ready: true },
+      { n: '2.6', t: '电源 IC', s: 'LDO 与 DCDC 规格书的关键页', f: 'c06.html', ready: true },
+      { n: '2.7', t: '接口与逻辑 IC', s: '电平转换、缓冲、模拟开关、ESD 阵列', f: 'c07.html', ready: true },
+      { n: '2.8', t: '怎么读数据手册', s: '绝对最大值、推荐条件、时序表、封装图', f: 'c08.html', ready: true }
     ]
   },
   {
