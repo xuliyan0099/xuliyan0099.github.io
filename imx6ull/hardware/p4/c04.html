@@ -100,6 +100,13 @@
     <details class="quiz"><summary>为什么 0.1µF 的安装电感从 1nH 增到 5nH，效果差很多？</summary><div class="ans">自谐振频率从约 16MHz 降到约 7MHz，意味着 10MHz 以上它已经呈感性，不再起旁路作用，高频噪声直接透到芯片。</div></details>
     <details class="quiz"><summary>平面电容为什么对高频有用？</summary><div class="ans">相邻电源/地平面构成一个大面积平板电容，虽然容值小（nF 级），但 ESL 极低，能在几百 MHz 以上继续提供低阻抗。</div></details>
 
+    
+    <h2>原页对照</h2>
+    <figure class="fig sch">
+      <div class="scroller"><a href="../../assets/img/sch/core_p2.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/core_p2.png" alt="CORE V2.0 第 2 页 SoC 电源脚" loading="lazy"></a></div>
+      <figcaption><b>原页 · CORE p2</b>　PDN 的实物样本：VDD_ARM_CAP 与 VDD_SOC_CAP 各四组电容（22µF + 0.1µF），VDD_HIGH_IN 与 SNVS 也是 22µF+0.1µF 成对出现。<b>「大容量 + 小容量 + 贴近引脚」</b>不是口诀，是这一页画出来的事实。<a class="zoom" href="../../assets/img/sch/core_p2.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
+    </figure>
+
     <div class="ch-nav"><a href="c03.html"><span>上一章</span><b>← 4.3 LDO 热设计</b></a>
       <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>4.5 上下拉与终端取值 →</b></a></div>
   </main>

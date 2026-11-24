@@ -100,6 +100,13 @@
     <details class="quiz"><summary>为什么输入电容要按 RMS 电流选，而不是按容值？</summary><div class="ans">因为输入电容承受的是脉冲电流（占空比 D 的方波），其发热由 I²·ESR 决定。容值只决定电压纹波，RMS 电流决定寿命与温升。</div></details>
     <details class="quiz"><summary>反馈电阻从 49.9k/15k 改成 47k/15k 会怎样？</summary><div class="ans">比值从 4.327 变 4.133，输出降低约 4.5%（按同 Vref）；同时 47k 是 5% 系列，精度下降。输出电压偏离规格。</div></details>
 
+    
+    <h2>原页对照</h2>
+    <figure class="fig sch">
+      <div class="scroller"><a href="../../assets/img/sch/mini_p4_fb5.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/mini_p4_fb5.png" alt="MINI V2.2 第 4 页 DC IN 与 VBIN" loading="lazy"></a></div>
+      <figcaption><b>原页 · MINI p4</b>　U6（DCJ5060T_6）把 DC_IN 降到 VBIN：反馈 R54 84.5k 1% / R69 15k 1%，比值 6.633；与 U4 的 49.9k/15k（比值 4.327）联立，可反推芯片基准 0.768V，从而得到 5.09V 与 3.32V。这就是「外围计算」的真实参照。<a class="zoom" href="../../assets/img/sch/mini_p4_fb5.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
+    </figure>
+
     <div class="ch-nav"><a href="c01.html"><span>上一章</span><b>← 4.1 电流预算</b></a>
       <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>4.3 LDO 热设计 →</b></a></div>
   </main>

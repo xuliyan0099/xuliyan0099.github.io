@@ -102,6 +102,13 @@
     <details class="quiz"><summary>为什么加大铜箔能降 R<sub>θJA</sub>？</summary><div class="ans">因为热量从结传到引脚再到铜箔，铜箔相当于散热器，面积越大对流与辐射散热越强，热阻下降。</div></details>
     <details class="quiz"><summary>同样耗散，为什么 DFN 比 SOT-23 凉？</summary><div class="ans">DFN 有裸露散热焊盘，热直接传到 PCB 地平面；SOT-23 只靠引脚传热，路径长、热阻大。</div></details>
 
+    
+    <h2>原页对照</h2>
+    <figure class="fig sch">
+      <div class="scroller"><a href="../../assets/img/sch/core_p1.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/core_p1.png" alt="CORE V2.0 第 1 页 LDO" loading="lazy"></a></div>
+      <figcaption><b>原页 · CORE p1</b>　LDO 热设计的真实对象：U7 ME6209A33（SNVS 3.3V）、U12 XC6206P282MR（2.8V）、U9 TMI6030（SD）。三颗都是 SOT-23-5，压差×(负载电流+静态电流) 全部变成热，θ<sub>JA</sub> 约 200–250°C/W，算出来才知道会不会烫。<a class="zoom" href="../../assets/img/sch/core_p1.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
+    </figure>
+
     <div class="ch-nav"><a href="c02.html"><span>上一章</span><b>← 4.2 DCDC 外围计算</b></a>
       <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>4.4 去耦与 PDN →</b></a></div>
   </main>

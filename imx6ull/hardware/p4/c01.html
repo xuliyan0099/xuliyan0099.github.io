@@ -100,6 +100,13 @@
     <details class="quiz"><summary>为什么上拉电阻也要算进预算？</summary><div class="ans">因为它们是常态负载：10 颗 4.7k 在 3.3V 下就是约 7mA；看起来小，但在 µA 级待机设计里就是致命的。</div></details>
     <details class="quiz"><summary>峰值 1.4A，选 1.5A 的 DCDC 行不行？</summary><div class="ans">不行。峰值已达额定的 93%，且没算效率与温升降额；应选 2A 级，或加大输出电容/软启动来削峰。</div></details>
 
+    
+    <h2>原页对照</h2>
+    <figure class="fig sch">
+      <div class="scroller"><a href="../../assets/img/sch/core_p1.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/core_p1.png" alt="CORE V2.0 第 1 页电源" loading="lazy"></a></div>
+      <figcaption><b>原页 · CORE p1</b>　电流预算的全部对象都在这一页：SNVS 3.3V、NVCC_CSI 2.8V、ARM/SOC 1.345V、DCDC_3V3 3.32V、LVDDR3 1.35V、NVCC_SD。右下角的官方电流表（27mA / 12mA / 400mA / 1.5A 等）就是预算的起点，别凭感觉估。<a class="zoom" href="../../assets/img/sch/core_p1.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
+    </figure>
+
     <div class="ch-nav"><a href="../index.html"><span>上一篇</span><b>← 返回总目录</b></a>
       <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>4.2 DCDC 外围计算 →</b></a></div>
   </main>
