@@ -52,15 +52,19 @@
 
     var nav = document.getElementById('volNav');
     if (nav) {
-      var idx = 0;
-      part.chapters.forEach(function (c, i) { if (c.f === file) idx = i; });
-      var prev = idx > 0 ? part.chapters[idx - 1] : null;
-      var next = idx < part.chapters.length - 1 ? part.chapters[idx + 1] : null;
+      var flat = [];
+      (window.DP_PARTS || []).forEach(function (p) {
+        p.chapters.forEach(function (c) { flat.push({ pid: p.id, n: c.n, f: c.f }); });
+      });
+      var gi = -1;
+      flat.forEach(function (c, i) { if (c.pid === partId && c.f === file) gi = i; });
+      var prev = gi > 0 ? flat[gi - 1] : null;
+      var next = gi > -1 && gi < flat.length - 1 ? flat[gi + 1] : null;
       var html = prev
-        ? '<a href="../' + part.id + '/' + prev.f + '">← ' + prev.n + '</a>'
+        ? '<a href="../' + prev.pid + '/' + prev.f + '">← ' + prev.n + '</a>'
         : '<a href="../index.html">← 目录</a>';
       html += next
-        ? '<a class="nx" href="../' + part.id + '/' + next.f + '">' + next.n + ' →</a>'
+        ? '<a class="nx" href="../' + next.pid + '/' + next.f + '">' + next.n + ' →</a>'
         : '<a class="nx" href="../index.html">目录 →</a>';
       nav.innerHTML = html;
     }

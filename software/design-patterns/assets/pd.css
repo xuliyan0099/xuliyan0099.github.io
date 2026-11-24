@@ -293,7 +293,7 @@ section[id]{scroll-margin-top:76px}
   text-decoration:none;color:#aab6cc;font-size:13px;line-height:1.45;border:1px solid transparent;
 }
 #sidebar>ol>li>a:hover{background:rgba(255,255,255,.035);color:#e7eaf0;border-color:var(--line)}
-#sidebar .no{flex:none;width:30px;font:600 11px/1.75 var(--mono);color:#7d8fb0;letter-spacing:0}
+#sidebar .no{flex:none;width:34px;font:600 11px/1.75 var(--mono);color:#7d8fb0;letter-spacing:0}
 #sidebar .sub{display:block;font-size:10.5px;line-height:1.5;color:#6b7385;margin-top:2px}
 #sidebar>ol>li>a.active{background:rgba(124,156,255,.09);border-color:rgba(124,156,255,.3);color:#dbe6ff}
 #sidebar>ol>li>a.active .no{color:var(--ac2)}
@@ -410,3 +410,4 @@ section[id]{scroll-margin-top:76px}
   .chrow .cm{display:none}
   .part-head2 h2{font-size:19px}
 }
+
