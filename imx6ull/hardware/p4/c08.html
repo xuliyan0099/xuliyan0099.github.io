@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4.8 测量与故障注入：从「不上电」到定位到一颗电阻 | 第四篇 · 设计与计算 | i.MX6ULL 学习手册</title>
+<meta name="description" content="给出一套可执行的板级测量与故障注入流程：限流上电五步、纹波/复位/时钟的正确测法、示波器带宽换算、十种注入实验与判据表。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第四篇 · 设计与计算</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第四篇 · 计算</span><span class="sep">/</span>第 8 章<span class="sep">/</span>约 60 分钟</div>
+    <h1>测量与故障注入：从「不上电」到定位到一颗电阻</h1>
+    <p class="lede">调试不是「换一颗试试」，而是<b>先设计实验，再看数据，最后收敛到一颗元件</b>。这一章给一套本板可直接执行的流程：限流上电五步、四个关键波形的正确测法、十种故障注入实验与判据表。</p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>按「限流 0.1A 起」的安全流程给一块新板首次上电</li>
+        <li>正确测电源纹波、复位时序、晶振幅度、DDR 时钟（四种不同姿势）</li>
+        <li>用 BW=0.35/t<sub>r</sub> 判断示波器够不够、探头带不带得动</li>
+        <li>设计 10 组故障注入实验（短路/开路/拉偏/相位偏移/温变）</li>
+        <li>把「现象」映射到「最可能元件」，而不是瞎猜</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">4.8.1</span>工具与它们的边界</h2>
+    <table>
+      <thead><tr><th>工具</th><th>能测</th><th>不能测 / 陷阱</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">数字万用表</td><td>直流电压、电阻、通断、二极管</td><td>高频纹波、动态电流；电阻档测在路电阻会被并联路径干扰</td></tr>
+        <tr><td class="nm">示波器（100MHz+）</td><td>纹波、时序、时钟、总线</td><td>探头地线过长会引入假尖峰；带宽不足会「抹平」真实边沿</td></tr>
+        <tr><td class="nm">限流直流电源</td><td>首次上电、功耗</td><td>限流过低会「假性不上电」；线损导致实际电压偏低</td></tr>
+        <tr><td class="nm">电子负载</td><td>负载跳变、效率</td><td>低速负载无法模拟 CPU 的 ns 级跳变</td></tr>
+        <tr><td class="nm">热像仪</td><td>找发热点、LDO 过载</td><td>发射率设置错误会读低 30°C 以上</td></tr>
+      </tbody>
+    </table>
+    <p>本板调试最少需要：万用表 + 100MHz 示波器 + 可限流电源。缺一样，很多结论就只能靠猜。</p>
+
+    <h2><span class="n">4.8.2</span>首次上电：五步法</h2>
+    <ol>
+      <li><b>断电测短路</b>：万用表电阻档测 DCDC_5V、DCDC_3V3、VDD_ARM_SOC_IN 对地电阻。判据：&gt;100Ω（1.35V 域可能只有几十 Ω，属正常，但要与同批板对比）。</li>
+      <li><b>限流 0.1A 上电</b>：若电流立刻顶到 0.1A，说明有短路，立即断电。判据：空载电流 &lt;50mA。</li>
+      <li><b>逐级量电压</b>：DC_IN → VM → DCDC_5V → DCDC_3V3 → VDD_ARM_SOC_IN → DRAM_1V35 → NVCC_SD。每级都要在标称 ±5% 内。</li>
+      <li><b>看复位与时钟</b>：POR_B 应为「低 200ms 后高」；OSC_OUT 应起振且 ≥1V<sub>pp</sub>。</li>
+      <li><b>放开限流到 1A，观察温升</b>：空载运行 10 分钟，摸 SoC/DCDC/PHY 温度。判据：无明显烫手（&lt;60°C）。</li>
+    </ol>
+    <p>这五步的价值：<b>把「不启动」拆成电源、复位、时钟三个可独立验证的条件</b>。任何一步失败，后面的都不用看。</p>
+
+    <h2><span class="n">4.8.3</span>四种波形的正确测法</h2>
+    <table>
+      <thead><tr><th>对象</th><th>探头设置</th><th>判据</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">电源纹波</td><td>AC 耦合、20MHz 带宽限制、弹簧地针、10:1</td><td>3.3V &lt;30mV<sub>pp</sub>；1.35V &lt;20mV<sub>pp</sub></td></tr>
+        <tr><td class="nm">复位时序</td><td>DC 耦合、双通道（POR_B + DCDC_5V）</td><td>5V 稳定后 ≥100ms 才释放复位</td></tr>
+        <tr><td class="nm">晶振</td><td>×10 探头测 OSC_OUT、DC 耦合</td><td>24MHz ≥1V<sub>pp</sub>；频率 ±50ppm</td></tr>
+        <tr><td class="nm">DDR 时钟</td><td>差分探头或双通道相减、全带宽</td><td>摆幅 1.35V 域约 0.6–0.9V<sub>pp</sub>，无明显过冲/振铃</td></tr>
+      </tbody>
+    </table>
+    <p>最容易犯的错：<b>用长地夹测纹波</b>。地线 10cm 约 100nH，在 100MHz 时阻抗 63Ω，开关尖峰全被「测」进来，读数虚高 5–10 倍。</p>
+
+    <h3>示波器带宽够不够：BW = 0.35/t<sub>r</sub></h3>
+    <p>被测信号的上升时间 t<sub>r</sub> 与所需带宽：</p>
+    <p style="text-align:center">BW<sub>min</sub> = 0.35/t<sub>r</sub></p>
+    <p>DDR3L 数据边沿约 0.5ns ⇒ 需 700MHz 带宽；而 24MHz 晶振边沿约 5ns ⇒ 70MHz 足够。用 100MHz 示波器测 DDR 边沿，看到的是「圆角」，过冲/振铃判据就失效了——<b>不是板子没问题，是仪器看不见</b>。</p>
+    <p>探头也有带宽：标配 ×10 探头通常 100–500MHz，且输入电容 10pF。测 400MHz 时钟时，探头电容已经在「加载」电路。</p>
+
+    <h2><span class="n">4.8.4</span>十组故障注入实验</h2>
+    <p>故障注入 = 主动制造一个已知故障，验证你的保护/判据是否成立。这是把「设计」变成「可验证设计」的关键一步。</p>
+    <table>
+      <thead><tr><th>#</th><th>注入</th><th>方法</th><th>期望现象</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">1</td><td>5V 短路</td><td>5V 对地接 1Ω</td><td>限流电源立刻限流，F1 不应烧（2A）</td></tr>
+        <tr><td class="nm">2</td><td>3.3V 开路</td><td>断开 L1 一端</td><td>SoC 不启动，POR_B 保持低</td></tr>
+        <tr><td class="nm">3</td><td>复位线卡低</td><td>POR_B 对地短接</td><td>完全无反应，电流很低</td></tr>
+        <tr><td class="nm">4</td><td>复位线卡高</td><td>POR_B 上拉 3.3V</td><td>可能启动但时序错，偶发挂死</td></tr>
+        <tr><td class="nm">5</td><td>晶振停振</td><td>拆 C12</td><td>不起振，串口无输出</td></tr>
+        <tr><td class="nm">6</td><td>负载电容偏大</td><td>C12/C14 换 33pF</td><td>频率偏低、起振变慢</td></tr>
+        <tr><td class="nm">7</td><td>输入欠压</td><td>12V 降到 9V</td><td>5V 仍稳（Buck 宽输入），但 USB 可能掉</td></tr>
+        <tr><td class="nm">8</td><td>输入过压</td><td>12V 升到 16V</td><td>TVS 钳位、保险丝不应烧（看 D1 SMBJ5.0A 在前级）</td></tr>
+        <tr><td class="nm">9</td><td>DDR VREF 偏</td><td>R54 换 1.2K</td><td>VREF 偏离 0.675V，DDR 训练失败/随机死机</td></tr>
+        <tr><td class="nm">10</td><td>温度应力</td><td>热风 60°C 吹 10 分钟</td><td>LDO 输出漂移、晶振频率漂移，观察是否重启</td></tr>
+      </tbody>
+    </table>
+    <p>做完这十组，你对这块板的「边界」就有量化认识了——这比读十篇文档都有效。</p>
+
+    <h2><span class="n">4.8.5</span>现象 → 元件：判据表</h2>
+    <table>
+      <thead><tr><th>现象</th><th>先查</th><th>再查</th><th>最后查</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">完全不上电，电流 0</td><td>F1 保险、K1 开关、DC 座</td><td>VD2 SS34 方向</td><td>PCB 断线</td></tr>
+        <tr><td class="nm">上电即限流</td><td>各域对地电阻</td><td>DCDC 输出短路、电容反贴</td><td>SoC 击穿</td></tr>
+        <tr><td class="nm">5V 正常、3.3V 无</td><td>U4 EN 电压</td><td>L1 开路、FB 分压</td><td>U4 损坏</td></tr>
+        <tr><td class="nm">电压全对但不启动</td><td>POR_B 时序</td><td>OSC_OUT 幅度</td><td>BOOT 拨码/47K 阵列</td></tr>
+        <tr><td class="nm">启动后随机死机</td><td>DDR VREF 与 ZQ</td><td>1.35V 纹波</td><td>晶振 ppm 偏差</td></tr>
+        <tr><td class="nm">串口无输出</td><td>UART_3V3、CH340</td><td>TXD/RXD 是否被 SGM3157 切走</td><td>UART1 引脚复用配置</td></tr>
+        <tr><td class="nm">网口不亮</td><td>VENET_3V3、25MHz</td><td>R64 2.49K RBIAS</td><td>PHY 地址 0x01 配置</td></tr>
+        <tr><td class="nm">USB 不识别</td><td>VBUS 5V、CC 5.1K</td><td>MT9700 限流状态</td><td>D+/D- 反接</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="n">4.8.6</span>记录：让下一次调试更快</h2>
+    <p>每次调试至少记五项：<b>板号、现象、测量值（含挡位）、结论、改动</b>。原因很简单：同类故障会重复出现，而人的记忆只保留「结论」，不保留「当时怎么测的」。一份好的调试记录，半年后能让你 10 分钟内复现问题。</p>
+
+    <div class="demo">
+      <div class="dh"><b>示波器带宽 / 探头选择计算器</b><span>给边沿时间，算所需带宽、探头是否够、测量误差估计</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div><div class="lbl">信号上升时间 <b id="trv">0.5</b> ns</div><input id="tr" class="r" type="range" min="0.1" max="20" step="0.1" value="0.5"></div>
+          <div><div class="lbl">示波器带宽 <b id="bwv">100</b> MHz</div><input id="bw" class="r" type="range" min="20" max="1000" step="10" value="100"></div>
+          <div><div class="lbl">探头带宽 <b id="pbwv">350</b> MHz</div><input id="pbw" class="r" type="range" min="50" max="1500" step="10" value="350"></div>
+        </div>
+        <div id="bwOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h3>练习</h3>
+    <details class="quiz"><summary>1. 0.5ns 边沿需要多少带宽？100MHz 示波器够吗？</summary><div class="ans">0.35/0.5n=700MHz，100MHz 远不够，会抹平边沿。</div></details>
+    <details class="quiz"><summary>2. 测纹波为什么要开 20MHz 带宽限制？</summary><div class="ans">滤掉开关尖峰与探头拾取的辐射噪声，只看低频纹波本体。</div></details>
+    <details class="quiz"><summary>3. 首次上电限流设多少？判据是什么？</summary><div class="ans">0.1A；空载 &lt;50mA，若立刻顶到限流说明短路。</div></details>
+    <details class="quiz"><summary>4. POR_B 一直低，怎么区分「复位芯片坏」与「电源没到」？</summary><div class="ans">量 U2 的 VDD 脚与 3.3V 域，若 VDD 正常仍低则查芯片/复位线短接。</div></details>
+    <details class="quiz"><summary>5. DDR VREF 应为多少？怎么算的？</summary><div class="ans">1.35×(1.5K/(1.5K+1.5K))=0.675V。</div></details>
+    <details class="quiz"><summary>6. 网口不亮先量哪三个点？</summary><div class="ans">VENET_3V3、25MHz 晶振、R64 RBIAS 2.49K。</div></details>
+    <details class="quiz"><summary>7. 为什么调试记录要写「挡位」？</summary><div class="ans">不同挡位内阻不同，在路测量结果差异大，复现时必须一致。</div></details>
+
+    <div class="ch-nav">
+      <a href="c07.html"><span>上一篇</span><b>← 4.7 分压与采样</b></a>
+      <a class="nx" id="chNavNext" href="../p5/c01.html"><span>下一篇</span><b>第五篇 · PCB 与制造 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p4','c08.html');
+(function(){
+  function calc(){
+    var tr=+document.getElementById('tr').value, bw=+document.getElementById('bw').value, pbw=+document.getElementById('pbw').value;
+    var need=0.35/tr*1000; // MHz
+    var sys=1/Math.sqrt(1/Math.pow(bw,2)+1/Math.pow(pbw,2));
+    var measured=0.35/sys*1000;
+    document.getElementById('trv').textContent=tr.toFixed(1);
+    document.getElementById('bwv').textContent=bw.toFixed(0);
+    document.getElementById('pbwv').textContent=pbw.toFixed(0);
+    var ok = sys>=need*0.9;
+    document.getElementById('bwOut').innerHTML=
+      '所需带宽 BW<sub>min</sub> = 0.35/t<sub>r</sub> = <b style="color:#5ff1ef">'+need.toFixed(0)+' MHz</b><br>'+
+      '系统带宽（示波器与探头串联）= <b style="color:#5ff1ef">'+sys.toFixed(0)+' MHz</b><br>'+
+      '能看到的边沿 t<sub>r,meas</sub> ≈ '+(measured).toFixed(2)+' ns（真实 '+tr.toFixed(1)+' ns）<br>'+
+      (ok?'<span style="color:#9ff5c0">带宽够用，可判过冲/振铃</span>':'<span style="color:#ffb4a8">带宽不足：边沿被抹平，过冲判据失效</span>');
+  }
+  ['tr','bw','pbw'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .r{width:100%;accent-color:#5ff1ef}
+</style>
+</body>
+</html>
+
+

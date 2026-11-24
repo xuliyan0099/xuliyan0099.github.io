@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4.7 分压与采样：12 位 ADC 的 0.8mV 与 1% 电阻 | 第四篇 · 设计与计算 | i.MX6ULL 学习手册</title>
+<meta name="description" content="从 12 位 ADC 的 LSB 算起，讲分压比、源阻抗、采样保持、误差合成与 RC 抗混叠，落地到本板 ADC_VREFH/VDDA_ADC_3P3 与电池检测设计。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第四篇 · 设计与计算</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第四篇 · 计算</span><span class="sep">/</span>第 7 章<span class="sep">/</span>约 55 分钟</div>
+    <h1>分压与采样：12 位 ADC 的 0.8mV 与 1% 电阻</h1>
+    <p class="lede">「用两个电阻分压，接 ADC 就行」——这句话背后有三个坑：分压比精度、源阻抗与采样保持、参考电压噪声。这一章把 12 位 ADC 从 LSB 算到总误差，并给出本板可直接照抄的电池检测电路。</p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>算 12 位 ADC 在 3.3V 参考下的 LSB，并换算成被测电压的分辨率</li>
+        <li>按量程反推分压比与电阻取值，兼顾功耗与源阻抗</li>
+        <li>算源阻抗对采样精度的影响，知道为什么建议 &lt;10K</li>
+        <li>把电阻误差、参考误差、量化误差合成为总误差</li>
+        <li>设计 RC 抗混叠滤波器，并解释「采样前为什么要先缓冲」</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">4.7.1</span>LSB：一切精度的起点</h2>
+    <p>本板 ADC 为 12 位、参考 3.3V（ADC_VREFH 直接接 VDDA_ADC_3P3，C10 104 去耦）：</p>
+    <p style="text-align:center">LSB = V<sub>REF</sub>/2<sup>12</sup> = 3.3/4096 = <b>0.806 mV</b></p>
+    <p>这只是「理想分辨率」。真实误差还包括：量化 ±0.5LSB、INL/DNL（i.MX6ULL ADC 典型 ±2LSB）、参考噪声、源阻抗引起的建立误差。合起来，<b>有效位数 ENOB 往往只有 10–11 位</b>。</p>
+    <p>换算到被测端：若分压比 1/12（测 12V），则输入端每 1LSB 对应 12×0.806=<b>9.7mV</b>。这就是「12V 电池电压只能精确到 10mV」的来源，别指望用它做毫伏级测量。</p>
+
+    <h2><span class="n">4.7.2</span>分压比与电阻取值</h2>
+    <p>分压公式：V<sub>ADC</sub> = V<sub>in</sub>·R<sub>2</sub>/(R<sub>1</sub>+R<sub>2</sub>)。要求最大输入时 V<sub>ADC</sub> ≤ V<sub>REF</sub> 且留 10% 余量。</p>
+    <p>例：监控 12V 适配器（最高 13.2V），取 V<sub>ADC,max</sub>=2.9V：</p>
+    <p style="text-align:center">R<sub>2</sub>/(R<sub>1</sub>+R<sub>2</sub>) = 2.9/13.2 = 0.22 ⇒ R<sub>1</sub>:R<sub>2</sub> ≈ 3.55:1</p>
+    <p>取 R<sub>1</sub>=100K、R<sub>2</sub>=28K（或 100K/27K）：分压比 0.2126，13.2V→2.81V ✓。此时分压支路电流 = 13.2/128K ≈ <b>103µA</b>，一年耗电 0.9Wh，可接受。</p>
+    <p>若取 R<sub>1</sub>=10K、R<sub>2</sub>=2.8K，电流 1mA，功耗大但源阻抗低（2.5K），采样更准。<b>取舍点就是源阻抗。</b></p>
+
+    <h2><span class="n">4.7.3</span>源阻抗：为什么建议 &lt;10K</h2>
+    <p>ADC 内部有采样电容 C<sub>S</sub>（典型 3–10pF）与采样开关电阻 R<sub>SW</sub>（典型 100–500Ω）。采样期间，外部源要给 C<sub>S</sub> 充电，建立时间常数：</p>
+    <p style="text-align:center">τ = (R<sub>source</sub> + R<sub>SW</sub>)·C<sub>S</sub></p>
+    <p>要建立到 0.5LSB（12 位要求约 8.3 个 τ），若采样窗口 1µs：</p>
+    <p style="text-align:center">τ ≤ 1µs/8.3 = 120ns ⇒ R<sub>source</sub> ≤ 120n/5p ≈ <b>24K</b></p>
+    <p>本板建议 &lt;10K 是留了 2 倍余量（含温度与批次）。100K/28K 的分压源阻抗 = 100K∥28K = <b>22K</b>，刚卡在边界——所以高阻分压后面必须加一颗 100nF 电容（形成低通 + 提供电荷），或加运放缓冲。</p>
+    <p>这是新手最容易忽略的一点：<b>分压电阻选大了省电，但采样就不准了</b>。折中做法是「高阻分压 + 100nF」：电容在采样瞬间提供电荷，静态功耗仍只有 100µA。</p>
+
+    <h2><span class="n">4.7.4</span>误差合成：把四项加起来</h2>
+    <table>
+      <thead><tr><th>误差源</th><th>典型值</th><th>折算到被测端（12V 量程）</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">量化</td><td>±0.5 LSB</td><td>±4.8mV</td></tr>
+        <tr><td class="nm">INL/DNL</td><td>±2 LSB</td><td>±19mV</td></tr>
+        <tr><td class="nm">电阻 1%</td><td>分压比 ±1.4%</td><td>±170mV</td></tr>
+        <tr><td class="nm">参考电压</td><td>±1%（含纹波）</td><td>±120mV</td></tr>
+      </tbody>
+    </table>
+    <p>RSS 合成：√(4.8²+19²+170²+120²) ≈ <b>210mV</b>。结论很清楚：<b>电阻精度与参考精度主导，ADC 位数不是瓶颈</b>。</p>
+    <p>所以工程做法：</p>
+    <ul>
+      <li>分压电阻用 <b>1% 薄膜</b>（不要 5% 碳膜），最好同一批次、同封装（温漂一致，比例误差抵消）；</li>
+      <li>参考电压不要用 DCDC 直出，要经 LDO 或至少 LC 滤波；</li>
+      <li>需要更高精度就做<b>两点校准</b>（软件乘斜率 + 偏移），可把电阻误差消掉。</li>
+    </ul>
+
+    <h2><span class="n">4.7.5</span>RC 抗混叠：采样前必须滤波</h2>
+    <p>ADC 采样是「离散化」，高于 f<sub>s</sub>/2 的噪声会折叠到低频（混叠）。例如开关电源 500kHz 纹波，采样率 10kHz，会折到 10kHz−500kHz×n 的某个低频，表现为「读数缓慢漂移」。</p>
+    <p>抗混叠滤波器截止频率应 ≤ f<sub>s</sub>/2：</p>
+    <p style="text-align:center">f<sub>c</sub> = 1/(2πRC) ≤ f<sub>s</sub>/2</p>
+    <p>采样率 1kHz ⇒ f<sub>c</sub> ≤500Hz ⇒ 取 R=10K、C=33nF：f<sub>c</sub>=482Hz ✓。这颗电容同时兼任 4.7.3 的「采样电荷池」，一举两得。</p>
+
+    <h2><span class="n">4.7.6</span>本板可直接照抄的电池检测电路</h2>
+    <p>若要在 MINI 板上加「12V 输入电压监测」，接到 ADC1_IN0（GPIO1_IO00 复用）：</p>
+    <ul>
+      <li>R<sub>1</sub>=100K（1%）、R<sub>2</sub>=27K（1%）→ 分压比 0.2126；</li>
+      <li>R<sub>2</sub> 并联 100nF（0805 X7R 25V）→ 与 22K 源阻抗构成 f<sub>c</sub>=72Hz 低通；</li>
+      <li>ADC 脚串 100Ω + 并 1nF 到地，抑制尖峰（可选）；</li>
+      <li>软件按 13.2V 满量程标定，两点校准。</li>
+    </ul>
+    <p>算一下实际值：12.0V 输入 → 2.55V → 码值 2.55/0.806=3163。若读数 3100，反推 11.76V，误差 2%（主要来自电阻）。用 1% 电阻 + 两点校准可降到 0.5%。</p>
+
+    <div class="demo">
+      <div class="dh"><b>分压 / ADC 采样计算器</b><span>输入量程、R1/R2、参考与位数，算分压比、LSB、码值、源阻抗与建立误差</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div><div class="lbl">被测电压 <b id="vinv">12.0</b> V</div><input id="vin" class="r" type="range" min="1" max="24" step="0.1" value="12"></div>
+          <div><div class="lbl">R1 <b id="r1v">100</b> kΩ</div><input id="r1" class="r" type="range" min="1" max="200" step="1" value="100"></div>
+          <div><div class="lbl">R2 <b id="r2v">27</b> kΩ</div><input id="r2" class="r" type="range" min="1" max="100" step="1" value="27"></div>
+          <div><div class="lbl">V<sub>REF</sub> <b id="vrefv">3.3</b> V</div><input id="vref" class="r" type="range" min="1.8" max="5" step="0.1" value="3.3"></div>
+          <div><div class="lbl">位数 <b id="bv">12</b> bit</div><input id="b" class="r" type="range" min="8" max="16" step="1" value="12"></div>
+          <div><div class="lbl">C<sub>S</sub> <b id="csv">5</b> pF</div><input id="cs" class="r" type="range" min="1" max="20" step="1" value="5"></div>
+        </div>
+        <div id="adcOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h3>练习</h3>
+    <details class="quiz"><summary>1. 3.3V 参考、12 位的 LSB 是多少？</summary><div class="ans">3.3/4096=0.806mV。</div></details>
+    <details class="quiz"><summary>2. 测 13.2V 满量程，R1=100K，R2 取多少？</summary><div class="ans">需分压比 ≤2.9/13.2=0.22，R2/R1 ≤0.28 ⇒ 27K 左右。</div></details>
+    <details class="quiz"><summary>3. 100K∥27K 的源阻抗？有何影响？</summary><div class="ans">约 21K，接近 24K 边界，建议并 100nF 提供电荷。</div></details>
+    <details class="quiz"><summary>4. 12V 量程下总误差约多少？主导项是什么？</summary><div class="ans">约 210mV，电阻 1% 与参考 1% 主导。</div></details>
+    <details class="quiz"><summary>5. 采样率 1kHz，抗混叠 RC 怎么取？</summary><div class="ans">f<sub>c</sub>≤500Hz，10K+33nF → 482Hz。</div></details>
+    <details class="quiz"><summary>6. 为什么 5% 碳膜电阻不能用？</summary><div class="ans">分压比误差 ±1.4% 以上，直接吃掉整个精度预算，且温漂大。</div></details>
+
+    <div class="ch-nav">
+      <a href="c06.html"><span>上一篇</span><b>← 4.6 复位与晶振计算</b></a>
+      <a class="nx" id="chNavNext" href="c08.html"><span>下一章</span><b>4.8 测量与故障注入 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p4','c07.html');
+(function(){
+  function calc(){
+    var vin=+document.getElementById('vin').value, r1=+document.getElementById('r1').value*1000, r2=+document.getElementById('r2').value*1000;
+    var vref=+document.getElementById('vref').value, bits=+document.getElementById('b').value, cs=+document.getElementById('cs').value*1e-12;
+    var ratio=r2/(r1+r2), vadc=vin*ratio, lsb=vref/Math.pow(2,bits);
+    var code=Math.round(vadc/lsb), codeMax=Math.pow(2,bits)-1;
+    var rsrc=(r1*r2)/(r1+r2), tau=(rsrc+300)*cs;
+    document.getElementById('vinv').textContent=vin.toFixed(1);
+    document.getElementById('r1v').textContent=(r1/1000).toFixed(0);
+    document.getElementById('r2v').textContent=(r2/1000).toFixed(0);
+    document.getElementById('vrefv').textContent=vref.toFixed(1);
+    document.getElementById('bv').textContent=bits;
+    document.getElementById('csv').textContent=(cs*1e12).toFixed(0);
+    document.getElementById('adcOut').innerHTML=
+      '分压比 = <b style="color:#5ff1ef">'+ratio.toFixed(4)+'</b> ⇒ ADC 输入 '+vadc.toFixed(3)+' V '+(vadc>vref?'<span style="color:#ffb4a8">超量程！</span>':'')+'<br>'+
+      'LSB = <b style="color:#5ff1ef">'+(lsb*1000).toFixed(3)+' mV</b>，对应被测端 '+(lsb/ratio*1000).toFixed(1)+' mV<br>'+
+      '码值 ≈ <b style="color:#5ff1ef">'+code+'</b> / '+codeMax+'（满量程 '+(vref/ratio).toFixed(2)+' V）<br>'+
+      '源阻抗 = R1∥R2 = <b style="color:#5ff1ef">'+(rsrc/1000).toFixed(1)+' kΩ</b>，τ=(Rs+300Ω)·C<sub>S</sub>='+(tau*1e9).toFixed(1)+' ns<br>'+
+      '8.3τ 建立 = '+(tau*8.3*1e9).toFixed(0)+' ns '+(tau*8.3>1e-6?'<span style="color:#ffb4a8">超过 1µs 采样窗口</span>':'<span style="color:#9ff5c0">满足 1µs 窗口</span>');
+  }
+  ['vin','r1','r2','vref','b','cs'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .r{width:100%;accent-color:#5ff1ef}
+</style>
+</body>
+</html>
+
+

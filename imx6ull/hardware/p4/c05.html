@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4.5 上下拉与终端取值：4.7K、120Ω、360Ω 从哪来 | 第四篇 · 设计与计算 | i.MX6ULL 学习手册</title>
+<meta name="description" content="用上升时间公式算 I2C 4.7K 是否够、用分压算 CAN/RS485 终端与偏置、用反射算 DDR 时钟 470Ω 与 ODT 10K，全部落到本板真实位号。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第四篇 · 设计与计算</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第四篇 · 计算</span><span class="sep">/</span>第 5 章<span class="sep">/</span>约 60 分钟</div>
+    <h1>上下拉与终端取值：4.7K、120Ω、360Ω 从哪来</h1>
+    <p class="lede">原理图上到处是 4.7K、10K、47K、120Ω、360Ω。这些不是「习惯值」，每一个都由<b>上升时间、驱动能力、反射、偏置</b>四件事反推出来。这一章把本板四类电阻全部算一遍。</p>
+
+    <figure class="fig sch">
+      <div class="scroller"><img src="../../assets/img/sch/mini_p1_22r.png" alt="MINI 第 1 页 I2C 4.7K 上拉与 22R 串阻"></div>
+      <figcaption>MINI 第 1 页裁切：I2C1/I2C2 各一对 4.7K 上拉（R40/R41、R42/R57），CSI_MCLK 串 22R（R32）。上拉决定电平与边沿，串阻决定过冲。</figcaption>
+    </figure>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>用 t<sub>r</sub>=0.8473·R·C 反推 I2C 上拉的最大值，并校验灌电流下限</li>
+        <li>算出 CAN 双终端为什么是 120Ω+120Ω=60Ω，以及偏置 360Ω 的作用</li>
+        <li>解释 IO 上拉 10K/47K 在「耗电」与「抗扰」之间的取舍</li>
+        <li>用反射与阻抗解释 DDR 时钟 470Ω 串阻与 ODT 10K 下拉</li>
+        <li>判断一颗上拉电阻该不该装（DNP）的依据</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">4.5.1</span>上拉电阻的第一性原理</h2>
+    <p>开漏/开集总线（I2C、CAN、RS485、复位）空闲时靠上拉拉高。上拉值同时受两个约束：</p>
+    <ol>
+      <li><b>上限（不能太大）</b>：RC 充电太慢，边沿超过规范，通信误码。</li>
+      <li><b>下限（不能太小）</b>：器件拉低时要灌电流，V<sub>OL</sub> 会抬高，且静态功耗大。</li>
+    </ol>
+    <p>上升时间公式（从 0 充到 0.7V<sub>DD</sub>，即 V<sub>IH</sub>）：</p>
+    <p style="text-align:center">t<sub>r</sub> = 0.8473 × R × C<sub>bus</sub></p>
+
+    <h3>I2C：本板 4.7K 的来历</h3>
+    <p>Fast mode（400kHz）要求 t<sub>r</sub> ≤ 300ns。本板总线只有 SoC + 一两个从器件，走线短，C<sub>bus</sub> 估 60pF：</p>
+    <p style="text-align:center">t<sub>r</sub> = 0.8473 × 4700 × 60p = <b>239 ns</b> ✓</p>
+    <p>若挂 5 个器件、C<sub>bus</sub>=200pF：t<sub>r</sub>=797ns，400kHz 就超了，必须把上拉降到 1.8K 左右。这就是「I2C 挂太多器件要减小上拉」的量化依据。</p>
+    <p>下限校验：I2C 规定 V<sub>OL</sub> ≤ 0.4V @ 3mA。3.3V 上拉 4.7K 时灌电流 =(3.3−0.4)/4.7K=<b>0.62mA</b>，远小于 3mA ✓。若用 1K，灌电流 2.9mA，接近上限，且功耗 3.6mA×0.5（占空比）=1.8mA。</p>
+    <table>
+      <thead><tr><th>上拉</th><th>C=60pF 的 t<sub>r</sub></th><th>C=200pF 的 t<sub>r</sub></th><th>灌电流</th><th>适用</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">10K</td><td>508ns</td><td>1.69µs</td><td>0.29mA</td><td>100kHz 低速、低功耗</td></tr>
+        <tr><td class="nm">4.7K</td><td>239ns</td><td>797ns</td><td>0.62mA</td><td>本板选择：400kHz、短总线</td></tr>
+        <tr><td class="nm">2.2K</td><td>112ns</td><td>373ns</td><td>1.3mA</td><td>多器件、长走线</td></tr>
+        <tr><td class="nm">1K</td><td>51ns</td><td>169ns</td><td>2.9mA</td><td>极限，功耗大</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="n">4.5.2</span>IO 上拉：10K 与 47K 的分工</h2>
+    <p>普通 GPIO/BOOT 脚的上拉不参与时序，只做「默认电平」。取值看两件事：</p>
+    <ul>
+      <li><b>漏电与功耗</b>：若该脚可能被外部拉低（如按键、拨码），上拉电流 = V/R。3.3V/10K=0.33mA，3.3V/47K=70µA。</li>
+      <li><b>抗扰</b>：阻值越大，越容易被干扰拉偏。长线、有电机/继电器场合用 10K，板内静态配置用 47K。</li>
+    </ul>
+    <p>本板 BOOT 配置用 <b>47K</b>（R4–R24）：只在复位瞬间采样，平时不耗电，阻值大没关系；而 BOOT_MODE0/1 用 <b>10K</b>（R43/R44），因为它们还要经拨码开关接地，需要更强的下拉确定电平。</p>
+    <p>「DNP（不贴）」也是取值的一部分：一颗上拉画在图上但不贴，等于「预留可能性」。本板 R26（ONOFF 100K 上拉到 VDD_SNVS_IN）标 DNP，是因为 SoC 内部已有上拉，外部再并一颗只是冗余。</p>
+
+    <h2><span class="n">4.5.3</span>CAN 终端：为什么是 120Ω + 120Ω</h2>
+    <p>CAN 是差分总线，电缆特性阻抗 120Ω。终端匹配的目的：</p>
+    <ol>
+      <li><b>吸收反射</b>：两端各接 120Ω，与电缆阻抗匹配，行波不反射。</li>
+      <li><b>提供隐性电平</b>：CAN 收发器靠终端电阻把 CANH/CANL 拉回 2.5V 附近（隐性）。</li>
+    </ol>
+    <p>两点终端并联后，总线直流负载 = 60Ω。显性时驱动器输出约 1.5V 差分，电流 = 1.5/60 = <b>25mA</b>，这就是 TJA1050 能驱动的最小负载。</p>
+    <p>本板 R14=120Ω 一颗（节点端），RS1=120Ω（RS485 端）。注意：<b>一条总线只能有两端终端</b>，中间节点不能加，否则 3 个 120Ω 并联成 40Ω，电流过大、电平塌陷。</p>
+
+    <h3>RS485 偏置：360Ω + 22K 的作用</h3>
+    <p>RS485 总线在「无驱动器」时必须处于确定状态（fail-safe），否则接收器输出随机。本板用：</p>
+    <ul>
+      <li>R25/R26 = 360Ω：A 上拉到 3.3V、B 下拉到 GND，形成约 <b>4.6mA</b> 的偏置电流；</li>
+      <li>R27 = 22K + Q4 SS8050 + R23 10K：自动方向控制，发送时把偏置「短路」掉，避免额外功耗与负载。</li>
+    </ul>
+    <p>偏置电流要大于「接收器阈值电流 + 终端漏电流」，太小则 fail-safe 失效；太大则增加总线负载。360Ω 在 3.3V 下给出 9.2mA/2≈4.6mA，是典型折中。若总线两端都有 120Ω 终端，偏置电流会多耗 4.6mA×2，所以很多设计把偏置放在主机端。</p>
+
+    <h2><span class="n">4.5.4</span>DDR 终端：470Ω、2.2pF、10K</h2>
+    <p>DDR3L 的 SDCLK 是差分时钟，频率可达 400MHz+，走线是传输线，必须做源端匹配与终端：</p>
+    <ul>
+      <li><b>R47 470Ω 串在 SDCLK0_P</b>：源端串联匹配，抑制二次反射。取值与驱动阻抗有关（SoC 输出阻抗约 40–60Ω，加上 470Ω 后接近线阻抗的一半，形成「弱驱动」以减小过冲）。同页注释直接写了 “CLK termination: Place RXX close to U2”。</li>
+      <li><b>C51/C52 2.2pF</b>：与走线电感构成低通，压掉 GHz 级尖峰；也参与阻抗微调。</li>
+      <li><b>R50/R51 10K ODT 下拉</b>：ODT（On-Die Termination）引脚在复位期间必须确定电平，10K 下拉保证不浮空；正常工作时由控制器驱动。</li>
+      <li><b>R48/R49 240Ω ZQ</b>：不是上拉，是校准电阻。ZQ 引脚外接 240Ω 精密电阻（±1%），芯片用它校准输出阻抗，DDR3 规范强制要求。</li>
+    </ul>
+    <p>这些电阻值不能随便改：470Ω 改小会过冲、改大会边沿变慢导致建立时间不足；240Ω 改值会直接让 ODT 阻抗失配。</p>
+
+    <h2><span class="n">4.5.5</span>SD 卡上拉 47K 为什么可以很大</h2>
+    <p>TF 卡的 CMD/DATA 线在初始化阶段是开漏（OD）模式，需要上拉，规范要求 10K–100K。本板用 <b>47K</b>（R70–R75 是 47Ω 串阻，不同！），实际是 R1–R5 47K/NC。</p>
+    <p>为什么能取 47K：SD 时钟初始化只有 400kHz，t<sub>r</sub> 要求宽松（&lt;几 µs）；进入高速模式后总线改为推挽，上拉不再参与边沿。所以 47K 只负责「不浮空」，不影响速度。</p>
+    <p>串阻 47Ω（R70–R75）则是另一个作用：<b>抑制过冲与 EMI</b>，与 SD 卡座的长走线构成阻尼。这与上拉完全是两回事，初学者常混。</p>
+
+    <div class="demo">
+      <div class="dh"><b>开漏总线上拉计算器</b><span>给 VDD、上拉 R、总线电容与目标速率，算 t<sub>r</sub>、灌电流、可用最高频率</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+          <div><div class="lbl">VDD <b id="vddv">3.3</b> V</div><input id="vdd" class="r" type="range" min="1.8" max="5" step="0.1" value="3.3"></div>
+          <div><div class="lbl">上拉 R <b id="rv">4.7</b> kΩ</div><input id="r" class="r" type="range" min="0.5" max="20" step="0.1" value="4.7"></div>
+          <div><div class="lbl">总线电容 <b id="cv">60</b> pF</div><input id="c" class="r" type="range" min="10" max="500" step="10" value="60"></div>
+          <div><div class="lbl">V<sub>OL</sub> 上限 <b id="volv">0.4</b> V</div><input id="vol" class="r" type="range" min="0.2" max="1" step="0.05" value="0.4"></div>
+        </div>
+        <div id="puOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h3>练习</h3>
+    <details class="quiz"><summary>1. R=4.7K、C=200pF，t<sub>r</sub> 多少？400kHz 够吗？</summary><div class="ans">797ns &gt; 300ns，不够，需降到 1.8K 左右。</div></details>
+    <details class="quiz"><summary>2. I2C 上拉 1K 时灌电流多少？有何风险？</summary><div class="ans">(3.3−0.4)/1K=2.9mA，接近 3mA 上限，且功耗大。</div></details>
+    <details class="quiz"><summary>3. CAN 为什么两端各 120Ω，中间节点不加？</summary><div class="ans">匹配 120Ω 电缆特性阻抗；中间加会并联成 40Ω，电流过大。</div></details>
+    <details class="quiz"><summary>4. CAN 显性时总线电流多少？</summary><div class="ans">约 1.5V/60Ω=25mA。</div></details>
+    <details class="quiz"><summary>5. DDR 的 ZQ 240Ω 是做什么的？</summary><div class="ans">输出阻抗校准基准，±1% 精度，不是上拉。</div></details>
+    <details class="quiz"><summary>6. SD 卡 CMD 用 47K 上拉为何不影响高速？</summary><div class="ans">高速模式改推挽，上拉只负责初始化阶段不浮空。</div></details>
+    <details class="quiz"><summary>7. 标记 DNP 的电阻是什么意思？</summary><div class="ans">图上预留但不贴装，保留后续调整/冗余的可能。</div></details>
+
+    <div class="ch-nav">
+      <a href="c04.html"><span>上一篇</span><b>← 4.4 去耦与 PDN</b></a>
+      <a class="nx" id="chNavNext" href="c06.html"><span>下一章</span><b>4.6 复位与晶振计算 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p4','c05.html');
+(function(){
+  function calc(){
+    var v=+document.getElementById('vdd').value, r=+document.getElementById('r').value*1000;
+    var c=+document.getElementById('c').value*1e-12, vol=+document.getElementById('vol').value;
+    var tr=0.8473*r*c, iol=(v-vol)/r;
+    document.getElementById('vddv').textContent=v.toFixed(1);
+    document.getElementById('rv').textContent=(r/1000).toFixed(1);
+    document.getElementById('cv').textContent=(c*1e12).toFixed(0);
+    document.getElementById('volv').textContent=vol.toFixed(2);
+    var fmax=1/(3*tr);
+    document.getElementById('puOut').innerHTML=
+      '上升时间 t<sub>r</sub> = 0.8473·R·C = <b style="color:#5ff1ef">'+(tr*1e9).toFixed(0)+' ns</b><br>'+
+      '拉低时灌电流 = (VDD−V<sub>OL</sub>)/R = <b style="color:#5ff1ef">'+(iol*1000).toFixed(2)+' mA</b>'+(iol>0.003?' <span style="color:#ffb4a8">超过 3mA 常见上限</span>':'')+'<br>'+
+      '若按 t<sub>r</sub> 占位 1/3 位时间估算，可用速率上限 ≈ <b style="color:#5ff1ef">'+(fmax/1000).toFixed(0)+' kHz</b><br>'+
+      '（I2C 规范：Fast 400kHz 要求 t<sub>r</sub>≤300ns、V<sub>OL</sub>≤0.4V@3mA）';
+  }
+  ['vdd','r','c','vol'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .r{width:100%;accent-color:#5ff1ef}
+</style>
+</body>
+</html>

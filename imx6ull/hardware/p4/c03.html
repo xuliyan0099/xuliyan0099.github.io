@@ -1,9 +1,11 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>4.3 LDO 热设计 | 第四篇 · 设计与计算 | i.MX6ULL 学习手册</title>
-<meta name="description" content="耗散公式、结温计算、SOT-23/SOT-89/DFN 热阻对照、铜箔与过孔、降额规则；用 U12 与 DCJ5060 实例核算。">
-<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+<title>4.3 LDO 热设计：压差、功耗、结温怎么算 | 第四篇 · 设计与计算 | i.MX6ULL 学习手册</title>
+<meta name="description" content="用本板 ME6209A33、XC6206P282 两颗 LDO 的真实负载，手算压差、功耗、结温与铜箔散热面积，给出 SOT-23 的 200mW 生死线。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -14,126 +16,180 @@
   <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
 <div class="shell">
   <aside id="sidebar"><div class="vol-h">第四篇 · 设计与计算</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第四篇 · 设计</span><span class="sep">/</span>第 3 章<span class="sep">/</span>约 24 分钟</div>
-    <h1>LDO 热设计：算完再决定封装</h1>
-    <p class="lede">LDO 的电气设计很简单，<b>难的是热</b>。同一颗芯片，SOT-23 只能散 0.3W，SOT-89 能散 1W，DFN 带散热焊盘能散 2W 以上。选错封装，电路「能工作」但三个月后批量失效。</p>
+    <div class="ch-meta"><span class="lv">第四篇 · 计算</span><span class="sep">/</span>第 3 章<span class="sep">/</span>约 55 分钟</div>
+    <h1>LDO 热设计：压差、功耗、结温怎么算</h1>
+    <p class="lede">LDO 便宜、简单、噪声低，但它是<b>线性调整</b>——多余电压全部变成热。SOT-23 封装的 200mW 就是生死线，超了不会立刻坏，而是「上电工作 10 分钟后随机重启」。这一章把本板两颗 LDO 的热账算到底。</p>
+
+    <figure class="fig sch">
+      <div class="scroller"><img src="../../assets/img/sch/core_p1_rails.png" alt="CORE 第 1 页 ME6209A33 / XC6206P282 两路 LDO 外围"></div>
+      <figcaption>CORE 第 1 页裁切：U7 ME6209A33（5V→SNVS_3V3，C86 104 + C87 22µF）与 U12 XC6206P282（DCDC_3V3→VCC_CSI 2.8V，C108 104 + C88 10µF）。两颗都是 SOT-23 封装、都用 104+大电容的经典搭配。</figcaption>
+    </figure>
+
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>用 P = (V<sub>in</sub>−V<sub>out</sub>)I + V<sub>in</sub>I<sub>q</sub> 算耗散</li>
-        <li>用 T<sub>j</sub> = T<sub>a</sub> + P·R<sub>θJA</sub> 判断是否超 125°C</li>
-        <li>说出加大铜箔、散热过孔、降压差三种降温手段的效果差异</li>
+        <li>算 LDO 的压差需求，判断 3.3V 输入能否稳住 2.8V 输出</li>
+        <li>用 P=(Vin−Vout)·Iout+Vin·Iq 算功耗，并算出结温</li>
+        <li>说清 θ<sub>JA</sub> 与铜箔面积的关系，知道 SOT-23 的实际上限</li>
+        <li>解释为什么 SNVS 域与摄像头模拟域必须用 LDO 而不是 DCDC</li>
+        <li>判断 LDO 自激振荡的三个常见原因并给出对策</li>
       </ol>
     </div>
 
-    <h2><span class="n">4.3.1</span>两个公式够了</h2>
-    <p style="text-align:center">P = (V<sub>in</sub> − V<sub>out</sub>) × I<sub>out</sub> + V<sub>in</sub> × I<sub>q</sub><br>T<sub>j</sub> = T<sub>a</sub> + P × R<sub>θJA</sub></p>
+    <h2><span class="n">4.3.1</span>LDO 与 DCDC 的分工</h2>
     <table>
-      <thead><tr><th>封装</th><th>R<sub>θJA</sub>（典型，无散热铜箔）</th><th>有铜箔/散热焊盘</th><th>可用耗散（T<sub>a</sub>=40°C，T<sub>j</sub>≤125°C）</th></tr></thead>
+      <thead><tr><th>维度</th><th>DCDC（Buck）</th><th>LDO</th></tr></thead>
       <tbody>
-        <tr><td class="nm">SOT-23</td><td>约 200°C/W</td><td>150°C/W</td><td>约 0.4–0.55W</td></tr>
-        <tr><td class="nm">SOT-89</td><td>约 100°C/W</td><td>60°C/W</td><td>约 0.85–1.4W</td></tr>
-        <tr><td class="nm">DFN + 散热焊盘</td><td>约 60°C/W</td><td>30°C/W</td><td>约 1.4–2.8W</td></tr>
-        <tr><td class="nm">TO-252（DPAK）</td><td>约 50°C/W</td><td>25°C/W</td><td>约 1.7–3.4W</td></tr>
+        <tr><td class="nm">效率</td><td>85–95%，与压差无关</td><td>Vout/Vin，压差越大越差</td></tr>
+        <tr><td class="nm">输出噪声</td><td>mV 级开关纹波 + 尖峰</td><td>µV 级，PSRR 60–80dB</td></tr>
+        <tr><td class="nm">外围</td><td>电感 + 大电容 + 补偿</td><td>1–2 颗电容</td></tr>
+        <tr><td class="nm">适用</td><td>主电源、大电流</td><td>小电流、噪声敏感、常电</td></tr>
       </tbody>
     </table>
-    <p>注意：这些 R<sub>θJA</sub> 都依赖铜箔面积与层数。规格书常标「1 平方英寸 2oz 铜」，小板上达不到，要按实际打折（可能差 2 倍）。</p>
+    <p>本板的分工很典型：1.35V/3.3V 大电流用 Buck（U6/U8/U11），而 <b>SNVS 常电域</b>（U7）与 <b>摄像头 2.8V 模拟域</b>（U12）用 LDO——前者要求 µA 级静态电流与干净电源，后者要求低噪声，都不在乎那点效率。</p>
 
-    <figure class="fig">
-      <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <rect x="16" y="16" width="410" height="180" rx="10" fill="#141c2e" stroke="#3a4560"/>
-        <text x="32" y="40" fill="#eaf3ff" font-size="11">耗散与压差的关系</text>
-        <line x1="60" y1="150" x2="390" y2="150" stroke="#3a4560"/>
-        <line x1="60" y1="60" x2="60" y2="150" stroke="#3a4560"/>
-        <line x1="60" y1="150" x2="200" y2="118" stroke="#5ff1ef" stroke-width="2"/>
-        <line x1="60" y1="150" x2="200" y2="86" stroke="#ffb84d" stroke-width="2"/>
-        <line x1="60" y1="150" x2="200" y2="62" stroke="#ff9c9c" stroke-width="2"/>
-        <text x="210" y="116" fill="#9df5f4" font-size="9">0.1A</text>
-        <text x="210" y="86" fill="#ffd79a" font-size="9">0.3A</text>
-        <text x="210" y="62" fill="#ff9c9c" font-size="9">0.6A</text>
-        <text x="60" y="166" fill="#6f7f9c" font-size="9">横轴：压差 0–2V</text>
-        <text x="32" y="184" fill="#9fb0c7" font-size="9">同样压差，电流翻倍 → 耗散翻倍</text>
+    <h2><span class="n">4.3.2</span>压差：3.3V 能不能出 2.8V</h2>
+    <p>LDO 的调整管需要「headroom」，即 V<sub>in</sub>−V<sub>out</sub> ≥ V<sub>dropout</sub>。XC6206 的 dropout 典型值：</p>
+    <table>
+      <thead><tr><th>负载</th><th>典型 dropout</th><th>最大 dropout</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">10mA</td><td>60mV</td><td>120mV</td></tr>
+        <tr><td class="nm">50mA</td><td>150mV</td><td>250mV</td></tr>
+        <tr><td class="nm">100mA</td><td>250mV</td><td>400mV</td></tr>
+      </tbody>
+    </table>
+    <p>本板 U12：3.3V 输入、2.8V 输出、负载约 120mA ⇒ 需要 0.5V headroom，实际有 0.5V，<b>刚好卡在边界</b>。这意味着：</p>
+    <ul>
+      <li>DCDC_3V3 若有 3% 跌落（3.2V），输出就掉到 2.7V，摄像头可能出现图像噪点/不识别；</li>
+      <li>这也是为什么 VCC_CSI 单独一路，不从负载更大的 3.3V 主干直接取。</li>
+    </ul>
+    <p>反过来 U7：5V 输入、3.3V 输出，headroom 1.7V，非常宽松——代价是功耗大（见下）。</p>
 
-        <rect x="446" y="16" width="410" height="180" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
-        <text x="462" y="40" fill="#eaf3ff" font-size="11">三种降温手段的实际效果</text>
-        <text x="462" y="72" fill="#9df5f4" font-size="10">① 加大铜箔</text>
-        <text x="462" y="92" fill="#9fb0c7" font-size="9.5">RθJA 可降 30–50%，成本最低</text>
-        <text x="462" y="118" fill="#9df5f4" font-size="10">② 散热过孔阵列</text>
-        <text x="462" y="138" fill="#9fb0c7" font-size="9.5">把热传到内层地平面，降 20–40%</text>
-        <text x="462" y="164" fill="#9df5f4" font-size="10">③ 降低压差</text>
-        <text x="462" y="184" fill="#9fb0c7" font-size="9.5">前面加 DCDC，效果最直接</text>
+    <h2><span class="n">4.3.3</span>功耗与结温：核心公式</h2>
+    <p style="text-align:center">P<sub>D</sub> = (V<sub>in</sub> − V<sub>out</sub>)·I<sub>out</sub> + V<sub>in</sub>·I<sub>q</sub><br>
+      T<sub>J</sub> = T<sub>A</sub> + P<sub>D</sub>·θ<sub>JA</sub></p>
+    <p><b>算 U12（3.3→2.8V，120mA）</b>：</p>
+    <p style="text-align:center">P<sub>D</sub> = 0.5×0.12 + 3.3×3µA ≈ <b>60 mW</b><br>
+      θ<sub>JA</sub>(SOT-23，1cm² 铜) ≈ 250°C/W ⇒ ΔT = 60m×250 = <b>15°C</b></p>
+    <p>环境 40°C 时结温 55°C，很安全；环境 70°C（密闭机箱）时 85°C，仍低于 125°C 上限。</p>
+    <p><b>算 U7（5→3.3V，仅 5mA）</b>：</p>
+    <p style="text-align:center">P<sub>D</sub> = 1.7×0.005 = <b>8.5 mW</b> ⇒ ΔT ≈ 2°C</p>
+    <p>看起来微不足道，但如果有人把 U7 换成给 3.3V 外设供电（200mA）：P<sub>D</sub>=1.7×0.2=<b>340mW</b> ⇒ ΔT=85°C，环境 50°C 就 135°C，<b>直接过热保护/烧毁</b>。这就是「LDO 只能带小电流」的量化来源。</p>
 
-        <text x="16" y="226" fill="#9fb0c7" font-size="10.5">实例：U12（XC6206P282MR）3.3V→2.8V、100mA：P=0.05W，SOT-23 温升仅 10°C，安全。</text>
-        <text x="16" y="250" fill="#6f7f9c" font-size="10">反例：5V→1.8V、300mA：P=0.96W，SOT-23 温升 190°C，必然烧毁——必须改 DCDC。</text>
-        <text x="16" y="274" fill="#ff9c9c" font-size="10">判据：Tj 估算 ≤125°C（留 25°C 余量）；批量产品建议 ≤110°C。</text>
-      </svg>
-      <figcaption><b>图 4-3</b>　耗散随压差与电流变化，以及三种降温手段。</figcaption>
-    </figure>
+    <h3>200mW 生死线的由来</h3>
+    <p>SOT-23 的 θ<sub>JA</sub> 在「最小焊盘」时约 350°C/W，在「1cm² 铜箔」时约 200–250°C/W。按 125°C 上限、环境 50°C：</p>
+    <p style="text-align:center">P<sub>max</sub> = (125−50)/350 ≈ <b>214 mW</b>（最差焊盘）</p>
+    <p>所以 SOT-23 LDO 的经验上限就是 200mW 左右。要更大功率就换 SOT-89/DFN 或加大铜箔。</p>
+
+    <h2><span class="n">4.3.4</span>散热：铜箔就是散热器</h2>
+    <p>SOT-23 没有散热焊盘，热量只能从引脚传到铜箔。实测经验值（1oz 外层，静止空气）：</p>
+    <table>
+      <thead><tr><th>GND 引脚铜箔面积</th><th>θ<sub>JA</sub></th><th>200mW 时 ΔT</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">仅焊盘（约 2mm²）</td><td>350°C/W</td><td>70°C</td></tr>
+        <tr><td class="nm">5×5mm（25mm²）</td><td>280°C/W</td><td>56°C</td></tr>
+        <tr><td class="nm">10×10mm（100mm²）</td><td>230°C/W</td><td>46°C</td></tr>
+        <tr><td class="nm">加 4 个过孔到内层地</td><td>180°C/W</td><td>36°C</td></tr>
+      </tbody>
+    </table>
+    <p>所以本板在 U7/U12 的 GND 脚周围铺了一小片铜——这不是「随便画画」，是热设计。你改板时若把铜箔削掉，就要重新算结温。</p>
+
+    <h2><span class="n">4.3.5</span>稳定性：LDO 为什么会自己振荡</h2>
+    <p>LDO 内部是误差放大器 + 调整管，构成负反馈环路。三个常见翻车点：</p>
+    <ol>
+      <li><b>输出电容 ESR 太低</b>。老式 LDO（如某些 1117）要求 ESR 在 0.1–1Ω 之间才稳定，接纯陶瓷电容（ESR 5mΩ）会振荡。对策：串一颗 0.1–0.5Ω 电阻，或改用「陶瓷稳定」型（XC6206/ME6209 属于此类）。</li>
+      <li><b>输出电容太小</b>。低于手册最小值（常见 1µF）时，极点移到高频，相位裕度不够。本板用 10–22µF，远超最小值，稳。</li>
+      <li><b>负载电容过大 + 无前馈</b>。负载侧若有 100µF 以上，环路极点下移。对策：加前馈电容 C<sub>ff</sub>（10–100pF）跨接上反馈电阻。</li>
+    </ol>
+    <p>判断方法：空载到满载阶跃，看输出是否有 100kHz 以上的持续衰减振荡（不是单次跌落）。若有，就是相位裕度不足。</p>
+
+    <h2><span class="n">4.3.6</span>PSRR：为什么摄像头要独立 LDO</h2>
+    <p>PSRR（电源抑制比）定义为输入纹波到输出纹波的衰减，单位 dB。XC6206 在 1kHz 约 60dB（衰减 1000 倍）。</p>
+    <p>本板 3.3V 主干的开关纹波约 20mV<sub>pp</sub>，若直接给摄像头模拟电路，20mV 纹波会在图像上表现为<b>横条纹噪声</b>（因为像素时钟与开关频率异步）。经 U12 后变成 20µV，肉眼不可见。</p>
+    <p>注意 PSRR 随频率下降：到 1MHz 时往往只剩 20–30dB。所以 LDO 前面仍需要 DCDC 输出端的 104 电容先把高频尖峰压掉。</p>
+
+    <h2><span class="n">4.3.7</span>实测三步</h2>
+    <ol>
+      <li><b>测压差</b>：满载时测 V<sub>in</sub> 与 V<sub>out</sub>，差值就是实际 dropout。判据：≥ 手册 maximum dropout 的 1.2 倍。</li>
+      <li><b>测温升</b>：热像仪或贴温度探头，满载运行 30 分钟。判据：结温（估算）= 壳温 + 5°C，不超过 100°C 为佳。</li>
+      <li><b>测纹波</b>：示波器 AC 耦合、20MHz 限制。判据：LDO 输出 &lt;1mV<sub>pp</sub>（小电流时）。</li>
+    </ol>
+    <p>故障判据表（直接抄）：</p>
+    <table>
+      <thead><tr><th>现象</th><th>最可能原因</th><th>验证</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">输出低于标称 0.2V 以上</td><td>压差不足 / 负载过大</td><td>量 Vin，减负载再看</td></tr>
+        <tr><td class="nm">输出随温度漂移</td><td>过热保护 / 热失控</td><td>吹冷风看是否恢复</td></tr>
+        <tr><td class="nm">输出有 200kHz 振荡</td><td>ESR 不匹配</td><td>换电容或串 0.2Ω</td></tr>
+        <tr><td class="nm">上电即烧</td><td>输入反接 / 超压</td><td>查 TVS 与极性</td></tr>
+      </tbody>
+    </table>
 
     <div class="demo">
-      <div class="dh"><b>LDO 结温计算器</b><span>给工况与热阻，直接判断封装是否够</span></div>
+      <div class="dh"><b>LDO 功耗 / 结温计算器</b><span>输入压差与负载电流，算功耗、温升、是否越过 125°C</span></div>
       <div class="db">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
-          <div><div style="font-size:12px;color:#9fb0c7">Vin <b id="iv" style="color:#5ff1ef">3.3</b> V</div><input id="vin" type="range" min="1.8" max="24" step="0.1" value="3.3" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12px;color:#9fb0c7">Vout <b id="ov" style="color:#5ff1ef">2.8</b> V</div><input id="vout" type="range" min="0.8" max="12" step="0.1" value="2.8" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12px;color:#9fb0c7">Iout <b id="iov" style="color:#5ff1ef">100</b> mA</div><input id="iout" type="range" min="5" max="500" step="5" value="100" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12px;color:#9fb0c7">RθJA <b id="rv" style="color:#5ff1ef">200</b> °C/W</div><input id="r" type="range" min="20" max="300" step="10" value="200" style="width:100%;accent-color:#5ff1ef"></div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+          <div><div class="lbl">Vin <b id="vinv">5.0</b> V</div><input id="vin" class="r" type="range" min="2.5" max="12" step="0.1" value="5"></div>
+          <div><div class="lbl">Vout <b id="voutv">3.3</b> V</div><input id="vout" class="r" type="range" min="0.8" max="5" step="0.1" value="3.3"></div>
+          <div><div class="lbl">Iout <b id="iov">5</b> mA</div><input id="io" class="r" type="range" min="1" max="300" step="1" value="5"></div>
+          <div><div class="lbl">θ<sub>JA</sub> <b id="thv">250</b> °C/W</div><input id="th" class="r" type="range" min="150" max="400" step="10" value="250"></div>
+          <div><div class="lbl">环境温度 <b id="tav">40</b> °C</div><input id="ta" class="r" type="range" min="0" max="80" step="1" value="40"></div>
         </div>
-        <div id="ldoOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+        <div id="ldOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
       </div>
     </div>
 
-    <h2><span class="n">4.3.2</span>三个设计习惯</h2>
-    <ol class="steps">
-      <li><b>先算热，再画封装</b>：耗散 >0.4W 就别用 SOT-23。</li>
-      <li><b>散热焊盘打过孔</b>：每个过孔约 0.3–0.5°C/W 改善，9 个过孔阵列效果明显。</li>
-      <li><b>远离热源</b>：LDO 紧贴 DCDC 电感，等于给自己加环境温度。</li>
-    </ol>
-    <div class="box tip">
-      <h5>手摸法的边界</h5>
-      <p>手指能长期按住（约 60°C 以下）说明余量很大；烫到不敢碰（&gt;70°C）就要算；闻到味道或变色，说明 T<sub>j</sub> 已远超 125°C。<b>手摸只能定性，不能替代计算。</b></p>
+    <h3>练习</h3>
+    <details class="quiz"><summary>1. 3.3V→2.8V、120mA 的功耗与温升？</summary><div class="ans">P=0.5×0.12=60mW；ΔT=60m×250=15°C。</div></details>
+    <details class="quiz"><summary>2. 5V→3.3V 带 200mA，为什么危险？</summary><div class="ans">P=1.7×0.2=340mW，ΔT=85°C，环境 50°C 时 135°C 超上限。</div></details>
+    <details class="quiz"><summary>3. SOT-23 的 200mW 上限怎么来的？</summary><div class="ans">(125−50)/350≈214mW，最差焊盘 θ<sub>JA</sub>=350。</div></details>
+    <details class="quiz"><summary>4. 3.3V 输入能否稳定输出 3.0V/100mA？</summary><div class="ans">不能可靠：dropout 250mV，只剩 300mV 余量，输入稍有跌落就失稳。</div></details>
+    <details class="quiz"><summary>5. LDO 输出为什么不能只用 100nF？</summary><div class="ans">低于手册最小电容（常 1µF），环路极点右移，相位裕度不足会振荡。</div></details>
+    <details class="quiz"><summary>6. 摄像头为什么不用主 3.3V 而用独立 LDO？</summary><div class="ans">PSRR 60dB 把 20mV 开关纹波压到 20µV，避免图像横条纹噪声。</div></details>
+
+    <div class="ch-nav">
+      <a href="c02.html"><span>上一篇</span><b>← 4.2 DCDC 外围计算</b></a>
+      <a class="nx" id="chNavNext" href="c04.html"><span>下一章</span><b>4.4 去耦与 PDN →</b></a>
     </div>
-
-    <h3>自测</h3>
-    <details class="quiz"><summary>5V→3.3V、200mA、SOT-23（200°C/W）、T<sub>a</sub>=40°C，安全吗？</summary><div class="ans">P=0.34W，T<sub>j</sub>=40+68=108°C，低于 125°C 但余量不大；批量建议换 SOT-89 或加铜箔，把 T<sub>j</sub> 压到 100°C 以下。</div></details>
-    <details class="quiz"><summary>为什么加大铜箔能降 R<sub>θJA</sub>？</summary><div class="ans">因为热量从结传到引脚再到铜箔，铜箔相当于散热器，面积越大对流与辐射散热越强，热阻下降。</div></details>
-    <details class="quiz"><summary>同样耗散，为什么 DFN 比 SOT-23 凉？</summary><div class="ans">DFN 有裸露散热焊盘，热直接传到 PCB 地平面；SOT-23 只靠引脚传热，路径长、热阻大。</div></details>
-
-    
-    <h2>原页对照</h2>
-    <figure class="fig sch">
-      <div class="scroller"><a href="../../assets/img/sch/core_p1.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/core_p1.png" alt="CORE V2.0 第 1 页 LDO" loading="lazy"></a></div>
-      <figcaption><b>原页 · CORE p1</b>　LDO 热设计的真实对象：U7 ME6209A33（SNVS 3.3V）、U12 XC6206P282MR（2.8V）、U9 TMI6030（SD）。三颗都是 SOT-23-5，压差×(负载电流+静态电流) 全部变成热，θ<sub>JA</sub> 约 200–250°C/W，算出来才知道会不会烫。<a class="zoom" href="../../assets/img/sch/core_p1.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
-    </figure>
-
-    <div class="ch-nav"><a href="c02.html"><span>上一章</span><b>← 4.2 DCDC 外围计算</b></a>
-      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>4.4 去耦与 PDN →</b></a></div>
   </main>
 </div>
-<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
 <script>
 renderPart('p4','c03.html');
 (function(){
   function calc(){
     var vin=+document.getElementById('vin').value, vout=+document.getElementById('vout').value;
-    var io=+document.getElementById('iout').value/1000, r=+document.getElementById('r').value;
-    document.getElementById('iv').textContent=vin.toFixed(1);
-    document.getElementById('ov').textContent=vout.toFixed(1);
+    var io=+document.getElementById('io').value/1000, th=+document.getElementById('th').value, ta=+document.getElementById('ta').value;
+    var p=(vin-vout)*io;
+    var dt=p*th, tj=ta+dt;
+    document.getElementById('vinv').textContent=vin.toFixed(1);
+    document.getElementById('voutv').textContent=vout.toFixed(1);
     document.getElementById('iov').textContent=(io*1000).toFixed(0);
-    document.getElementById('rv').textContent=r;
-    var p=(vin-vout)*io, tj=40+p*r;
-    var pmax=(125-40)/r;
-    document.getElementById('ldoOut').innerHTML=
-      '<b style="color:#eaf3ff;font-size:15px">耗散 '+(p*1000).toFixed(0)+' mW　结温 ≈ '+tj.toFixed(0)+' °C</b><br>'+
-      '此封装在 40°C 环境下最多散 '+(pmax*1000).toFixed(0)+' mW<br>'+
-      '<span style="color:'+(tj<=110?'#9df3c2':'#ff9c9c')+'">'+(tj<=110?'余量充足（≤110°C）':(tj<=125?'勉强可用，批量建议换封装':'超 125°C，必须改方案'))+'</span><br>'+
-      '<span style="color:#6f7f9c;font-size:11.5px">按 Ta=40°C 估算；实际环境温度按机箱内温度取（常 50–60°C）。RθJA 已含铜箔影响，按实际 Layout 修正。</span>';
+    document.getElementById('thv').textContent=th;
+    document.getElementById('tav').textContent=ta;
+    var cls = tj>125?'#ff8f80':(tj>100?'#ffd79a':'#9ff5c0');
+    var tip = tj>125?'超 125°C，必须加铜箔/换封装/降电流':(tj>100?'接近上限，建议加大铜箔':'安全');
+    document.getElementById('ldOut').innerHTML=
+      '压差 = '+ (vin-vout).toFixed(2) +' V ，效率 = '+ (vout/vin*100).toFixed(1) +'%<br>'+
+      '功耗 P<sub>D</sub> = <b style="color:#5ff1ef">'+ (p*1000).toFixed(0) +' mW</b><br>'+
+      '温升 ΔT = P·θ<sub>JA</sub> = <b style="color:#5ff1ef">'+ dt.toFixed(0) +' °C</b><br>'+
+      '结温 T<sub>J</sub> ≈ <b style="color:'+cls+'">'+ tj.toFixed(0) +' °C</b>（'+tip+'）';
   }
-  ['vin','vout','iout','r'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  ['vin','vout','io','th','ta'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
   calc();
 })();
 </script>
-</body></html>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .r{width:100%;accent-color:#5ff1ef}
+</style>
+</body>
+</html>
+
+

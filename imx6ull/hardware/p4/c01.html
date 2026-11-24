@@ -1,9 +1,11 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>4.1 电流预算与选型 | 第四篇 · 设计与计算 | i.MX6ULL 学习手册</title>
-<meta name="description" content="逐路列负载、峰值与效率，反推输入电流与器件选型；30% 余量规则与一张可复用的预算表。">
-<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+<title>4.1 电流预算与选型：一张表决定所有器件的余量 | 第四篇 · 设计与计算 | i.MX6ULL 学习手册</title>
+<meta name="description" content="把本板每一路电源的平均、峰值、启动电流列表算清，据此选电感、连接器、保险丝、铜箔宽度；含 IPC-2221 载流与温升计算器。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -14,123 +16,144 @@
   <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
 <div class="shell">
   <aside id="sidebar"><div class="vol-h">第四篇 · 设计与计算</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第四篇 · 设计</span><span class="sep">/</span>第 1 章<span class="sep">/</span>约 26 分钟</div>
-    <h1>电流预算：画板前的第一张表</h1>
-    <p class="lede">几乎所有「电源不够」的事故，根源都是<b>没做预算</b>：凭感觉选了一颗 1A 的 DCDC，实际峰值要 1.4A。<b>预算不是估算，是把每一路负载的典型值、峰值、持续时间都写下来，再乘效率反推输入。</b></p>
+    <div class="ch-meta"><span class="lv">第四篇 · 计算</span><span class="sep">/</span>第 1 章<span class="sep">/</span>约 60 分钟</div>
+    <h1>电流预算与选型：一张表决定所有器件的余量</h1>
+    <p class="lede">设计一块板，第一件事不是画原理图，而是<b>算电流</b>。每一路的平均电流决定电感与铜箔，峰值电流决定电容与连接器，启动电流决定保险丝与上电时序。这一章用本板的真实数字，把三张表算出来。</p>
+
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>列出六路负载的典型/峰值电流，算出总输入功率</li>
-        <li>用效率反推输入电流，判断保险丝、连接器、电感是否够</li>
-        <li>套用「30% 余量」规则选出 DCDC 与 LDO 的额定值</li>
+        <li>列出五个必须分开统计的电流口径：静态、平均、峰值、启动、故障</li>
+        <li>用本板六路电源算出总输入功率并反推 12V 侧电流</li>
+        <li>按 1.3 倍峰值余量选电感饱和电流、连接器触点、保险丝</li>
+        <li>用 IPC-2221 公式算铜箔宽度，知道 1oz 铜 1A 大概多宽</li>
+        <li>解释「为什么 5V 母线上的 470µF 比 3.3V 上的更大」</li>
       </ol>
     </div>
 
-    <h2><span class="n">4.1.1</span>预算表的五列</h2>
+    <h2><span class="n">4.1.1</span>五个电流口径，不能混用</h2>
     <table>
-      <thead><tr><th>轨</th><th>典型电流</th><th>峰值/持续时间</th><th>电压</th><th>功率</th></tr></thead>
+      <thead><tr><th>口径</th><th>含义</th><th>用来选什么</th><th>本板例子</th></tr></thead>
       <tbody>
-        <tr><td class="nm">VDD_ARM_SOC 1.35V</td><td>0.6A</td><td>1.1A / 10ms（满载瞬间）</td><td>1.35V</td><td>0.8–1.5W</td></tr>
-        <tr><td class="nm">DRAM_1V35</td><td>0.3A</td><td>0.5A / 突发</td><td>1.35V</td><td>0.4–0.7W</td></tr>
-        <tr><td class="nm">DCDC_3V3</td><td>0.4A</td><td>0.8A / 外设全开</td><td>3.3V</td><td>1.3–2.6W</td></tr>
-        <tr><td class="nm">SNVS 3.3V</td><td>3mA</td><td>10mA</td><td>3.3V</td><td>&lt;0.03W</td></tr>
-        <tr><td class="nm">NVCC_CSI 2.8V</td><td>60mA</td><td>120mA</td><td>2.8V</td><td>0.2–0.34W</td></tr>
-        <tr><td class="nm">NVCC_SD</td><td>50mA</td><td>200mA / 写卡</td><td>1.8–3.3V</td><td>0.1–0.66W</td></tr>
+        <tr><td class="nm">静态 I<sub>q</sub></td><td>无负载时的自身消耗</td><td>常电域、电池寿命</td><td>ME6209 约 1µA；TJA1050 待机 mA 级</td></tr>
+        <tr><td class="nm">平均 I<sub>avg</sub></td><td>正常工作长期值</td><td>铜箔宽度、散热、效率</td><td>3.3V 域约 400mA</td></tr>
+        <tr><td class="nm">峰值 I<sub>p</sub></td><td>µs–ms 级突发</td><td>电感饱和、电容储能、连接器</td><td>ARM 内核 1.0A 峰值</td></tr>
+        <tr><td class="nm">启动 I<sub>inrush</sub></td><td>上电瞬间充电电流</td><td>保险丝、DCDC 限流、时序</td><td>470µF 从 0 充到 5V</td></tr>
+        <tr><td class="nm">故障 I<sub>fault</sub></td><td>短路时的电流</td><td>TVS、保险丝、限流开关</td><td>USB 限流 1.3A（MT9700）</td></tr>
       </tbody>
     </table>
-    <p>先算<b>输出功率总和</b>，再按每一级效率反推输入功率，逐级相加得到 5V 输入电流。这是「自下而上」的正确顺序；反过来「先定输入 5V/2A 再分配」会导致某一路不够。</p>
+    <p>新手最常犯的错是「只算平均」：平均 400mA 的 3.3V 域，峰值可能 1.5A，用电感 I<sub>sat</sub>=1A 的器件就会在负载跳变时饱和，输出电压瞬间塌陷，表现为「跑压力测试就重启」。</p>
 
-    <figure class="fig">
-      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <rect x="16" y="16" width="420" height="210" rx="10" fill="#141c2e" stroke="#3a4560"/>
-        <text x="32" y="40" fill="#eaf3ff" font-size="11">自下而上的预算链</text>
-        <text x="32" y="72" fill="#9fb0c7" font-size="10">① 列每路负载的典型/峰值</text>
-        <text x="32" y="96" fill="#9fb0c7" font-size="10">② 算每路输出功率 P = V×I</text>
-        <text x="32" y="120" fill="#9fb0c7" font-size="10">③ 按效率反推输入功率 Pin = Pout/η</text>
-        <text x="32" y="144" fill="#9fb0c7" font-size="10">④ 逐级相加得 5V 输入电流</text>
-        <text x="32" y="168" fill="#9fb0c7" font-size="10">⑤ 按峰值再核一遍，取大者</text>
-        <text x="32" y="196" fill="#9df3c2" font-size="10">余量：连续负载 ≤ 额定 70%</text>
-        <text x="32" y="216" fill="#ff9c9c" font-size="10">峰值 ≤ 额定 90%，且时间受限</text>
+    <h2><span class="n">4.1.2</span>本板真实预算表</h2>
+    <p>按「谁吃哪路电」逐项列，单位 mA（典型值，来自器件手册与本板实际配置）：</p>
+    <table>
+      <thead><tr><th>电源轨</th><th>负载</th><th>平均</th><th>峰值</th><th>备注</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">SNVS 3.3V</td><td>RTC + 唤醒逻辑</td><td>2–5</td><td>10</td><td>常电，必须最低 I<sub>q</sub></td></tr>
+        <tr><td class="nm">VDD_ARM_SOC 1.35V</td><td>CPU 内核 + SOC 逻辑</td><td>250–600</td><td>1500</td><td>随主频/负载剧烈跳变</td></tr>
+        <tr><td class="nm">DRAM_1V35</td><td>DDR3L 颗粒</td><td>120–250</td><td>500</td><td>读写突发时上升</td></tr>
+        <tr><td class="nm">VDD_HIGH 3.3V</td><td>SoC 内部高压域</td><td>20–40</td><td>80</td><td>独立一路，隔离噪声</td></tr>
+        <tr><td class="nm">NVCC_CSI 2.8V</td><td>摄像头</td><td>60–120</td><td>200</td><td>只在接摄像头时</td></tr>
+        <tr><td class="nm">NVCC_SD</td><td>TF/eMMC</td><td>50–100</td><td>200</td><td>写卡时峰值</td></tr>
+        <tr><td class="nm">3.3V 外设</td><td>PHY + LCD + LED + 上拉</td><td>180–260</td><td>400</td><td>PHY 约 150mA</td></tr>
+        <tr><td class="nm">5V 外设</td><td>CAN ×1 + RS485 + USB Host</td><td>80–150</td><td>1500</td><td>USB 限流 1.3A 是上限</td></tr>
+      </tbody>
+    </table>
+    <p><b>汇总</b>：3.3V 域合计约 550mA（含核心板各路），1.35V 域约 1.5A 峰值。把这些换算到 5V 与 12V 输入侧：</p>
+    <p style="text-align:center">P<sub>3V3</sub> ≈ 3.3 × 0.55 = 1.82W（效率 88% → 输入 2.07W）<br>
+      P<sub>1V35</sub> ≈ 1.35 × 1.0(平均) = 1.35W（效率 85% → 输入 1.59W）</p>
+    <p>5V 母线总输入约 3.7W，加 5V 外设 0.75W，共 <b>4.4W</b>；12V 侧电流约 0.37A（再算上 U6/U4 的效率与静态）。所以 <b>2A 保险丝、1A 级别的电感、0.5A/触点的连接器并联 4 个</b>，都是「1.3 倍以上余量」的结果。</p>
 
-        <rect x="456" y="16" width="400" height="210" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
-        <text x="472" y="40" fill="#eaf3ff" font-size="11">容易漏掉的四项</text>
-        <text x="472" y="72" fill="#9fb0c7" font-size="10">① 效率不是 100%：85–95%</text>
-        <text x="472" y="96" fill="#9fb0c7" font-size="10">② 上拉/终端/指示灯的常态电流</text>
-        <text x="472" y="120" fill="#9fb0c7" font-size="10">③ 电容充电的浪涌（上电瞬间）</text>
-        <text x="472" y="144" fill="#9fb0c7" font-size="10">④ 芯片自身 Iq 与外围损耗</text>
-        <text x="472" y="172" fill="#6f7f9c" font-size="9">例如 10 颗 4.7k 上拉就是 7mA 常态电流</text>
-        <text x="472" y="194" fill="#6f7f9c" font-size="9">浪涌决定保险丝与软启动，而不是稳态</text>
+    <h2><span class="n">4.1.3</span>启动电流：被忽视的那一项</h2>
+    <p>上电瞬间，所有输出电容都是短路。以本板 5V 母线的 470µF 为例：</p>
+    <p style="text-align:center">Q = C·V = 470µF × 5V = 2.35mC<br>若 DCDC 限流 1A，充电时间 t = Q/I = 2.35ms</p>
+    <p>这 2.35ms 内，DCDC 一直工作在限流状态，输出电压缓慢上升。若下一级（3.3V Buck）在此时就使能，它会看到「输入不足」，可能反复启动（打嗝）。解决办法就是<b>时序</b>：5V 的 PG 经 RC 延时后再使能 3.3V（本板核心板 U6 的 EN 就是这样，R60 10K + C85 104，τ=1ms）。</p>
+    <p>再看 USB：<b>MT9700 限流 1.3A</b>，插入 U 盘瞬间，U 盘输入电容（约 10–100µF）充电，电流被限制在 1.3A，电压跌落由 MT9700 的软启动控制。若没有这颗限流开关，插入瞬间可能拉低整板 5V，导致 SoC 复位。</p>
 
-        <text x="16" y="256" fill="#9fb0c7" font-size="10.5">连接器与电感要按「峰值 + 余量」选：连接器每脚 0.5–1A，电感按 I sat 的 70%。</text>
-        <text x="16" y="280" fill="#6f7f9c" font-size="10">预算表做完，选型就已经定了一半：DCDC 的额定电流、电感的 I sat、保险丝的 I²t。</text>
-        <text x="16" y="304" fill="#ff9c9c" font-size="10">坑：只算稳态不算峰值，负载一跳电源就跌，表现为「随机重启」。</text>
-      </svg>
-      <figcaption><b>图 4-1</b>　预算链与四个容易漏掉的项。</figcaption>
-    </figure>
+    <h2><span class="n">4.1.4</span>铜箔能扛多少：IPC-2221 公式</h2>
+    <p>PCB 走线的载流能力不是「1A 对应 1mm」这种口诀，而是与铜厚、允许温升、走线是否外层有关。IPC-2221 的经验公式：</p>
+    <p style="text-align:center">I = k × ΔT<sup>0.44</sup> × A<sup>0.725</sup></p>
+    <p>其中 A 是截面积（mil²），k 外层 0.048、内层 0.024，ΔT 是允许温升（°C）。反解宽度：</p>
+    <p style="text-align:center">A = (I/(k·ΔT<sup>0.44</sup>))<sup>1/0.725</sup></p>
+    <p>算一个实际值：外层 1oz 铜（35µm≈1.38mil），ΔT=10°C，I=1A：</p>
+    <p style="text-align:center">A=(1/(0.048×10<sup>0.44</sup>))<sup>1.379</sup>≈(1/0.132)<sup>1.379</sup>≈13.9 mil²<br>宽度 w=A/1.38≈<b>10 mil ≈ 0.25mm</b></p>
+    <p>也就是说 <b>外层 1oz、10°C 温升下，1A 只需 0.25mm 宽</b>。但工程上不会这么用：</p>
+    <ul>
+      <li>实际按 <b>ΔT≤10°C 且电流×1.5 余量</b> 设计，1A 走 0.5mm；</li>
+      <li>内层散热差（k 减半），同电流需要约 1.7 倍宽度；</li>
+      <li>过孔也载流：一个 0.3mm 孔径过孔约 1–2A（镀铜 25µm），大电流要打多个。</li>
+    </ul>
+    <p>本板的 3.3V 主干在主电源区用了铺铜而不是细线，就是因为 550mA 平均 + 峰值 1.5A，细线会有 20°C 以上温升。</p>
+
+    <h2><span class="n">4.1.5</span>选型的三条硬规则</h2>
+    <ol>
+      <li><b>电感 I<sub>sat</sub> ≥ 1.3×I<sub>peak</sub></b>，且 I<sub>rms</sub> ≥ I<sub>out</sub>。饱和后电感量骤降，电流失控。</li>
+      <li><b>连接器每触点 ≤ 0.5×额定</b>，电源脚并联。0.5A 额定的触点用 1A 会温升过高、接触电阻上升。</li>
+      <li><b>保险丝 ≥ 1.5×正常最大电流，≤ 后级器件耐受</b>。2A 保险丝配 1.3A 限流开关，正常；若配 3A 就会「烧板不烧保险」。</li>
+    </ol>
 
     <div class="demo">
-      <div class="dh"><b>电源预算计算器</b><span>输入各路负载，算总功率与 5V 输入电流</span></div>
+      <div class="dh"><b>铜箔载流 / 温升计算器</b><span>输入电流、铜厚、走线宽度、内外层，算温升与压降</span></div>
       <div class="db">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
-          <div><div style="font-size:12px;color:#9fb0c7">1.35V 电流 <b id="a1v" style="color:#5ff1ef">0.9</b> A</div><input id="a1" type="range" min="0.1" max="2" step="0.05" value="0.9" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12px;color:#9fb0c7">3.3V 电流 <b id="a2v" style="color:#5ff1ef">0.8</b> A</div><input id="a2" type="range" min="0.05" max="2" step="0.05" value="0.8" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12px;color:#9fb0c7">2.8V 电流 <b id="a3v" style="color:#5ff1ef">0.12</b> A</div><input id="a3" type="range" min="0.01" max="0.5" step="0.01" value="0.12" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12px;color:#9fb0c7">效率 <b id="efv" style="color:#5ff1ef">88</b> %</div><input id="ef" type="range" min="70" max="96" step="1" value="88" style="width:100%;accent-color:#5ff1ef"></div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+          <div><div class="lbl">电流 <b id="in">1.0</b> A</div><input id="i" type="range" min="0.1" max="5" step="0.1" value="1" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">铜厚 <b id="tn">1</b> oz</div><input id="t" type="range" min="0.5" max="3" step="0.5" value="1" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">线宽 <b id="wn">10</b> mil</div><input id="w" type="range" min="4" max="120" step="1" value="10" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div class="lbl">层 <b id="lvn">外层</b></div><select id="lv" class="inp"><option value="0.048">外层</option><option value="0.024">内层</option></select></div>
         </div>
-        <div id="budOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+        <div id="cuOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
       </div>
     </div>
 
-    <h2><span class="n">4.1.2</span>余量规则与三个判据</h2>
-    <ol class="steps">
-      <li><b>连续负载 ≤ 额定 70%</b>：给温升与寿命留空间。</li>
-      <li><b>峰值 ≤ 额定 90%</b>：且峰值持续时间受限于软启动/输出电容。</li>
-      <li><b>输入侧 ≤ 连接器/保险丝的 80%</b>：接触电阻与浪涌都要留。</li>
-    </ol>
-    <div class="box tip">
-      <h5>一个快速校验</h5>
-      <p>整板输入 5V、总功率 6W，则输入电流约 1.2A（按 90% 效率）。保险丝取 2A、连接器至少两个电源脚并联、输入电容按每安 10µF 配。三条能覆盖大多数小板。</p>
+    <h3>练习（答案在折叠里）</h3>
+    <details class="quiz"><summary>1. 五个电流口径里，哪个决定电感饱和电流？</summary><div class="ans">峰值（µs–ms 级突发）。电感在峰值时必须不饱和。</div></details>
+    <details class="quiz"><summary>2. 470µF 充到 5V、限流 1A，需要多久？</summary><div class="ans">Q=2.35mC，t=2.35ms。</div></details>
+    <details class="quiz"><summary>3. 外层 1oz、10°C、1A 的走线宽度？</summary><div class="ans">约 10mil（0.25mm）；工程上按 0.5mm 设计。</div></details>
+    <details class="quiz"><summary>4. 为什么内层同电流要更宽？</summary><div class="ans">内层被介质包围，散热差，IPC 公式的 k 从 0.048 降到 0.024。</div></details>
+    <details class="quiz"><summary>5. 2A 保险丝配 1.3A 限流开关合理吗？</summary><div class="ans">合理：保险丝 ≥1.5×正常电流，且后级限流先动作，避免烧板。</div></details>
+    <details class="quiz"><summary>6. 3.3V 平均 550mA、峰值 1.5A，电感怎么选？</summary><div class="ans">I<sub>sat</sub>≥1.3×1.5≈2A，I<sub>rms</sub>≥0.6A，取 3A/2A 以上留余量。</div></details>
+
+    <div class="ch-nav">
+      <a href="../p3/c12.html"><span>上一篇</span><b>← 第三篇 · MINI 第 3–4 页</b></a>
+      <a class="nx" id="chNavNext" href="c02.html"><span>下一章</span><b>4.2 DCDC 外围计算 →</b></a>
     </div>
-
-    <h3>自测</h3>
-    <details class="quiz"><summary>1.35V/1A 与 3.3V/0.8A 两路，效率 88%，5V 输入电流约多少？</summary><div class="ans">Pout = 1.35 + 2.64 = 3.99W；Pin = 3.99/0.88 ≈ 4.53W；Iin ≈ 4.53/5 ≈ 0.91A。再按峰值乘 1.3–1.5 倍选型。</div></details>
-    <details class="quiz"><summary>为什么上拉电阻也要算进预算？</summary><div class="ans">因为它们是常态负载：10 颗 4.7k 在 3.3V 下就是约 7mA；看起来小，但在 µA 级待机设计里就是致命的。</div></details>
-    <details class="quiz"><summary>峰值 1.4A，选 1.5A 的 DCDC 行不行？</summary><div class="ans">不行。峰值已达额定的 93%，且没算效率与温升降额；应选 2A 级，或加大输出电容/软启动来削峰。</div></details>
-
-    
-    <h2>原页对照</h2>
-    <figure class="fig sch">
-      <div class="scroller"><a href="../../assets/img/sch/core_p1.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/core_p1.png" alt="CORE V2.0 第 1 页电源" loading="lazy"></a></div>
-      <figcaption><b>原页 · CORE p1</b>　电流预算的全部对象都在这一页：SNVS 3.3V、NVCC_CSI 2.8V、ARM/SOC 1.345V、DCDC_3V3 3.32V、LVDDR3 1.35V、NVCC_SD。右下角的官方电流表（27mA / 12mA / 400mA / 1.5A 等）就是预算的起点，别凭感觉估。<a class="zoom" href="../../assets/img/sch/core_p1.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
-    </figure>
-
-    <div class="ch-nav"><a href="../index.html"><span>上一篇</span><b>← 返回总目录</b></a>
-      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>4.2 DCDC 外围计算 →</b></a></div>
   </main>
 </div>
-<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
 <script>
 renderPart('p4','c01.html');
 (function(){
   function calc(){
-    var i1=+document.getElementById('a1').value, i2=+document.getElementById('a2').value, i3=+document.getElementById('a3').value, ef=+document.getElementById('ef').value/100;
-    document.getElementById('a1v').textContent=i1.toFixed(2);
-    document.getElementById('a2v').textContent=i2.toFixed(2);
-    document.getElementById('a3v').textContent=i3.toFixed(2);
-    document.getElementById('efv').textContent=(ef*100).toFixed(0);
-    var p1=1.35*i1, p2=3.3*i2, p3=2.8*i3, pt=p1+p2+p3;
-    var pin=pt/ef, iin=pin/5;
-    document.getElementById('budOut').innerHTML=
-      '<b style="color:#eaf3ff;font-size:15px">输出总功率 '+(pt).toFixed(2)+' W　输入 '+(pin).toFixed(2)+' W　5V 电流 '+(iin).toFixed(2)+' A</b><br>'+
-      '分项：1.35V '+(p1*1000).toFixed(0)+' mW / 3.3V '+(p2*1000).toFixed(0)+' mW / 2.8V '+(p3*1000).toFixed(0)+' mW<br>'+
-      '按峰值 ×1.4 选型：输入约 '+(iin*1.4).toFixed(2)+' A，保险丝取 '+(Math.ceil(iin*1.4/0.5)*0.5).toFixed(1)+' A<br>'+
-      '<span style="color:#6f7f9c;font-size:11.5px">未含上拉/指示/电容浪涌；实际还要加 5–10% 常态负载与上电浪涌校验。</span>';
+    var I=+document.getElementById('i').value, oz=+document.getElementById('t').value, w=+document.getElementById('w').value, k=+document.getElementById('lv').value;
+    var milT=oz*1.38;
+    var A=w*milT;
+    var dT=Math.pow(I/(k*Math.pow(A,0.725)),1/0.44);
+    var Rsq=1.7e-6/ (oz*35e-6); // ohm per square approx
+    document.getElementById('in').textContent=I.toFixed(1);
+    document.getElementById('tn').textContent=oz.toFixed(1);
+    document.getElementById('wn').textContent=w;
+    document.getElementById('lvn').textContent=(k>0.03?'外层':'内层');
+    var dTshow=(isFinite(dT)&&dT>0)?dT.toFixed(1):'—';
+    document.getElementById('cuOut').innerHTML=
+      '截面积 A = '+w+'mil × '+(milT).toFixed(2)+'mil = <b style="color:#5ff1ef">'+A.toFixed(1)+' mil²</b><br>'+
+      '温升 ΔT = (I/(k·A<sup>0.725</sup>))<sup>1/0.44</sup> ≈ <b style="color:#5ff1ef">'+dTshow+' °C</b>（k='+k+'）<br>'+
+      '方块电阻 ≈ '+(Rsq*1000).toFixed(2)+' mΩ/□；'+(dT>10?'<span style="color:#ffb4a8">超过 10°C，建议加宽或改用铺铜</span>':'<span style="color:#9ff5c0">温升可接受</span>');
   }
-  ['a1','a2','a3','ef'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  ['i','t','w','lv'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  document.getElementById('lv').addEventListener('change',calc);
   calc();
 })();
 </script>
-</body></html>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .inp{width:100%;background:#0a1020;color:#5ff1ef;border:1px solid #2a3a55;border-radius:8px;padding:6px}
+</style>
+</body>
+</html>
+

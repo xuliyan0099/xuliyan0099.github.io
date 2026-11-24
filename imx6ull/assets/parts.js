@@ -60,10 +60,10 @@ window.PARTS = [
       { n: '4.2', t: 'DCDC 外围计算', s: '电感、输出电容、反馈电阻、纹波', f: 'c02.html', ready: true },
       { n: '4.3', t: 'LDO 热设计', s: '结温、热阻、铜箔面积', f: 'c03.html', ready: true },
       { n: '4.4', t: '去耦与 PDN', s: '目标阻抗、容值组合、平面谐振', f: 'c04.html', ready: true },
-      { n: '4.5', t: '上下拉与终端取值', s: 'I2C、UART、SD、DDR 的边界条件', f: 'c05.html', ready: false },
-      { n: '4.6', t: '复位与晶振计算', s: 'RC 脉宽、负载电容、起振裕度', f: 'c06.html', ready: false },
-      { n: '4.7', t: '分压与采样', s: 'ADC 输入、电池检测、按键阵列', f: 'c07.html', ready: false },
-      { n: '4.8', t: '测量与故障注入', s: '万用表、示波器、限流电源下拆件', f: 'c08.html', ready: false }
+      { n: '4.5', t: '上下拉与终端取值', s: 'I2C 4.7K、CAN 120Ω、DDR 470Ω 的推导', f: 'c05.html', ready: true },
+      { n: '4.6', t: '复位与晶振计算', s: 'MAX809、18pF 负载电容、负阻裕度', f: 'c06.html', ready: true },
+      { n: '4.7', t: '分压与采样', s: 'LSB、源阻抗、误差合成、抗混叠', f: 'c07.html', ready: true },
+      { n: '4.8', t: '测量与故障注入', s: '五步上电、四种波形测法、十组注入', f: 'c08.html', ready: true }
     ]
   },
   {
@@ -101,5 +101,6 @@ window.PART_OF = function (n) {
   var map = { '1': 'p1', '2': 'p2', '3': 'p3', '4': 'p4', '5': 'p5', '6': 'p6' };
   return map[major] || 'p1';
 };
+
 
 

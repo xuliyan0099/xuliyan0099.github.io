@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4.6 复位与晶振计算：MAX809、18pF、负阻裕度 | 第四篇 · 设计与计算 | i.MX6ULL 学习手册</title>
+<meta name="description" content="算 MAX809 的复位阈值与保持时间、算 24MHz 晶振的负载电容与负阻裕度、给出示波器测起振的正确方法与判据。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第四篇 · 设计与计算</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第四篇 · 计算</span><span class="sep">/</span>第 6 章<span class="sep">/</span>约 60 分钟</div>
+    <h1>复位与晶振计算：MAX809、18pF、负阻裕度</h1>
+    <p class="lede">板子不启动，一半是复位，一半是晶振。这两块最容易「看起来没问题」：复位脚电压正常但时序不对，晶振有波形但幅度不够。这一章把两者的判据都算成数字。</p>
+
+    <figure class="fig sch tall">
+      <div class="scroller"><img src="../../assets/img/sch/core_p6_ctrl.png" alt="CORE 第 6 页 复位 MAX809R 与 24MHz 晶振电路"></div>
+      <figcaption>CORE 第 6 页裁切（300dpi）：U2 MAX809R（SOT-23，GND=1/RST=2/VDD=3）经 R31/R33 0Ω 接 POR_B；下方 Y2 24MHz 四脚晶振 + C12/C14 18pF + R32 1M 并联反馈。</figcaption>
+    </figure>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>算 RC 上电复位的延时，并说明为什么用专用复位芯片代替 RC</li>
+        <li>解释 MAX809 的阈值、迟滞、200ms 保持时间各自解决什么问题</li>
+        <li>用 C<sub>L</sub>=C<sub>1</sub>C<sub>2</sub>/(C<sub>1</sub>+C<sub>2</sub>)+C<sub>stray</sub> 反推晶振该选多大负载电容</li>
+        <li>算负阻裕度，判断「起振慢/偶尔不起振」的根因</li>
+        <li>用示波器正确测晶振（不把它测停），并读出 ppm 偏差</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">4.6.1</span>复位要解决三件事</h2>
+    <table>
+      <thead><tr><th>类型</th><th>触发条件</th><th>本板实现</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">上电复位 POR</td><td>VDD 从 0 上升</td><td>U2 MAX809R 监控 3.3V，输出 POR_B</td></tr>
+        <tr><td class="nm">掉电复位 BOR</td><td>VDD 跌到阈值以下</td><td>同上，阈值以下立即拉低</td></tr>
+        <tr><td class="nm">手动复位</td><td>按键</td><td>MINI 板 KEY4 → RESET（R85 10K/DNP）</td></tr>
+        <tr><td class="nm">看门狗复位</td><td>软件喂狗超时</td><td>SoC 内部 WDOG，外部 nWDOG 由 U10 监控</td></tr>
+      </tbody>
+    </table>
+    <p>为什么不用「RC + 施密特」？因为 RC 复位有两个硬伤：</p>
+    <ol>
+      <li><b>掉电时不复位</b>。VDD 缓慢下降时，RC 电容也跟着放电，复位脚可能一直保持高电平，CPU 在欠压状态下乱跑，可能写坏 eMMC。</li>
+      <li><b>阈值不准</b>。RC 的阈值取决于后级输入阈值（漂移大），而专用芯片阈值精度 ±2%。</li>
+    </ol>
+
+    <h2><span class="n">4.6.2</span>RC 延时到底多长：公式与算例</h2>
+    <p>若真用 RC（比如给 DCDC 的 EN 做延时），充电到阈值 V<sub>th</sub> 的时间：</p>
+    <p style="text-align:center">t = −R·C·ln(1 − V<sub>th</sub>/V<sub>DD</sub>)</p>
+    <p>本板 5V 使能 3.3V 的 EN 延时：R60=10K、C85=104（0.1µF）、EN 阈值约 1.2V：</p>
+    <p style="text-align:center">t = −10K×0.1µ×ln(1−1.2/5) = −1ms×ln0.76 = <b>0.27 ms</b></p>
+    <p>看起来很短，但这只是「达到阈值」的时间，实际还要等 DCDC 软启动（约 1ms）。两级加起来约 1.3ms，足够 5V 大电容充完（4.1 节算过 2.35ms，稍紧，但 5V 母线是 12V 降压，充电更快）。</p>
+
+    <h2><span class="n">4.6.3</span>MAX809：阈值、迟滞、200ms</h2>
+    <p>MAX809 系列按阈值分档：R=2.63V、S=2.93V、T=3.08V。本板用 <b>R（2.63V）</b>，即 3.3V 掉到 2.63V 就复位。</p>
+    <p>为什么不是 2.93V？因为 3.3V 域正常波动 ±5%（3.13–3.47V），若阈值 2.93V，留给 DCDC 瞬态跌落的余量只有 0.2V；2.63V 给到 0.5V，更抗瞬态。代价是「欠压到 2.63V 才发现」，但 SoC 在 2.63V 以上仍能正常工作。</p>
+    <p>三个关键参数：</p>
+    <ul>
+      <li><b>阈值精度 ±2%</b>：2.63V 实际 2.58–2.68V，避免批次差异导致「有的板复位早有的晚」；</li>
+      <li><b>迟滞约 1.5%</b>：防止电源纹波在阈值附近反复触发复位（抖动）；</li>
+      <li><b>复位保持 200ms（典型）</b>：VDD 越过阈值后，RST 仍保持低 200ms 再释放。这 200ms 让晶振起振、内部 LDO 稳定、BOOT 引脚采样完成。</li>
+    </ul>
+    <p>R31/R33 是 0Ω：它们不是「限流」，而是<b>布局跳线</b>——允许在调试时断开复位线，插入外部复位源，或在改版时改成 RC。</p>
+
+    <h3>复位时序必须与 BOOT 采样对齐</h3>
+    <p>i.MX6ULL 在 <b>POR_B 释放后的第一个时钟</b>采样 BOOT_MODE 与 BT_CFG 引脚。若拨码开关的 RC（47K + 拨码寄生电容）还没稳定，就会读错启动方式。本板 47K 上拉 + 拨码，稳定时间 µs 级，远小于 200ms，安全。</p>
+
+    <h2><span class="n">4.6.4</span>晶振负载电容：18pF 怎么来的</h2>
+    <p>晶振标称的 C<sub>L</sub>（负载电容）是它「在电路里应该看到」的等效电容。板上的两颗电容是串联看进晶振两端：</p>
+    <p style="text-align:center">C<sub>L</sub> = C<sub>1</sub>·C<sub>2</sub>/(C<sub>1</sub>+C<sub>2</sub>) + C<sub>stray</sub></p>
+    <p>C<sub>stray</sub> 是 PCB 走线与引脚寄生，典型 2–5pF。本板 C12=C14=18pF：</p>
+    <p style="text-align:center">C<sub>L</sub> = 18×18/(18+18) + 3 = 9 + 3 = <b>12 pF</b></p>
+    <p>所以本板选的 24MHz 晶振应是 <b>C<sub>L</sub>=12pF</b> 规格。若错买 C<sub>L</sub>=10pF 的，实际频率会偏高：</p>
+    <p style="text-align:center">Δf/f ≈ (C<sub>L,实际</sub>−C<sub>L,标称</sub>)/(2·C<sub>0</sub>) 的近似，通常每 1pF 偏差约 +30~50ppm</p>
+    <p>12pF vs 10pF 差 2pF ⇒ 频率偏高约 60–100ppm。对 UART/以太网（要求 ±50ppm 内）可能刚好超标，表现为「偶发丢包」。这就是为什么改晶振必须连电容一起改。</p>
+
+    <h2><span class="n">4.6.5</span>负阻裕度：为什么加了 1M 电阻</h2>
+    <p>晶振是「弱正反馈」振荡器：芯片内部反相放大器提供增益，晶振选频，两颗负载电容移相 180°。起振条件是环路增益 &gt;1，工程判据是<b>负阻裕度</b>：</p>
+    <p style="text-align:center">|−R<sub>neg</sub>| ≥ 5 × R<sub>ESR(max)</sub></p>
+    <p>24MHz 晶振的 ESR 典型 30–60Ω，要求负阻 ≥300Ω。若裕度不足（比如负载电容选大了、走线长了、芯片增益不够），现象是：</p>
+    <ul>
+      <li>常温能起振，低温/低压不起振；</li>
+      <li>起振时间从 µs 变成 ms，复位释放时时钟还没稳，启动失败；</li>
+      <li>频率不稳、抖动大。</li>
+    </ul>
+    <p><b>R32 1M 的作用</b>：与晶振并联，给内部反相器提供直流偏置点，让它工作在放大区（线性区）；没有这颗电阻，反相器可能被偏到电源轨，增益骤降。取值 1M 是因为它不能显著加载晶振（1M 相对晶振等效阻抗几十 kΩ 可忽略）。</p>
+    <p>为什么不用 10M？偏置太弱，起振慢；为什么不用 100K？加载过重，负阻裕度下降。1M 是行业折中值。</p>
+
+    <h2><span class="n">4.6.6</span>RTC 32.768kHz：另一套参数</h2>
+    <p>RTC 晶振（Y1）频率低、ESR 高（典型 30–70kΩ），驱动能力也弱（nA 级）。它的 C<sub>L</sub> 通常 6–12pF，本板 C2/C3 也是 18pF ⇒ C<sub>L</sub>≈12pF，与 Y1 的规格匹配。</p>
+    <p>RTC 晶振最怕两件事：</p>
+    <ol>
+      <li><b>走线长、靠近噪声</b>：nA 级电流，几 pF 的耦合电容就能把它带偏；</li>
+      <li><b>用普通探头测</b>：探头电容 10–15pF 并在上面，直接改变 C<sub>L</sub>，频率偏几十 ppm 甚至停振。</li>
+    </ol>
+
+    <h2><span class="n">4.6.7</span>实测：怎么测晶振才不把它测停</h2>
+    <ol>
+      <li>用 <b>×10 探头</b>（输入电容约 10pF）或专用低电容探头，不要用 ×1。</li>
+      <li>测 <b>OSC_OUT</b>（不是 OSC_IN），因为 OUT 端驱动强一些。</li>
+      <li>看幅度：24MHz 主晶振峰峰值应 ≥1V<sub>pp</sub>（典型 1.5–2.5V<sub>pp</sub>）；RTC 只有 0.3–0.8V<sub>pp</sub>。</li>
+      <li>测频率偏差：用频率计 1s 闸门，判据 ±50ppm（主晶振）、±20ppm（RTC 日误差 &lt;2s）。</li>
+    </ol>
+    <p>故障判据表：</p>
+    <table>
+      <thead><tr><th>现象</th><th>最可能原因</th><th>验证方法</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">完全无波形</td><td>晶振坏 / 电容短路 / 焊虚</td><td>断电测 C 是否短路，换晶振</td></tr>
+        <tr><td class="nm">幅度 &lt;0.8V<sub>pp</sub></td><td>负阻裕度不足、负载电容偏大</td><td>减小 C 或换低 ESR 晶振</td></tr>
+        <tr><td class="nm">起振要几百 µs</td><td>偏置弱、C 过大</td><td>查 R32 是否漏贴</td></tr>
+        <tr><td class="nm">频率偏 +100ppm</td><td>负载电容比标称小</td><td>按 4.6.4 重算 C<sub>L</sub></td></tr>
+        <tr><td class="nm">复位后偶发不启动</td><td>复位保持时间不足 / 时钟未稳</td><td>测 POR_B 与 OSC_OUT 的先后</td></tr>
+      </tbody>
+    </table>
+
+    <div class="demo">
+      <div class="dh"><b>复位延时 / 晶振负载电容计算器</b><span>上排算 RC 复位时间，下排算 C<sub>L</sub> 与 ppm 偏差</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div><div class="lbl">R <b id="rv">10</b> kΩ</div><input id="r" class="r" type="range" min="1" max="100" step="1" value="10"></div>
+          <div><div class="lbl">C <b id="cv">0.1</b> µF</div><input id="c" class="r" type="range" min="0.01" max="1" step="0.01" value="0.1"></div>
+          <div><div class="lbl">V<sub>DD</sub> <b id="vddv">5.0</b> V</div><input id="vdd" class="r" type="range" min="3" max="12" step="0.1" value="5"></div>
+          <div><div class="lbl">阈值 <b id="vthv">1.2</b> V</div><input id="vth" class="r" type="range" min="0.4" max="4" step="0.05" value="1.2"></div>
+          <div><div class="lbl">C1/C2 <b id="c1v">18</b> pF</div><input id="c1" class="r" type="range" min="5" max="33" step="1" value="18"></div>
+          <div><div class="lbl">寄生 <b id="csv">3</b> pF</div><input id="cs" class="r" type="range" min="0" max="8" step="0.5" value="3"></div>
+        </div>
+        <div id="rcOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h3>练习</h3>
+    <details class="quiz"><summary>1. R=10K、C=0.1µF、Vth=1.2V、VDD=5V，延时多少？</summary><div class="ans">t=−1ms×ln(0.76)=0.27ms。</div></details>
+    <details class="quiz"><summary>2. MAX809R 阈值多少？为什么 3.3V 系统选 R 不选 S？</summary><div class="ans">2.63V；给 DCDC 瞬态留 0.5V 余量，2.93V 只剩 0.2V。</div></details>
+    <details class="quiz"><summary>3. C1=C2=18pF、寄生 3pF，C<sub>L</sub> 多少？</summary><div class="ans">9+3=12pF。</div></details>
+    <details class="quiz"><summary>4. 晶振标称 10pF，板上却给了 12pF，频率偏高还是偏低？</summary><div class="ans">偏高，约 60–100ppm。</div></details>
+    <details class="quiz"><summary>5. R32 1M 的作用？为什么不是 100K 或 10M？</summary><div class="ans">给反相器直流偏置使其工作在线性区；100K 加载过重，10M 偏置太弱。</div></details>
+    <details class="quiz"><summary>6. 负阻裕度的判据？</summary><div class="ans">|−R<sub>neg</sub>| ≥ 5×ESR<sub>max</sub>。</div></details>
+    <details class="quiz"><summary>7. 为什么测晶振不能用 ×1 探头？</summary><div class="ans">探头电容 10–15pF 并到电路上，改变 C<sub>L</sub>，频率偏移或停振。</div></details>
+
+    <div class="ch-nav">
+      <a href="c05.html"><span>上一篇</span><b>← 4.5 上下拉与终端取值</b></a>
+      <a class="nx" id="chNavNext" href="c07.html"><span>下一章</span><b>4.7 分压与采样 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
+<script>
+renderPart('p4','c06.html');
+(function(){
+  function calc(){
+    var r=+document.getElementById('r').value*1000, c=+document.getElementById('c').value*1e-6;
+    var vdd=+document.getElementById('vdd').value, vth=+document.getElementById('vth').value;
+    var c1=+document.getElementById('c1').value, cs=+document.getElementById('cs').value;
+    var t=-r*c*Math.log(1-vth/vdd);
+    var cl=c1*c1/(c1+c1)+cs;
+    document.getElementById('rv').textContent=(r/1000).toFixed(0);
+    document.getElementById('cv').textContent=(c*1e6).toFixed(2);
+    document.getElementById('vddv').textContent=vdd.toFixed(1);
+    document.getElementById('vthv').textContent=vth.toFixed(2);
+    document.getElementById('c1v').textContent=c1.toFixed(0);
+    document.getElementById('csv').textContent=cs.toFixed(1);
+    document.getElementById('rcOut').innerHTML=
+      'RC 复位延时 t = −R·C·ln(1−V<sub>th</sub>/V<sub>DD</sub>) = <b style="color:#5ff1ef">'+(t*1000).toFixed(2)+' ms</b><br>'+
+      '晶振负载电容 C<sub>L</sub> = C1·C2/(C1+C2) + C<sub>stray</sub> = <b style="color:#5ff1ef">'+cl.toFixed(1)+' pF</b><br>'+
+      '若晶振标称 C<sub>L0</sub>=12pF，偏差 '+(cl-12).toFixed(1)+'pF ⇒ 频率约 '+(cl-12>0?'偏低':'偏高')+' '+Math.abs((cl-12)*40).toFixed(0)+' ppm（按 40ppm/pF 粗估）';
+  }
+  ['r','c','vdd','vth','c1','cs'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .r{width:100%;accent-color:#5ff1ef}
+</style>
+</body>
+</html>

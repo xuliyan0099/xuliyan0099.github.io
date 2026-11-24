@@ -1,9 +1,11 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>4.4 去耦与 PDN | 第四篇 · 设计与计算 | i.MX6ULL 学习手册</title>
-<meta name="description" content="目标阻抗、容值组合、并联反谐振、安装电感与平面电容；用 1.35V/1A 的 SoC 轨走一遍 PDN 设计。">
-<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+<title>4.4 去耦与 PDN：目标阻抗、谐振、224 阵列 | 第四篇 · 设计与计算 | i.MX6ULL 学习手册</title>
+<meta name="description" content="从目标阻抗算起，讲电容频域模型、ESL 谐振、反谐振、安装电感，并用本板 CORE 第 2/3 页的 224 阵列解释去耦电容到底怎么排。">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/book.css">
+<link rel="stylesheet" href="../../assets/mobile.css">
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -14,122 +16,161 @@
   <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
 <div class="shell">
   <aside id="sidebar"><div class="vol-h">第四篇 · 设计与计算</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第四篇 · 设计</span><span class="sep">/</span>第 4 章<span class="sep">/</span>约 28 分钟</div>
-    <h1>去耦与 PDN：让电源在芯片眼里是「短路」</h1>
-    <p class="lede">芯片在高频翻转时，电流是<b>纳秒级脉冲</b>，远处的稳压器根本来不及响应。这时靠的是「芯片脚边那一小片电容 + 平面电容」，把电源在芯片眼里维持在低阻抗——这就是 PDN（Power Delivery Network）设计。</p>
+    <div class="ch-meta"><span class="lv">第四篇 · 计算</span><span class="sep">/</span>第 4 章<span class="sep">/</span>约 65 分钟</div>
+    <h1>去耦与 PDN：目标阻抗、谐振、224 阵列</h1>
+    <p class="lede">「每个电源脚配一颗 100nF」是口诀，不是设计。<b>为什么是 100nF 而不是 1µF？为什么本板用 224（0.22µF）？并联会不会反谐振？</b>这一章把 PDN 当成一个阻抗问题来算，最后落到本板 CORE 第 2/3 页那 30 多颗电容的真实排布。</p>
+
+    <figure class="fig sch">
+      <div class="scroller"><img src="../../assets/img/sch/core_p2_caps.png" alt="CORE 第 2 页 SoC 电源球与去耦阵列"></div>
+      <figcaption>CORE 第 2 页裁切：VDD_ARM_CAP 用 224 + 22µF，VDD_SOC_CAP 用 224 阵列 + 22µF，VDD_HIGH_CAP/VDD_SNVS_CAP 也同样成对。这颗 224（0.22µF）不是随手选的，见 4.4.3。</figcaption>
+    </figure>
+
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>用 Z<sub>target</sub> = ΔV/ΔI 定出目标阻抗</li>
-        <li>解释「容值组合」为什么不是随便并几颗，而要考虑反谐振</li>
-        <li>说清安装电感（过孔/走线）如何毁掉一颗好电容</li>
+        <li>用 Z=ΔV/ΔI 算出本板 1.35V 域的目标阻抗</li>
+        <li>画出单个电容的 |Z|–f 曲线，说出 ESR 平台与 ESL 上升段</li>
+        <li>解释 0402/0.22µF 的自谐振频率，以及为什么高频段只认「小容值」</li>
+        <li>识别两种容值并联后的反谐振峰，知道怎么用 ESR 或磁珠压下去</li>
+        <li>算安装电感（走线 + 过孔），判断「电容放得远」等于没放</li>
+        <li>看懂本板 17×224 + 2×22µF 的排布逻辑</li>
       </ol>
     </div>
 
-    <h2><span class="n">4.4.1</span>目标阻抗：先定指标</h2>
-    <p style="text-align:center">Z<sub>target</sub> = (允许的电压波动) / (负载电流阶跃)</p>
-    <p>以 1.35V 内核轨、允许 ±5%（67mV）、阶跃 0.5A 为例：Z<sub>target</sub> = 67mV/0.5A ≈ 134mΩ。整条 PDN 在关注频段内（通常几十 kHz 到几百 MHz）的阻抗都要低于这个值。</p>
-    <p>这个数决定了「要并多少电容」：单颗 0.1µF 的谷底阻抗约等于它的 ESR（几 mΩ 到几十 mΩ），但离开谐振点就上升。所以需要<b>多容值、多封装并联</b>，把整个频段的阻抗压下去。</p>
+    <h2><span class="n">4.4.1</span>为什么要去耦：电流不是从电源来的</h2>
+    <p>SoC 内核在 1ns 内从 0.3A 跳到 1.0A，di/dt = 700A/µs。即使电源平面阻抗只有 10mΩ，也会产生 7mV 跌落；而真正的限制是<b>电感</b>：从 DCDC 输出到芯片的路径有 10nH，ΔV = L·di/dt = 10n×0.7A/ns = <b>7V</b>——完全不可能。</p>
+    <p>所以高频电流必须由<b>芯片附近的电容</b>提供：电容在 ns 级时间内放电，把 di/dt 的路径长度缩到毫米级。去耦电容不是「滤波」，是「本地电池」。</p>
 
-    <h2><span class="n">4.4.2</span>并联反谐振：并得越多不一定越好</h2>
-    <p>两颗不同容值的电容并联，在某个频率上会形成<b>LC 并联谐振</b>：一颗呈感性、另一颗呈容性，二者「互相抵消」不掉，阻抗出现尖峰。这个峰可能比单颗的谷底高一个量级。</p>
-    <p>对策：① 选用 ESR 稍大的电容（阻尼谐振）；② 容值不要跨太多倍（如 0.1µF 与 10µF 之间加一颗 1µF）；③ 用平面电容/多过孔降低高频阻抗。</p>
+    <h2><span class="n">4.4.2</span>目标阻抗：唯一的设计指标</h2>
+    <p style="text-align:center">Z<sub>target</sub> = ΔV<sub>allowed</sub>/ΔI<sub>step</sub></p>
+    <p>本板 1.35V 域允许 ±5%（67.5mV），最坏阶跃 1A ⇒ Z<sub>target</sub> = <b>67.5 mΩ</b>。这个阻抗必须在<b>整个关注频段</b>（通常 1kHz–100MHz）都低于目标。</p>
+    <p>3.3V 域允许 ±5%（165mV），阶跃 0.5A ⇒ Z<sub>target</sub>=<b>330 mΩ</b>，宽松得多。这就是为什么 3.3V 域的电容排布没那么讲究。</p>
+    <p>注意：Z<sub>target</sub> 是<b>频域</sub>指标。要在全频段压住，只能靠「电容 + 平面 + 封装」三级协同。</p>
 
-    <figure class="fig">
-      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <rect x="16" y="16" width="420" height="210" rx="10" fill="#141c2e" stroke="#3a4560"/>
-        <text x="32" y="40" fill="#eaf3ff" font-size="11">PDN 阻抗曲线与目标线</text>
-        <line x1="50" y1="160" x2="400" y2="160" stroke="#3a4560"/>
-        <line x1="50" y1="60" x2="50" y2="160" stroke="#3a4560"/>
-        <line x1="50" y1="110" x2="400" y2="110" stroke="#ffb84d" stroke-dasharray="4 3"/>
-        <text x="330" y="104" fill="#ffd79a" font-size="9">Z target</text>
-        <path d="M54 150 C 90 148 130 130 160 118 C 190 108 210 112 240 118 C 270 128 300 140 340 146" stroke="#5ff1ef" stroke-width="2" fill="none"/>
-        <text x="180" y="100" fill="#9df5f4" font-size="9">谷底：电容有效区</text>
-        <text x="250" y="176" fill="#6f7f9c" font-size="9">高频段靠平面与小封装电容</text>
-        <text x="32" y="196" fill="#9fb0c7" font-size="9">目标：全频段低于虚线</text>
+    <h2><span class="n">4.4.3</span>单颗电容的 |Z|–f 曲线</h2>
+    <p>真实电容是 C + ESR + ESL 串联：</p>
+    <p style="text-align:center">Z(f) = ESR + j(2πfL − 1/(2πfC))</p>
+    <p>三个特征点：</p>
+    <ol>
+      <li><b>低频段</b>：|Z|≈1/(2πfC)，随频率下降（容性）</li>
+      <li><b>自谐振 f<sub>0</sub>=1/(2π√(LC))</b>：|Z| 最小，等于 ESR</li>
+      <li><b>高频段</b>：|Z|≈2πfL，随频率上升（感性，电容「失效」）</li>
+    </ol>
+    <p>算几颗本板实际用的：</p>
+    <table>
+      <thead><tr><th>封装/容值</th><th>C</th><th>ESL</th><th>f<sub>0</sub></th><th>ESR</th><th>高频失效点</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">0402 100nF</td><td>0.1µF</td><td>0.5nH</td><td>22.5MHz</td><td>30mΩ</td><td>&gt;50MHz</td></tr>
+        <tr><td class="nm">0402 224</td><td>0.22µF</td><td>0.5nH</td><td>15.2MHz</td><td>20mΩ</td><td>&gt;40MHz</td></tr>
+        <tr><td class="nm">0603 1µF</td><td>1µF</td><td>0.8nH</td><td>5.6MHz</td><td>10mΩ</td><td>&gt;20MHz</td></tr>
+        <tr><td class="nm">0805 22µF</td><td>22µF</td><td>1.2nH</td><td>0.98MHz</td><td>3mΩ</td><td>&gt;8MHz</td></tr>
+      </tbody>
+    </table>
+    <p><b>为什么本板用 224 而不是 100nF</b>：224 在同样封装下容值翻倍，低频阻抗更低，自谐振只从 22.5MHz 降到 15MHz，而 DDR/SoC 的主要噪声能量在 1–20MHz（开关电源 + 内核跳变）。用 224 相当于把「有用频段」整体压低阻抗，代价是 40MHz 以上略差——那一段由封装内电容和平面兜底。</p>
+    <p>反过来，<b>100nF 在高频段并不比 224 好</b>：两者 ESL 相同（同封装），高频都变成电感。真正决定 100MHz 以上的是<b>封装内的硅电容</b>（几分之一个 nH），板级电容无能为力。</p>
 
-        <rect x="456" y="16" width="400" height="210" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
-        <text x="472" y="40" fill="#eaf3ff" font-size="11">安装电感：最常见的「白装」</text>
-        <text x="472" y="72" fill="#9fb0c7" font-size="10">过孔约 0.3–0.5nH/个</text>
-        <text x="472" y="96" fill="#9fb0c7" font-size="10">1mm 走线约 1nH</text>
-        <text x="472" y="120" fill="#9fb0c7" font-size="10">0.1µF + 1nH → f0 约 16MHz</text>
-        <text x="472" y="144" fill="#9fb0c7" font-size="10">0.1µF + 5nH → f0 约 7MHz</text>
-        <text x="472" y="170" fill="#9df3c2" font-size="10">结论：贴得近，比买得贵更重要</text>
-        <text x="472" y="192" fill="#6f7f9c" font-size="9">BGA 背面直贴 + 就近过孔是最优解</text>
+    <h2><span class="n">4.4.4</span>反谐振：并联不一定更好</h2>
+    <p>把 22µF（ESL 1.2nH）与 224（ESL 0.5nH）并联，会在两者之间出现一个<b>并联谐振峰</b>：</p>
+    <p style="text-align:center">f<sub>anti</sub> ≈ 1/(2π√(L<sub>大</sub>·C<sub>小</sub>)) = 1/(2π√(1.2n×0.22µ)) ≈ <b>9.8 MHz</b></p>
+    <p>在这个频率上，大电容呈感性、小电容呈容性，两者并联反而变成一个「高阻」LC 并联回路，|Z| 可能从 3mΩ 冲到 50mΩ 以上——<b>恰好落在 DDR 时钟与内核噪声频段</b>。</p>
+    <p>三种压法：</p>
+    <ul>
+      <li><b>靠 ESR 阻尼</b>：把大电容选 ESR 稍大的型号（如 5–10mΩ），Q 值降低，峰变矮。这也是为什么板上不全是「超低 ESR」电容。</li>
+      <li><b>多值分散</b>：不要 22µF + 0.22µF 两档硬拼，中间补 1µF/4.7µF，让峰彼此错开、互相填平。</li>
+      <li><b>磁珠隔离</b>：在不同域之间串磁珠（本板 L3 220R、L4 120R 用在网口电源），把谐振「关」在局部。</li>
+    </ul>
+    <p>本板 DDR 域用「17 颗 224 + 2 颗 22µF」，就是把 224 铺满、只用少量 22µF 打底，峰值靠数量与 ESR 压住。</p>
 
-        <text x="16" y="256" fill="#9fb0c7" font-size="10.5">容值组合建议：10µF（低频）/1µF（中频）/0.1µF（高频）按数量递减，每档都靠近对应的引脚。</text>
-        <text x="16" y="280" fill="#6f7f9c" font-size="10">DDR 与 SoC 的每个电源脚都要有 0.1µF；大容值可几个脚共用一颗，但 0.1µF 不能共用。</text>
-        <text x="16" y="304" fill="#ff9c9c" font-size="10">坑：电容放在芯片另一侧、靠长走线连过去，等于把 ESL 放大 10 倍。</text>
-      </svg>
-      <figcaption><b>图 4-4</b>　PDN 目标阻抗与安装电感的影响。</figcaption>
-    </figure>
+    <h2><span class="n">4.4.5</span>安装电感：放远了等于没放</h2>
+    <p>电容的 <b>ESL 由封装决定，但回路电感由布局决定</b>。经验值：</p>
+    <table>
+      <thead><tr><th>路径</th><th>电感</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">1mm 宽 0.2mm 厚走线，1mm 长</td><td>约 1nH</td></tr>
+        <tr><td class="nm">0.3mm 过孔（板厚 1.6mm）</td><td>约 0.5–0.8nH</td></tr>
+        <tr><td class="nm">电容到电源脚 5mm 走线</td><td>约 5nH</td></tr>
+      </tbody>
+    </table>
+    <p>5nH 在 100MHz 时阻抗 = 2π×100M×5n = <b>3.1Ω</b>，比电容本身高两个数量级——这颗电容等于没装。</p>
+    <p>规则：<b>去耦电容到电源脚的总回路电感 ≤ 1nH</b>，即走线 ≤1mm、过孔 ≤1 个，且电源与地过孔成对放置（电流一进一出，互感抵消）。本板 CORE 的 224 都紧贴 BGA 焊盘，就是这个道理。</p>
+
+    <h2><span class="n">4.4.6</span>本板 PDN 三层结构</h2>
+    <table>
+      <thead><tr><th>层级</th><th>元件</th><th>负责频段</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">第一层</td><td>DCDC 输出 22µF/470µF</td><td>1kHz–1MHz，储能与环路稳定</td></tr>
+        <tr><td class="nm">第二层</td><td>板级 224/1µF 阵列</td><td>1–50MHz，本地瞬态</td></tr>
+        <tr><td class="nm">第三层</td><td>封装内电容 + 电源/地平面</td><td>50MHz–1GHz</td></tr>
+      </tbody>
+    </table>
+    <p>平面为什么重要：两层铜（间距 0.1mm）构成的平板电容 C = ε·A/d，10cm² 面积约 1nF，且 ESL 极低。它是 100MHz 以上唯一的「低阻抗通路」。所以叠层设计（第五篇）会专门讲「电源地平面紧邻」。</p>
 
     <div class="demo">
-      <div class="dh"><b>PDN 目标阻抗计算器</b><span>给电压、允许波动与阶跃电流，算 Z<sub>target</sub> 与所需并联数</span></div>
+      <div class="dh"><b>PDN 目标阻抗 / 电容数量计算器</b><span>给定电压、允许跌落、阶跃电流与频段，算 Z<sub>target</sub> 与所需并联电容数</span></div>
       <div class="db">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-          <div><div style="font-size:12px;color:#9fb0c7">电压 <b id="vv" style="color:#5ff1ef">1.35</b> V</div><input id="v" type="range" min="0.9" max="5" step="0.05" value="1.35" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12px;color:#9fb0c7">允许波动 <b id="pv" style="color:#5ff1ef">5</b> %</div><input id="p" type="range" min="1" max="10" step="1" value="5" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12px;color:#9fb0c7">阶跃电流 <b id="iv" style="color:#5ff1ef">0.5</b> A</div><input id="i" type="range" min="0.05" max="3" step="0.05" value="0.5" style="width:100%;accent-color:#5ff1ef"></div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div><div class="lbl">电压 <b id="vv">1.35</b> V</div><input id="v" class="r" type="range" min="0.8" max="5" step="0.05" value="1.35"></div>
+          <div><div class="lbl">允许跌落 <b id="pv">5</b> %</div><input id="p" class="r" type="range" min="1" max="10" step="1" value="5"></div>
+          <div><div class="lbl">阶跃电流 <b id="iv">1.0</b> A</div><input id="i" class="r" type="range" min="0.1" max="3" step="0.1" value="1"></div>
+          <div><div class="lbl">关注频率 <b id="fv">10</b> MHz</div><input id="f" class="r" type="range" min="1" max="100" step="1" value="10"></div>
+          <div><div class="lbl">单颗容值 <b id="cv">0.22</b> µF</div><input id="c" class="r" type="range" min="0.01" max="22" step="0.01" value="0.22"></div>
+          <div><div class="lbl">单颗 ESR <b id="ev">20</b> mΩ</div><input id="e" class="r" type="range" min="1" max="100" step="1" value="20"></div>
         </div>
-        <div id="pdnOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+        <div id="pdnOut" style="margin-top:12px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
       </div>
     </div>
 
-    <h2><span class="n">4.4.3</span>布局五条硬规则</h2>
-    <ol class="steps">
-      <li><b>0.1µF 贴脚</b>：电容焊盘到引脚的距离 ≤2mm，过孔直接打在焊盘旁。</li>
-      <li><b>大容值靠外</b>：10µF/22µF 可以稍远，但要靠近该域的入口。</li>
-      <li><b>地过孔不共用</b>：每颗电容至少一个独立地过孔，回到完整地平面。</li>
-      <li><b>电源平面成对</b>：电源层与地平面相邻，形成平面电容（高频去耦的「隐形电容」）。</li>
-      <li><b>不要跨分割</b>：电容的地必须回到同一个地平面，跨分割等于加了个电感。</li>
-    </ol>
+    <h3>练习</h3>
+    <details class="quiz"><summary>1. 1.35V、±5%、1A 阶跃，Z<sub>target</sub> 是多少？</summary><div class="ans">0.0675V/1A=67.5mΩ。</div></details>
+    <details class="quiz"><summary>2. 0402 0.22µF、ESL 0.5nH 的自谐振频率？</summary><div class="ans">f=1/(2π√(0.5n×0.22µ))≈15.2MHz。</div></details>
+    <details class="quiz"><summary>3. 为什么高频段换更小容值没用？</summary><div class="ans">同封装 ESL 相同，高频都呈感性，|Z|=2πfL 与容值无关。</div></details>
+    <details class="quiz"><summary>4. 22µF 与 0.22µF 并联的反谐振大概在多少？</summary><div class="ans">约 9.8MHz，落在 DDR/内核噪声频段，需 ESR 或中间容值压峰。</div></details>
+    <details class="quiz"><summary>5. 电容离电源脚 5mm，100MHz 时阻抗多少？</summary><div class="ans">5nH×2π×100M≈3.1Ω，基本失效。</div></details>
+    <details class="quiz"><summary>6. 本板 DDR 域为什么用 17 颗 224 而不是 17 颗 100nF？</summary><div class="ans">224 低频阻抗更低，自谐振仍在 15MHz，刚好覆盖主要噪声频段。</div></details>
+    <details class="quiz"><summary>7. 平面电容为什么能管 100MHz 以上？</summary><div class="ans">面积大、间距小，C 约 nF 级且 ESL 极低，是高频唯一低阻通路。</div></details>
 
-    <div class="box pit">
-      <h5>三个「明明放了很多电容还是不稳」的原因</h5>
-      <p><b>1. 安装电感太大：</b>电容在板子另一侧，走线 10mm，f0 掉到几 MHz。</p>
-      <p><b>2. 反谐振峰：</b>0.1µF 与 10µF 并联在中间频段出现尖峰，正好落在负载跳变的频谱上。</p>
-      <p><b>3. 地不完整：</b>电容的地过孔落在被分割的岛上，回流路径长。</p>
+    <div class="ch-nav">
+      <a href="c03.html"><span>上一篇</span><b>← 4.3 LDO 热设计</b></a>
+      <a class="nx" id="chNavNext" href="c05.html"><span>下一章</span><b>4.5 上下拉与终端取值 →</b></a>
     </div>
-
-    <h3>自测</h3>
-    <details class="quiz"><summary>1.8V 轨、允许 3%、阶跃 1A，Z<sub>target</sub> 是多少？</summary><div class="ans">允许波动 54mV，Z=54mV/1A=54mΩ。整条 PDN 在该频段都要低于 54mΩ，通常需要多颗低 ESL 电容并联并保证平面完整。</div></details>
-    <details class="quiz"><summary>为什么 0.1µF 的安装电感从 1nH 增到 5nH，效果差很多？</summary><div class="ans">自谐振频率从约 16MHz 降到约 7MHz，意味着 10MHz 以上它已经呈感性，不再起旁路作用，高频噪声直接透到芯片。</div></details>
-    <details class="quiz"><summary>平面电容为什么对高频有用？</summary><div class="ans">相邻电源/地平面构成一个大面积平板电容，虽然容值小（nF 级），但 ESL 极低，能在几百 MHz 以上继续提供低阻抗。</div></details>
-
-    
-    <h2>原页对照</h2>
-    <figure class="fig sch">
-      <div class="scroller"><a href="../../assets/img/sch/core_p2.png" target="_blank" rel="noopener"><img src="../../assets/img/sch/core_p2.png" alt="CORE V2.0 第 2 页 SoC 电源脚" loading="lazy"></a></div>
-      <figcaption><b>原页 · CORE p2</b>　PDN 的实物样本：VDD_ARM_CAP 与 VDD_SOC_CAP 各「3 颗 224（0.22µF）+ 1 颗 22µF」，VDD_HIGH_IN 与 SNVS 也是 224+10µF 成对出现。<b>「大容量 + 小容量 + 贴近引脚」</b>不是口诀，是这一页画出来的事实。<a class="zoom" href="../../assets/img/sch/core_p2.png" target="_blank" rel="noopener">在新窗口打开原图 ↗</a></figcaption>
-    </figure>
-
-    <div class="ch-nav"><a href="c03.html"><span>上一章</span><b>← 4.3 LDO 热设计</b></a>
-      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>4.5 上下拉与终端取值 →</b></a></div>
   </main>
 </div>
-<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+
+<script src="../../assets/parts.js"></script>
+<script src="../../assets/part.js"></script>
 <script>
 renderPart('p4','c04.html');
 (function(){
   function calc(){
-    var v=+document.getElementById('v').value, p=+document.getElementById('p').value/100, i=+document.getElementById('i').value;
+    var v=+document.getElementById('v').value, pct=+document.getElementById('p').value;
+    var i=+document.getElementById('i').value, f=+document.getElementById('f').value*1e6;
+    var c=+document.getElementById('c').value*1e-6, esr=+document.getElementById('e').value/1000;
+    var dv=v*pct/100, zt=dv/i;
+    var zc=1/(2*Math.PI*f*c);
+    var n=Math.ceil(zc/zt);
     document.getElementById('vv').textContent=v.toFixed(2);
-    document.getElementById('pv').textContent=(p*100).toFixed(0);
-    document.getElementById('iv').textContent=i.toFixed(2);
-    var dv=v*p, z=dv/i;
-    var n=Math.max(1,Math.ceil(0.02/z));
+    document.getElementById('pv').textContent=pct;
+    document.getElementById('iv').textContent=i.toFixed(1);
+    document.getElementById('fv').textContent=(f/1e6).toFixed(0);
+    document.getElementById('cv').textContent=(c*1e6).toFixed(2);
+    document.getElementById('ev').textContent=(esr*1000).toFixed(0);
     document.getElementById('pdnOut').innerHTML=
-      '<b style="color:#eaf3ff;font-size:15px">允许波动 '+(dv*1000).toFixed(0)+' mV　Z target ≈ '+(z*1000).toFixed(0)+' mΩ</b><br>'+
-      '若单颗电容谷底约 20mΩ，至少并 '+n+' 颗（还要覆盖频段，实际更多）<br>'+
-      '<span style="color:#6f7f9c;font-size:11.5px">只按谷底估算，未计反谐振与安装电感；工程上用 10µF/1µF/0.1µF 三档组合，再按仿真/实测修正。</span><br>'+
-      '<span style="color:#9fb0c7">关注频段：负载跳变的上升沿越陡，需要覆盖的频率越高（tr=10ns 对应约 35MHz 以上）。</span>';
+      '允许跌落 ΔV = '+ (dv*1000).toFixed(1) +' mV ⇒ Z<sub>target</sub> = <b style="color:#5ff1ef">'+ (zt*1000).toFixed(1) +' mΩ</b><br>'+
+      '单颗在 '+(f/1e6).toFixed(0)+'MHz 的容性阻抗 = '+(zc*1000).toFixed(1)+' mΩ（ESR '+(esr*1000).toFixed(0)+'mΩ）<br>'+
+      '理论上至少需要 <b style="color:#5ff1ef">'+ n +' 颗</b> 并联（不含反谐振与安装电感影响，实际取 1.5 倍 ≈ '+(Math.ceil(n*1.5))+' 颗）';
   }
-  ['v','p','i'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  ['v','p','i','f','c','e'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
   calc();
 })();
 </script>
-</body></html>
+<style>
+.demo .lbl{font-size:12px;color:#9fb0c7}
+.demo .r{width:100%;accent-color:#5ff1ef}
+</style>
+</body>
+</html>
+
