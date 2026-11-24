@@ -44,11 +44,11 @@ window.PARTS = [
       { n: '3.5', t: '核心板第 4 页：eMMC 与 NAND', s: '10k 上拉、双存储位号、NVCC_SD 切换', f: 'c05.html', ready: true },
       { n: '3.6', t: '核心板第 6 页：复位与晶振', s: 'MAX809R、24MHz 18pF、RTC 32.768kHz', f: 'c06.html', ready: true },
       { n: '3.7', t: '核心板第 7 页：启动配置', s: 'BOOT_CFG 4.7k 阵列与 BOOT 表', f: 'c07.html', ready: true },
-      { n: '3.8', t: 'MINI 第 1 页：连接器与调试', s: '两个 60pin、I2C 4.7k、JTAG、8 位拨码', f: 'c08.html', ready: false },
-      { n: '3.9', t: 'MINI 第 2 页：TF 卡与低速外设', s: '47k 上拉、LED/按键/蜂鸣器、RS485/CAN', f: 'c09.html', ready: false },
-      { n: '3.10', t: 'MINI 第 3 页：以太网与排针', s: 'SR8201F、25MHz、变压器、网口 LED', f: 'c10.html', ready: false },
-      { n: '3.11', t: 'MINI 第 4 页：输入电源与 USB', s: '两片 DCJ5060、4.7µH、USB 切换、CH340', f: 'c11.html', ready: false },
-      { n: '3.12', t: '一页看全板', s: '把 12 页压成一张信号地图', f: 'c12.html', ready: false }
+      { n: '3.8', t: 'MINI 第 1 页：连接器与调试', s: '两个 60pin、I2C 4.7k、JTAG、8 位拨码', f: 'c08.html', ready: true },
+      { n: '3.9', t: 'MINI 第 2 页：TF 卡与低速外设', s: '47k 上拉、LED/按键/蜂鸣器、RS485/CAN', f: 'c09.html', ready: true },
+      { n: '3.10', t: 'MINI 第 3 页：以太网与排针', s: 'SR8201F、25MHz、变压器、网口 LED', f: 'c10.html', ready: true },
+      { n: '3.11', t: 'MINI 第 4 页：输入电源与 USB', s: '两片 DCJ5060、4.7µH、USB 切换、CH340', f: 'c11.html', ready: true },
+      { n: '3.12', t: '一页看全板', s: '把 12 页压成一张信号地图', f: 'c12.html', ready: true }
     ]
   },
   {

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3.10 MINI 第 3 页：以太网与排针 | 第三篇 · 逐页读真实原理图 | i.MX6ULL 学习手册</title>
+<meta name="description" content="SR8201F PHY、磁珠 220R 与 10µF、25MHz 12pF 晶振、ATK9111A 变压器、44pin 排针信号分配。">
+<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第三篇 · 逐页读真实原理图</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 10 章<span class="sep">/</span>约 24 分钟</div>
+    <h1>MINI 第 3 页：以太网与排针</h1>
+    <p class="lede">以太网是这块板上「最模拟」的接口：<b>PHY + 变压器 + 阻抗 + 时钟</b>，每一环都不能省。这一页还藏着 44pin 排针，把 UART、CAN、ENET、JTAG 引到外部——它是「接逻辑分析仪和示波器」的地方。</p>
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>说出 PHY、变压器、RJ45 三者各自解决什么问题</li>
+        <li>解释 25MHz 晶振 12pF 与磁珠 220R@100MHz 的取值理由</li>
+        <li>知道排针上哪些信号能直接测量、哪些不能乱接</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">3.10.1</span>以太网链路的三段</h2>
+    <table>
+      <thead><tr><th>段</th><th>器件</th><th>做什么</th><th>关键外围</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">数字侧</td><td>SoC ENET（RMII）</td><td>MAC 层，TXD/RXD/REF_CLK/MDC/MDIO</td><td>REF_CLK 由 PHY 或外部晶振提供</td></tr>
+        <tr><td class="nm">PHY</td><td><b>U11 SR8201F</b></td><td>编解码、自协商、LED、地址配置</td><td><b>25MHz 晶振 E1 + C19/C20 12pF</b>；<b>L3 磁珠 220R@100MHz + C13 10µF</b></td></tr>
+        <tr><td class="nm">隔离</td><td><b>ATK9111A</b> 网络变压器</td><td>电气隔离（耐压）、共模抑制、阻抗匹配</td><td>中心抽头接法、终端电阻</td></tr>
+        <tr><td class="nm">接口</td><td>RJ45</td><td>物理连接、LED 指示</td><td>ESD 保护、变压器侧终端</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="n">3.10.2</span>磁珠与晶振：两个「看起来随便」的取值</h2>
+    <p><b>L3（220Ω@100MHz）+ C13（10µF）</b>是 PHY 模拟电源的 LC 滤波：磁珠在高频呈阻性，把开关噪声挡在 PHY 之外；10µF 提供本地储能。选 220Ω 而不是更大的值，是为了兼顾「抑制」与「直流压降/电流能力」。</p>
+    <p><b>25MHz 晶振配 12pF</b>：按 3.6 章的算法，两只电容串联等效 6pF + 约 6pF 寄生 ≈ 12pF，正好匹配 CL=12pF 的晶振。以太网对时钟精度要求 ±50ppm，晶振负载电容错 2pF 就可能出界。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 860 300" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="16" y="18" width="430" height="180" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="32" y="42" fill="#eaf3ff" font-size="11">以太网信号链</text>
+        <rect x="40" y="62" width="80" height="36" rx="4" fill="rgba(95,241,239,.1)" stroke="#5ff1ef"/>
+        <text x="80" y="84" fill="#9df5f4" font-size="9" text-anchor="middle">SoC MAC</text>
+        <line x1="120" y1="80" x2="170" y2="80" stroke="#3a4560"/>
+        <rect x="170" y="62" width="86" height="36" rx="4" fill="rgba(255,184,77,.12)" stroke="#ffb84d"/>
+        <text x="213" y="84" fill="#ffd79a" font-size="9" text-anchor="middle">SR8201F</text>
+        <line x1="256" y1="80" x2="300" y2="80" stroke="#3a4560"/>
+        <rect x="300" y="62" width="86" height="36" rx="4" fill="rgba(139,123,255,.12)" stroke="#8b7bff"/>
+        <text x="343" y="84" fill="#c8c0ff" font-size="9" text-anchor="middle">变压器</text>
+        <line x1="386" y1="80" x2="420" y2="80" stroke="#3a4560"/>
+        <text x="424" y="84" fill="#9fb0c7" font-size="9">RJ45</text>
+        <text x="32" y="130" fill="#9fb0c7" font-size="9">RMII：TXD/RXD/REF_CLK，50MHz 参考时钟</text>
+        <text x="32" y="150" fill="#9fb0c7" font-size="9">MDC/MDIO：配置与读状态</text>
+        <text x="32" y="176" fill="#6f7f9c" font-size="9">PHY 地址脚在复位时采样，决定 MDIO 地址</text>
+
+        <rect x="456" y="18" width="380" height="180" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="472" y="42" fill="#eaf3ff" font-size="11">44pin 排针 P4 的用途</text>
+        <text x="472" y="72" fill="#9fb0c7" font-size="10">UART1–3：串口日志与登录</text>
+        <text x="472" y="96" fill="#9fb0c7" font-size="10">CAN：接 CAN 分析仪</text>
+        <text x="472" y="120" fill="#9fb0c7" font-size="10">ENET：部分信号引出</text>
+        <text x="472" y="144" fill="#9fb0c7" font-size="10">JTAG：接仿真器（需注意电平）</text>
+        <text x="472" y="172" fill="#ff9c9c" font-size="9.5">不要把 5V 直接接到排针的 IO 上</text>
+
+        <text x="16" y="242" fill="#9fb0c7" font-size="10.5">链路不通的排查顺序：PHY 供电/复位 → 25MHz 是否有波形 → MDIO 能否读到 PHY ID → 变压器与网口 → 最后才怀疑 MAC 配置。</text>
+        <text x="16" y="266" fill="#6f7f9c" font-size="10">网口 LED 不亮但能通信，通常是 LED 脚配置错误（复用为其他功能），不是链路问题。</text>
+        <text x="16" y="290" fill="#ff9c9c" font-size="10">坑：变压器中心抽头上拉电压接错（3.3V vs 1.8V），链路协商直接失败。</text>
+      </svg>
+      <figcaption><b>图 3-10</b>　以太网三段链路与排针用途。</figcaption>
+    </figure>
+
+    <div class="box pit">
+      <h5>以太网四个高频故障</h5>
+      <p><b>1. PHY 复位没释放：</b>MDIO 读不到 ID，链路灯不亮。</p>
+      <p><b>2. 晶振不起振/频偏：</b>能识别 PHY 但链路不稳、丢包。</p>
+      <p><b>3. 差分对走线不对称：</b>眼图差、长距离掉线。</p>
+      <p><b>4. 变压器中心抽头去耦缺失：</b>共模噪声大，辐射超标。</p>
+    </div>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>MDIO 读不到 PHY，最先量什么？</summary><div class="ans">先量 PHY 的供电与复位脚，再量 25MHz 晶振是否起振。供电/复位不正常时，PHY 根本不响应 MDIO。</div></details>
+    <details class="quiz"><summary>为什么 PHY 的模拟电源要加磁珠而不是直接连 3.3V？</summary><div class="ans">因为 PHY 内部的模拟电路（PLL、驱动）对电源噪声敏感；磁珠在高频呈高阻，配合电容把开关噪声隔离，提升链路裕量。</div></details>
+    <details class="quiz"><summary>排针上的 UART 能直接接 5V 的 USB 转串口吗？</summary><div class="ans">不能直接接。SoC 的 IO 是 3.3V 域，5V 电平会灌入。要用 3.3V 电平的转串口，或加电平转换。</div></details>
+
+    <div class="ch-nav"><a href="c09.html"><span>上一章</span><b>← 3.9 MINI 第 2 页</b></a>
+      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.11 MINI 第 4 页 →</b></a></div>
+  </main>
+</div>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+<script>renderPart('p3','c10.html');</script>
+</body></html>

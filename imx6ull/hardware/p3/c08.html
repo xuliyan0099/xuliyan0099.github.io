@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3.8 MINI 第 1 页：连接器与调试 | 第三篇 · 逐页读真实原理图 | i.MX6ULL 学习手册</title>
+<meta name="description" content="两个 60pin 板对板连接器、I2C 4.7k 上拉、JTAG 10k 下拉、8 位拨码；从连接器看两板之间到底传了哪些信号。">
+<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第三篇 · 逐页读真实原理图</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 8 章<span class="sep">/</span>约 22 分钟</div>
+    <h1>MINI 第 1 页：两个 60pin 连接器</h1>
+    <p class="lede">核心板与底板之间没有排线，只有两个 <b>60pin 板对板连接器（IMX1、IMX2，型号 3710M060046G3FT01）</b>。这一页是「两板合同」：所有跨板的电源、地、总线、控制信号都在这里。<b>数清 120 个脚怎么分配，就看懂了整机架构。</b></p>
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>说清两个连接器的分工（电源/地 vs 高速信号）</li>
+        <li>解释 I2C 的 4.7k 上拉（R40/R42/R57）与 JTAG 的 10k 下拉（R59–R62）</li>
+        <li>理解 8 位拨码为什么要放在底板而不是核心板</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">3.8.1</span>连接器的分配逻辑</h2>
+    <table>
+      <thead><tr><th>组</th><th>典型内容</th><th>设计考虑</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">电源与地</td><td>DCDC_5V、DCDC_3V3、GND（多个脚并联）</td><td>大电流回路要用多个脚并联降阻抗；地脚分散布置保证回流</td></tr>
+        <tr><td class="nm">高速差分</td><td>USB_OTG_DP/DM、ENET 差分、LCD 差分时钟（若有）</td><td>成对相邻、阻抗连续、尽量少过孔</td></tr>
+        <tr><td class="nm">低速总线</td><td>I2C、UART、SPI、CAN、RS485 侧信号</td><td>可容忍较长走线，但要上拉/串阻</td></tr>
+        <tr><td class="nm">控制/配置</td><td>BOOT_CFG、RESET、ON_OFF、中断</td><td>上电默认电平必须确定</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="n">3.8.2</span>三处上拉/下拉，各管一件事</h2>
+    <ul>
+      <li><b>I2C 上拉 R40 / R42 / R57（4.7k）</b>：开漏总线必须有上拉，4.7k 是 100–400kHz 下的常用值（1.9 章）。</li>
+      <li><b>JTAG 下拉 R59–R62（10k）</b>：JTAG 的 TCK/TMS/TDI/TRST 必须有确定默认电平，否则上电时可能误入测试模式、甚至让 CPU 停在调试状态。</li>
+      <li><b>拨码 SW（D1–D8）</b>：放底板是为了让用户可改；核心板只留 4.7k 上拉，拨码接地即把该位拉低（3.7 章）。</li>
+    </ul>
+
+    <figure class="fig">
+      <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="20" y="18" width="250" height="200" rx="10" fill="#141c2e" stroke="#5ff1ef"/>
+        <text x="145" y="42" fill="#9df5f4" font-size="11" text-anchor="middle">核心板</text>
+        <rect x="60" y="60" width="170" height="40" rx="4" fill="rgba(95,241,239,.08)" stroke="#3a4560"/>
+        <text x="145" y="84" fill="#9fb0c7" font-size="9" text-anchor="middle">IMX1（60pin）</text>
+        <rect x="60" y="110" width="170" height="40" rx="4" fill="rgba(95,241,239,.08)" stroke="#3a4560"/>
+        <text x="145" y="134" fill="#9fb0c7" font-size="9" text-anchor="middle">IMX2（60pin）</text>
+        <text x="40" y="180" fill="#6f7f9c" font-size="9">电源/地/总线/控制全部跨板</text>
+
+        <line x1="230" y1="80" x2="330" y2="80" stroke="#3a4560" stroke-dasharray="4 3"/>
+        <line x1="230" y1="130" x2="330" y2="130" stroke="#3a4560" stroke-dasharray="4 3"/>
+
+        <rect x="330" y="18" width="250" height="200" rx="10" fill="#141c2e" stroke="#5ce1a0"/>
+        <text x="455" y="42" fill="#9df3c2" font-size="11" text-anchor="middle">MINI 底板</text>
+        <rect x="370" y="60" width="170" height="40" rx="4" fill="rgba(92,225,160,.08)" stroke="#3a4560"/>
+        <text x="455" y="84" fill="#9fb0c7" font-size="9" text-anchor="middle">插座 + 上拉/下拉</text>
+        <rect x="370" y="110" width="170" height="40" rx="4" fill="rgba(92,225,160,.08)" stroke="#3a4560"/>
+        <text x="455" y="134" fill="#9fb0c7" font-size="9" text-anchor="middle">拨码 / 外设</text>
+        <text x="350" y="180" fill="#6f7f9c" font-size="9">TF 卡、CAN、RS485、以太网、USB</text>
+
+        <text x="620" y="70" fill="#9fb0c7" font-size="9.5">读图技巧：</text>
+        <text x="620" y="92" fill="#9fb0c7" font-size="9.5">① 先数地脚与电源脚</text>
+        <text x="620" y="112" fill="#9fb0c7" font-size="9.5">② 再找差分对</text>
+        <text x="620" y="132" fill="#9fb0c7" font-size="9.5">③ 最后查配置脚</text>
+
+        <text x="20" y="248" fill="#9fb0c7" font-size="10.5">板对板连接器的额定电流通常每脚 0.5–1A，电源必须多脚并联；接触电阻也会随插拔次数上升。</text>
+        <text x="20" y="272" fill="#ff9c9c" font-size="10">现场故障：连接器没插紧 → 某路电源时有时无，表现为「碰一下就好」。</text>
+      </svg>
+      <figcaption><b>图 3-8</b>　两板之间的信号分配。</figcaption>
+    </figure>
+
+    <div class="box pit">
+      <h5>连接器相关的四个坑</h5>
+      <p><b>1. 只插一侧：</b>电源与地不成回路，现象千奇百怪。</p>
+      <p><b>2. 地脚分配不均：</b>回流路径长，高速信号误码。</p>
+      <p><b>3. 差分对不在同一连接器：</b>跨连接器走线，阻抗突变。</p>
+      <p><b>4. 插反/错位：</b>防呆设计不足，直接烧核心板。</p>
+    </div>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>为什么 JTAG 的 TMS/TCK 要下拉而不是上拉？</summary><div class="ans">为了让上电时默认处于「非调试」状态：TCK 被拉低不产生时钟、TMS 为低不进入测试序列。若浮空，噪声可能让 CPU 进入调试停滞。</div></details>
+    <details class="quiz"><summary>两个连接器的电源脚为什么要多个并联？</summary><div class="ans">单脚额定电流有限（约 0.5–1A），且接触电阻会产生压降与发热。多脚并联降低总阻抗与温升，也提高可靠性。</div></details>
+    <details class="quiz"><summary>拨码为什么放在底板？</summary><div class="ans">用户需要随时改动启动介质；核心板是模块化产品，把拨码/按键/接口放在底板上更符合「核心板 + 底板」的产品形态。</div></details>
+
+    <div class="ch-nav"><a href="c07.html"><span>上一章</span><b>← 3.7 启动配置</b></a>
+      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.9 MINI 第 2 页 →</b></a></div>
+  </main>
+</div>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+<script>renderPart('p3','c08.html');</script>
+</body></html>

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3.11 MINI 第 4 页：输入电源与 USB | 第三篇 · 逐页读真实原理图 | i.MX6ULL 学习手册</title>
+<meta name="description" content="DC5V 入口 TVS、两片 DCJ5060T-6 与 4.7µH、49.9k/15k 反馈、SS34、USB Host/OTG 切换、CH340 与 UART 选择、DNP 位。">
+<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第三篇 · 逐页读真实原理图</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 11 章<span class="sep">/</span>约 26 分钟</div>
+    <h1>MINI 第 4 页：输入电源与 USB</h1>
+    <p class="lede">这是整块板「最上游」的一页：<b>DC5V 进来 → TVS 保护 → 两片 DCDC → 5V/3.3V 出去</b>，同时还有 USB Host/OTG 切换、CH340 转串口、UART 选择。这一页读完，你就掌握了「上电为什么起不来」的一半排查路径。</p>
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>顺着 DC5V 走完输入保护与两级 DCDC，说出每颗外围的作用</li>
+        <li>用 49.9k/15k 反馈算出输出（代入规格书 V<sub>ref</sub>）</li>
+        <li>说清 USB Host 与 OTG 的供电切换、以及 CH340 的 UART 选择逻辑</li>
+        <li>理解 DNP（R58/R76）在版本配置中的意义</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">3.11.1</span>输入的四个保护件</h2>
+    <ol class="steps">
+      <li><b>D1（SMBJ5.0A）</b>：DC5V 入口的 TVS，吸收插拔/静电浪涌，钳位约 9.2V（2.4 章）。</li>
+      <li><b>输入电容 47µF/25V + 104</b>：大容值稳住输入、抑制线缆电感造成的跌落；104 吸高频。</li>
+      <li><b>SS34 肖特基</b>：防反接/隔离，防止外部电压倒灌。</li>
+      <li><b>D2（SMBJ3.3A）</b>：3.3V 侧再挡一次残余瞬态。</li>
+    </ol>
+    <p>顺序很重要：<b>先 TVS，再滤波，再 DCDC</b>。TVS 在前面承担大能量，滤波器吸收残余，DCDC 看到的是干净输入。</p>
+
+    <h2><span class="n">3.11.2</span>两片 DCDC：U6 与 U9</h2>
+    <p>两颗 <b>DCJ5060T-6</b>，各配 <b>4.7µH（L1/L2）</b>，反馈分压 <b>49.9k / 15k（1%）</b>。输出电压由 V<sub>ref</sub> 决定：</p>
+    <p style="text-align:center">V<sub>out</sub> = V<sub>ref</sub> × (1 + 49.9k/15k) = V<sub>ref</sub> × 4.327</p>
+    <p>代入规格书的 V<sub>ref</sub>（常见 0.6V / 0.8V / 1.2V 几档）才能得到 5V 或 3.3V。这也是「为什么不能照着电阻值猜输出」的原因——<b>V<sub>ref</sub> 是芯片内部的，必须查手册</b>。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="16" y="16" width="420" height="200" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="32" y="40" fill="#eaf3ff" font-size="11">输入到输出的链路</text>
+        <rect x="40" y="58" width="70" height="30" rx="4" fill="rgba(255,184,77,.14)" stroke="#ffb84d"/>
+        <text x="75" y="78" fill="#ffd79a" font-size="9" text-anchor="middle">DC5V</text>
+        <text x="118" y="78" fill="#9fb0c7" font-size="9">→ D1 TVS → 47µF → SS34</text>
+        <line x1="40" y1="112" x2="400" y2="112" stroke="#3a4560"/>
+        <rect x="60" y="126" width="120" height="30" rx="4" fill="rgba(95,241,239,.1)" stroke="#5ff1ef"/>
+        <text x="120" y="146" fill="#9df5f4" font-size="9" text-anchor="middle">U6 + L1 4.7µH</text>
+        <rect x="230" y="126" width="150" height="30" rx="4" fill="rgba(95,241,239,.1)" stroke="#5ff1ef"/>
+        <text x="305" y="146" fill="#9df5f4" font-size="9" text-anchor="middle">反馈 49.9k/15k → 5V</text>
+        <rect x="60" y="172" width="120" height="30" rx="4" fill="rgba(92,225,160,.1)" stroke="#5ce1a0"/>
+        <text x="120" y="192" fill="#9df3c2" font-size="9" text-anchor="middle">U9 + L2 4.7µH</text>
+        <rect x="230" y="172" width="150" height="30" rx="4" fill="rgba(92,225,160,.1)" stroke="#5ce1a0"/>
+        <text x="305" y="192" fill="#9df3c2" font-size="9" text-anchor="middle">反馈 49.9k/15k → 3.3V</text>
+
+        <rect x="456" y="16" width="400" height="200" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="472" y="40" fill="#eaf3ff" font-size="11">USB 与串口的三颗开关/芯片</text>
+        <text x="472" y="70" fill="#9df5f4" font-size="10">USB Host / OTG 供电切换</text>
+        <text x="472" y="90" fill="#9fb0c7" font-size="9.5">决定 VBUS 由板供还是由外部主机供</text>
+        <text x="472" y="116" fill="#9df5f4" font-size="10">U7 CH340 类：USB → UART</text>
+        <text x="472" y="136" fill="#9fb0c7" font-size="9.5">3.3V 供电则 IO 3.3V，可直连 SoC</text>
+        <text x="472" y="162" fill="#9df5f4" font-size="10">U12/U13 SGM3157：UART 选择</text>
+        <text x="472" y="182" fill="#9fb0c7" font-size="9.5">决定调试串口是 UART1 还是 UART3</text>
+
+        <text x="16" y="248" fill="#9fb0c7" font-size="10.5">R58（10k，DNP）与 R76（10k，DNP）是版本配置：贴或不贴决定 RESET/ON_OFF 的默认状态，改版时只动 BOM 不动 PCB。</text>
+        <text x="16" y="272" fill="#6f7f9c" font-size="10">看到 DNP 就要问：「它在什么配置下会被贴上？贴上后行为怎么变？」——这是读懂板子变体的关键。</text>
+        <text x="16" y="296" fill="#ff9c9c" font-size="10">坑：把 USB OTG 的 VBUS 与 Host 的 5V 直接并在一起，两边互相灌电，主机关机时板子被反向供电。</text>
+      </svg>
+      <figcaption><b>图 3-11</b>　输入链路与 USB/串口切换。</figcaption>
+    </figure>
+
+    <div class="box deep">
+      <h5>为什么反馈电阻用 49.9k 这种「怪值」</h5>
+      <p>因为 49.9k 是 E96 系列（1% 精度）的标准值，而 47k 属于 E24（5% 时代）。精密分压必须用 E96 值，才能同时保证比值准确与供货可得。同理 15.0k 也是 E96。</p>
+    </div>
+
+    <h2><span class="n">3.11.3</span>上电排查：从 DC5V 到 3.3V</h2>
+    <ol class="steps">
+      <li>量 DC5V 入口：有 5V？没有 → 查保险/接线/SS34。</li>
+      <li>量 U6/U9 的 EN 与 SW 节点：SW 无开关波形 → 芯片没启动或反馈异常。</li>
+      <li>量输出：5V/3.3V 是否在 ±5%；偏低 → 反馈分压或负载短路。</li>
+      <li>摸芯片温度：烫 → 短路/饱和/反馈错。</li>
+      <li>再进核心板（3.2 章的五点体检）。</li>
+    </ol>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>3.3V 输出只有 1.2V，最可能是什么？</summary><div class="ans">反馈分压异常：上端电阻虚焊或值错，芯片以为输出过低而一直加大占空比；也可能 FB 脚被短路到地。先断电量分压电阻，再上电量 FB 电压。</div></details>
+    <details class="quiz"><summary>USB 插入电脑后板子不识别，但接 5V 电源正常，查什么？</summary><div class="ans">查 VBUS 切换与 D+/D− 的串阻/ESD：Host 模式下 VBUS 应由板供，OTG 模式下由主机供；切换逻辑错会导致枚举失败。也查 D+/D− 是否接反。</div></details>
+    <details class="quiz"><summary>DNP 电阻贴上去会怎样？</summary><div class="ans">取决于它的位置：若在复位/使能脚，会改变默认电平（例如强制复位或强制关机）。贴之前必须确认该配置与当前固件/硬件版本匹配。</div></details>
+
+    <div class="ch-nav"><a href="c10.html"><span>上一章</span><b>← 3.10 MINI 第 3 页</b></a>
+      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.12 一页看全板 →</b></a></div>
+  </main>
+</div>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+<script>renderPart('p3','c11.html');</script>
+</body></html>

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3.12 一页看全板 | 第三篇 · 逐页读真实原理图 | i.MX6ULL 学习手册</title>
+<meta name="description" content="把 12 页压成一张信号地图：电源树、总线清单、测试点、故障定位矩阵；以及从「读图」到「自己画」的过渡。">
+<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第三篇 · 逐页读真实原理图</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 12 章<span class="sep">/</span>约 20 分钟</div>
+    <h1>一页看全板：把 12 页压成一张图</h1>
+    <p class="lede">读完前面 11 章，你脑子里应该有一张表：<b>哪一路电源喂谁、哪条总线连哪、出问题先量哪里</b>。这一章把它压成一页，作为以后翻图纸的「索引」，也是进入第四篇（自己设计）的跳板。</p>
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>不看图纸说出六路电源的来源与去向</li>
+        <li>按「现象 → 先量哪 → 再查哪」定位常见故障</li>
+        <li>说出这块板「如果要自己画」，哪五处最容易翻车</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">3.12.1</span>六路电源一页表</h2>
+    <table>
+      <thead><tr><th>轨</th><th>来源</th><th>电压</th><th>喂谁</th><th>测试点</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">DC5V</td><td>底板输入 + D1 TVS + SS34</td><td>5.0V</td><td>两片底板 DCDC、USB VBUS</td><td>入口</td></tr>
+        <tr><td class="nm">DCDC_5V</td><td>U6 + L1 4.7µH</td><td>5.0V</td><td>核心板输入、USB Host</td><td>—</td></tr>
+        <tr><td class="nm">DCDC_3V3</td><td>U9 + L2 4.7µH</td><td>3.3V</td><td>NVCC_GPIO、上拉、底板外设</td><td>—</td></tr>
+        <tr><td class="nm">VDD_ARM_SOC</td><td>核心板 U1（MT3420B 类）+ 2.2µH</td><td>1.35V</td><td>SoC 内核</td><td>TP3</td></tr>
+        <tr><td class="nm">DRAM_1V35</td><td>核心板 DCDC</td><td>1.35V</td><td>DDR3L</td><td>TP7</td></tr>
+        <tr><td class="nm">SNVS / CSI / SD</td><td>U7 / U12 / U9 开关</td><td>3.3 / 2.8 / 1.8–3.3V</td><td>RTC / 摄像头 / SD 卡</td><td>TP4 / TP8 / TP6</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="n">3.12.2</span>故障定位矩阵</h2>
+    <table>
+      <thead><tr><th>现象</th><th>先量</th><th>再查</th><th>常见根因</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">完全不启动</td><td>TP4 → TP3 → POR_B</td><td>24MHz、BOOT_CFG</td><td>SNVS 没电、复位未释放、拨码错</td></tr>
+        <tr><td class="nm">串口无输出</td><td>UART TX 波形</td><td>CH340、UART 选择脚</td><td>TX/RX 接反、U12/U13 选错通道</td></tr>
+        <tr><td class="nm">DDR 不稳</td><td>TP7 纹波、VREF</td><td>ZQ、CK/DQS 走线</td><td>VREF 噪声、ZQ 精度、等长超标</td></tr>
+        <tr><td class="nm">认不到卡</td><td>NVCC_SD、CMD 上拉</td><td>47k、卡座</td><td>上拉漏贴、电压未切换</td></tr>
+        <tr><td class="nm">CAN 不通</td><td>TXD/RXD 电平</td><td>终端、共模</td><td>RXD 5V 直灌、终端错</td></tr>
+        <tr><td class="nm">网口不通</td><td>PHY 供电/复位</td><td>25MHz、MDIO</td><td>晶振不起振、地址脚错</td></tr>
+      </tbody>
+    </table>
+
+    <figure class="fig">
+      <svg viewBox="0 0 880 330" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="16" y="16" width="420" height="230" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="32" y="40" fill="#eaf3ff" font-size="11">全板信号地图</text>
+        <text x="32" y="72" fill="#ffd79a" font-size="10">电源：DC5V → 5V/3.3V → 1.35V/2.8V/SNVS</text>
+        <text x="32" y="96" fill="#9df5f4" font-size="10">存储：eMMC（8 位）、NAND（8 位复用）、TF</text>
+        <text x="32" y="120" fill="#9df5f4" font-size="10">网络：RMII → SR8201F → 变压器 → RJ45</text>
+        <text x="32" y="144" fill="#9df5f4" font-size="10">现场总线：CAN（5V）、RS485（3.3V）</text>
+        <text x="32" y="168" fill="#9df5f4" font-size="10">人机：RGB LCD（SGM3157 切换）、按键、LED、蜂鸣器</text>
+        <text x="32" y="192" fill="#9df5f4" font-size="10">调试：JTAG、UART（CH340）、USB OTG</text>
+        <text x="32" y="216" fill="#6f7f9c" font-size="9">每个域都有自己的「上拉 + 串阻 + 测试点」三件套</text>
+
+        <rect x="456" y="16" width="400" height="230" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="472" y="40" fill="#eaf3ff" font-size="11">自己画板时最易翻车的五处</text>
+        <text x="472" y="72" fill="#ff9c9c" font-size="10">① DDR：VREF、ZQ、等长</text>
+        <text x="472" y="96" fill="#ff9c9c" font-size="10">② 电源：反馈分压、软启动、时序</text>
+        <text x="472" y="120" fill="#ff9c9c" font-size="10">③ 复位/时钟：POR_B、24MHz 负载电容</text>
+        <text x="472" y="144" fill="#ff9c9c" font-size="10">④ 启动：BOOT_CFG 上下拉与拨码定义</text>
+        <text x="472" y="168" fill="#ff9c9c" font-size="10">⑤ 接口：终端/上拉/电平匹配</text>
+        <text x="472" y="200" fill="#9fb0c7" font-size="9.5">这五处不是「细节」，是「能不能跑起来」</text>
+        <text x="472" y="222" fill="#6f7f9c" font-size="9">第四篇会把它们逐个变成可计算的步骤</text>
+
+        <text x="16" y="276" fill="#9fb0c7" font-size="10.5">读图到设计的跨越：读图回答「是什么」，设计要回答「为什么是这个值、换一个行不行」。</text>
+        <text x="16" y="300" fill="#6f7f9c" font-size="10">下一步（第四篇）：电流预算 → DCDC 计算 → LDO 热设计 → 去耦 → 上下拉/终端 → 复位晶振 → 采样 → 故障注入。</text>
+        <text x="16" y="324" fill="#ff9c9c" font-size="10">自检：能否在不看图纸的情况下，说出 TP3/TP4/TP6/TP7/TP8 各测什么？</text>
+      </svg>
+      <figcaption><b>图 3-12</b>　全板信号地图与「自己画板」的五处高风险。</figcaption>
+    </figure>
+
+    <div class="box tip">
+      <h5>把这一页打印出来</h5>
+      <p>建议把这张表和 3.12.1 的电源表打印贴在工位：调试时先对照「现象 → 先量哪」，比翻 12 页 PDF 快得多。这也是老工程师「一眼看出问题」的秘密——不是记性好，是手里有索引。</p>
+    </div>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>不看图纸，说出五个测试点各测什么。</summary><div class="ans">TP3：VDD_ARM_SOC_IN 1.35V；TP4：VDD_SNVS_3V3 3.3V；TP6：NVCC_SD（1.8/3.3V）；TP7：DRAM_1V35；TP8：NVCC_CSI 2.8V。</div></details>
+    <details class="quiz"><summary>「认不到 TF 卡」的三步排查是什么？</summary><div class="ans">① 量 NVCC_SD 是否有电、电压是否正确；② 量 CMD 上拉（47k）是否存在；③ 查卡座与 DAT 线，最后才怀疑 SoC 控制器配置。</div></details>
+    <details class="quiz"><summary>为什么说「这五处决定能不能跑起来」？</summary><div class="ans">因为它们直接决定 SoC 的上电、时钟、复位、启动介质与内存访问。任何一处错，系统根本进不到内核，后面所有软件调试都无从谈起。</div></details>
+
+    <div class="ch-nav"><a href="c11.html"><span>上一章</span><b>← 3.11 MINI 第 4 页</b></a>
+      <a class="nx" id="chNavNext" href="../index.html"><span>本篇完</span><b>进入第四篇 →</b></a></div>
+  </main>
+</div>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+<script>renderPart('p3','c12.html');</script>
+</body></html>

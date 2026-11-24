@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3.9 MINI 第 2 页：TF 卡与低速外设 | 第三篇 · 逐页读真实原理图 | i.MX6ULL 学习手册</title>
+<meta name="description" content="TF 卡 47k 上拉、CAN TJA1050 与 120Ω、RS485 SP3485 自动方向、LED/按键/蜂鸣器、RGB LCD 模拟开关、摄像头接口。">
+<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第三篇 · 逐页读真实原理图</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 9 章<span class="sep">/</span>约 28 分钟</div>
+    <h1>MINI 第 2 页：TF 卡与低速外设</h1>
+    <p class="lede">这一页是「接口大杂烩」：TF 卡、CAN、RS485、LED、按键、蜂鸣器、RGB LCD、摄像头。它们有个共同点——<b>每个接口都靠几颗电阻决定成败</b>。这一章按接口逐个拆，每处给出「错一个会怎样」。</p>
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>说出 TF 卡 47k 上拉、CAN 120Ω 终端、RS485 22Ω 串阻各自的作用</li>
+        <li>解释 RS485 自动方向电路（Q4 + R23 + D6）的工作原理</li>
+        <li>说清蜂鸣器为什么用 PNP 高边、按键为什么要 10k 上拉</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">3.9.1</span>逐个接口看</h2>
+    <table>
+      <thead><tr><th>接口</th><th>核心器件</th><th>关键外围</th><th>作用与错误后果</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">TF 卡（SDIO）</td><td>CARD1 座</td><td><b>R1–R5 47k 上拉</b></td><td>CMD/DAT 空闲保持高；漏贴 → 识别不到卡或读写随机失败</td></tr>
+        <tr><td class="nm">CAN</td><td>U5 TJA1050（5V）</td><td><b>R57 510Ω</b>、120Ω 终端</td><td>510Ω 限制 TXD 电流/阻尼；终端只在两端</td></tr>
+        <tr><td class="nm">RS485</td><td>U10 SP3485（3.3V）</td><td><b>R23 10k、R27 22Ω、D6 MBR0520</b></td><td>Q4 自动方向；R27 阻尼；120Ω 终端在 A/B 端</td></tr>
+        <tr><td class="nm">LED</td><td>LED + <b>R6 510Ω</b></td><td>—</td><td>限流约 2.5mA；阻值过小会烧 LED 或 IO</td></tr>
+        <tr><td class="nm">按键 KEY0</td><td>轻触开关</td><td><b>R12 10k 上拉</b></td><td>按下拉低、松开回高；无上拉则悬空乱跳</td></tr>
+        <tr><td class="nm">蜂鸣器</td><td><b>Q1 SS8550（PNP）</b></td><td><b>R21 1k</b> 基极</td><td>高边开关；基极直接接 GPIO 会超电流</td></tr>
+        <tr><td class="nm">RGB LCD</td><td><b>U1–U3 SGM3157</b></td><td><b>R18 10k、R64/R65 10k</b></td><td>切换 LCD 信号/电压；R18 定默认状态</td></tr>
+        <tr><td class="nm">摄像头</td><td>P1 18pin</td><td><b>R7/R13 10k</b></td><td>I2C 上拉与复位/使能默认电平</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="n">3.9.2</span>RS485 自动方向：四颗元件的配合</h2>
+    <p>半双工 RS485 需要「发送时 DE 有效、接收时 DE 无效」。MINI 不用 GPIO 控制，而是用 <b>Q4（SS8050）+ R23 10k + R27 22Ω + D6（MBR0520）</b> 做「发送自动使能」：</p>
+    <ol class="steps">
+      <li>UART TX 空闲为高 → Q4 截止 → DE 被 R23 拉低 → 处于接收。</li>
+      <li>开始发送，TX 出现低电平 → Q4 导通 → DE 拉高 → 收发器进入发送。</li>
+      <li>发送结束回到高 → Q4 截止 → 自动回到接收。</li>
+      <li>R27 串在 TX 与基极之间，限制基极电流并阻尼边沿；D6 加速关断（泄放基极电荷）。</li>
+      </ol>
+    <p>这个电路的代价是<b>波特率不能太高</b>（Q4 的开关速度限制），且发送第一位可能被截断——所以很多设计改用 GPIO 直接控制 DE。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 860 300" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="20" y="18" width="410" height="190" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="36" y="42" fill="#eaf3ff" font-size="11">RS485 自动方向</text>
+        <line x1="70" y1="80" x2="160" y2="80" stroke="#5ff1ef"/>
+        <text x="74" y="74" fill="#9df5f4" font-size="9">UART TX</text>
+        <rect x="120" y="86" width="22" height="26" rx="3" fill="rgba(92,225,160,.15)" stroke="#5ce1a0"/>
+        <text x="146" y="104" fill="#9df3c2" font-size="9">R27 22Ω</text>
+        <text x="70" y="140" fill="#9fb0c7" font-size="9">Q4 导通 → DE 高 → 发送</text>
+        <line x1="200" y1="110" x2="200" y2="150" stroke="#5ff1ef"/>
+        <rect x="180" y="150" width="70" height="34" rx="4" fill="rgba(255,255,255,.03)" stroke="#8b7bff"/>
+        <text x="215" y="172" fill="#c8c0ff" font-size="9" text-anchor="middle">SP3485</text>
+        <text x="36" y="204" fill="#6f7f9c" font-size="9">A/B 端各挂 120Ω（只在总线两端）</text>
+
+        <rect x="450" y="18" width="390" height="190" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="466" y="42" fill="#eaf3ff" font-size="11">三种终端的取舍</text>
+        <text x="466" y="72" fill="#9df5f4" font-size="10">不加终端</text>
+        <text x="466" y="92" fill="#9fb0c7" font-size="9.5">短距（&lt;1m）、低速可用；长线反射严重</text>
+        <text x="466" y="118" fill="#9df5f4" font-size="10">两端各 120Ω</text>
+        <text x="466" y="138" fill="#9fb0c7" font-size="9.5">标准做法；断电量 A/B 约 60Ω</text>
+        <text x="466" y="164" fill="#ff9c9c" font-size="10">每节点都贴</text>
+        <text x="466" y="184" fill="#9fb0c7" font-size="9.5">并联后 &lt;60Ω，驱动器带不动、幅度塌</text>
+
+        <text x="20" y="246" fill="#9fb0c7" font-size="10.5">CAN 的 510Ω（R57）不是终端：它串在 TXD 路径上做阻尼/限流；CAN 终端另有 120Ω。</text>
+        <text x="20" y="270" fill="#6f7f9c" font-size="10">按键 10k 上拉 + 内部消抖：硬件只保证电平确定，抖动仍需软件处理。</text>
+        <text x="20" y="294" fill="#ff9c9c" font-size="10">坑：TF 卡上拉接到固定 3.3V，切 1.8V 模式时持续灌电。</text>
+      </svg>
+      <figcaption><b>图 3-9</b>　RS485 自动方向与终端取舍。</figcaption>
+    </figure>
+
+    <div class="box tip">
+      <h5>蜂鸣器为什么用 PNP 而不是 NPN</h5>
+      <p>PNP 做高边开关：发射极接 3.3V、集电极接蜂鸣器、基极经 1k 由 GPIO 拉低导通。好处是蜂鸣器一端直接接地，布线与「低边 NPN」相反但同样简单；坏处是默认状态要确保关断（基极上拉或 GPIO 初始为高）。</p>
+    </div>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>RS485 只能收不能发，先查哪颗元件？</summary><div class="ans">查 Q4 与 R23：若 Q4 没导通（虚焊/损坏），DE 永远为低，收发器一直处于接收。也查 R27 是否虚焊导致基极没有驱动。</div></details>
+    <details class="quiz"><summary>TF 卡识别不到，47k 上拉漏贴会有什么现象？</summary><div class="ans">CMD 线在初始化时无法保持高电平，卡不响应命令，表现为「完全不识别」或「偶发识别后读写失败」。</div></details>
+    <details class="quiz"><summary>CAN 只在一端贴 120Ω 会怎样？</summary><div class="ans">另一端反射不被吸收，长线/高速率下误码率升高；示波器上能看到明显的振铃。标准做法是总线物理两端各一个。</div></details>
+
+    <div class="ch-nav"><a href="c08.html"><span>上一章</span><b>← 3.8 MINI 第 1 页</b></a>
+      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.10 MINI 第 3 页 →</b></a></div>
+  </main>
+</div>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+<script>renderPart('p3','c09.html');</script>
+</body></html>
