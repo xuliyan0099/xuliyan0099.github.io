@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1.8 运放与比较器 | 第一篇 · 电学与器件基础 | i.MX6ULL 学习手册</title>
-<meta name="description" content="虚短虚断、跟随器、放大与迟滞比较器；用 MAX809R 复位监控讲「比较器 + 基准」的真实用法。">
+<title>1.8 运放与比较器：虚短虚断、跟随、迟滞 | 第一篇 · 电学与器件基础 | i.MX6ULL 学习手册</title>
+<meta name="description" content="从虚短虚断推出四种基本组态增益，讲清跟随器为什么能救 ADC 采样，再用板上 MAX809R 复位监控说清比较器、基准与迟滞。">
 <link rel="stylesheet" href="../../assets/style.css">
 <link rel="stylesheet" href="../../assets/book.css">
 <link rel="stylesheet" href="../../assets/mobile.css">
@@ -18,117 +18,153 @@
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
 
 <div class="shell">
-  <aside id="sidebar">
-    <div class="vol-h">第一篇 · 电学与器件基础</div>
-    <ol id="sideList"></ol>
-    <div class="vol-nav" id="volNav"></div>
-  </aside>
-
+  <aside id="sidebar"><div class="vol-h">第一篇 · 电学与器件基础</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第一篇 · 电学基础</span><span class="sep">/</span>第 8 章<span class="sep">/</span>约 22 分钟</div>
-    <h1>运放与比较器：把「差不多」变成「确定」</h1>
-    <p class="lede">这块板子上没有音频运放，但你每天都在用它们的近亲——<b>复位监控芯片 MAX809R 内部就是一个比较器 + 基准 + 延时</b>。理解运放的两条假设（虚短、虚断），你就能看懂几乎所有的采样、检测、保护电路。</p>
+    <div class="ch-meta"><span class="lv">第一篇 · 电学基础</span><span class="sep">/</span>第 8 章<span class="sep">/</span>约 50 分钟</div>
+    <h1>运放与比较器：虚短虚断、跟随、迟滞</h1>
+    <p class="lede">运放是模拟电路里唯一一个「只要记住两条假设，就能算完 90% 电路」的器件：<b>虚短（两输入电压相等）、虚断（输入不吸电流）</b>。比较器则是它的「开关版」：不带负反馈，专门把两个电压比大小。这一章把四种组态的增益推一遍，再讲清「为什么给 ADC 采样必须先加跟随器」，最后用板上 MAX809R 复位监控做实。</p>
 
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>说出运放的「虚短、虚断」两条假设，并用它算同相/反相放大倍数</li>
-        <li>解释跟随器为什么能「隔离」前后级，什么场合必须用</li>
-        <li>说出比较器与运放的差别（开环、速度、输出电平）</li>
-        <li>用 MAX809R 讲清「电压监控 → 复位」的完整逻辑，并理解迟滞的作用</li>
+        <li>说清虚短、虚断成立的前提（负反馈 + 理想运放），以及不成立时会怎样</li>
+        <li>推出跟随、同相、反相、差分四种组态的增益公式</li>
+        <li>解释跟随器为什么能解决「高源阻抗 + ADC 采样电容」的精度问题</li>
+        <li>用正反馈算比较器的迟滞窗口，理解为什么单阈值比较器会抖动</li>
+        <li>读懂板上 MAX809R：阈值、复位延时、POR_B 的低有效逻辑与 R33/C13 的作用</li>
       </ol>
     </div>
 
-    <h2><span class="n">1.8.1</span>两条假设，能算所有线性电路</h2>
-    <p>理想运放在负反馈下满足：</p>
+    <h2><span class="n">1.8.1</span>两条假设：虚短与虚断</h2>
+    <p>理想运放有三个特征：<b>开环增益无穷大、输入阻抗无穷大、输出阻抗为零</b>。接上负反馈后，就得到两条黄金假设：</p>
     <ul>
-      <li><b>虚短：</b>两个输入端电压几乎相等（V<sub>+</sub> ≈ V<sub>−</sub>），因为开环增益极大。</li>
-      <li><b>虚断：</b>输入端几乎不取电流（输入阻抗极高），所以外部电阻上的电流关系可以照基尔霍夫算。</li>
+      <li><b>虚短</b>：V<sub>+</sub> = V<sub>−</sub>。因为增益无穷大，任何微小差压都会让输出饱和；负反馈把差值压到「几乎为零」。</li>
+      <li><b>虚断</b>：I<sub>+</sub> = I<sub>−</sub> = 0。输入阻抗无穷大，不吸电流。</li>
     </ul>
-    <p>同相放大：V<sub>out</sub> = V<sub>in</sub> × (1 + R<sub>f</sub>/R<sub>g</sub>)；反相放大：V<sub>out</sub> = −V<sub>in</sub> × (R<sub>f</sub>/R<sub>in</sub>)。跟随器就是 R<sub>f</sub> = 0、R<sub>g</sub> 开路，增益为 1。</p>
+    <p>注意前提：<b>必须闭环负反馈</b>。开环（比较器）或正反馈时虚短不成立——这是初学者最常犯的概念错误：「为什么比较器两输入不相等？」因为它们本来就不该相等。</p>
 
-    <h2><span class="n">1.8.2</span>跟随器：为什么「增益 1」也有用</h2>
-    <p>因为它的价值不在放大，而在<b>阻抗变换</b>：输入高阻（几乎不取电流）、输出低阻（能带负载）。典型用途：</p>
-    <ul>
-      <li>用高阻分压得到一个参考电压，但后级要取几 mA —— 直接分压会塌，加跟随器后就不塌了。</li>
-      <li>ADC 采样前缓冲，避免采样瞬间把信号源拉偏。</li>
-      <li>驱动长线或容性负载，避免信号源被负载影响。</li>
-    </ul>
-
-    <h2><span class="n">1.8.3</span>比较器：只回答「高还是低」</h2>
-    <p>比较器是开环工作的运放：V<sub>+</sub> &gt; V<sub>−</sub> 输出高，反之输出低。它不追求线性，追求<b>快和确定</b>。实际使用时几乎都要加<b>迟滞</b>（正反馈），否则输入在阈值附近抖动时输出会疯狂翻转。</p>
-    <figure class="fig">
-      <svg viewBox="0 0 900 330" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <!-- 无迟滞 -->
-        <rect x="30" y="26" width="400" height="200" rx="10" fill="#141c2e" stroke="#3a4560"/>
-        <text x="46" y="50" fill="#eaf3ff" font-size="11.5">没有迟滞：抖动被放大成乱跳</text>
-        <path d="M60 120 Q 120 90 180 120 Q 240 150 300 120 Q 340 100 380 112" stroke="#5ff1ef" stroke-width="1.6" fill="none"/>
-        <line x1="60" y1="120" x2="410" y2="120" stroke="#ffb84d" stroke-dasharray="4 3"/>
-        <text x="330" y="114" fill="#ffd79a" font-size="9">阈值</text>
-        <path d="M60 180 L120 180 L130 150 L200 150 L210 180 L280 180 L290 150 L360 150 L370 180 L410 180" stroke="#ff9c9c" stroke-width="1.6" fill="none"/>
-        <text x="60" y="212" fill="#6f7f9c" font-size="9.5">输入噪声让输出在每次过阈值时翻转</text>
-
-        <!-- 有迟滞 -->
-        <rect x="470" y="26" width="400" height="200" rx="10" fill="#141c2e" stroke="#3a4560"/>
-        <text x="486" y="50" fill="#eaf3ff" font-size="11.5">有迟滞：两个阈值，翻转一次就稳住</text>
-        <path d="M500 120 Q 560 92 620 120 Q 660 140 720 120" stroke="#5ff1ef" stroke-width="1.6" fill="none"/>
-        <line x1="500" y1="112" x2="850" y2="112" stroke="#ffb84d" stroke-dasharray="4 3"/>
-        <line x1="500" y1="132" x2="850" y2="132" stroke="#5ce1a0" stroke-dasharray="4 3"/>
-        <text x="790" y="106" fill="#ffd79a" font-size="9">上阈值</text>
-        <text x="790" y="148" fill="#9df3c2" font-size="9">下阈值</text>
-        <path d="M500 182 L620 182 L630 152 L720 152 L730 182 L850 182" stroke="#5ce1a0" stroke-width="1.6" fill="none"/>
-        <text x="500" y="212" fill="#6f7f9c" font-size="9.5">只有越过另一侧阈值才回翻 → 输出干净</text>
-
-        <text x="30" y="264" fill="#9fb0c7" font-size="10.5">迟滞宽度 = 上阈值 − 下阈值，由正反馈电阻决定。宽度太小挡不住噪声，太大则反应迟钝、精度差。</text>
-        <text x="30" y="288" fill="#6f7f9c" font-size="10">工程取值：按键检测、电源监控常用 1–5% 的迟滞；精密测量则改用带内部迟滞的比较器或软件滤波。</text>
-      </svg>
-      <figcaption><b>图 1-7</b>　迟滞的作用：把「一次抖动多次触发」变成「一次越界只翻一次」。</figcaption>
-    </figure>
-
-    <h2><span class="n">1.8.4</span>MAX809R：一颗芯片，就是一套电压监控</h2>
-    <p>核心板第 6 页的复位电路：<b>U3（MAX809R）</b>的 VDD 接 <code>DCDC_3V3</code>，RST 输出经 <b>R33（0Ω）</b>接到 <code>POR_B</code>，<b>C14（0.1µF）</b>挂在 POR_B 上。它内部做了三件事：</p>
-    <ol class="steps">
-      <li><b>分压 + 基准：</b>把 VDD 按比例与内部基准（约 2.63V 对应 3.3V 型号）比较。</li>
-      <li><b>比较器 + 延时：</b>电压低于阈值时输出低（复位有效），回升后还要保持一段时间（典型 100–200ms）才释放，保证电源与时钟稳定。</li>
-      <li><b>开漏/推挽输出：</b>直接驱动 SoC 的 POR_B，内部有下拉，外部可再加快放电电容。</li>
-    </ol>
-    <div class="box tip">
-      <h5>为什么监视 3.3V 就够了</h5>
-      <p>因为 3.3V 是「最后建立、最先跌落」的主轨，它稳了基本说明前面几级都稳了；而 1.35V 由它派生，跟随性很好。监视最关键的那一路，比监视所有路更实际。</p>
-    </div>
-
-    <div class="box pit">
-      <h5>三个让复位「时好时坏」的原因</h5>
-      <p><b>1. 阈值选错。</b>3.3V 系统用了 5V 型号的监控芯片（阈值 4.0V+），3.3V 永远「欠压」，一直复位。</p>
-      <p><b>2. 复位脚被别的电路拉住。</b>调试器、外部复位按钮、另一颗芯片同时驱动同一网络，形成冲突。</p>
-      <p><b>3. 延时电容太大。</b>释放太慢，看起来像「按了没反应」。</p>
-    </div>
-
-    <h2><span class="n">1.8.5</span>什么时候该用运放，什么时候用比较器</h2>
+    <h2><span class="n">1.8.2</span>四种组态：四条增益公式</h2>
+    <p>用虚短虚断 + 节点电流法，四种组态几行就能推完：</p>
     <table>
-      <thead><tr><th>需求</th><th>选什么</th><th>理由</th></tr></thead>
+      <thead><tr><th>组态</th><th>增益</th><th>输入阻抗</th><th>典型用途</th></tr></thead>
       <tbody>
-        <tr><td>要把小信号放大到 ADC 量程</td><td>运放（线性）</td><td>需要成比例的连续输出</td></tr>
-        <tr><td>要隔离前后级阻抗</td><td>运放跟随器</td><td>高输入阻抗、低输出阻抗</td></tr>
-        <tr><td>判断「过没过阈值」</td><td>比较器</td><td>要的是确定的高低电平，不是比例</td></tr>
-        <tr><td>做电源监控/复位</td><td>专用监控芯片</td><td>内部已含基准、延时、迟滞，省事可靠</td></tr>
+        <tr><td class="nm">跟随器</td><td>A = 1</td><td>极高</td><td>阻抗变换、驱动 ADC/长线</td></tr>
+        <tr><td class="nm">同相放大</td><td>A = 1 + R<sub>f</sub>/R<sub>g</sub></td><td>极高</td><td>传感器小信号放大</td></tr>
+        <tr><td class="nm">反相放大</td><td>A = −R<sub>f</sub>/R<sub>in</sub></td><td>= R<sub>in</sub></td><td>需要反相/精确增益</td></tr>
+        <tr><td class="nm">差分</td><td>A = R<sub>f</sub>/R<sub>in</sub>（四电阻匹配）</td><td>较高</td><td>抑制共模、电流采样</td></tr>
       </tbody>
     </table>
+    <p>推导示范（反相）：V<sub>−</sub> 虚地（=V<sub>+</sub>=0），输入电流 I=(V<sub>in</sub>−0)/R<sub>in</sub>，全部流过 R<sub>f</sub>（虚断，电流无处可去），所以 V<sub>out</sub>=0−I·R<sub>f</sub>=−V<sub>in</sub>·R<sub>f</sub>/R<sub>in</sub>。</p>
+    <p>同相组态：V<sub>−</sub>=V<sub>in</sub>，R<sub>g</sub> 与 R<sub>f</sub> 构成分压，V<sub>−</sub>=V<sub>out</sub>·R<sub>g</sub>/(R<sub>g</sub>+R<sub>f</sub>)，联立得 V<sub>out</sub>=V<sub>in</sub>(1+R<sub>f</sub>/R<sub>g</sub>)。<b>注意同相组态的增益永远 ≥1，不能小于 1</b>——想衰减就得用分压或反相组态。</p>
 
-    <h3>自测</h3>
-    <details class="quiz"><summary>跟随器增益是 1，为什么还要多放一颗芯片？</summary><div class="ans">因为它改变的是阻抗而不是电压：输入几乎不取电流，输出能带负载。用分压得到的参考电压直接供后级会塌，加跟随器就不塌。</div></details>
-    <details class="quiz"><summary>比较器不加迟滞，接一个机械按键会怎样？</summary><div class="ans">按键抖动期间输入在阈值附近来回，输出会跟着翻转几十次，被 MCU 当成多次按键。要么加迟滞，要么软件消抖，要么两者都做。</div></details>
-    <details class="quiz"><summary>MAX809R 的输出为什么能直接接 POR_B？</summary><div class="ans">因为 POR_B 是低有效复位输入，内部有上拉，外部拉低即复位。MAX809R 在欠压时输出低、正常时输出高（或开漏释放），电平与逻辑都匹配，且带延时，正好满足 SoC 的上电时序要求。</div></details>
+    <h2><span class="n">1.8.3</span>跟随器：为什么它是 ADC 的「救命稻草」</h2>
+    <p>回到第 1.2 章那个事故：100k/100k 分压监测 12V，源阻抗 50k，直接接 ADC，读数随采样率跳变。原因：ADC 采样瞬间接入一个几 pF 的采样电容，需要一个「电荷包」快速充满；源阻抗太大，RC 时间常数远大于采样窗口，读数就偏低且不稳。</p>
+    <p>加一级跟随器后：</p>
+    <ul>
+      <li>运放输入阻抗极高（MΩ–GΩ 级），对分压点几乎不加载；</li>
+      <li>输出阻抗极低（几十 Ω），能在采样瞬间提供电荷；</li>
+      <li>增益为 1，不改变电压值。</li>
+    </ul>
+    <p>这就是为什么「高阻节点 + ADC」这个组合，教科书上永远画一个跟随器。判据：<b>源阻抗 × 采样电容 &gt; 采样窗口</b> 就必须加缓冲。</p>
 
-    <div class="ch-nav">
-      <a href="c07.html"><span>上一章</span><b>← 1.7 三极管与 MOS</b></a>
-      <a class="nx" id="chNavNext" href="c09.html"><span>下一章</span><b>1.9 数字电平 →</b></a>
+    <h2><span class="n">1.8.4</span>单电源运放：三个必须确认的边界</h2>
+    <p>板上只有 3.3V/5V 单电源，没有 ±15V，所以选运放必须确认：</p>
+    <ul>
+      <li><b>是否轨到轨（Rail-to-Rail）</b>：输入共模范围能不能到电源轨？输出能不能摆到接近 0V 与 V<sub>cc</sub>？普通运放输入到不了正电源，输出也差 1–2V。</li>
+      <li><b>共模范围</b>：同相端电压必须落在手册标明的范围内，否则虚短失效、输出反相。</li>
+      <li><b>输出摆幅与负载</b>：带 10k 与带 100Ω 的摆幅完全不同，手册会给曲线。</li>
+    </ul>
+    <p>另一个常被忽略的点：<b>单电源下「地」是 0V，信号必须偏置在中间</b>（如 V<sub>cc</sub>/2）。交流信号直接进来会被削掉负半周——这就是「单电源运放要加虚地偏置」的原因。</p>
+
+    <h2><span class="n">1.8.5</span>比较器：为什么必须加迟滞</h2>
+    <p>比较器没有负反馈，输出只有高/低两态：V<sub>+</sub> &gt; V<sub>−</sub> 输出高，反之低。问题是：<b>当输入正好在阈值附近抖动（噪声）时，输出会疯狂翻转</b>，后级计数器/中断被打爆。</p>
+    <p>解决办法是<b>正反馈迟滞</b>：把输出的一部分送回同相端，让「上升阈值」和「下降阈值」分开。以反相比较器为例，回差：</p>
+    <p style="text-align:center">ΔV = V<sub>OH</sub> × R1/(R1+R2)（近似，取决于接法）</p>
+    <p>这样噪声幅度小于 ΔV 时，输出就不会来回跳。代价是「判断变迟钝」：输入要越过更宽的窗口才动作，所以迟滞要按噪声幅度设计，不能拍脑袋取大。</p>
+    <p>另一个选择是<b>软件消抖</b>（连续采样 N 次一致才认），但硬件迟滞更快、更可靠，电源监控类场合基本都用硬件。</p>
+
+    <h2><span class="n">1.8.6</span>板上真实：MAX809R 复位监控</h2>
+    <figure class="fig">
+      <img src="../../assets/img/sch/core_p6_reset.png" alt="CORE V2.0 第 6 页 MAX809R 复位电路" loading="lazy">
+      <figcaption><b>图 1-9</b>　CORE V2.0 第 6 页原图：<b>U2 = MAX809R</b>，VDD(3) 由 DCDC_3V3 经 R31 0Ω 供电并挂 C11 104；RST(2) 经 <b>R33 0Ω</b> 输出 <b>POR_B</b>，POR_B 上挂 <b>C13 104</b> 到地。R33/C13 的作用是给这条复位线一个确定的边沿与抗扰，而不是「随便挂个电容」。<a class="zoom" href="../../assets/img/sch/core_p6_reset.png" target="_blank" rel="noopener">原图 ↗</a></figcaption>
+    </figure>
+    <p>MAX809 内部是「基准 + 比较器 + 延时」三件套：</p>
+    <ul>
+      <li>监测 VDD，当 VDD 低于阈值（R 档约 <b>2.63V</b>，S 档 2.93V、T 档 3.08V）时，RST 拉低；</li>
+      <li>VDD 恢复后，RST 继续保持低电平一段<b>复位延时</b>（典型 140–460ms，视型号），保证 SoC 时钟稳定后才放行；</li>
+      <li>输出是<b>低有效</b>（POR_B 的 _B 就是这个意思），所以 SoC 的 POR_B 脚低电平即复位。</li>
+    </ul>
+    <p>为什么用 2.63V 而不是 3.0V？因为要给 3.3V 轨的正常容差（±5% → 3.135V）留空间：阈值必须低于 3.135V 才不会误复位，又要高于 SoC 的最低工作电压，2.63V 是折中。这也解释了「为什么不能随便换型号」：S 档 2.93V 在 3.3V 掉到 3.0V 时就复位，可能过于敏感。</p>
+    <p>R33 0Ω + C13 104 形成一个小 RC（若后级有上拉，τ 取决于上拉值），主要作用是<b>抑制复位线上的窄脉冲干扰</b>，并给走线一个本地电荷；但 C13 不能取太大，否则复位释放变慢，SoC 可能错过时序。</p>
+
+    <h2><span class="n">1.8.7</span>怎么测：虚短与阈值的实测</h2>
+    <ol class="steps">
+      <li><b>验虚短</b>：给运放接成跟随器，输入 1.000V，量输出与两输入。三者应在几 mV 内一致；若差几十 mV，说明失调电压大或不是轨到轨。</li>
+      <li><b>验增益</b>：输入 0.5V，按公式算输出，实测对比；注意输入必须在共模范围内，否则结论无效。</li>
+      <li><b>验阈值</b>：用可调电源缓慢升/降 MAX809 的 VDD，记录 RST 翻转的两个电压（上升阈值与下降阈值）。若两者差很多，说明器件带迟滞（正常）；若完全一样，可能是软件/后级影响。</li>
+    </ol>
+
+    <div class="box pit">
+      <h5>三个常见错误</h5>
+      <p>① <b>把比较器当运放接负反馈</b>：比较器内部没有相位补偿，闭环会振荡。</p>
+      <p>② <b>单电源运放输入接地</b>：普通运放的共模范围到不了 0V，输入贴近地时输出会反相或锁死。</p>
+      <p>③ <b>复位线挂大电容</b>：释放变慢，SoC 在电容充电期间反复复位或进入异常启动。</p>
     </div>
+
+    <div class="demo">
+      <div class="dh"><b>运放增益 / 比较器迟滞计算器</b><span>上面算增益与输出，下面算回差窗口</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+          <div><div style="font-size:12px;color:#9fb0c7">Vin <b id="vinv" style="color:#5ff1ef">0.50</b> V</div><input id="vin" type="range" min="0" max="3.3" step="0.01" value="0.5" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">R<sub>in</sub> <b id="riv" style="color:#5ff1ef">10</b> kΩ</div><input id="ri" type="range" min="1" max="100" step="0.5" value="10" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">R<sub>f</sub> <b id="rfv" style="color:#5ff1ef">47</b> kΩ</div><input id="rf" type="range" min="1" max="200" step="0.5" value="47" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">模式 <select id="mode" style="background:#0a1020;color:#5ff1ef;border:1px solid #2a3a55;border-radius:6px"><option value="inv">反相</option><option value="non">同相</option><option value="buf">跟随</option></select></div></div>
+        </div>
+        <div id="opOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h2><span class="n">1.8.8</span>四个选型误区</h2>
+    <ol>
+      <li><b>不看共模范围。</b>输入贴近电源轨时普通运放会失效。</li>
+      <li><b>不看输出摆幅。</b>轨到轨也要看负载，带 100Ω 时摆幅会缩。</li>
+      <li><b>用比较器做放大。</b>没有补偿，闭环振荡。</li>
+      <li><b>迟滞取太大。</b>判断变迟钝，小信号直接被吞掉。</li>
+    </ol>
+
+    <h3>练习（答案在折叠里）</h3>
+    <details class="quiz"><summary>1. 反相组态 R<sub>in</sub>=10k、R<sub>f</sub>=47k，输入 0.5V，输出多少？</summary><div class="ans">A=−47/10=−4.7，V<sub>out</sub>=−2.35V。单电源下会饱和到 0V，必须加偏置或用双电源。</div></details>
+    <details class="quiz"><summary>2. 同相组态 R<sub>g</sub>=10k、R<sub>f</sub>=47k，增益多少？</summary><div class="ans">1+47/10=5.7。</div></details>
+    <details class="quiz"><summary>3. 跟随器的输入阻抗与输出阻抗大致多少？</summary><div class="ans">输入 MΩ–GΩ 级；输出几十 Ω 以内。</div></details>
+    <details class="quiz"><summary>4. MAX809R 的 RST 是低有效还是高有效？板上为什么叫 POR_B？</summary><div class="ans">低有效；_B 后缀表示低电平有效，SoC 的 POR_B 被拉低即复位。</div></details>
+    <details class="quiz"><summary>5. 比较器不加迟滞，输入带 20mV 噪声会怎样？</summary><div class="ans">输出在阈值附近高频翻转，后级中断/计数被打爆；应加回差 &gt; 噪声峰值。</div></details>
+    <details class="quiz"><summary>6. 为什么高阻分压点接 ADC 要先加跟随器？</summary><div class="ans">ADC 采样电容需要瞬间电荷，源阻抗大则充不满；跟随器输入高阻、输出低阻，正好隔离。</div></details>
+
+    <div class="ch-nav"><a href="c07.html"><span>上一章</span><b>← 1.7 三极管与 MOS</b></a>
+      <a class="nx" id="chNavNext" href="c09.html"><span>下一章</span><b>1.9 数字电平 →</b></a></div>
   </main>
 </div>
-
-<script src="../../assets/parts.js"></script>
-<script src="../../assets/part.js"></script>
-<script>renderPart('p1','c08.html');</script>
-</body>
-</html>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+<script>
+renderPart('p1','c08.html');
+(function(){
+  function calc(){
+    var vin=+document.getElementById('vin').value, ri=+document.getElementById('ri').value*1000;
+    var rf=+document.getElementById('rf').value*1000, mode=document.getElementById('mode').value;
+    document.getElementById('vinv').textContent=vin.toFixed(2);
+    document.getElementById('riv').textContent=(ri/1000).toFixed(1);
+    document.getElementById('rfv').textContent=(rf/1000).toFixed(1);
+    var A = mode==='inv' ? -rf/ri : mode==='non' ? 1+rf/ri : 1;
+    var vout=A*vin, sat = vout>3.3? '（超出 3.3V，实际饱和）' : vout<0? '（低于 0V，单电源下饱和）':'';
+    document.getElementById('opOut').innerHTML=
+      '<b style="color:#eaf3ff;font-size:15px">增益 A = '+A.toFixed(3)+'　输出 = '+vout.toFixed(3)+' V</b>'+sat+'<br>'+
+      '输入阻抗：'+(mode==='inv'?(ri/1000).toFixed(1)+' kΩ（=R<sub>in</sub>）':'极高（MΩ 级）')+'<br>'+
+      (mode==='non'?'同相增益不能小于 1；要衰减只能分压或反相。':'反相组态输入阻抗由 R<sub>in</sub> 决定，高阻信号要加缓冲。')+
+      '<br><span style="color:#6f7f9c;font-size:11.5px">单电源运放必须做 V<sub>cc</sub>/2 偏置，否则负半周被削掉。</span>';
+  }
+  ['vin','ri','rf'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  document.getElementById('mode').addEventListener('change',calc);
+  calc();
+})();
+</script>
+</body></html>

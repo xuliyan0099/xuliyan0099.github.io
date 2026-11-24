@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1.6 二极管家族 | 第一篇 · 电学与器件基础 | i.MX6ULL 学习手册</title>
-<meta name="description" content="用 MINI 板上的 SMBJ5.0A、SMBJ3.3A、RB521S-30、LED 讲肖特基、TVS、稳压与发光二极管的正向压降、钳位与限流电阻。">
+<title>1.6 二极管家族：整流、肖特基、齐纳、TVS、LED | 第一篇 · 电学与器件基础 | i.MX6ULL 学习手册</title>
+<meta name="description" content="从 PN 结与 Vf 讲到肖特基、齐纳、TVS、LED 的选型与计算，用板上 SS34 防反接、SMBJ5.0A TVS、R8 蓝光 LED 的真实数值算一遍。">
 <link rel="stylesheet" href="../../assets/style.css">
 <link rel="stylesheet" href="../../assets/book.css">
 <link rel="stylesheet" href="../../assets/mobile.css">
@@ -18,163 +18,166 @@
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
 
 <div class="shell">
-  <aside id="sidebar">
-    <div class="vol-h">第一篇 · 电学与器件基础</div>
-    <ol id="sideList"></ol>
-    <div class="vol-nav" id="volNav"></div>
-  </aside>
-
+  <aside id="sidebar"><div class="vol-h">第一篇 · 电学与器件基础</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第一篇 · 电学基础</span><span class="sep">/</span>第 6 章<span class="sep">/</span>约 26 分钟</div>
-    <h1>二极管家族：五个成员，五种用途</h1>
-    <p class="lede">板上标 <code>D</code> 的元件至少有五种完全不同的东西：整流二极管、肖特基、齐纳（稳压）、TVS、LED。它们外形都像二极管，但工作区完全不同。<b>认错一个，保护电路就形同虚设。</b>这一章用 MINI 板上真实的 D1–D6 逐个说清。</p>
+    <div class="ch-meta"><span class="lv">第一篇 · 电学基础</span><span class="sep">/</span>第 6 章<span class="sep">/</span>约 55 分钟</div>
+    <h1>二极管家族：整流、肖特基、齐纳、TVS、LED</h1>
+    <p class="lede">它们外形几乎一样，都是一端带条线的黑色小方块，但干的事完全不同：<b>整流</b>（只让电流单向走）、<b>防反接</b>（接反了也不炸）、<b>钳位</b>（把电压摁住）、<b>稳压</b>（用一个反向击穿换稳定电压）、<b>发光</b>。选错的后果从「效率低一点」到「整板冒烟」。这一章用本板 SS34、SMBJ5.0A、R8 蓝光 LED 把每个家族的账算清楚。</p>
 
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>说出普通二极管、肖特基、齐纳、TVS、LED 各自工作在哪个区、看哪几个参数</li>
-        <li>算出 LED 的限流电阻，并解释 MINI 板上 R6 为什么是 510Ω</li>
-        <li>解释 SMBJ5.0A / SMBJ3.3A 这两颗 TVS 放在哪、挡什么</li>
-        <li>判断「用普通二极管替代肖特基」会带来什么问题</li>
+        <li>解释 V<sub>f</sub> 从 0.2V 到 3V 的差别来自什么（材料、结构、颜色）</li>
+        <li>用恒压模型算整流/防反接的压降与损耗，并判断该不该换 MOS 理想二极管</li>
+        <li>读懂 TVS 的 V<sub>RWM</sub>/V<sub>BR</sub>/V<sub>C</sub>/I<sub>PP</sub>/结电容，知道它该放在哪</li>
+        <li>算出 LED 限流电阻，并解释为什么 3.3V 驱动蓝光 LED 只有 0.3mA</li>
+        <li>用万用表二极管档在板上判断好坏，避开「在路测量」的陷阱</li>
       </ol>
     </div>
 
-    <h2><span class="n">1.6.1</span>五个成员的分工</h2>
+    <h2><span class="n">1.6.1</span>PN 结：为什么硅是 0.7V、肖特基是 0.3V</h2>
+    <p>二极管的全部行为来自一个 PN 结：P 区多空穴、N 区多电子，交界处形成<b>耗尽层</b>与内建电场。加正压时耗尽层变薄、载流子越过势垒 → 导通；加反压时耗尽层变厚 → 只有极小的漏电流。</p>
+    <p>这个「势垒高度」就是正向压降 V<sub>f</sub>：</p>
+    <ul>
+      <li><b>硅 PN 结</b>：约 0.6–0.7V（小信号 1N4148 ≈0.7V）；</li>
+      <li><b>肖特基（金属-半导体结）</b>：0.2–0.4V，因为势垒更低，这也是它效率高的原因；</li>
+      <li><b>LED</b>：1.8–3.4V，取决于材料带隙（红 1.8–2.0、绿 2.0–2.4、蓝/白 2.8–3.4）；</li>
+      <li><b>齐纳</b>：正向也是 0.7V，但反向在 V<sub>z</sub> 处「击穿」并稳定工作。</li>
+    </ul>
+    <p>温度会改变 V<sub>f</sub>：硅二极管约 <b>−2mV/°C</b>（温度升高，V<sub>f</sub> 降低）。肖特基也类似。这个系数在做「用二极管做温度传感器」时是优点，在用二极管做基准时是缺点。</p>
+
+    <h2><span class="n">1.6.2</span>三种模型：从理想开关到指数曲线</h2>
+    <p>工程计算不需要每次都解指数方程，按精度选模型：</p>
     <table>
-      <thead><tr><th>类型</th><th>工作区</th><th>关键参数</th><th>MINI 板上的位号</th><th>作用</th></tr></thead>
+      <thead><tr><th>模型</th><th>假设</th><th>适用</th><th>误差</th></tr></thead>
       <tbody>
-        <tr><td class="nm">整流二极管</td><td>正向导通</td><td>Vf≈0.7V、If、Vr</td><td>很少单用</td><td>整流、防反接</td></tr>
-        <tr><td class="nm">肖特基</td><td>正向导通（低压降）</td><td>Vf≈0.2–0.4V、Vr 低</td><td><b>D3–D5 RB521S-30</b></td><td>电源「或」逻辑、续流</td></tr>
-        <tr><td class="nm">齐纳（稳压）</td><td>反向击穿（可逆）</td><td>Vz、Iz、功耗</td><td>本板未用</td><td>简易稳压、限幅</td></tr>
-        <tr><td class="nm">TVS</td><td>反向瞬态击穿</td><td>Vbr、Vc（钳位）、Ipp、电容</td><td><b>D1 SMBJ5.0A、D2 SMBJ3.3A</b></td><td>挡静电与浪涌</td></tr>
-        <tr><td class="nm">LED</td><td>正向发光</td><td>Vf、If、亮度/电流曲线</td><td><b>LED1（R6 510Ω）</b></td><td>指示</td></tr>
+        <tr><td class="nm">理想开关</td><td>导通 0V、截止断路</td><td>只看逻辑方向、粗略估电流</td><td>压降全忽略，小电压电路误差大</td></tr>
+        <tr><td class="nm">恒压降</td><td>导通固定 V<sub>f</sub>（硅 0.7、肖 0.3）</td><td>电源、限流、防反接</td><td>小电流时偏大，大电流时偏小</td></tr>
+        <tr><td class="nm">指数（Shockley）</td><td>I = I<sub>s</sub>(e<sup>V/nV<sub>T</sub></sup> − 1)</td><td>精密、仿真、对数电路</td><td>需要 I<sub>s</sub>、n 参数</td></tr>
       </tbody>
     </table>
-    <p>最容易混淆的是<b>齐纳与 TVS</b>：齐纳是「持续工作在击穿区」的稳压器件，TVS 是「平时不工作、只在瞬态导通」的保护器件。TVS 的钳位电压通常比标称高不少（SMBJ5.0A 的 Vbr 在 6.4–7.0V，钳位可到 9.2V）。</p>
+    <p>V<sub>T</sub> = kT/q ≈ 26mV（室温）。这个 26mV 很重要：它决定了「V<sub>f</sub> 每变 60mV，电流变 10 倍」——所以二极管两端电压的小变化会引起电流的巨大变化，这也是为什么<b>二极管不能直接并接在电源上</b>。</p>
 
+    <h2><span class="n">1.6.3</span>防反接：SS34 的真实代价</h2>
     <figure class="fig">
-      <svg viewBox="0 0 900 380" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <!-- V-I 曲线 -->
-        <rect x="30" y="26" width="380" height="230" rx="10" fill="#141c2e" stroke="#3a4560"/>
-        <text x="46" y="50" fill="#eaf3ff" font-size="11.5">五种二极管的 V-I 曲线位置</text>
-        <line x1="60" y1="150" x2="380" y2="150" stroke="#3a4560"/>
-        <line x1="220" y1="60" x2="220" y2="230" stroke="#3a4560"/>
-        <text x="228" y="74" fill="#6f7f9c" font-size="9">I</text>
-        <text x="374" y="166" fill="#6f7f9c" font-size="9">V</text>
-        <path d="M220 150 L246 150 C 252 120 258 96 270 92 L 360 88" stroke="#5ff1ef" stroke-width="2" fill="none"/>
-        <text x="286" y="80" fill="#9df5f4" font-size="9.5">肖特基 Vf≈0.3V</text>
-        <path d="M220 150 L262 150 C 268 118 276 96 292 92 L 360 90" stroke="#ffb84d" stroke-width="1.4" fill="none" stroke-dasharray="4 3"/>
-        <text x="300" y="106" fill="#ffd79a" font-size="9.5">普通 Vf≈0.7V</text>
-        <path d="M220 150 L196 150 C 190 132 186 110 176 96" stroke="#8b7bff" stroke-width="1.6" fill="none"/>
-        <text x="70" y="96" fill="#c8c0ff" font-size="9.5">齐纳：反向击穿后可逆</text>
-        <path d="M220 150 L212 150 L200 142 L186 152 L176 130" stroke="#ff9c9c" stroke-width="1.6" fill="none"/>
-        <text x="70" y="126" fill="#ffc0c0" font-size="9.5">TVS：只在尖峰时通</text>
-
-        <!-- LED 限流 -->
-        <rect x="430" y="26" width="200" height="230" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
-        <text x="446" y="50" fill="#eaf3ff" font-size="11.5">LED 必须串电阻</text>
-        <line x1="446" y1="80" x2="446" y2="110" stroke="#ffb84d" stroke-width="1.3"/>
-        <text x="454" y="88" fill="#ffd79a" font-size="9.5">3.3V</text>
-        <rect x="434" y="110" width="24" height="34" rx="3" fill="rgba(255,184,77,.15)" stroke="#ffb84d"/>
-        <text x="466" y="130" fill="#ffd79a" font-size="9.5">R6 510Ω</text>
-        <path d="M434 152 L458 152 M446 152 L446 168" stroke="#5ff1ef" stroke-width="1.2"/>
-        <polygon points="436,168 456,168 446,182" fill="none" stroke="#5ff1ef" stroke-width="1.5"/>
-        <line x1="436" y1="182" x2="456" y2="182" stroke="#5ff1ef" stroke-width="1.5"/>
-        <line x1="446" y1="182" x2="446" y2="196" stroke="#6f7f9c"/>
-        <text x="470" y="176" fill="#9fb0c7" font-size="9.5">Vf≈2.0V</text>
-        <text x="446" y="222" fill="#9fb0c7" font-size="10">I = (3.3 − 2.0) / 510 ≈ 2.5mA</text>
-        <text x="446" y="242" fill="#6f7f9c" font-size="9.5">不串电阻 → 电流只受内阻限制 → 烧</text>
-
-        <!-- 保护位置 -->
-        <rect x="650" y="26" width="220" height="230" rx="10" fill="rgba(255,156,156,.06)" stroke="#ff9c9c"/>
-        <text x="666" y="50" fill="#ffc0c0" font-size="11.5">TVS 放在哪</text>
-        <text x="666" y="78" fill="#eaf3ff" font-size="10.5">D1 SMBJ5.0A</text>
-        <text x="666" y="96" fill="#9fb0c7" font-size="9.5">DC5V 输入侧，挡外部浪涌</text>
-        <text x="666" y="122" fill="#eaf3ff" font-size="10.5">D2 SMBJ3.3A</text>
-        <text x="666" y="140" fill="#9fb0c7" font-size="9.5">DCDC_3V3 侧，挡内部瞬态</text>
-        <text x="666" y="170" fill="#eaf3ff" font-size="10.5">位置原则</text>
-        <text x="666" y="188" fill="#9fb0c7" font-size="9.5">越靠近入口越好，走线要短</text>
-        <text x="666" y="210" fill="#9fb0c7" font-size="9.5">放在被保护器件之前，不之后</text>
-        <text x="666" y="234" fill="#6f7f9c" font-size="9.5">后面还要跟限流或保险，否则钳位时烧 TVS</text>
-
-        <text x="30" y="306" fill="#9fb0c7" font-size="10.5">一个常被忽略的参数：结电容。TVS 的结电容有几 nF 到几十 nF，挂在 USB/以太网差分线上会破坏阻抗。</text>
-        <text x="30" y="330" fill="#6f7f9c" font-size="10">判据：USB 要用低电容 TVS（&lt;1pF 量级），别拿电源口的 TVS 直接上高速线。</text>
-      </svg>
-      <figcaption><b>图 1-5</b>　五种二极管在 V-I 图上的位置：肖特基靠左（低压降）、齐纳与 TVS 在反向区。</figcaption>
+      <img src="../../assets/img/sch/mini_p4_ss34.png" alt="MINI V2.2 第 4 页 DC 输入与 SS34 防反接" loading="lazy">
+      <figcaption><b>图 1-7</b>　MINI V2.2 第 4 页原图：<b>DC_IN1 经 SS34（肖特基，3A/40V）到 VM</b>，后面是 C32 47µF/25V + C34 104，再送 U6（DC JW5060T_6）降到 VBIN。SS34 的作用就是「插反了不炸」——反接时它截止，整板不工作但不会烧。代价是常态压降。<a class="zoom" href="../../assets/img/sch/mini_p4_ss34.png" target="_blank" rel="noopener">原图 ↗</a></figcaption>
     </figure>
+    <p>SS34 在 1A 时 V<sub>f</sub> 约 0.4–0.45V，于是：</p>
+    <p style="text-align:center">P<sub>loss</sub> = V<sub>f</sub> × I = 0.45 × 1 = <b>0.45W</b>；若整板 2A：0.5×2 = <b>1W</b></p>
+    <p>1W 在 SMA 封装（θ<sub>JA</sub> 约 100–150°C/W）里温升 100–150°C——所以这种板子在大电流时不用二极管防反接，而用 <b>PMOS 理想二极管</b>：导通时 R<sub>ds(on)</sub> 只有几十 mΩ，2A 下损耗 0.4²×0.05 ≈ 8mW，比二极管低两个量级。</p>
+    <p>判据：<b>电流 &lt; 0.5A 用肖特基就行；&gt;1A 且在意效率/发热，就上理想二极管或 PMOS 反接保护。</b></p>
+
+    <h2><span class="n">1.6.4</span>肖特基 / 快恢复 / 普通整流：三张牌</h3>
+    <table>
+      <thead><tr><th>类型</th><th>V<sub>f</sub></th><th>反向恢复 t<sub>rr</sub></th><th>反向漏电</th><th>典型用途</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">普通整流（1N4007/M7）</td><td>0.9–1.0V</td><td>~30µs（很慢）</td><td>小</td><td>50/60Hz 整流、防反接（低频）</td></tr>
+        <tr><td class="nm">快恢复（ES1J/F1K）</td><td>0.9–1.3V</td><td>150–500ns</td><td>小</td><td>开关电源、续流、高频整流</td></tr>
+        <tr><td class="nm">肖特基（SS34/MBR0520）</td><td>0.3–0.55V</td><td>几乎无（多数载流子）</td><td><b>较大，随温度上升</b></td><td>Buck 续流、防反接、低压整流</td></tr>
+      </tbody>
+    </table>
+    <p>关键取舍：肖特基压降低、速度快，但<b>反向漏电大</b>（µA–mA 级，高温更糟）。所以高压、高温场合反而不选肖特基；而 Buck 的低压续流非它不可（用普通二极管 t<sub>rr</sub> 太慢，损耗巨大）。</p>
+
+    <h2><span class="n">1.6.5</span>TVS：把电压「摁住」的那道闸</h2>
+    <p>TVS 是「专门用来被击穿」的二极管。正常时它截止（只有漏电）；电压超过击穿点，它瞬间导通，把能量引到地，把电压钳在一个安全值。板上两颗：<b>D1 = SMBJ5.0A（单向，5V 系统）、D2 = SMBJ3.3A（单向，3.3V 系统）</b>。</p>
+    <p>读 TVS 规格只看五个数：</p>
+    <ul>
+      <li><b>V<sub>RWM</sub></b>（反向工作电压）：正常能扛的最高电压。SMBJ5.0A 是 5.0V，所以它接在 5V 轨上刚好。</li>
+      <li><b>V<sub>BR</sub></b>（击穿电压）：开始导通的电压，通常 V<sub>RWM</sub> 的 1.1–1.3 倍。</li>
+      <li><b>V<sub>C</sub></b>（钳位电压）：在指定 I<sub>PP</sub> 下的最高电压——<b>这个值必须低于后级器件的绝对最大耐压</b>。</li>
+      <li><b>I<sub>PP</sub></b>（峰值脉冲电流）：能承受多大的浪涌（配合波形 10/1000µs）。</li>
+      <li><b>C<sub>j</sub></b>（结电容）：高速线（USB、以太网）上大结电容会伤信号，要选低容 TVS 或 ESD 阵列。</li>
+    </ul>
+    <p>放置原则：<b>越靠近接口越有效</b>（先钳位再进板），且 TVS 与受保护器件之间不要串长走线/大电阻，否则钳位能量还会耦合进去。另外 TVS 只能「扛一下」，长期过压它会烧——它不是稳压器。</p>
+
+    <h2><span class="n">1.6.6</span>LED：为什么 3.3V 点蓝光只有 0.3mA</h2>
+    <p>LED 的 V<sub>f</sub> 由材料带隙决定：红 1.8–2.0V、绿 2.0–2.4V、蓝/白 2.8–3.4V。板上 PWR 指示灯就是蓝光：<b>R8 = 1K，串在 3.3V 与 LED 之间</b>。代入：</p>
+    <p style="text-align:center">I = (3.3 − 3.0)/1k ≈ <b>0.3mA</b>，P<sub>R8</sub> ≈ 0.09mW</p>
+    <p>0.3mA 对蓝光 LED 是「微亮」——这是设计者刻意压低的待机指示亮度，也说明 <b>3.3V 驱动蓝光 LED 余量很小（只剩 0.3V）</b>。如果换成 5V 供电、同样 1K：I=(5−3)/1k=2mA，亮度明显提升；若想 10mA，就要 R=(3.3−3.0)/10mA=30Ω（且要注意 LED 的 V<sub>f</sub> 离散性，可能一批亮一批不亮）。</p>
+    <p>这就是「红光好驱动、蓝光难驱动」的工程原因：不是电阻问题，是 V<sub>f</sub> 与电源电压太接近，工作点极不稳定。</p>
+
+    <h2><span class="n">1.6.7</span>齐纳：用一个「可控击穿」做稳压</h2>
+    <p>齐纳二极管工作在反向击穿区：电压到 V<sub>z</sub> 就基本不再上升，多余的电压由串联电阻承担。设计两条：</p>
+    <p style="text-align:center">R = (V<sub>in</sub> − V<sub>z</sub>)/(I<sub>z</sub> + I<sub>load</sub>)</p>
+    <ul>
+      <li><b>I<sub>z</sub> 不能太小</b>（否则不稳、噪声大），典型取 1–5mA；</li>
+      <li><b>I<sub>z</sub> 不能太大</b>（否则功耗超限），要满足 P<sub>z</sub> = V<sub>z</sub>×I<sub>z</sub> &lt; 额定。</li>
+    </ul>
+    <p>算例：12V 输入、5.1V 齐纳、负载 10mA、取 I<sub>z</sub>=5mA：R=(12−5.1)/15mA=460Ω（取 470Ω）。此时齐纳功耗 5.1×5mA≈26mW，1/4W 器件完全够。<b>但输入变到 24V 时，I<sub>z</sub> 会涨到 (24−5.1)/470=40mA，齐纳功耗 204mW，接近极限</b>——所以齐纳稳压只适合「输入变化不大、负载很轻」的场合。板上这种场合已经被 LDO 取代。</p>
+
+    <h2><span class="n">1.6.8</span>小信号二极管：钳位与防倒灌</h2>
+    <p>板上还有几颗「不显眼但关键」的小二极管：<b>D3/D4（RB521S-30，肖特基 30V/200mA）</b>用在 USB OTG 的 VBUS 路径上，做<b>防倒灌</b>——防止外部 5V 反灌进板内电源；<b>BAT43WS</b> 用作快速钳位。它们的共同特点：V<sub>f</sub> 低（0.3V 级）、结电容小、封装极小（SOD-323/SOT-23）。</p>
+    <p>在信号线上，这类二极管常做两件事：</p>
+    <ul>
+      <li><b>钳位</b>：信号超过 V<sub>DD</sub>+0.3V 时导通到电源轨（配合 TVS/ESD 阵列），保护芯片输入；</li>
+      <li><b>防倒灌</b>：两个电源域之间只允许单向供电。</li>
+    </ul>
+
+    <h2><span class="n">1.6.9</span>怎么测：二极管档与三个陷阱</h2>
+    <ol class="steps">
+      <li><b>二极管档</b>：红笔正、黑笔负 → 显示 0.4–0.7V（硅）或 0.15–0.3V（肖特基）；反过来显示 OL。两个方向都通 = 击穿短路；两个方向都不通 = 开路。</li>
+      <li><b>在路测量会被并联路径骗</b>：板上二极管常与其他元件并联，正反向都可能「通」。判断要拆一端，或结合电路分析。</li>
+      <li><b>看压降判断型号</strong>：0.5V 左右多半是硅，0.2V 左右是肖特基；但同封装不同型号压降可能只差 50mV，不能作为唯一判据，最终要看丝印/料号。</li>
+    </ol>
+
+    <div class="box pit">
+      <h5>两条最常见的错误</h5>
+      <p>① <b>把 TVS 当稳压用</b>：TVS 的击穿电压容差很大（±5%~±10%），且长期工作在击穿区会烧，不能替代 LDO/齐纳。</p>
+      <p>② <b>肖特基反向漏电没算</b>：高温下漏电可达 mA 级，反接到电池的场景会慢慢把电耗光；用在「电池防反接」时，要选低漏电型号或改用 PMOS。</p>
+    </div>
 
     <div class="demo">
-      <div class="dh"><b>LED 限流电阻计算器</b><span>给电源、Vf 与目标电流，算出电阻与就近标准值</span></div>
+      <div class="dh"><b>二极管/ LED 工作点计算器</b><span>给电源、V<sub>f</sub>、限流电阻，算电流、电阻功耗与 LED 功耗</span></div>
       <div class="db">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
-          <div><div style="font-size:12.5px;color:#9fb0c7">电源 = <b id="vv" style="color:#5ff1ef">3.3</b> V</div>
-            <input id="v" type="range" min="1.8" max="5.5" step="0.1" value="3.3" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12.5px;color:#9fb0c7">Vf = <b id="fv" style="color:#5ff1ef">2.0</b> V</div>
-            <input id="vf" type="range" min="1.2" max="3.2" step="0.05" value="2.0" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12.5px;color:#9fb0c7">目标电流 = <b id="iv" style="color:#5ff1ef">3</b> mA</div>
-            <input id="i" type="range" min="0.5" max="20" step="0.5" value="3" style="width:100%;accent-color:#5ff1ef"></div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+          <div><div style="font-size:12px;color:#9fb0c7">电源 <b id="vsv" style="color:#5ff1ef">3.3</b> V</div><input id="vs" type="range" min="0.5" max="24" step="0.1" value="3.3" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">V<sub>f</sub> <b id="vfv" style="color:#5ff1ef">3.00</b> V</div><input id="vf" type="range" min="0" max="4" step="0.01" value="3" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">R <b id="rv" style="color:#5ff1ef">1000</b> Ω</div><input id="r" type="range" min="10" max="5000" step="10" value="1000" style="width:100%;accent-color:#5ff1ef"></div>
         </div>
-        <div id="ledOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+        <div id="dOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
       </div>
     </div>
 
-    <h2><span class="n">1.6.2</span>肖特基在板上的两个真实用途</h2>
-    <p><strong>用途一：电源「或」。</strong>MINI 板的 USB Host 接口有 <b>D3（RB521S-30）</b>，从 <code>DCDC_5V</code> 接到 <code>USB_OTG2_VBUS</code>。它让板子给外部 USB 设备供电，同时阻止外部设备反向往板内灌电。如果用普通二极管，压降 0.7V 会让 5V 变成 4.3V，USB 设备就可能不稳。</p>
-    <p><strong>用途二：续流。</strong>驱动感性负载（蜂鸣器、继电器）时，关断瞬间线圈会产生反向高压，肖特基并在线圈两端把它泄放掉。MINI 的蜂鸣器是无源的，所以没加；但如果换成有源蜂鸣器或继电器，这颗二极管就是必须的。</p>
-    <div class="box pit">
-      <h5>肖特基的代价</h5>
-      <p><b>反向漏电大。</b>常温下可能几 µA，高温可到几十 µA。所以在「极低功耗待机」的电路里，反接保护更常用 MOS 的理想二极管方案，而不是肖特基。</p>
-      <p><b>反向耐压偏低。</b>RB521S-30 只有 30V，别拿它挡高压瞬态。</p>
-    </div>
+    <h2><span class="n">1.6.10</span>四个选型误区</h2>
+    <ol>
+      <li><b>防反接只看「能不能防」，不看压降损耗。</b>1A 以上就该算损耗，必要时换 PMOS。</li>
+      <li><b>TVS 只看功率，不看钳位电压。</b>V<sub>C</sub> 高于后级耐压等于没保护。</li>
+      <li><b>LED 不按 V<sub>f</sub> 分布设计。</b>蓝光在 3.3V 下工作点极窄，批次差异会让亮度差一倍。</li>
+      <li><b>把肖特基当万能。</b>高压、高温、低漏电场合它并不合适。</li>
+    </ol>
 
-    <h2><span class="n">1.6.3</span>TVS：钳位不是「接地」，是「抬住」</h2>
-    <p>很多人以为 TVS 是「把浪涌接到地」，其实它是在<b>把电压钳在一个安全值</b>，电流由它自己吃掉（并配合上游的保险丝或限流电阻）。参数表里要看的三个数是：</p>
-    <ul>
-      <li><b>Vbr（击穿电压）</b>：开始导通的电压，SMBJ5.0A 约 6.4–7.0V。</li>
-      <li><b>Vc（钳位电压）</b>：在指定浪涌电流下的最大电压，SMBJ5.0A 约 9.2V——被保护器件必须能扛住这个值。</li>
-      <li><b>Ipp / 功率</b>：能吸收多大的瞬态能量，选小了会被打穿。</li>
-    </ul>
-    <div class="box deep">
-      <h5>为什么 TVS 挡不住「持续过压」</h5>
-      <p>TVS 的设计是吸收<b>微秒级</b>的能量。如果电源接错成 12V 持续输入，TVS 会一直导通并迅速烧毁（甚至起火）。所以输入保护的正确顺序是：<b>保险丝/自恢复保险 → TVS → 后级</b>。保险丝负责「持续异常」，TVS 负责「瞬态尖峰」，缺一不可。</p>
-    </div>
+    <h3>练习（答案在折叠里）</h3>
+    <details class="quiz"><summary>1. SS34 在 2A 时损耗多少？温升大概多少？</summary><div class="ans">V<sub>f</sub>≈0.5V，P=1W；SMA 的 θ<sub>JA</sub>≈100–150°C/W，温升 100–150°C，必须换 PMOS 或加散热。</div></details>
+    <details class="quiz"><summary>2. 3.3V 经 1K 点蓝光 LED（V<sub>f</sub>=3.0V），电流多少？</summary><div class="ans">(3.3−3.0)/1k=0.3mA，微亮；若想 5mA，R=(3.3−3.0)/5mA=60Ω。</div></details>
+    <details class="quiz"><summary>3. TVS 的 V<sub>C</sub>=9.2V，后级芯片绝对最大 6V，能用吗？</summary><div class="ans">不能。钳位电压高于后级耐压，浪涌时后级先坏；要选 V<sub>C</sub> 更低（如 5V 级）或加二级保护。</div></details>
+    <details class="quiz"><summary>4. 12V 输入、5.1V 齐纳、负载 10mA、I<sub>z</sub>=5mA，串联电阻取多少？</summary><div class="ans">R=(12−5.1)/15mA≈460Ω，取 470Ω；齐纳功耗约 26mW。</div></details>
+    <details class="quiz"><summary>5. 二极管档两个方向都显示 0.5V，说明什么？</summary><div class="ans">可能已击穿短路（在路时也可能被并联支路干扰，需拆下复测）。</div></details>
+    <details class="quiz"><summary>6. 为什么 Buck 的续流二极管必须用肖特基或同步 MOS？</summary><div class="ans">普通二极管反向恢复慢（µs 级），每个开关周期都会产生大损耗与尖峰；肖特基几乎无 t<sub>rr</sub>，同步 MOS 则直接导通续流。</div></details>
 
-    <h3>自测</h3>
-    <details class="quiz"><summary>3.3V 供电、红色 LED（Vf≈2.0V）、想要 3mA，电阻取多少？</summary><div class="ans">R = (3.3−2.0)/0.003 ≈ 433Ω，就近取 430Ω 或 470Ω。MINI 板用 510Ω，对应约 2.5mA，属于「够亮又省电」的取值。</div></details>
-    <details class="quiz"><summary>为什么不能直接用普通 1N4148 替代 RB521S-30？</summary><div class="ans">压降不同：1N4148 约 0.7V，RB521S-30 约 0.3V。在 5V 供电路径上，0.4V 的差别会让后级电压明显下降；而且 1N4148 电流能力只有几十 mA，带 USB 设备会过热。</div></details>
-    <details class="quiz"><summary>TVS 的钳位电压 9.2V，后级芯片绝对最大 6V，能用吗？</summary><div class="ans">不能。钳位电压必须低于被保护器件的绝对最大额定值，一般还要留 20% 余量。这种情况要选更低钳位的型号，或在 TVS 后加一级限流/稳压。</div></details>
-
-    <div class="ch-nav">
-      <a href="c05.html"><span>上一章</span><b>← 1.5 电感与磁珠</b></a>
-      <a class="nx" id="chNavNext" href="c07.html"><span>下一章</span><b>1.7 三极管与 MOS →</b></a>
-    </div>
+    <div class="ch-nav"><a href="c05.html"><span>上一章</span><b>← 1.5 电感与磁珠</b></a>
+      <a class="nx" id="chNavNext" href="c07.html"><span>下一章</span><b>1.7 三极管与 MOS →</b></a></div>
   </main>
 </div>
-
-<script src="../../assets/parts.js"></script>
-<script src="../../assets/part.js"></script>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
 <script>
 renderPart('p1','c06.html');
 (function(){
-  var STD=[100,120,150,180,220,270,330,390,430,470,510,560,680,820,1000,1200,1500,2000,2200,2700,3300,4700,5100,6800,10000];
   function calc(){
-    var v=+document.getElementById('v').value, vf=+document.getElementById('vf').value, i=+document.getElementById('i').value/1000;
-    document.getElementById('vv').textContent=v.toFixed(1);
-    document.getElementById('fv').textContent=vf.toFixed(2);
-    document.getElementById('iv').textContent=(i*1000).toFixed(1);
-    var r=(v-vf)/i;
-    var near=STD[0], diff=1e9;
-    STD.forEach(function(s){ if(Math.abs(s-r)<diff){diff=Math.abs(s-r); near=s;} });
-    var p=(v-vf)*(v-vf)/near;
-    document.getElementById('ledOut').innerHTML=
-      '<b style="color:#eaf3ff;font-size:15px">R ≈ '+Math.round(r)+' Ω　就近取 '+near+' Ω</b><br>'+
-      '实际电流 '+(((v-vf)/near)*1000).toFixed(2)+' mA　电阻功耗 '+(p*1000).toFixed(1)+' mW（0402 够用）<br>'+
-      '<span style="color:'+(v<=vf?'#ff9c9c':'#9df3c2')+'">'+(v<=vf?'电源低于 Vf，LED 不亮，检查选型':'余量 '+(v-vf).toFixed(2)+'V，可用')+'</span><br>'+
-      '<span style="color:#6f7f9c;font-size:11.5px">亮度大致与电流成正比；指示灯 1–3mA 足够，照明/背光才需要几十 mA 并配恒流驱动。</span>';
+    var vs=+document.getElementById('vs').value, vf=+document.getElementById('vf').value, r=+document.getElementById('r').value;
+    document.getElementById('vsv').textContent=vs.toFixed(1);
+    document.getElementById('vfv').textContent=vf.toFixed(2);
+    document.getElementById('rv').textContent=r;
+    var i=Math.max(0,(vs-vf)/r);
+    var pr=i*i*r, pl=vf*i;
+    document.getElementById('dOut').innerHTML=
+      '<b style="color:#eaf3ff;font-size:15px">电流 '+(i*1000).toFixed(2)+' mA　电阻功耗 '+(pr*1000).toFixed(1)+' mW　LED '+ (pl*1000).toFixed(1)+' mW</b><br>'+
+      '电阻压降 '+(vs-vf).toFixed(2)+' V　'+(i>0?'':'<span style="color:#ff9c9c">电源低于 V<sub>f</sub>，LED 不亮</span>')+'<br>'+
+      '若想让电流到 5mA：R = '+(vs>vf?((vs-vf)/0.005).toFixed(0)+' Ω':'—')+'<br>'+
+      '<span style="color:#6f7f9c;font-size:11.5px">LED 亮度与电流近似成正比，但 V<sub>f</sub> 随电流/温度变化（约 −2mV/°C），工作点窄时要留余量。</span>';
   }
-  ['v','vf','i'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  ['vs','vf','r'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
   calc();
 })();
 </script>
-</body>
-</html>
+</body></html>

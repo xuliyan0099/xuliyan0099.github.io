@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>1.7 三极管与 MOS | 第一篇 · 电学与器件基础 | i.MX6ULL 学习手册</title>
-<meta name="description" content="用 MINI 板的 SS8550、SS8050 与核心板 2SK3018 讲三极管开关、基极电阻计算、MOS 阈值与导通电阻、以及 MOS 做电平转换。">
+<title>1.7 三极管与 MOS：开关、放大、栅极电荷 | 第一篇 · 电学与器件基础 | i.MX6ULL 学习手册</title>
+<meta name="description" content="BJT 的 β 与饱和判据、MOS 的 Vgs(th)/Rds(on)/Qg、开关损耗与栅极电阻，用板上 Q1 SS8550 蜂鸣器、Q4 SS8050、Q2/Q6/Q7 2SK3018 逐个算。">
 <link rel="stylesheet" href="../../assets/style.css">
 <link rel="stylesheet" href="../../assets/book.css">
 <link rel="stylesheet" href="../../assets/mobile.css">
@@ -18,168 +18,160 @@
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
 
 <div class="shell">
-  <aside id="sidebar">
-    <div class="vol-h">第一篇 · 电学与器件基础</div>
-    <ol id="sideList"></ol>
-    <div class="vol-nav" id="volNav"></div>
-  </aside>
-
+  <aside id="sidebar"><div class="vol-h">第一篇 · 电学与器件基础</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
   <main class="doc book">
-    <div class="ch-meta"><span class="lv">第一篇 · 电学基础</span><span class="sep">/</span>第 7 章<span class="sep">/</span>约 26 分钟</div>
-    <h1>三极管与 MOS：两种开关</h1>
-    <p class="lede">板子上需要「用小信号控制大电流」的地方，用的都是这两种器件：<b>三极管（BJT）靠电流控制，MOS 靠电压控制</b>。GPIO 只能出几毫安，而蜂鸣器、灯带、继电器要几十到几百毫安——中间这一级，就是它们的工作。</p>
+    <div class="ch-meta"><span class="lv">第一篇 · 电学基础</span><span class="sep">/</span>第 7 章<span class="sep">/</span>约 60 分钟</div>
+    <h1>三极管与 MOS：开关、放大、栅极电荷</h1>
+    <p class="lede">板上的三极管和 MOS 几乎只做一件事：<b>用一个小信号控制一个大电流</b>。但两者机理完全不同：BJT 靠「注入电流」控制，MOS 靠「加电压建立沟道」控制。这决定了选型、驱动、损耗、发热全都不一样。这一章用板上 Q1（SS8550 驱动蜂鸣器）、Q4（SS8050 驱动 RS485）、Q2/Q6/Q7（2SK3018）把两种器件各算一遍。</p>
 
     <div class="goals">
       <h4>读完这一章，你应该能</h4>
       <ol>
-        <li>说出 NPN、PNP、N-MOS、P-MOS 四种器件的开关条件与常见接法</li>
-        <li>用「饱和条件」算出基极电阻，并解释为什么不能直接用 GPIO 驱动负载</li>
-        <li>说出 V<sub>gs(th)</sub>、R<sub>ds(on)</sub>、Q<sub>g</sub> 三个参数各自影响什么</li>
-        <li>看懂核心板上 2SK3018 做电平/使能开关的那几处电路</li>
+        <li>说清 BJT 的三个工作区，并用 I<sub>c</sub>=βI<sub>b</sub> 判断是否进入饱和</li>
+        <li>解释 MOS 的 V<sub>gs(th)</sub>、R<sub>ds(on)</sub>、Q<sub>g</sub> 各自决定什么</li>
+        <li>算出开关损耗（导通 + 开关 + 栅极驱动），并判断需不需要散热</li>
+        <li>选对高侧/低侧开关：为什么高侧常用 PNP/PMOS，低侧常用 NPN/NMOS</li>
+        <li>用板上真实位号验证 Q1、Q4、Q2/Q6/Q7 的取值理由</li>
       </ol>
     </div>
 
-    <h2><span class="n">1.7.1</span>四种器件，一句话记住</h2>
+    <h2><span class="n">1.7.1</span>BJT：电流控制电流，三个工作区</h2>
+    <p>NPN 三极管的三个脚：基极 B、集电极 C、发射极 E。核心关系：<b>I<sub>c</sub> = β × I<sub>b</sub></b>（β 通常 50–300，离散性极大）。</p>
     <table>
-      <thead><tr><th>器件</th><th>导通条件</th><th>常见位置</th><th>MINI / 核心板实例</th></tr></thead>
+      <thead><tr><th>工作区</th><th>条件</th><th>V<sub>ce</sub></th><th>用途</th></tr></thead>
       <tbody>
-        <tr><td class="nm">NPN（SS8050）</td><td>基极比发射极高 0.7V，且要有足够基极电流</td><td>低边开关（负载接在电源与集电极之间）</td><td>Q4：RS485 自动收发方向控制</td></tr>
-        <tr><td class="nm">PNP（SS8550）</td><td>基极比发射极低 0.7V</td><td>高边开关（负载接在集电极与地之间）</td><td>Q1：蜂鸣器驱动（R21 1k 基极电阻）</td></tr>
-        <tr><td class="nm">N-MOS（2SK3018）</td><td>V<sub>gs</sub> &gt; V<sub>gs(th)</sub>，通常要 2.5V 以上</td><td>低边开关、电平转换、电源切换</td><td>核心板 Q5–Q8：使能/放电/电平转换</td></tr>
-        <tr><td class="nm">P-MOS</td><td>V<sub>gs</sub> &lt; −V<sub>gs(th)</sub>（栅极比源极低）</td><td>高边开关、防反接</td><td>本板未用，常见于电源入口</td></tr>
+        <tr><td class="nm">截止</td><td>V<sub>be</sub> &lt; 0.6V</td><td>≈ 电源电压</td><td>关断，漏电 nA 级</td></tr>
+        <tr><td class="nm">放大</td><td>V<sub>be</sub>≈0.7V，I<sub>c</sub>=βI<sub>b</sub> 成立</td><td>0.3V–V<sub>cc</sub></td><td>模拟放大、恒流源</td></tr>
+        <tr><td class="nm">饱和</td><td>I<sub>b</sub> 足够大，I<sub>c</sub> 被外部限制</td><td>0.1–0.3V（V<sub>ce(sat)</sub>）</td><td><b>开关</b>：功耗最低</td></tr>
       </tbody>
     </table>
+    <p>做开关时目标是「深度饱和」：<b>I<sub>b</sub> 取 I<sub>c</sub>/β 的 2–5 倍</b>（过驱动），保证批次差异、温度变化下仍在饱和。代价是基极电流白白消耗，以及关断变慢（存储电荷多）。</p>
 
+    <h2><span class="n">1.7.2</span>算例：Q1 驱动蜂鸣器（PNP 高侧）</h2>
     <figure class="fig">
-      <svg viewBox="0 0 900 380" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
-        <!-- NPN 低边 -->
-        <rect x="30" y="26" width="270" height="230" rx="10" fill="#141c2e" stroke="#3a4560"/>
-        <text x="46" y="50" fill="#eaf3ff" font-size="11.5">NPN 低边开关</text>
-        <line x1="120" y1="70" x2="120" y2="96" stroke="#ffb84d" stroke-width="1.4"/>
-        <text x="128" y="66" fill="#ffd79a" font-size="9.5">负载电源 3.3V</text>
-        <rect x="100" y="96" width="40" height="34" rx="4" fill="rgba(95,241,239,.1)" stroke="#5ff1ef"/>
-        <text x="120" y="118" fill="#9df5f4" font-size="9" text-anchor="middle">负载</text>
-        <line x1="120" y1="130" x2="120" y2="152" stroke="#5ff1ef" stroke-width="1.2"/>
-        <line x1="104" y1="152" x2="136" y2="152" stroke="#c8c0ff" stroke-width="1.6"/>
-        <line x1="120" y1="152" x2="120" y2="176" stroke="#c8c0ff" stroke-width="1.2"/>
-        <line x1="112" y1="182" x2="128" y2="176" stroke="#c8c0ff" stroke-width="1.4"/>
-        <line x1="112" y1="194" x2="128" y2="188" stroke="#c8c0ff" stroke-width="1.4"/>
-        <line x1="120" y1="194" x2="120" y2="216" stroke="#6f7f9c"/>
-        <line x1="106" y1="216" x2="134" y2="216" stroke="#6f7f9c"/>
-        <line x1="60" y1="176" x2="104" y2="176" stroke="#5ce1a0" stroke-width="1.2"/>
-        <rect x="42" y="166" width="18" height="30" rx="3" fill="rgba(92,225,160,.15)" stroke="#5ce1a0"/>
-        <text x="34" y="160" fill="#9df3c2" font-size="9">Rb</text>
-        <text x="46" y="222" fill="#9fb0c7" font-size="9.5">GPIO → Rb → 基极</text>
-        <text x="46" y="242" fill="#6f7f9c" font-size="9">GPIO 只需 mA 级电流</text>
-
-        <!-- PNP 高边 -->
-        <rect x="320" y="26" width="270" height="230" rx="10" fill="#141c2e" stroke="#3a4560"/>
-        <text x="336" y="50" fill="#eaf3ff" font-size="11.5">PNP 高边开关（蜂鸣器）</text>
-        <line x1="410" y1="70" x2="410" y2="96" stroke="#ffb84d" stroke-width="1.4"/>
-        <text x="418" y="80" fill="#ffd79a" font-size="9.5">3.3V</text>
-        <line x1="394" y1="96" x2="426" y2="96" stroke="#c8c0ff" stroke-width="1.6"/>
-        <line x1="410" y1="96" x2="410" y2="120" stroke="#c8c0ff" stroke-width="1.2"/>
-        <line x1="402" y1="126" x2="418" y2="120" stroke="#c8c0ff" stroke-width="1.4"/>
-        <line x1="402" y1="138" x2="418" y2="132" stroke="#c8c0ff" stroke-width="1.4"/>
-        <line x1="410" y1="138" x2="410" y2="158" stroke="#5ff1ef" stroke-width="1.2"/>
-        <text x="436" y="108" fill="#9fb0c7" font-size="9">E → 3.3V</text>
-        <text x="436" y="142" fill="#9fb0c7" font-size="9">C → 蜂鸣器</text>
-        <text x="336" y="212" fill="#6f7f9c" font-size="9">基极拉低 → 导通</text>
-        <line x1="410" y1="158" x2="410" y2="176" stroke="#5ff1ef" stroke-width="1.2"/>
-        <rect x="388" y="176" width="44" height="30" rx="4" fill="rgba(95,241,239,.1)" stroke="#5ff1ef"/>
-        <text x="410" y="196" fill="#9df5f4" font-size="9" text-anchor="middle">蜂鸣器</text>
-        <line x1="410" y1="206" x2="410" y2="226" stroke="#6f7f9c"/>
-        <line x1="396" y1="226" x2="424" y2="226" stroke="#6f7f9c"/>
-        <line x1="366" y1="130" x2="402" y2="130" stroke="#5ce1a0" stroke-width="1.2"/>
-        <rect x="348" y="120" width="18" height="26" rx="3" fill="rgba(92,225,160,.15)" stroke="#5ce1a0"/>
-        <text x="336" y="112" fill="#9df3c2" font-size="9">R21 1k</text>
-
-        <!-- MOS -->
-        <rect x="610" y="26" width="260" height="230" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
-        <text x="626" y="50" fill="#eaf3ff" font-size="11.5">N-MOS：看电压，不看电流</text>
-        <text x="626" y="80" fill="#9df3c2" font-size="10.5">Vgs(th)：开启阈值</text>
-        <text x="626" y="98" fill="#9fb0c7" font-size="9.5">2SK3018 约 0.8–1.5V，3.3V 可完全开通</text>
-        <text x="626" y="126" fill="#9df3c2" font-size="10.5">Rds(on)：导通电阻</text>
-        <text x="626" y="144" fill="#9fb0c7" font-size="9.5">决定发热：1Ω 过 1A 就是 1W</text>
-        <text x="626" y="172" fill="#9df3c2" font-size="10.5">Qg：栅极电荷</text>
-        <text x="626" y="190" fill="#9fb0c7" font-size="9.5">决定开关速度与驱动电流</text>
-        <text x="626" y="218" fill="#ff9c9c" font-size="9.5">栅极不能悬空：会半开通而烧毁</text>
-        <text x="626" y="240" fill="#6f7f9c" font-size="9">必须加 10k–100k 下拉到源极</text>
-
-        <text x="30" y="300" fill="#9fb0c7" font-size="10.5">为什么 GPIO 不能直接驱动负载：一颗 GPIO 通常只能出 4–8mA，而蜂鸣器要 20–30mA、继电器要 50mA 以上。</text>
-        <text x="30" y="324" fill="#6f7f9c" font-size="10">直接驱动轻则电压掉到 1V 不工作，重则永久损伤 IO。中间必须加一级开关。</text>
-      </svg>
-      <figcaption><b>图 1-6</b>　三种最常见的开关接法。高边用 PNP/P-MOS，低边用 NPN/N-MOS。</figcaption>
+      <img src="../../assets/img/sch/mini_p2_buzzer.png" alt="MINI V2.2 第 2 页 BEEP 蜂鸣器驱动电路" loading="lazy">
+      <figcaption><b>图 1-8</b>　MINI V2.2 第 2 页 BEEP 区原图：<b>Q1（S8550，PNP）</b>发射极接 DCDC_3V3、集电极接蜂鸣器 BEEP1，基极经 <b>R21 1K</b> 接 BEEP 信号。<b>BEEP 拉低 → 导通</b>，这是典型的高侧 PNP 开关。旁边的 KEY0 用 R12 10k 上拉 + 按键接地，是另一套「读电平」结构。<a class="zoom" href="../../assets/img/sch/mini_p2_buzzer.png" target="_blank" rel="noopener">原图 ↗</a></figcaption>
     </figure>
+    <p>PNP 的基极电流从发射极（3.3V）流向基极，经 R21 到被拉低的 BEEP 脚：</p>
+    <p style="text-align:center">I<sub>b</sub> = (3.3 − 0.7)/1k ≈ <b>2.6mA</b></p>
+    <p>蜂鸣器工作电流通常 10–30mA，取 30mA：需要 I<sub>b</sub> ≥ 30mA/β。若 β=100，只需 0.3mA；给到 2.6mA 是<b>约 8 倍过驱动</b>，稳稳饱和，V<sub>ce(sat)</sub> 约 0.2V，管耗 P = 0.2×30mA = 6mW，SOT-23 毫无压力。</p>
+    <p>反过来看 R21 取值的边界：<b>太小</b>（如 100Ω）→ I<sub>b</sub>=26mA，超过 MCU 引脚驱动能力（多数 GPIO 只有 4–8mA），且浪费；<b>太大</b>（如 10k）→ I<sub>b</sub>=0.26mA，β 偏差时可能进不了饱和，V<sub>ce</sub> 升高、管子发热。1k 正好在这个窗口里。</p>
 
-    <h2><span class="n">1.7.2</span>基极电阻：不是随便放个 1k</h2>
-    <p>三极管做开关时必须进入<b>饱和区</b>（V<sub>ce</sub> 接近 0.2V），否则它会变成一个发热的电阻。饱和的条件是：</p>
-    <p style="text-align:center">I<sub>b</sub> ≥ ( I<sub>c</sub> / h<sub>FE(min)</sub> ) × (2–5 倍过驱动系数)</p>
-    <p>所以基极电阻：R<sub>b</sub> = (V<sub>drive</sub> − V<sub>be</sub>) / I<sub>b</sub>。以 MINI 板的蜂鸣器为例：Q1（SS8550，PNP），负载约 20mA，SS8550 的 h<sub>FE</sub> 最小约 120（大电流下会降到几十）。取 I<sub>c</sub> = 20mA、过驱动 3 倍，I<sub>b</sub> ≈ 0.5mA，则 R<sub>b</sub> = (3.3 − 0.7)/0.0005 ≈ 5.2k。板上取 1k，相当于给了 2.6mA 基极电流——远超需求，保证深度饱和。</p>
-    <p>为什么宁可选小一点？因为 h<sub>FE</sub> 随温度、批次、电流下降，留大余量比「刚好够」稳。</p>
+    <h2><span class="n">1.7.3</span>MOS：电压控制电流，看三个参数</h2>
+    <p>NMOS 三个脚：栅 G、漏 D、源 S。当 V<sub>gs</sub> 超过阈值 V<sub>gs(th)</sub>，栅下形成沟道，D-S 导通。关键参数：</p>
+    <ul>
+      <li><b>V<sub>gs(th)</sub></b>：开启阈值（1–3V 常见）。注意这是「刚开始导通」，不是「完全导通」。</li>
+      <li><b>R<sub>ds(on)</sub></b>：完全导通后的电阻，几 mΩ–几 Ω。它决定导通损耗 I²R。</li>
+      <li><b>Q<sub>g</sub></b>：栅极总电荷（nC）。它决定驱动损耗与开关速度：I<sub>drive</sub> = Q<sub>g</sub>/t。</li>
+      <li><b>C<sub>iss</sub></b>：输入电容，影响驱动与米勒平台。</li>
+    </ul>
+    <p>与 BJT 最大的区别：<b>MOS 的栅极静态电流几乎为零</b>（只有充放电的脉冲电流），所以「用电压驱动」；但也因此，<b>栅极悬空时状态不确定</b>，必须加上拉/下拉电阻（板上 Q4 的 R74? 以及 Q2/Q6/Q7 都配了栅极电阻）。</p>
+
+    <h2><span class="n">1.7.4</span>开关损耗：三个部分必须分开算</h2>
+    <p>MOS 做开关时，总损耗 = 导通 + 开关 + 驱动：</p>
+    <p style="text-align:center">P<sub>cond</sub> = I² × R<sub>ds(on)</sub> × D<br>P<sub>sw</sub> ≈ 0.5 × V<sub>ds</sub> × I × (t<sub>r</sub>+t<sub>f</sub>) × f<br>P<sub>gate</sub> = Q<sub>g</sub> × V<sub>gs</sub> × f</p>
+    <p>算例：V<sub>ds</sub>=12V、I=2A、R<sub>ds(on)</sub>=20mΩ、D=0.5、t<sub>r</sub>+t<sub>f</sub>=20ns、f=100kHz、Q<sub>g</sub>=10nC：</p>
+    <ul>
+      <li>P<sub>cond</sub> = 4×0.02×0.5 = <b>40mW</b>；</li>
+      <li>P<sub>sw</sub> = 0.5×12×2×20ns×100k = <b>24mW</b>；</li>
+      <li>P<sub>gate</sub> = 10nC×10V×100k = <b>10mW</b>；</li>
+      <li>合计 74mW，SOT-23 温升约 15°C，没问题。</li>
+    </ul>
+    <p>但把 f 提到 1MHz、电流 10A：P<sub>sw</sub> 变 240mW、P<sub>cond</sub> 变 1W，立刻需要散热与大封装。这就是「开关频率不是越高越好」的原因。</p>
+
+    <h2><span class="n">1.7.5</span>高侧还是低侧：四种组合</h2>
+    <table>
+      <thead><tr><th>位置</th><th>常用器件</th><th>驱动难点</th><th>板上例子</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">低侧 NPN</td><td>SS8050</td><td>基极电流小，简单</td><td>Q4 驱动 RS485 的 DE/RE</td></tr>
+        <tr><td class="nm">低侧 NMOS</td><td>2SK3018</td><td>V<sub>gs</sub> 相对源极（地）易驱动</td><td>Q2/Q6/Q7 放电、电平转换</td></tr>
+        <tr><td class="nm">高侧 PNP</td><td>SS8550</td><td>基极需拉到低于发射极</td><td>Q1 蜂鸣器</td></tr>
+        <tr><td class="nm">高侧 PMOS</td><td>AO3401 等</td><td>栅极需拉到接近地；耐压要够</td><td>电源开关、反接保护</td></tr>
+      </tbody>
+    </table>
+    <p>为什么高侧少用 NMOS？因为 NMOS 的源极跟着输出走，V<sub>gs</sub> 需要「高于电源」的驱动电压，得加自举电容或电荷泵。板子上没有这些，所以高侧一律用 PNP/PMOS。这是读图时判断「这个管子为什么是 P 型」的核心逻辑。</p>
+
+    <h2><span class="n">1.7.6</span>栅极电阻与米勒平台</h2>
+    <p>栅极前面的那个电阻（板上 Q4 附近 R74 10k 是下拉/偏置，Q2/Q6/Q7 也有栅极电阻）有两个作用：</p>
+    <ul>
+      <li><b>限制峰值驱动电流</b>：I<sub>peak</sub>=V/R，保护 MCU 引脚、抑制振铃；</li>
+      <li><b>控制开关速度</b>：R 大 → 开关慢 → 开关损耗大，但 EMI 小；R 小则相反。</li>
+    </ul>
+    <p><b>米勒平台</b>：MOS 开通时，V<sub>gs</sub> 会在某个电压上「停一会儿」，因为栅极电荷要先给 C<sub>gd</sub> 充电、把 V<sub>ds</sub> 拉下来。这段平台期就是开关损耗的主要来源。驱动能力弱（大 R<sub>g</sub>）时平台变长，管子发热明显——这是「为什么 MOS 烫但 R<sub>ds(on)</sub> 明明很小」的常见答案。</p>
+
+    <h2><span class="n">1.7.7</span>板上还有哪些管子</h2>
+    <ul>
+      <li><b>Q4（SS8050，NPN）</b>：MINI p2 用于 RS485 的收发控制/驱动，低侧开关，基极经限流电阻接 SoC 的 GPIO。</li>
+      <li><b>Q2/Q6/Q7（2SK3018，NMOS）</b>：CORE p1 里出现在 DCDC 的 DISCHG 与电平转换位置——用 NMOS 把某个节点快速拉到地（放电），或做单向电平隔离。它们旁边都有 10k 栅极电阻，保证默认关断。</li>
+      <li><b>Q1（SS8550，PNP）</b>：蜂鸣器高侧开关，见上。</li>
+    </ul>
+    <p>一个读图技巧：<b>看箭头方向判断 NPN/PNP</b>——箭头朝外（发射极指向外）是 NPN，箭头朝内是 PNP；MOS 则看衬底箭头：朝内是 NMOS，朝外是 PMOS。</p>
+
+    <h2><span class="n">1.7.8</span>怎么测：三个电压就能判断工作区</h2>
+    <ol class="steps">
+      <li><b>BJT</b>：量 V<sub>be</sub> 与 V<sub>ce</sub>。V<sub>be</sub>≈0.7V 且 V<sub>ce</sub>&lt;0.3V → 饱和（好）；V<sub>be</sub>≈0.7 但 V<sub>ce</sub> 几伏 → 放大区（做开关时不对，驱动不足）；V<sub>be</sub>&lt;0.5V → 截止。</li>
+      <li><b>MOS</b>：量 V<sub>gs</sub> 与 V<sub>ds</sub>。V<sub>gs</sub> 远大于 V<sub>gs(th)</sub> 且 V<sub>ds</sub> 接近 0 → 导通良好；V<sub>ds</sub> 有几百 mV 以上 → 没完全导通或电流过大。</li>
+      <li><b>在路测电阻法</b>：断电，二极管档测体二极管（NMOS 的 S→D 有一个二极管），可快速判断 D-S 是否击穿；G-S 之间应为高阻。</li>
+    </ol>
+
+    <div class="box pit">
+      <h5>两个烧管子的经典错误</h5>
+      <p>① <b>MOS 栅极悬空</b>：手一碰、静电一打，V<sub>gs</sub> 乱飘，管子半开半关，瞬间过热。必须加 10k 下拉（板上都能看到）。</p>
+      <p>② <b>用 BJT 驱动大电流负载不核算 β</b>：以为「β=100，1mA 就能带 100mA」，但 β 在饱和区会掉到 20–30，且随温度下降。开关设计必须按最小 β 算，并过驱动 2–5 倍。</p>
+    </div>
 
     <div class="demo">
-      <div class="dh"><b>基极电阻计算器</b><span>按饱和条件算 Rb，并提示「过大不饱和 / 过小浪费」</span></div>
+      <div class="dh"><b>BJT 基极电阻 / MOS 损耗计算器</b><span>上面算驱动，下面算损耗，判断会不会烫</span></div>
       <div class="db">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
-          <div><div style="font-size:12px;color:#9fb0c7">驱动电压 <b id="dv" style="color:#5ff1ef">3.3</b> V</div><input id="dv2" type="range" min="1.8" max="5" step="0.1" value="3.3" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12px;color:#9fb0c7">负载电流 <b id="cv" style="color:#5ff1ef">20</b> mA</div><input id="ci" type="range" min="1" max="500" step="1" value="20" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12px;color:#9fb0c7">hFE(min) <b id="hv" style="color:#5ff1ef">120</b></div><input id="hf" type="range" min="20" max="400" step="10" value="120" style="width:100%;accent-color:#5ff1ef"></div>
-          <div><div style="font-size:12px;color:#9fb0c7">过驱动 <b id="ov" style="color:#5ff1ef">3</b> 倍</div><input id="od" type="range" min="1" max="5" step="0.5" value="3" style="width:100%;accent-color:#5ff1ef"></div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+          <div><div style="font-size:12px;color:#9fb0c7">负载电流 <b id="icv" style="color:#5ff1ef">30</b> mA</div><input id="ic" type="range" min="1" max="1000" step="1" value="30" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">最小 β <b id="bv" style="color:#5ff1ef">50</b></div><input id="beta" type="range" min="10" max="300" step="5" value="50" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">基极电阻 <b id="rbv" style="color:#5ff1ef">1.0</b> kΩ</div><input id="rb" type="range" min="0.1" max="20" step="0.1" value="1" style="width:100%;accent-color:#5ff1ef"></div>
         </div>
-        <div id="bjOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+        <div id="qOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
       </div>
     </div>
 
-    <h2><span class="n">1.7.3</span>核心板上的 2SK3018：只当开关，不当放大</h2>
-    <p>i.MX6ULL 核心板第 1 页有 <b>Q5–Q8（2SK3018，N 沟道 MOS）</b>，分别控制 <code>DISCHG_EN</code>、<code>SD1_VSELECT</code> 这类信号。它们的用法都很单一：<b>栅极给高 → 漏源导通 → 把某个信号拉到地或短接</b>。</p>
-    <p>为什么这里用 MOS 而不是三极管？因为 MOS 是电压驱动，栅极几乎不取电流，可以直接由 SoC 的 GPIO 控制，也不需要计算基极电阻；而且导通电阻小（2SK3018 约几 Ω），短接信号时压降可以忽略。</p>
-    <div class="box pit">
-      <h5>MOS 电路的三个常见错误</h5>
-      <p><b>1. 栅极悬空。</b>上电瞬间栅极电压不确定，MOS 可能半开通，变成一个大电阻并迅速过热。必须加下拉（10k–100k）。</p>
-      <p><b>2. 用 3.3V 逻辑驱动「逻辑电平」不兼容的 MOS。</b>有些 MOS 的 V<sub>gs(th)</sub> 是 4.5V 规格，3.3V 只能让它半开。选型要挑「逻辑电平（logic level）」型号。</p>
-      <p><b>3. 忽略体二极管。</b>N-MOS 内部有一个从源到漏的二极管，做「双向开关」时它会让反向电流照样通过，电平转换电路正是利用这一点。</p>
-    </div>
+    <h2><span class="n">1.7.9</span>四个选型误区</h2>
+    <ol>
+      <li><b>按典型 β 设计基极电流。</b>要按最小 β，并过驱动 2–5 倍。</li>
+      <li><b>高侧用 NMOS 却不加自举。</b>V<sub>gs</sub> 不够，管子半开，瞬间烧。</li>
+      <li><b>忽略 Q<sub>g</sub> 与驱动能力。</b>MCU 引脚几十 mA，驱动大 Q<sub>g</sub> 管子会拖慢开关、增加损耗。</li>
+      <li><b>栅极不加下拉。</b>上电/复位期间状态不定，可能误导通。</li>
+    </ol>
 
-    <div class="box deep">
-      <h5>MOS 做电平转换的原理（核心板那种接法）</h5>
-      <p>一个 N-MOS，栅极接低压侧电源（如 1.8V），源极接低压侧信号，漏极接高压侧信号，两侧各有一个上拉。当低压侧拉低时，MOS 导通把高压侧也拉低；当高压侧拉低时，靠体二极管先把低压侧拉低，MOS 再完全导通。<b>双向、无需方向控制</b>——这就是为什么 SD 卡电压切换、I2C 跨电压域都用这种小 MOS。</p>
-    </div>
+    <h3>练习（答案在折叠里）</h3>
+    <details class="quiz"><summary>1. Q1 的 R21=1k，BEEP 拉低到 0V，I<sub>b</sub> 多少？</summary><div class="ans">(3.3−0.7)/1k≈2.6mA。</div></details>
+    <details class="quiz"><summary>2. 负载 30mA、最小 β=50，需要多少 I<sub>b</sub>？2.6mA 够吗？</summary><div class="ans">临界 0.6mA；2.6mA 是 4 倍过驱动，够且稳。</div></details>
+    <details class="quiz"><summary>3. MOS 的 V<sub>gs(th)</sub>=1.5V，用 3.3V GPIO 直接驱动 3A 负载可以吗？</summary><div class="ans">要先看手册的 R<sub>ds(on)</sub> @V<sub>gs</sub>=2.5/3.3V 曲线；若该电压下 R<sub>ds(on)</sub> 仍很小才可以，否则要加驱动/换逻辑电平 MOS。</div></details>
+    <details class="quiz"><summary>4. V<sub>ds</sub>=12V、I=2A、t<sub>sw</sub>=20ns、f=100kHz，开关损耗多少？</summary><div class="ans">0.5×12×2×20n×100k=24mW。</div></details>
+    <details class="quiz"><summary>5. 为什么高侧开关常用 PMOS 而不是 NMOS？</summary><div class="ans">NMOS 源极随输出浮动，需要高于电源的栅压（自举/电荷泵）；PMOS 只需把栅拉到地即可导通。</div></details>
+    <details class="quiz"><summary>6. 量到 V<sub>be</sub>=0.75V、V<sub>ce</sub>=3V，说明什么？</summary><div class="ans">处于放大区，未饱和：基极驱动不足或负载过大，做开关会发热，应减小 R<sub>b</sub> 或换更大 β/达林顿。</div></details>
 
-    <h3>自测</h3>
-    <details class="quiz"><summary>蜂鸣器 30mA、hFE(min)=100、3.3V 驱动，Rb 取 10k 会怎样？</summary><div class="ans">Ib=(3.3−0.7)/10k≈0.26mA，最多只能驱动 26mA（还没算余量），三极管会停在放大区，Vce 升高、发热，蜂鸣器声音变小甚至不响。应取 1k 左右。</div></details>
-    <details class="quiz"><summary>为什么 MOS 的栅极要加下拉电阻？</summary><div class="ans">因为上电时 GPIO 通常是高阻态，栅极电荷无处泄放，电压可能停在中点，MOS 半开通、功耗很大。下拉保证默认关断。</div></details>
-    <details class="quiz"><summary>同样做开关，什么时候必须用 MOS 而不是三极管？</summary><div class="ans">三种情况：需要极低导通损耗（大电流）、需要电压控制（驱动源不能提供电流）、需要双向导通或高频开关。三极管适合小电流、低成本、对压降不敏感的场合。</div></details>
-
-    <div class="ch-nav">
-      <a href="c06.html"><span>上一章</span><b>← 1.6 二极管家族</b></a>
-      <a class="nx" id="chNavNext" href="c08.html"><span>下一章</span><b>1.8 运放与比较器 →</b></a>
-    </div>
+    <div class="ch-nav"><a href="c06.html"><span>上一章</span><b>← 1.6 二极管家族</b></a>
+      <a class="nx" id="chNavNext" href="c08.html"><span>下一章</span><b>1.8 运放与比较器 →</b></a></div>
   </main>
 </div>
-
-<script src="../../assets/parts.js"></script>
-<script src="../../assets/part.js"></script>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
 <script>
 renderPart('p1','c07.html');
 (function(){
   function calc(){
-    var v=+document.getElementById('dv2').value, ic=+document.getElementById('ci').value/1000;
-    var hfe=+document.getElementById('hf').value, od=+document.getElementById('od').value;
-    document.getElementById('dv').textContent=v.toFixed(1);
-    document.getElementById('cv').textContent=(ic*1000).toFixed(0);
-    document.getElementById('hv').textContent=hfe;
-    document.getElementById('ov').textContent=od.toFixed(1);
-    var ib=ic/hfe*od, rb=(v-0.7)/ib;
-    document.getElementById('bjOut').innerHTML=
-      '<b style="color:#eaf3ff;font-size:15px">需要 Ib ≈ '+(ib*1000).toFixed(2)+' mA　→ Rb ≈ '+Math.round(rb)+' Ω</b><br>'+
-      '就近取 1k / 2.2k / 4.7k；基极电流 '+(ib*1000).toFixed(2)+' mA 时 GPIO 负担很小<br>'+
-      '<span style="color:'+(v<=1?'#ff9c9c':'#9df3c2')+'">'+(v<=1?'驱动电压低于 Vbe，三极管根本打不开':'驱动电压足够')+'</span><br>'+
-      '<span style="color:#6f7f9c;font-size:11.5px">hFE 请用规格书的「最小值」而不是典型值；大电流时 hFE 会明显下降，过驱动系数就是为它留的余量。</span>';
+    var ic=+document.getElementById('ic').value/1000, beta=+document.getElementById('beta').value;
+    var rb=+document.getElementById('rb').value*1000;
+    document.getElementById('icv').textContent=(ic*1000).toFixed(0);
+    document.getElementById('bv').textContent=beta;
+    document.getElementById('rbv').textContent=(rb/1000).toFixed(1);
+    var ibmin=ic/beta, ib=(3.3-0.7)/rb, ratio=ib/ibmin;
+    var ok=ib>2*ibmin;
+    document.getElementById('qOut').innerHTML=
+      '<b style="color:#eaf3ff;font-size:15px">临界 I<sub>b</sub> '+(ibmin*1000).toFixed(2)+' mA　实际 I<sub>b</sub> '+(ib*1000).toFixed(2)+' mA　过驱动 '+ratio.toFixed(1)+'×</b><br>'+
+      '基极电阻功耗 ≈ '+(ib*ib*rb*1000).toFixed(1)+' mW；GPIO 需提供 '+ (ib*1000).toFixed(1) +' mA<br>'+
+      (ok?'<span style="color:#9df3c2">饱和裕度足够（≥2×）</span>':'<span style="color:#ff9c9c">驱动不足：减小 R<sub>b</sub> 或换高 β 器件</span>')+'<br>'+
+      '<span style="color:#6f7f9c;font-size:11.5px">多数 MCU 单脚持续电流 4–8mA，超过要加缓冲/减小 R<sub>b</sub> 需同时核算 GPIO 能力。</span>';
   }
-  ['dv2','ci','hf','od'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  ['ic','beta','rb'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
   calc();
 })();
 </script>
-</body>
-</html>
+</body></html>
