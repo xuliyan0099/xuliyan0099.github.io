@@ -26,7 +26,7 @@
 
     <figure class="fig sch">
       <div class="scroller"><img src="../../assets/img/sch/mini_p3_phy.png" alt="MINI 第 3 页 SR8201F 与 L3/L4 磁珠、变压器"></div>
-      <figcaption>MINI 第 3 页裁切：SR8201F（RMII PHY）后接 L3 220R/L4 120R 磁珠与 ATK9111A 变压器——这是「PHY 噪声不进网口、网口共模不进 PHY」的双向隔离。</figcaption>
+      <figcaption>MINI 第 3 页裁切：SR8201F 的 RMII 接口侧——R31 22Ω 串 TXC、R36–R38 10K 上拉、R63 10K 复位、R64 2.49K RBIAS。这些「小电阻」决定了 50MHz 信号的边沿与共模电平。</figcaption>
     </figure>
 
     <div class="goals">
@@ -157,4 +157,5 @@ renderPart('p6','c02.html');
 </style>
 </body>
 </html>
+
 
