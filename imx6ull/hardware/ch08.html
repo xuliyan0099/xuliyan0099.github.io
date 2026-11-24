@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1.8 上手清单：今天就能做的六件事 | 硬件篇 | i.MX6ULL 学习手册</title>
+<meta name="description" content="i.MX6ULL 上手六件事：认电源、接串口、玩拨码、认存储、点一个灯、插一次网线，每条带命令与验收标准。">
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">硬件篇 · 这块板子</div>
+    <ol>
+      <li><a href="ch01.html"><span class="no">1.1</span><span>这块板子是什么<span class="sub">五块拼图</span></span></a></li>
+      <li><a href="ch02.html"><span class="no">1.2</span><span>板子地图<span class="sub">认元件、看丝印</span></span></a></li>
+      <li><a href="ch03.html"><span class="no">1.3</span><span>SoC 里面有什么<span class="sub">Cortex-A7 与外设</span></span></a></li>
+      <li><a href="ch04.html"><span class="no">1.4</span><span>上电到 shell<span class="sub">五段路</span></span></a></li>
+      <li><a href="ch05.html"><span class="no">1.5</span><span>三种启动方式<span class="sub">拨码与 eFuse</span></span></a></li>
+      <li><a href="ch06.html"><span class="no">1.6</span><span>引脚复用<span class="sub">一个脚八个身份</span></span></a></li>
+      <li><a href="ch07.html"><span class="no">1.7</span><span>硬件故障对照<span class="sub">现象倒查</span></span></a></li>
+      <li><a href="ch08.html" class="active"><span class="no">1.8</span><span>上手清单<span class="sub">今天就能做</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="ch07.html">← 上一章</a><a href="../juan/j00.html">卷 00 →</a></div>
+  </aside>
+
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第一篇 · 硬件</span><span class="sep">/</span>第 8 章<span class="sep">/</span>约 60 分钟动手</div>
+    <h1>上手清单：六件事</h1>
+    <p class="lede">理论读到这里就够了，剩下的是手感。这六件事做完，这块板子对你来说就从「一块绿板子」变成「一台我能操作的机器」——而这个感觉，比再读十篇文章都值。</p>
+
+    <div class="goals">
+      <h4>做完这六件事，你会得到</h4>
+      <ol>
+        <li>一套能复现的上电流程和一次完整的串口对话</li>
+        <li>两种启动模式的实测差异（不是听别人说）</li>
+        <li>一颗能自己控制的灯，和一次真正跑通的网络</li>
+        <li>一张写着自己板子参数的记录表，以后排障直接用</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">1.8.1</span>准备：四样东西</h2>
+    <table>
+      <thead><tr><th>东西</th><th>要求</th><th>常见替代</th><th>没有会怎样</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">电源</td><td>5V/2A 独立电源，接口与板匹配</td><td>质量好的 USB 适配器 + 短粗线</td><td>启动瞬间掉压，随机重启</td></tr>
+        <tr><td class="nm">USB-TTL</td><td>CH340/CP2102 均可，3.3V 电平</td><td>板载 USB 转串口（很多板自带）</td><td>没有对话通道，全靠猜</td></tr>
+        <tr><td class="nm">TF 卡</td><td>8–32GB，FAT32</td><td>U 盘（若板支持）</td><td>只能玩 eMMC 里的系统</td></tr>
+        <tr><td class="nm">网线</td><td>普通网线 + 能上网的路由器</td><td>USB 网卡（不推荐）</td><td>联网实验做不了</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="n">1.8.2</span>六件事，逐条带验收</h2>
+
+    <h3><span class="n">①</span>认电源：量三个点</h3>
+    <ol class="steps">
+      <li>把万用表调到直流 20V 档，黑笔接板子 GND（螺丝孔或排针 GND）。</li>
+      <li>红笔量 5V 输入：应 ≥4.9V。低于 4.8V，换电源或换线。</li>
+      <li>量 3.3V 测试点（很多板有标注）：应 3.2–3.4V。</li>
+      <li>如果板上有 1.35V 测试点，量它：应 1.30–1.40V。</li>
+      <li>记下三个数值，写在纸上。</li>
+    </ol>
+    <p><b>验收：</b>三个数都在范围内，且上电瞬间 5V 不低于 4.5V。</p>
+
+<h3><span class="n">②</span>接串口：看到第一行字</h3>
+    <ol class="steps">
+      <li>接线：USB-TTL 的 <b>GND → 板 GND</b>，<b>TXD → 板 RXD</b>，<b>RXD → 板 TXD</b>（交叉！）。</li>
+      <li>PC 上装驱动，确认出现 <code>/dev/ttyUSB0</code>（Linux）或 COMx（Windows）。</li>
+      <li>打开串口终端：<code>picocom -b 115200 /dev/ttyUSB0</code>（或 minicom、PuTTY）。</li>
+      <li>上电，观察输出。正常应看到 <code>U-Boot SPL</code> 或板厂 logo。</li>
+    </ol>
+<pre><code># 一次完整的记录（Linux）
+sudo picocom -b 115200 /dev/ttyUSB0 | tee boot-$(date +%m%d-%H%M).log
+# 退出：Ctrl+A 然后 Ctrl+X</code></pre>
+    <p><b>验收：</b>串口里出现可读文字，且日志已存成文件。</p>
+
+    <h3><span class="n">③</span>玩拨码：两种模式对比</h3>
+    <ol class="steps">
+      <li>拍照记下当前拨码位置，上电，抄下第一行（如 <code>Trying to boot from MMC2</code>）。</li>
+      <li>断电，拨到另一档（如 TF 卡模式），插一张做过镜像的卡，上电，再抄第一行。</li>
+      <li>拔掉卡，保持这一档再上电，看它报什么错（通常会提示找不到卡）。</li>
+      <li>拨回原位置，确认系统恢复。</li>
+    </ol>
+    <p><b>验收：</b>你能说出「两个档位分别打印了哪行字」，并且知道错误长什么样。</p>
+
+    <h3><span class="n">④</span>认存储：容量对得上</h3>
+<pre><code># 进系统后
+lsblk                              # 看 eMMC / TF 的分区
+cat /proc/meminfo | head -3        # MemTotal 应接近 512MB（约 490000 kB）
+dmesg | grep -i mmc                # 看识别过程与速度模式
+cat /sys/block/mmcblk0/size        # 块数 × 512 = 字节</code></pre>
+    <p><b>验收：</b>内存、eMMC 容量与丝印一致；<code>dmesg</code> 里能看到卡/芯片的识别记录。</p>
+
+    <h3><span class="n">⑤</span>点一个灯：从用户空间控制 GPIO</h3>
+    <p>用 sysfs 最省事（老内核）或 <code>gpioset</code>（新内核 libgpiod）：</p>
+<pre><code># 方式 A：sysfs（内核 &lt; 4.x 常见）
+echo 3 &gt; /sys/class/gpio/export          # 假设用 GPIO1_IO03 → 编号 3
+echo out &gt; /sys/class/gpio/gpio3/direction
+echo 1 &gt; /sys/class/gpio/gpio3/value     # 亮
+echo 0 &gt; /sys/class/gpio/gpio3/value     # 灭
+
+# 方式 B：libgpiod（新内核）
+gpioinfo | grep -i led
+gpioset gpiochip1 3=1                   # 置高</code></pre>
+    <p><b>注意：</b>编号不是随便猜的——GPIO1_IO03 在多数 i.MX 内核里是「组内编号」，而 sysfs 的全局编号 = 组基数 + 组内号，先 <code>gpioinfo</code> 或 <code>cat /sys/kernel/debug/gpio</code> 确认。</p>
+    <p><b>验收：</b>灯真的亮了/灭了，且用万用表能在排针上量到电平变化。</p>
+
+    <h3><span class="n">⑥</span>插一次网线：从 ping 通到能上网</h3>
+<pre><code>ip link                              # 看 eth0/eth1 是否存在
+ip addr add 192.168.1.50/24 dev eth0 # 静态 IP（按你的网段改）
+ip link set eth0 up
+ping -c 3 192.168.1.1                # 网关通不通
+ip route add default via 192.168.1.1
+echo "nameserver 223.5.5.5" &gt; /etc/resolv.conf
+ping -c 3 www.baidu.com              # 域名能解析才算真通</code></pre>
+    <p><b>验收：</b>网关与域名都能 ping 通；<code>ethtool eth0</code> 显示 link detected: yes。</p>
+
+    <div class="demo">
+      <div class="dh"><b>清单打卡</b><span>勾完六项，进度会记在这台机器上</span></div>
+      <div class="db">
+        <div id="list"></div>
+        <div style="margin-top:12px;display:flex;align-items:center;gap:12px">
+          <div style="flex:1;height:8px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden">
+            <div id="bar" style="height:100%;width:0;background:linear-gradient(90deg,#5ff1ef,#8b7bff);transition:width .25s"></div>
+          </div>
+          <span id="pct" style="font:600 12px/1 ui-monospace,monospace;color:#8fa3c4">0 / 6</span>
+        </div>
+      </div>
+    </div>
+
+    <h2><span class="n">1.8.3</span>做完之后：把结果变成资产</h2>
+    <p>很多人做完就完了，下一次换板子又从零开始。建议把这次的结果整理成一页纸：</p>
+    <ul>
+      <li><b>板子参数：</b>型号、SoC 丝印、DDR 容量、eMMC 容量、串口位置、拨码组合。</li>
+      <li><b>三条命令输出：</b><code>lsblk</code>、<code>/proc/meminfo</code>、<code>dmesg | grep -i mmc</code> 的首几行。</li>
+      <li><b>遇到的坑：</b>例如「USB 线是充电线」「拨码在 TF 档」，一条一句。</li>
+    </ul>
+    <p>这张纸以后会救你很多次——尤其是换板子、换系统、给别人演示的时候。</p>
+
+    <div class="box tip">
+      <h5>下一步读哪儿</h5>
+      <p>硬件这层通了，往三个方向走都行：<b>系统层</b>去 <a href="../juan/j00.html">卷 00 · 起步与实验台</a> 搭交叉编译环境；<b>原理层</b>去 <a href="../ref/index.html">参考卷</a> 看 T 系列的 Linux 内核机制；<b>动手层</b>去 <a href="../asm/index.html">手写汇编</a> 从 mov 写到点灯，把「寄存器」这件事彻底搞懂。</p>
+    </div>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>为什么串口要 TX 接 RX、RX 接 TX？</summary><div class="ans">串口是「单向发送 + 单向接收」的两根线：A 的发送端只输出，必须接到 B 的接收端才能被读到。接成 TX→TX 两边都在说话、没人听，表现就是「完全没输出」或「只有乱码」。</div></details>
+    <details class="quiz"><summary>sysfs 的 GPIO 编号为什么不能直接用 GPIO1_IO03 的 3？</summary><div class="ans">因为 sysfs 用的是<b>全局编号</b>：全局号 = 控制器基号 + 组内偏移。<code>GPIO1_IO03</code> 的组内偏移是 3，但基号由内核分配（可能很远）。所以要先 <code>gpioinfo</code> 或 <code>/sys/kernel/debug/gpio</code> 查到真实编号。</div></details>
+    <details class="quiz"><summary>ping 通网关但 ping 不通域名，缺什么？</summary><div class="ans">缺 <b>DNS</b>。IP 层已通（网关可达），是域名解析没配：写 <code>/etc/resolv.conf</code>，或用 <code>nslookup</code> 验证解析器。这也说明「能上网」= 链路 + 路由 + DNS 三件事都成立。</div></details>
+
+    <div class="ch-nav">
+      <a href="ch07.html"><span>上一章</span><b>← 1.7 硬件故障对照</b></a>
+      <a class="nx" href="../juan/j00.html"><span>下一篇</span><b>卷 00 · 起步与实验台 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  var T=[
+    {k:'pwr',t:'① 认电源',s:'5V / 3.3V / 1.35V 三处实测，数值在范围内'},
+    {k:'uart',t:'② 接串口',s:'上电能看到可读文字，日志已存盘'},
+    {k:'boot',t:'③ 玩拨码',s:'两种档位各上电一次，能说出打印差异'},
+    {k:'mem',t:'④ 认存储',s:'内存与 eMMC 容量对得上丝印'},
+    {k:'gpio',t:'⑤ 点一个灯',s:'灯真的亮灭，排针上量到电平变化'},
+    {k:'net',t:'⑥ 插一次网线',s:'网关与域名都能 ping 通'}
+  ];
+  var KEY='imx6ull.hw.checklist.v1';
+  var done={};
+  try{ done=JSON.parse(localStorage.getItem(KEY)||'{}') }catch(e){ done={} }
+  var box=document.getElementById('list');
+  box.innerHTML=T.map(function(x){
+    return '<label style="display:flex;gap:11px;align-items:flex-start;padding:11px 13px;margin:0 0 8px;border:1px solid rgba(120,150,200,.22);border-radius:10px;background:rgba(255,255,255,.03);cursor:pointer">'+
+      '<input type="checkbox" data-k="'+x.k+'" style="margin-top:3px;accent-color:#5ff1ef">'+
+      '<span><b style="font-size:13.5px;color:#eaf3ff">'+x.t+'</b><br><span style="font-size:12.5px;color:#9fb0c7">'+x.s+'</span></span></label>';
+  }).join('');
+  function sync(){
+    var n=0;
+    Array.prototype.forEach.call(box.querySelectorAll('input'),function(i){
+      i.checked=!!done[i.dataset.k]; if(i.checked) n++;
+      var lab=i.closest('label');
+      lab.style.borderColor=i.checked?'rgba(95,241,239,.5)':'rgba(120,150,200,.22)';
+      lab.style.background=i.checked?'rgba(95,241,239,.08)':'rgba(255,255,255,.03)';
+    });
+    document.getElementById('bar').style.width=(n/T.length*100)+'%';
+    document.getElementById('pct').textContent=n+' / '+T.length;
+  }
+  box.addEventListener('change',function(e){
+    var i=e.target; if(!i.dataset.k) return;
+    done[i.dataset.k]=i.checked;
+    try{ localStorage.setItem(KEY,JSON.stringify(done)) }catch(err){}
+    sync();
+  });
+  sync();
+})();
+</script>
+</body>
+</html>

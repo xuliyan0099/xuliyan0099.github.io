@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1.4 上电到 shell：五段路 | 硬件篇 | i.MX6ULL 学习手册</title>
+<meta name="description" content="从按下电源到出现登录提示符：电源时序、Boot ROM、SPL/u-boot、内核、用户空间五段路，每段的串口输出与卡点诊断。">
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">硬件篇 · 这块板子</div>
+    <ol>
+      <li><a href="ch01.html"><span class="no">1.1</span><span>这块板子是什么<span class="sub">五块拼图</span></span></a></li>
+      <li><a href="ch02.html"><span class="no">1.2</span><span>板子地图<span class="sub">认元件、看丝印</span></span></a></li>
+      <li><a href="ch03.html"><span class="no">1.3</span><span>SoC 里面有什么<span class="sub">Cortex-A7 与外设</span></span></a></li>
+      <li><a href="ch04.html" class="active"><span class="no">1.4</span><span>上电到 shell<span class="sub">五段路</span></span></a></li>
+      <li><a href="ch05.html"><span class="no">1.5</span><span>三种启动方式<span class="sub">拨码与 eFuse</span></span></a></li>
+      <li><a href="ch06.html"><span class="no">1.6</span><span>引脚复用<span class="sub">一个脚八个身份</span></span></a></li>
+      <li><a href="ch07.html"><span class="no">1.7</span><span>硬件故障对照<span class="sub">现象倒查</span></span></a></li>
+      <li><a href="ch08.html"><span class="no">1.8</span><span>上手清单<span class="sub">今天就能做</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="ch03.html">← 上一章</a><a href="ch05.html">下一章 →</a></div>
+  </aside>
+
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第一篇 · 硬件</span><span class="sep">/</span>第 4 章<span class="sep">/</span>约 30 分钟</div>
+    <h1>上电到 shell：五段路</h1>
+    <p class="lede">按下电源到你能在串口敲命令，中间是一条固定的接力链：电源 → Boot ROM → u-boot → 内核 → 用户空间。每段交接都会在串口留一行字。<b>学会读这条「进度条」，排障就从猜变成定位。</b></p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>画出五段路，并说出每段「谁在跑、代码从哪来、跑在哪个地址」</li>
+        <li>看懂串口输出，凭最后一行判断断在第几段</li>
+        <li>解释 SPL 与 u-boot 的关系，以及为什么 DDR 必须先被初始化</li>
+        <li>知道内核 panic 的常见原因里，哪些其实是硬件/参数问题</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">1.4.1</span>五段路总览</h2>
+    <p>先给结论：<b>这段路上，代码执行的位置从「片内 ROM」→「片内 SRAM」→「DDR」，控制权从「硬件固化逻辑」→「u-boot」→「内核」→「init 进程」。</b>理解这三步搬迁，就理解了整个启动。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 900 330" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <!-- 时间轴 -->
+        <line x1="40" y1="252" x2="860" y2="252" stroke="#3a4560" stroke-width="1.4"/>
+        <text x="40" y="286" fill="#6f7f9c" font-size="10.5">t=0 上电</text>
+        <text x="830" y="286" fill="#6f7f9c" font-size="10.5">login:</text>
+
+        <!-- 段 1 -->
+        <rect x="40" y="120" width="130" height="104" rx="9" fill="rgba(255,184,77,.1)" stroke="#ffb84d"/>
+        <text x="105" y="144" fill="#ffd79a" font-size="11.5" text-anchor="middle" font-weight="bold">① 电源</text>
+        <text x="105" y="164" fill="#9fb0c7" font-size="10.5" text-anchor="middle">5V → 3.3/1.35/1.2V</text>
+        <text x="105" y="182" fill="#9fb0c7" font-size="10.5" text-anchor="middle">24MHz 起振</text>
+        <text x="105" y="200" fill="#9fb0c7" font-size="10.5" text-anchor="middle">复位释放</text>
+        <text x="105" y="216" fill="#6f7f9c" font-size="9.5" text-anchor="middle">毫秒级</text>
+        <rect x="40" y="244" width="130" height="16" rx="6" fill="#ffb84d" opacity=".5"/>
+
+        <!-- 段 2 -->
+        <rect x="196" y="90" width="150" height="134" rx="9" fill="rgba(95,241,239,.1)" stroke="#5ff1ef"/>
+        <text x="271" y="114" fill="#9df5f4" font-size="11.5" text-anchor="middle" font-weight="bold">② Boot ROM</text>
+        <text x="271" y="134" fill="#9fb0c7" font-size="10.5" text-anchor="middle">片内固化，不可改</text>
+        <text x="271" y="152" fill="#9fb0c7" font-size="10.5" text-anchor="middle">读拨码/eFuse</text>
+        <text x="271" y="170" fill="#9fb0c7" font-size="10.5" text-anchor="middle">找存储里的镜像</text>
+        <text x="271" y="188" fill="#9fb0c7" font-size="10.5" text-anchor="middle">校验 IVT，跳到 SPL</text>
+        <text x="271" y="212" fill="#6f7f9c" font-size="9.5" text-anchor="middle">地址 0x0000_0000</text>
+        <rect x="196" y="240" width="150" height="20" rx="6" fill="#5ff1ef" opacity=".5"/>
+
+        <!-- 段 3 -->
+        <rect x="372" y="60" width="170" height="164" rx="9" fill="rgba(139,123,255,.1)" stroke="#8b7bff"/>
+        <text x="457" y="84" fill="#c9b8ff" font-size="11.5" text-anchor="middle" font-weight="bold">③ SPL / u-boot</text>
+        <text x="457" y="104" fill="#9fb0c7" font-size="10.5" text-anchor="middle">SPL 在 SRAM 里初始化 DDR</text>
+        <text x="457" y="122" fill="#9fb0c7" font-size="10.5" text-anchor="middle">把完整 u-boot 搬进 DDR</text>
+        <text x="457" y="140" fill="#9fb0c7" font-size="10.5" text-anchor="middle">初始化时钟、串口、存储</text>
+        <text x="457" y="158" fill="#9fb0c7" font-size="10.5" text-anchor="middle">读内核与设备树</text>
+        <text x="457" y="176" fill="#9fb0c7" font-size="10.5" text-anchor="middle">启动参数 bootargs</text>
+        <text x="457" y="200" fill="#6f7f9c" font-size="9.5" text-anchor="middle">串口开始有输出</text>
+        <rect x="372" y="236" width="170" height="24" rx="6" fill="#8b7bff" opacity=".5"/>
+
+        <!-- 段 4 -->
+        <rect x="568" y="80" width="140" height="144" rx="9" fill="rgba(92,225,160,.1)" stroke="#5ce1a0"/>
+        <text x="638" y="104" fill="#9df3c2" font-size="11.5" text-anchor="middle" font-weight="bold">④ 内核</text>
+        <text x="638" y="124" fill="#9fb0c7" font-size="10.5" text-anchor="middle">自解压到 DDR</text>
+        <text x="638" y="142" fill="#9fb0c7" font-size="10.5" text-anchor="middle">打开 MMU、接管中断</text>
+        <text x="638" y="160" fill="#9fb0c7" font-size="10.5" text-anchor="middle">解析设备树、probe 驱动</text>
+        <text x="638" y="178" fill="#9fb0c7" font-size="10.5" text-anchor="middle">挂载根文件系统</text>
+        <text x="638" y="200" fill="#6f7f9c" font-size="9.5" text-anchor="middle">Linux version …</text>
+        <rect x="568" y="232" width="140" height="28" rx="6" fill="#5ce1a0" opacity=".5"/>
+
+        <!-- 段 5 -->
+        <rect x="734" y="108" width="126" height="116" rx="9" fill="rgba(255,156,156,.1)" stroke="#ff9c9c"/>
+        <text x="797" y="132" fill="#ffc0c0" font-size="11.5" text-anchor="middle" font-weight="bold">⑤ 用户空间</text>
+        <text x="797" y="152" fill="#9fb0c7" font-size="10.5" text-anchor="middle">启动 init</text>
+        <text x="797" y="170" fill="#9fb0c7" font-size="10.5" text-anchor="middle">起服务、挂文件系统</text>
+        <text x="797" y="188" fill="#9fb0c7" font-size="10.5" text-anchor="middle">给你 login 提示符</text>
+        <text x="797" y="208" fill="#6f7f9c" font-size="9.5" text-anchor="middle">busybox init</text>
+        <rect x="734" y="226" width="126" height="34" rx="6" fill="#ff9c9c" opacity=".5"/>
+
+        <!-- 交接箭头 -->
+        <text x="170" y="270" fill="#8fa3c4" font-size="10">移交控制</text>
+      </svg>
+      <figcaption><b>图 1-4</b>　五段路与代码执行位置。横轴是时间，纵轴是「跑在哪儿」——从片内 ROM 到 SRAM，再到 DDR，最后一次搬到用户空间。</figcaption>
+    </figure>
+
+    <h2><span class="n">1.4.2</span>① 电源：最容易被忽略的第一段</h2>
+    <p>按下电源那一刻，板上发生的是有顺序的电气事件，不是「一瞬间全亮」：</p>
+    <ol class="steps">
+      <li><b>5V 就位。</b>DC 座或 USB 供电进入，经过保险、滤波电容，电压稳定在 5V 附近。</li>
+      <li><b>3.3V 起来。</b>第一级 DC-DC 输出，供电给 IO、外设、存储。</li>
+      <li><b>DDR 电压起来（1.35V）。</b>顺序不能反：DDR 供电晚于 IO，SoC 可能锁在异常态。</li>
+      <li><b>内核电压起来（约 1.2V）。</b>有些板子由 PMIC 按固定时序给出。</li>
+      <li><b>复位释放。</b>RESET 脚从低变高，CPU 从 0x00000000 取第一条指令。</li>
+    </ol>
+    <p>这一段没有串口输出，也没有任何提示。<b>所以「一点反应都没有」时，唯一能做的就是拿万用表量电压、看电流。</b>一个实用技巧：把万用表接在 5V 上，眼睛盯表同时按电源键——如果电压瞬间跌到 4.3V 以下再回升，说明供电带载不足或有大电容短路。</p>
+
+    <div class="box pit">
+      <h5>电源段最常见的三个坑</h5>
+      <p><b>USB 口供电。</b>标称 5V/0.5A，启动瞬间不够，表现为「灯闪一下就灭」。</p>
+      <p><b>电源线太细/太长。</b>电阻压降，表上看着 5V，进板只剩 4.5V。</p>
+      <p><b>用万用表量「平均电压」。</b>要盯上电瞬间的最低点，平均值会骗人。</p>
+    </div>
+
+    <h2><span class="n">1.4.3</span>② Boot ROM：芯片自己做的第一件事</h2>
+    <p>i.MX6ULL 片内有一段只读代码（Boot ROM），出厂固化了启动逻辑，改不了。它做的事很朴素：</p>
+    <ol class="steps">
+      <li>读 BOOT_MODE 引脚 / eFuse，决定从哪个介质启动（eMMC、TF、USB、NAND，见下一章）。</li>
+      <li>初始化对应的存储控制器（SD1/SD2/NAND 等）到能读第一个扇区的程度。</li>
+      <li>读出镜像头（IVT），校验长度、加载地址、入口地址。</li>
+      <li>把镜像搬到片内 SRAM（或直接 DDR，视镜像而定），跳转执行。</li>
+    </ol>
+    <p><b>关键认知：这一刻 DDR 还不能用。</b>所以被 Boot ROM 加载的第一段程序（通常是 SPL）必须小到能装进片内 SRAM（i.MX6ULL 约 128KB 的 OCRAM 可用），它的唯一使命就是「把 DDR 初始化好」。</p>
+    <p>Boot ROM 期间的串口输出极少，多数板子在 USB 下载模式下才有一行 ROM 提示。所以这一段「沉默」是正常的，不要因为没输出就判定板子坏了。</p>
+
+    <h2><span class="n">1.4.4</span>③ SPL 与 u-boot：真正开始说话</p>
+    <p>SPL（Secondary Program Loader）是 u-boot 编译出来的「精简版」，只做一件事：<b>按板子的 DDR 参数把内存初始化好，然后把完整 u-boot 搬进 DDR 并跳过去。</b>从这里开始，串口才有输出，你才算「能听见板子说话」。</p>
+    <p>完整 u-boot 干的事就多了：配置时钟树、初始化串口、识别存储、读环境变量、读内核与设备树、组装启动参数（<code>bootargs</code>），最后 <code>bootm</code> 跳进内核。</p>
+    <p>典型串口输出（各家板厂文字略有差异）：</p>
+<pre><code>U-Boot SPL 2018.03 (Oct 11 2023 - 09:12:33 +0800)
+DRAM:  512 MiB
+Trying to boot from MMC2
+
+U-Boot 2018.03 (Oct 11 2023 - 09:12:33 +0800)
+
+CPU:   Freescale i.MX6ULL rev1.1 528 MHz (running at 396 MHz)
+Model: i.MX6ULL 14x14 EVK Board
+DRAM:  512 MiB
+MMC:   FSL_SDHC: 0, FSL_SDHC: 1
+In:    serial
+Out:   serial
+Err:   serial
+Net:   FEC0
+Hit any key to stop autoboot:  0
+Booting from mmc ...
+## Booting kernel from Legacy Image at 80800000 ...
+   Loading Kernel Image ... OK
+## Flattened Device Tree blob at 83000000
+   Booting using the fdt blob at 0x83000000
+   Starting kernel ...</code></pre>
+    <p>读这段输出的方法：<b>看到 <code>DRAM: 512 MiB</code> 说明 DDR 初始化成功</b>（SPL 过了）；<b>看到 <code>Starting kernel ...</code> 说明 u-boot 已把控制权交给内核</b>（u-boot 过了）。这行字之后如果没有任何输出，问题一定在内核侧，而不是电源或存储。</p>
+
+    <h2><span class="n">1.4.5</span>④ 内核：接管一切</h2>
+    <p>内核进来先把自己解压（zImage 是压缩的，自解压代码在头部），然后：打开 MMU、建立页表、接管中断、解析设备树、probe 各驱动、挂载根文件系统、启动 init。</p>
+    <p>这里的卡点非常典型：</p>
+    <table>
+      <thead><tr><th>串口最后一行</th><th>说明</th><th>先查</th></tr></thead>
+      <tbody>
+        <tr><td class="nm"><code>Starting kernel ...</code> 后无输出</td><td>内核没跑起来，或串口没被内核接管</td><td>内核镜像是否匹配板型、设备树是否对、内核里的 earlycon 参数</td></tr>
+        <tr><td class="nm"><code>Uncompressing Linux...</code> 后卡住</td><td>解压或 DDR 访问异常</td><td>DDR 时序、内核加载地址、镜像完整性</td></tr>
+        <tr><td class="nm"><code>Unable to mount root fs</code></td><td>根文件系统找不到</td><td><code>bootargs</code> 里的 <code>root=</code> 设备名、分区是否存在、文件系统类型</td></tr>
+        <tr><td class="nm"><code>Kernel panic - not syncing: VFS...</code></td><td>同上，且已判定放弃</td><td>同上；另外查 eMMC/TF 是否真被识别</td></tr>
+        <tr><td class="nm"><code>mmc0: error -110</code></td><td>SD 通信超时</td><td>卡质量、卡座供电、pin 复用、<code>bus-width</code></td></tr>
+      </tbody>
+    </table>
+
+    <div class="box deep">
+      <h5>为什么「Starting kernel」之后可能是「完全没输出」</h5>
+      <p>因为内核启动时会重新初始化串口，而它的串口配置来自设备树（<code>chosen/stdout-path</code>）与内核自己的驱动。如果设备树里的调试串口写错、或者内核根本没编进这个 UART 的驱动，就会出现「u-boot 能打印、内核一声不吭」的经典现象。排查时先用 <code>earlycon</code> 参数强行打开早期控制台，能立刻区分是「内核没跑」还是「内核跑了但没话说」。</p>
+    </div>
+
+    <h2><span class="n">1.4.6</span>⑤ 用户空间：从 init 到 login</h2>
+    <p>内核完成初始化后，会执行 <code>init</code>（BusyBox、systemd 或自写脚本）。它负责挂载其余分区、启动服务、拉起 <code>getty</code>（就是给你 login 提示符的那个程序）。这一段出问题，表现是「内核日志刷完，但始终没有 login」：</p>
+    <ol class="steps">
+      <li><b>根文件系统不完整。</b>缺 <code>/sbin/init</code> 或权限不对 → <code>Kernel panic: No init found</code>。</li>
+      <li><b>init 脚本语法错。</b>卡在某个服务，无 login；串口还能按回车看到反应。</li>
+      <li><b>串口 getty 没配。</b>系统起来了但没在 UART1 上开登录 → 换个串口或看 <code>/etc/inittab</code>。</li>
+    </ol>
+
+    <div class="demo">
+      <div class="dh"><b>五段路诊断器</b><span>选一个「串口最后一行」，看断在哪、先查什么</span></div>
+      <div class="db">
+        <div id="stops" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        <div id="stopOut" style="margin-top:14px;padding:13px 15px;border-radius:11px;border:1px solid rgba(120,150,200,.22);background:rgba(255,255,255,.02);font-size:13.5px;line-height:1.85;color:#cfdcf7;min-height:120px"></div>
+      </div>
+    </div>
+
+    <div class="box tip">
+      <h5>一条排障心法</h5>
+      <p><b>串口是唯一可靠的时间戳。</b>没有输出 = 前三段（电源/ROM/u-boot）；有 u-boot 没内核 = 存储或镜像/设备树；有内核日志但没 login = 根文件系统或 init。<b>永远先问「最后一行是什么」，再决定动哪里。</b></p>
+    </div>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>为什么 SPL 必须很小，而 u-boot 可以很大？</summary><div class="ans">因为 SPL 运行在 DDR 初始化<b>之前</b>，只能待在片内 SRAM（i.MX6ULL 约百 KB 级）；u-boot 是 SPL 初始化完 DDR 之后才被搬进 DDR 运行的，所以不受这个限制。这也是为什么 SPL 只能做「初始化内存 + 搬运」这类最小工作。</div></details>
+    <details class="quiz"><summary>串口停在 <code>Starting kernel ...</code>，你会怎么判断是内核问题而不是硬件问题？</summary><div class="ans">因为这一行是 u-boot 打印的，说明电源、DDR、存储、加载全部成功——硬件链路已经通了。<b>之后的沉默属于内核侧</b>：镜像不匹配、设备树串口配错、earlycon 没开、内核卡在解压。可以用 <code>earlycon</code> 或不带设备树的最小启动来二分。</div></details>
+    <details class="quiz"><summary>为什么有的板子「u-boot 有输出，内核完全没有」？</summary><div class="ans">最常见是设备树里 <code>stdout-path</code> 指向的串口与实际接线不一致，或者内核没编进该 UART 驱动。u-boot 用的是自己写死的串口配置，不受设备树影响，所以能打印。这也是「u-boot 正常、内核哑巴」这个经典现象的来源。</div></details>
+
+    <div class="ch-nav">
+      <a href="ch03.html"><span>上一章</span><b>← 1.3 SoC 里面有什么</b></a>
+      <a class="nx" href="ch05.html"><span>下一章</span><b>1.5 三种启动方式 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  var S=[
+    {k:'none',n:'完全没有输出',t:'断在第 ①/②/③ 段',d:'电源没到位、启动配置错、或串口本身不通。',c:'先量 5V/3.3V；再看拨码是否指向有系统的介质；最后查 TX/RX 与 GND、波特率。'},
+    {k:'spl',n:'只有 U-Boot SPL 一行',t:'可能在 ③ 段中途',d:'SPL 起来了，但加载完整 u-boot 失败，或 DDR 初始化后卡住。',c:'看 DRAM 是否打印；换启动介质；检查镜像完整性；用官方镜像对比。'},
+    {k:'uboot',n:'u-boot 起来但没内核',t:'断在 ③→④ 的交接',d:'存储里找不到内核/设备树，或加载地址错、镜像损坏。',c:'mmc list / fatls 看文件在不在；核对 bootcmd 的加载地址；重新烧录内核与 dtb。'},
+    {k:'kernel',n:'Starting kernel 之后无输出',t:'断在 ④ 段',d:'内核没跑起来，或跑起来了但没串口输出。',c:'设备树 stdout-path、earlycon 参数、内核是否匹配板型；换官方 dtb 复测。'},
+    {k:'panic',n:'Kernel panic: Unable to mount root fs',t:'断在 ④ 末尾',d:'根文件系统找不到或分区不对。',c:'bootargs 的 root= 与分区号；文件系统类型；eMMC/TF 是否识别（mmc info）。'},
+    {k:'nologin',n:'日志刷完但没有 login',t:'断在 ⑤ 段',d:'根文件系统不完整，或 init/getty 没配到 UART1。',c:'查 /sbin/init 是否存在；/etc/inittab 的 getty 行；用 rootfs 里自带的串口登录配置。'}
+  ];
+  var b=document.getElementById('stops'), o=document.getElementById('stopOut');
+  b.innerHTML=S.map(function(s){return '<button data-k="'+s.k+'" style="cursor:pointer;padding:9px 12px;border-radius:9px;border:1px solid rgba(120,150,200,.26);background:rgba(255,255,255,.04);color:#cfdcf7;font-size:12.5px">'+s.n+'</button>'}).join('');
+  function show(k){
+    var s=S.filter(function(x){return x.k===k})[0];
+    o.innerHTML='<b style="color:#eaf3ff">'+s.t+'</b><br>'+s.d+'<br><span style="color:#9df3c2">先查：</span>'+s.c;
+    Array.prototype.forEach.call(b.querySelectorAll('button'),function(x){
+      var on=x.dataset.k===k; x.style.borderColor=on?'#5ff1ef':'rgba(120,150,200,.26)'; x.style.background=on?'rgba(95,241,239,.12)':'rgba(255,255,255,.04)';
+    });
+  }
+  b.addEventListener('click',function(e){var x=e.target.closest('button[data-k]'); if(x) show(x.dataset.k)});
+  show('none');
+})();
+</script>
+</body>
+</html>

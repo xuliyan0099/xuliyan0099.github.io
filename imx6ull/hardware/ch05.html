@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1.5 三种启动方式 | 硬件篇 | i.MX6ULL 学习手册</title>
+<meta name="description" content="i.MX6ULL 的启动介质选择：BOOT_MODE 拨码与 eFuse、eMMC / TF / USB 下载三条路径、Boot ROM 的读取顺序与救砖方法。">
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">硬件篇 · 这块板子</div>
+    <ol>
+      <li><a href="ch01.html"><span class="no">1.1</span><span>这块板子是什么<span class="sub">五块拼图</span></span></a></li>
+      <li><a href="ch02.html"><span class="no">1.2</span><span>板子地图<span class="sub">认元件、看丝印</span></span></a></li>
+      <li><a href="ch03.html"><span class="no">1.3</span><span>SoC 里面有什么<span class="sub">Cortex-A7 与外设</span></span></a></li>
+      <li><a href="ch04.html"><span class="no">1.4</span><span>上电到 shell<span class="sub">五段路</span></span></a></li>
+      <li><a href="ch05.html" class="active"><span class="no">1.5</span><span>三种启动方式<span class="sub">拨码与 eFuse</span></span></a></li>
+      <li><a href="ch06.html"><span class="no">1.6</span><span>引脚复用<span class="sub">一个脚八个身份</span></span></a></li>
+      <li><a href="ch07.html"><span class="no">1.7</span><span>硬件故障对照<span class="sub">现象倒查</span></span></a></li>
+      <li><a href="ch08.html"><span class="no">1.8</span><span>上手清单<span class="sub">今天就能做</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="ch04.html">← 上一章</a><a href="ch06.html">下一章 →</a></div>
+  </aside>
+
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第一篇 · 硬件</span><span class="sep">/</span>第 5 章<span class="sep">/</span>约 25 分钟</div>
+    <h1>三种启动方式</h1>
+    <p class="lede">同一块板子，上电时从哪儿读系统是<b>可以被引脚和熔丝决定的</b>。这解释了 90% 的「我烧好了却起不来」：不是你烧错了，是它压根没去读你烧的那块存储。这一章讲清三条路、怎么切、切换失败的排查。</p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>说出 BOOT_MODE 拨码与 eFuse 的关系，以及谁优先级更高</li>
+        <li>画出 Boot ROM 的决策流程，知道它为每种介质做了什么准备</li>
+        <li>解释「USB 下载模式」为什么能救砖，它绕过了哪一步</li>
+        <li>自己完成一次「改拨码 → 从 TF 卡启动」并验证</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">1.5.1</span>决策发生在毫秒之内</h2>
+    <p>上电后复位释放的那一瞬，Boot ROM 读两个 BOOT_MODE 引脚的电平，决定走哪条路。这就是为什么很多板子的拨码只有 2 位——它只需要表达 4 种组合：内部启动、串行下载、SD 卡、NAND/eMMC（具体映射各家板厂略有差别）。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 900 420" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="330" y="20" width="240" height="58" rx="10" fill="rgba(95,241,239,.1)" stroke="#5ff1ef"/>
+        <text x="450" y="44" fill="#9df5f4" font-size="12.5" text-anchor="middle">复位释放 · Boot ROM 启动</text>
+        <text x="450" y="64" fill="#8fa3c4" font-size="10.5" text-anchor="middle">读 BOOT_MODE0/1 与 eFuse</text>
+
+        <rect x="330" y="104" width="240" height="52" rx="9" fill="#141c2e" stroke="#ffb84d"/>
+        <text x="450" y="126" fill="#ffd79a" font-size="11.5" text-anchor="middle">先看「引脚是否强制」</text>
+        <text x="450" y="144" fill="#8fa3c4" font-size="10.5" text-anchor="middle">BOOT_MODE 引脚 = 最高优先级</text>
+
+        <!-- 三条分支 -->
+        <rect x="60" y="200" width="230" height="112" rx="9" fill="#141c2e" stroke="#8b7bff"/>
+        <text x="76" y="224" fill="#c9b8ff" font-size="11.5">① eMMC / NAND 启动</text>
+        <text x="76" y="244" fill="#9fb0c7" font-size="10.5">Boot ROM 初始化 SD2（eMMC）</text>
+        <text x="76" y="262" fill="#9fb0c7" font-size="10.5">读第一个扇区 → IVT → SPL</text>
+        <text x="76" y="280" fill="#9fb0c7" font-size="10.5">日常使用就拨到这一档</text>
+        <text x="76" y="300" fill="#6f7f9c" font-size="9.5">介质坏了：只能靠 USB 救</text>
+
+        <rect x="330" y="200" width="230" height="112" rx="9" fill="#141c2e" stroke="#5ce1a0"/>
+        <text x="346" y="224" fill="#9df3c2" font-size="11.5">② TF 卡启动</text>
+        <text x="346" y="244" fill="#9fb0c7" font-size="10.5">初始化 SD1，读卡上第一个扇区</text>
+        <text x="346" y="262" fill="#9fb0c7" font-size="10.5">卡里必须有 u-boot（通常整镜像写入）</text>
+        <text x="346" y="280" fill="#9fb0c7" font-size="10.5">试新系统不动 eMMC 的官方姿势</text>
+        <text x="346" y="300" fill="#6f7f9c" font-size="9.5">卡没做对：Card did not respond</text>
+
+        <rect x="604" y="200" width="240" height="112" rx="9" fill="#141c2e" stroke="#ff9c9c"/>
+        <text x="620" y="224" fill="#ffc0c0" font-size="11.5">③ USB 串行下载</text>
+        <text x="620" y="244" fill="#9fb0c7" font-size="10.5">不读任何存储，坐在 USB 上等主机</text>
+        <text x="620" y="262" fill="#9fb0c7" font-size="10.5">主机用 uuu / MFG Tool 下发镜像</text>
+        <text x="620" y="280" fill="#9fb0c7" font-size="10.5">救砖唯一可靠路径</text>
+        <text x="620" y="300" fill="#6f7f9c" font-size="9.5">要装驱动，要能进下载模式</text>
+
+        <line x1="400" y1="156" x2="175" y2="200" stroke="#8b7bff" stroke-width="1.4"/>
+        <line x1="450" y1="156" x2="445" y2="200" stroke="#5ce1a0" stroke-width="1.4"/>
+        <line x1="500" y1="156" x2="724" y2="200" stroke="#ff9c9c" stroke-width="1.4"/>
+
+        <!-- 结果条 -->
+        <rect x="60" y="336" width="784" height="64" rx="9" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="80" y="360" fill="#cfe0f7" font-size="11.5">共同点：Boot ROM 只做「找到第一段镜像 + 校验 + 跳过去」，剩下的（DDR 初始化、加载完整 u-boot）都交给它加载的那段代码</text>
+        <text x="80" y="382" fill="#6f7f9c" font-size="10.5">差别只在于：它去哪里读、读完信不信（IVT 校验/签名）、失败时往哪退</text>
+      </svg>
+      <figcaption><b>图 1-5</b>　Boot ROM 的三条路。三条路后面接的是同一个 SPL→u-boot→内核链，区别只在「第一段镜像从哪儿来」。</figcaption>
+    </figure>
+
+    <h2><span class="n">1.5.2</span>拨码与 eFuse：谁说了算</h2>
+    <p>优先级从高到低：</p>
+    <ol class="steps">
+      <li><b>BOOT_MODE 引脚（拨码）。</b>上电瞬间采样，最高优先级。板子上有两个小开关，通常标 <code>BOOT_MODE0/1</code> 或 <code>1/2</code>。</li>
+      <li><b>eFuse（一次性熔丝）。</b>可以用工具烧写，烧了就改不回来，常用于量产时锁定启动介质。</li>
+      <li><b>默认/回退策略。</b>有的板子配置了「主介质失败自动尝试下一个」，具体看参考手册的 Boot chapter。</li>
+    </ol>
+    <p>结论很简单：<b>拨码优先。</b>所以「我明明烧到 eMMC 了怎么起不来」的第一嫌疑永远是拨码位置，而不是烧录工具。</p>
+
+    <div class="box tip">
+      <h5>一个三十秒的自检动作</h5>
+      <p>上电前先拍照记下拨码位置；两种位置各上电一次，把串口第一行抄下来对比。i.MX6ULL 的 SPL 通常会打印 <code>Trying to boot from MMC1/MMC2</code>，这一行直接告诉你它认为自己在读哪——比猜快得多。</p>
+    </div>
+
+    <h2><span class="n">1.5.3</span>eMMC 启动：日常那一档</h2>
+    <p>Boot ROM 初始化 SD2 控制器，按 eMMC 协议读第一个扇区（通常是 512B 的 MBR 或直接 IVT），找到 IVT，校验，然后把 SPL 搬进 SRAM 执行。这条链路最短、最快，也是日常使用的默认。</p>
+    <p>注意两个细节：</p>
+    <ul>
+      <li>eMMC 有自己的分区结构（boot 区、user 区），有些板厂把 u-boot 写到 boot 区，有些写到 user 区起始位置。烧录时用板厂给的工具或 <code>dd</code> 的确切偏移，别自己估。</li>
+      <li>eMMC 的 <code>VCCQ</code>（IO 电压）常是 3.3V 或 1.8V，配错会识别不到或读错——这就属于第 2 章的「电源脚」检查。</li>
+    </ul>
+
+    <h2><span class="n">1.5.4</span>TF 卡启动：最安全的试验场</h2>
+    <p>因为 TF 卡可以整机启动，你可以把新系统写到卡上，完全不动 eMMC 里的正式系统；出问题拔卡就行。<b>这是学习阶段最该用的方式。</b></p>
+    <p>要让卡能启动，必须满足：</p>
+    <ol class="steps">
+      <li>卡上写入完整的启动镜像（通常包含 SPL、u-boot、内核、设备树、根文件系统，或至少前两段）。</li>
+      <li>分区表与偏移符合板厂约定（很多教程用 <code>dd</code> 把 u-boot 写到卡起始几 MB 的裸区）。</li>
+      <li>卡本身是 FAT32 或板厂要求的格式，且容量与卡座兼容（老卡座对大容量卡兼容性差）。</li>
+    </ol>
+    <p>失败时的典型串口：<code>Card did not respond to voltage select!</code> 或 <code>MMC: no card present</code>——前者多半是卡不兼容/供电，后者是没识别到卡（卡座、复用、<code>detect</code> 脚）。</p>
+
+    <h2><span class="n">1.5.5</span>USB 下载：救砖的最后一道门</h2>
+    <p>当 eMMC 被写坏、系统完全起不来、卡也不灵时，唯一还能救的就是 USB 下载模式。原理是：<b>Boot ROM 不读存储，直接在 USB OTG 上枚举成一个特殊设备，等主机下发镜像。</b>此时 DDR 都还没初始化，所以下发的是「能初始化 DDR 的最小代码 + 后续镜像」。</p>
+    <p>操作流程（以 uuu 为例）：</p>
+<pre><code># 1. 板上拨到 USB 下载模式（BOOT_MODE 组合）
+# 2. 用「数据」线连接 PC 的 USB 口与板的 USB OTG
+# 3. 上电，PC 端应出现 NXP/Freescale 设备（Windows 需装驱动）
+uuu flash.uuu          # 或 MFG Tool 图形界面</code></pre>
+    <p>两个常见失败点：<b>线是充电线</b>（没有数据芯），<b>没进下载模式</b>（拨码不对）。这两个占了失败的绝大多数，别一上来怀疑板子。</p>
+
+    <div class="demo">
+      <div class="dh"><b>切换启动方式</b><span>选一种，看 Boot ROM 与串口的对应行为</span></div>
+      <div class="db">
+        <div id="modes" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        <div id="modeOut" style="margin-top:14px;padding:13px 15px;border-radius:11px;border:1px solid rgba(120,150,200,.22);background:rgba(255,255,255,.02);font-size:13.5px;line-height:1.85;color:#cfdcf7;min-height:140px"></div>
+      </div>
+    </div>
+
+    <h2><span class="n">1.5.6</span>一次完整的切换练习</h2>
+    <ol class="steps">
+      <li>记下当前拨码位置（拍照），确认当前能正常启动，串口第一行是什么。</li>
+      <li>拨到 TF 卡模式，插一张<b>做过启动镜像</b>的卡，上电，抄下第一行。</li>
+      <li>把卡拔掉再上电，观察它是否报「no card」——这一步能确认拨码真的生效了。</li>
+      <li>拨回原位置，确认恢复。整个过程不要动 eMMC。</li>
+    </ol>
+    <p>做完这一次，你对「启动介质」的理解就从文字变成肌肉记忆了。</p>
+
+    <div class="box pit">
+      <h5>三个高频误会</h5>
+      <p><b>「烧录成功」不等于「能启动」。</b>烧录工具常常只写文件，不保证拨码、不保证偏移对。</p>
+      <p><b>「从 TF 卡启动」不等于「卡里只要有内核」。</b>卡上必须有第一段（SPL/u-boot），否则 Boot ROM 找不到可执行的镜像。</p>
+      <p><b>「USB 模式」下串口可能一句话都没有。</b>因为那时还轮不到串口初始化，主要看 PC 端是否枚举到设备。</p>
+    </div>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>拨码与 eFuse 冲突时听谁的？</summary><div class="ans"><b>拨码（BOOT_MODE 引脚）优先。</b>Boot ROM 上电先采样引脚电平；eFuse 是「引脚未明确指定时」才生效的持久配置，且烧写后不可逆，量产时才用。</div></details>
+    <details class="quiz"><summary>为什么 USB 下载能救砖，而 TF 卡启动不一定能？</summary><div class="ans">USB 模式<b>完全不依赖任何板上存储</b>：Boot ROM 直接通过 USB 收镜像，连 DDR 初始化代码都是主机下发的。TF 卡启动仍然要读卡、要卡里的镜像正确，卡或卡座有问题就救不了。</div></details>
+    <details class="quiz"><summary>串口打印 <code>Trying to boot from MMC1</code> 说明什么？</summary><div class="ans">说明 SPL 已经在跑（电源、时钟、SRAM 都正常），并且它**选择去读 SD1**（通常是 TF 卡）。如果你的系统在 eMMC 上，这一行就暴露了拨码错了；如果卡里没镜像，接下来会卡住或报错。</div></details>
+
+    <div class="ch-nav">
+      <a href="ch04.html"><span>上一章</span><b>← 1.4 上电到 shell</b></a>
+      <a class="nx" href="ch06.html"><span>下一章</span><b>1.6 引脚复用 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  var B=[
+    {k:'emmc',n:'eMMC 启动',r:'BOOT_MODE → 内部启动',p:'Boot ROM 初始化 SD2 → 读第一个扇区 → IVT → SPL（SRAM）→ 完整 u-boot（DDR）',u:'日常使用；系统已烧进 eMMC。',s:'1 秒内出现 U-Boot SPL，随后 DRAM: 512 MiB。',f:'eMMC 被写坏时无法自救，只能 USB 下载。'},
+    {k:'sd',n:'TF 卡启动',r:'BOOT_MODE → SD 卡',p:'初始化 SD1 → 读卡起始的镜像 → 同一套 SPL/u-boot 流程',u:'试新系统、不动 eMMC；学习阶段首选。',s:'Trying to boot from MMC1 → 之后与 eMMC 相同。',f:'卡没做启动镜像：Card did not respond / 卡住。'},
+    {k:'usb',n:'USB 下载',r:'BOOT_MODE → 串行下载',p:'不读存储，USB OTG 枚举成设备 → 主机用 uuu/MFG Tool 下发 → 写 eMMC',u:'救砖；eMMC 全坏时的唯一通道。',s:'串口可能无输出，主要看 PC 端是否出现设备。',f:'充电线、没进下载模式、驱动没装。'}
+  ];
+  var b=document.getElementById('modes'), o=document.getElementById('modeOut');
+  b.innerHTML=B.map(function(x){return '<button data-k="'+x.k+'" style="cursor:pointer;padding:9px 13px;border-radius:9px;border:1px solid rgba(120,150,200,.26);background:rgba(255,255,255,.04);color:#cfdcf7;font-size:12.5px">'+x.n+'</button>'}).join('');
+  function show(k){
+    var x=B.filter(function(y){return y.k===k})[0];
+    o.innerHTML='<b style="color:#eaf3ff">'+x.n+'　<span style="color:#7f90ad;font-size:11.5px">'+x.r+'</span></b><br><span style="color:#9df3c2">Boot ROM：</span>'+x.p+'<br><span style="color:#c9b8ff">适用：</span>'+x.u+'<br><span style="color:#7ee7ff">串口：</span>'+x.s+'<br><span style="color:#ffb4b4">失败：</span>'+x.f;
+    Array.prototype.forEach.call(b.querySelectorAll('button'),function(y){
+      var on=y.dataset.k===k; y.style.borderColor=on?'#5ff1ef':'rgba(120,150,200,.26)'; y.style.background=on?'rgba(95,241,239,.12)':'rgba(255,255,255,.04)';
+    });
+  }
+  b.addEventListener('click',function(e){var x=e.target.closest('button[data-k]'); if(x) show(x.dataset.k)});
+  show('emmc');
+})();
+</script>
+</body>
+</html>

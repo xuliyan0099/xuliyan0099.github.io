@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1.2 板子地图：认元件 | 硬件篇 | i.MX6ULL 学习手册</title>
+<meta name="description" content="i.MX6ULL 开发板元件认读：丝印怎么读、原理图第几页、每颗芯片的电源脚与信号脚在哪、坏了怎么验。">
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">硬件篇 · 这块板子</div>
+    <ol>
+      <li><a href="ch01.html"><span class="no">1.1</span><span>这块板子是什么<span class="sub">五块拼图</span></span></a></li>
+      <li><a href="ch02.html" class="active"><span class="no">1.2</span><span>板子地图<span class="sub">认元件、看丝印</span></span></a></li>
+      <li><a href="ch03.html"><span class="no">1.3</span><span>SoC 里面有什么<span class="sub">Cortex-A7 与外设</span></span></a></li>
+      <li><a href="ch04.html"><span class="no">1.4</span><span>上电到 shell<span class="sub">五段路</span></span></a></li>
+      <li><a href="ch05.html"><span class="no">1.5</span><span>三种启动方式<span class="sub">拨码与 eFuse</span></span></a></li>
+      <li><a href="ch06.html"><span class="no">1.6</span><span>引脚复用<span class="sub">一个脚八个身份</span></span></a></li>
+      <li><a href="ch07.html"><span class="no">1.7</span><span>硬件故障对照<span class="sub">现象倒查</span></span></a></li>
+      <li><a href="ch08.html"><span class="no">1.8</span><span>上手清单<span class="sub">今天就能做</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="ch01.html">← 上一章</a><a href="ch03.html">下一章 →</a></div>
+  </aside>
+
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第一篇 · 硬件</span><span class="sep">/</span>第 2 章<span class="sep">/</span>约 20 分钟</div>
+    <h1>板子地图：认元件</h1>
+    <p class="lede">认板子不是背布局。同一颗芯片在不同板厂可能换位置、换型号、换封装，但<b>认法永远一样</b>：看丝印 → 翻原理图对应的那一页 → 找它的电源脚和信号脚 → 用表量。这一章把这套动作拆开练，配一张可点的地图。</p>
+
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>凭丝印在 30 秒内说出这颗芯片是干什么的（SoC / DDR / eMMC / PHY / PMIC）</li>
+        <li>拿到原理图，找到某个网络名对应到板子上的哪个脚、哪一页</li>
+        <li>知道每颗主要芯片「该有多少伏、该有几路电」，并会用万用表验证</li>
+        <li>区分「板级元件」和「排针外设」，知道问题该往哪一层查</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">1.2.1</span>先看地图：一张典型 i.MX6ULL 板子的分区</h2>
+    <p>下面按正点原子 / 野火这一类的 MINI、ALPHA 板画的布局示意，不是某一家精确丝印。但分区逻辑是通用的：中间是 SoC 与存储（信号最短、走线最贵），左上电源，右侧接口，下侧排针。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 900 460" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="10" y="10" width="880" height="440" rx="12" fill="#0a1120" stroke="#2a3a5c"/>
+        <!-- 安装孔 -->
+        <g fill="#1b2438" stroke="#31405e">
+          <circle cx="40" cy="40" r="9"/><circle cx="860" cy="40" r="9"/><circle cx="40" cy="420" r="9"/><circle cx="860" cy="420" r="9"/>
+        </g>
+        <!-- SoC -->
+        <rect x="352" y="150" width="150" height="130" rx="8" fill="rgba(95,241,239,.14)" stroke="#5ff1ef"/>
+        <text x="427" y="196" fill="#eafdff" font-size="13" text-anchor="middle" font-weight="bold">i.MX6ULL</text>
+        <text x="427" y="216" fill="#9fc4d8" font-size="10.5" text-anchor="middle">BGA · 焊死</text>
+        <text x="427" y="236" fill="#6f7f9c" font-size="10" text-anchor="middle">板子的心脏</text>
+        <!-- DDR -->
+        <rect x="530" y="150" width="110" height="58" rx="7" fill="#141c2e" stroke="#8b7bff"/>
+        <text x="585" y="176" fill="#c9b8ff" font-size="11.5" text-anchor="middle">DDR3L</text>
+        <text x="585" y="194" fill="#8fa3c4" font-size="10" text-anchor="middle">512MB 运行内存</text>
+        <!-- eMMC -->
+        <rect x="530" y="222" width="110" height="58" rx="7" fill="#141c2e" stroke="#8b7bff"/>
+        <text x="585" y="248" fill="#c9b8ff" font-size="11.5" text-anchor="middle">eMMC / NAND</text>
+        <text x="585" y="266" fill="#8fa3c4" font-size="10" text-anchor="middle">8GB 系统盘</text>
+        <!-- 电源区 -->
+        <rect x="40" y="60" width="200" height="150" rx="9" fill="rgba(255,184,77,.07)" stroke="#ffb84d"/>
+        <text x="56" y="84" fill="#ffd79a" font-size="12" font-weight="bold">电源区</text>
+        <text x="56" y="106" fill="#9fb0c7" font-size="11">DC 输入 5V</text>
+        <text x="56" y="124" fill="#9fb0c7" font-size="11">DC-DC ×3（3.3 / 1.35 / 1.2）</text>
+        <text x="56" y="142" fill="#9fb0c7" font-size="11">电感 4.7µH 黑色方块</text>
+        <text x="56" y="160" fill="#9fb0c7" font-size="11">电源开关 + 复位键</text>
+        <text x="56" y="182" fill="#6f7f9c" font-size="10">量 5V 与 3.3V 先来这儿</text>
+        <!-- 时钟 -->
+        <rect x="40" y="228" width="200" height="86" rx="9" fill="rgba(95,241,239,.06)" stroke="#5ff1ef"/>
+        <text x="56" y="252" fill="#9df5f4" font-size="12" font-weight="bold">时钟区</text>
+        <text x="56" y="272" fill="#9fb0c7" font-size="11">24MHz 主晶振</text>
+        <text x="56" y="290" fill="#9fb0c7" font-size="11">32.768kHz RTC 晶振</text>
+        <text x="56" y="306" fill="#6f7f9c" font-size="10">小圆柱/贴片，旁边两个小电容</text>
+        <!-- 调试口 -->
+        <rect x="352" y="60" width="330" height="66" rx="9" fill="rgba(92,225,160,.07)" stroke="#5ce1a0"/>
+        <text x="368" y="84" fill="#9df3c2" font-size="12" font-weight="bold">调试口</text>
+        <text x="368" y="104" fill="#9fb0c7" font-size="11">UART1 → USB 转串口（CH340/CP2102）或 4 针排针</text>
+        <text x="368" y="118" fill="#6f7f9c" font-size="10">115200 8N1，上电第一句话从这里出来</text>
+        <!-- 网口 -->
+        <rect x="700" y="60" width="160" height="86" rx="9" fill="rgba(255,156,156,.06)" stroke="#ff9c9c"/>
+        <text x="716" y="84" fill="#ffc0c0" font-size="12" font-weight="bold">以太网</text>
+        <text x="716" y="104" fill="#9fb0c7" font-size="11">RJ45 + PHY</text>
+        <text x="716" y="122" fill="#9fb0c7" font-size="11">KSZ8081 一类</text>
+        <!-- USB -->
+        <rect x="700" y="166" width="160" height="70" rx="9" fill="rgba(255,156,156,.06)" stroke="#ff9c9c"/>
+        <text x="716" y="190" fill="#ffc0c0" font-size="12" font-weight="bold">USB</text>
+        <text x="716" y="210" fill="#9fb0c7" font-size="11">OTG（烧录/gadget）</text>
+        <text x="716" y="226" fill="#9fb0c7" font-size="11">Host（U 盘/键鼠）</text>
+        <!-- LCD -->
+        <rect x="700" y="252" width="160" height="66" rx="9" fill="rgba(255,156,156,.06)" stroke="#ff9c9c"/>
+        <text x="716" y="276" fill="#ffc0c0" font-size="12" font-weight="bold">LCD FPC</text>
+        <text x="716" y="296" fill="#9fb0c7" font-size="11">24bit RGB + 背光</text>
+        <!-- TF -->
+        <rect x="530" y="300" width="110" height="54" rx="7" fill="#141c2e" stroke="#ffb84d"/>
+        <text x="585" y="324" fill="#ffd79a" font-size="11.5" text-anchor="middle">TF 卡槽</text>
+        <text x="585" y="342" fill="#8fa3c4" font-size="10" text-anchor="middle">SD1，可整机启动</text>
+        <!-- 拨码 -->
+        <rect x="352" y="300" width="150" height="54" rx="7" fill="#141c2e" stroke="#ff9c9c"/>
+        <text x="427" y="324" fill="#ffc0c0" font-size="11.5" text-anchor="middle">启动拨码</text>
+        <text x="427" y="342" fill="#8fa3c4" font-size="10" text-anchor="middle">BOOT_MODE</text>
+        <!-- 排针 -->
+        <rect x="40" y="350" width="880" height="66" rx="9" fill="rgba(110,168,254,.05)" stroke="#4a6ea8" stroke-dasharray="6 5"/>
+        <text x="56" y="378" fill="#9fb0c7" font-size="12" font-weight="bold">2×20 排针（GPIO / I2C / SPI / UART / PWM / ADC）</text>
+        <text x="56" y="398" fill="#6f7f9c" font-size="10">复用脚都引到这里；接上去没反应，八成是复用没配（见 1.6）</text>
+        <!-- 存储之间的箭头 -->
+        <line x1="502" y1="179" x2="530" y2="179" stroke="#8b7bff" stroke-width="1.4"/>
+        <line x1="502" y1="251" x2="530" y2="251" stroke="#8b7bff" stroke-width="1.4"/>
+      </svg>
+      <figcaption><b>图 1-2</b>　典型 i.MX6ULL 开发板分区图。左侧电源与时钟负责「活下来」，中间 SoC 与存储负责「跑起来」，右侧接口负责「用起来」，下侧排针负责「接出去」。</figcaption>
+    </figure>
+
+    <h2><span class="n">1.2.2</span>八颗主要元件：怎么认、干什么、坏了什么症状</h2>
+    <p>下面这张表可以当随身卡片用。丝印一栏写的是「你在板子上会看到什么特征」，比记型号可靠。</p>
+    <table>
+      <thead><tr><th>元件</th><th>丝印/外观特征</th><th>作用</th><th>坏了</th><th>怎么验</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">SoC</td><td>最大的 BGA，四周密排小点，印 <code>MCIMX6…</code></td><td>CPU + 所有控制器</td><td>完全不启动、时好时坏（虚焊）</td><td>量各路供电、24MHz 起振、看串口有无输出</td></tr>
+        <tr><td class="nm">DDR3L</td><td>与 SoC 相邻的长方形芯片，印 <code>…512M16…</code></td><td>运行内存</td><td>u-boot 阶段死、随机死机</td><td>u-boot 内存测试；<code>/proc/meminfo</code> 对容量</td></tr>
+        <tr><td class="nm">eMMC/NAND</td><td>8 脚或 BGA 小方块，印 <code>…08G…</code></td><td>放系统</td><td>卡 kernel、挂根失败、变只读</td><td><code>mmc info</code>、<code>lsblk</code>、<code>dmesg | grep mmc</code></td></tr>
+        <tr><td class="nm">PMIC / DC-DC</td><td>小方块 + 黑色电感 + 大电容</td><td>5V → 3.3/1.35/1.2V</td><td>灯不亮、重启、发烫</td><td>逐路量电压；上电瞬间看跌落</td></tr>
+        <tr><td class="nm">晶振</td><td>金属壳小圆柱或贴片，旁有两个小电容</td><td>24MHz 主时钟、32.768kHz RTC</td><td>串口乱码、网口不通</td><td>示波器量起振；看波特率是否整体偏</td></tr>
+        <tr><td class="nm">USB 转串口</td><td>8 脚小芯片（CH340/CP2102/FT232）</td><td>PC ↔ UART1</td><td>PC 认不到串口、无输出</td><td>换线、看设备管理器、短接 TX/RX 自测回环</td></tr>
+        <tr><td class="nm">以太网 PHY</td><td>RJ45 后面那颗方形芯片</td><td>MAC 与网线之间的模拟层</td><td>网口灯不亮、丢包</td><td>看 PHY 灯；<code>ip link</code>、<code>ethtool</code></td></tr>
+        <tr><td class="nm">拨码/按键</td><td>两个小开关（拨码）、轻触键</td><td>决定启动介质、复位</td><td>「烧好起不来」的元凶</td><td>对照原理图看电平；两种模式各上电一次</td></tr>
+      </tbody>
+    </table>
+
+    <div class="demo">
+      <div class="dh"><b>板子地图</b><span>点方块看细节；这版按上图的布局画的</span></div>
+      <div class="db">
+        <div id="map" style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px"></div>
+        <div id="det" style="margin-top:14px;padding:13px 15px;border-radius:11px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.07);min-height:110px;font-size:13.5px;line-height:1.85;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h2><span class="n">1.2.3</span>看丝印：一条从型号到用途的推理链</h2>
+    <p>丝印就是你手上的「最短文档」。以一颗常见的 DDR 颗粒 <code>MT41K256M16TW-107</code> 为例：</p>
+    <ol class="steps">
+      <li><b>认出厂商与系列。</b><code>MT</code> = Micron，<code>41K</code> = DDR3L 系列。系列决定它的工作电压是 1.35V，不是 1.5V——这颗板子若按 1.5V 供，会过热。</li>
+      <li><b>读容量编码。</b><code>256M16</code> = 256M 个存储单元 × 16 位宽。换成字节：256M × 16bit ÷ 8 = 512MB。板子标「512MB」就是这么来的。</li>
+      <li><b>读速度等级。</b><code>-107</code> 对应约 1866MT/s 的能力，实际跑多少由 u-boot 的 DDR 配置决定，不必跑满。</li>
+      <li><b>反查原理图。</b>用网络名（如 <code>DRAM_A0</code>、<code>DRAM_DQ0</code>）在原理图里搜，就能看到它连到 SoC 的哪组引脚，以及供电来自哪一页。</li>
+    </ol>
+    <p>同样的方法可以读 eMMC（<code>…08G…</code> = 8GB）、PHY（<code>KSZ8081</code> = 10/100M RMII）、串口芯片（<code>CH340</code>）。<b>不会读没关系，关键是知道「丝印里一定有这些字段」，查一次就会了。</b></p>
+
+    <div class="box tip">
+      <h5>原理图怎么找</h5>
+      <p>板厂一般提供 PDF 原理图，几十页，按功能分页：电源页、SoC 页、DDR 页、eMMC 页、接口页、排针页。最快的用法是「先在 SoC 页找到这个信号名，再用网络名反查它接到了谁」——网络名是全图通用的钥匙，比记住页码可靠。</p>
+    </div>
+
+    <h2><span class="n">1.2.4</span>每颗芯片的「电源脚」和「信号脚」</h2>
+    <p>判断一颗芯片是否「活着」，永远先看电源脚，再看信号脚。这张表是通用套路，换芯片只是数字不同：</p>
+    <table>
+      <thead><tr><th>芯片</th><th>该有的电压</th><th>信号脚先看哪个</th><th>典型异常</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">SoC</td><td>3.3V（IO）、1.35V（DDR IO）、~1.2V（内核）</td><td>24MHz 晶振脚、复位脚、UART1 TX</td><td>某一路缺 → 完全不启动</td></tr>
+        <tr><td class="nm">DDR</td><td>1.35V（VDD）、0.675V（VREF，通常由分压产生）</td><td>时钟 CK/CK#、片选 CS#</td><td>VREF 偏 → 时序余量不足，随机死机</td></tr>
+        <tr><td class="nm">eMMC</td><td>3.3V（VCC）、1.8V 或 3.3V（VCCQ）</td><td>CLK、CMD、DAT0</td><td>VCCQ 不对 → 识别不到或读错</td></tr>
+        <tr><td class="nm">PHY</td><td>3.3V（模拟）、1.2V 或 2.5V（内核/IO 视型号）</td><td>REF_CLK（50MHz 或 25MHz）、RXDV</td><td>时钟没到 → 网口灯不亮</td></tr>
+        <tr><td class="nm">USB 转串口</td><td>5V（VBUS）或 3.3V</td><td>TX/RX 与 GND</td><td>只供电无数据 → 线是充电线</td></tr>
+      </tbody>
+    </table>
+    <p>记住一条经验：<b>任何一颗芯片，如果它的供电脚电压对、参考时钟在、复位已释放，却完全没反应，才轮到怀疑它本身或焊接。</b>顺序反了，会把「没供电」误判成「芯片烧了」。</p>
+
+    <div class="box pit">
+      <h5>三个真实翻车点</h5>
+      <p><b>1. 拿 1.5V 的 DDR3 参数去配 1.35V 的 DDR3L。</b>能跑起来，但高温下随机死机；丝印上的 <code>L</code> 就是提示。</p>
+      <p><b>2. 用「能充电」的 USB 线接串口。</b>没数据线芯，PC 端一切正常，板子就是没输出。换一根，问题消失。</p>
+      <p><b>3. 拨码在 TF 模式，eMMC 里有系统。</b>上电先找 TF 卡，卡不对就停住。新手最容易在这里怀疑「烧录失败」。</p>
+    </div>
+
+    <h2><span class="n">1.2.5</span>动手：给板子做一张自己的地图</h2>
+    <p>花二十分钟，画一张只属于你这块板子的地图，比看别人的图有用得多：</p>
+    <ol class="steps">
+      <li>拍照打印，或用白纸描出板子轮廓，标出安装孔与接口位置。</li>
+      <li>把 1.2.2 表里的八类元件圈出来，写上丝印关键字（只要前 6 位）。</li>
+      <li>在图上标三样东西：5V 输入、串口、拨码。这是排障时最先摸的三个点。</li>
+      <li>对着原理图，把 SoC 页的网络名抄到对应元件旁（只抄 3–4 个关键信号即可）。</li>
+      <li>把这张图贴在工位，下次接线出错先看它，而不是翻 PDF。</li>
+    </ol>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>一颗 DDR 颗粒丝印是 <code>MT41K256M16TW-107</code>，容量是多少、供电多少伏？</summary><div class="ans"><b>512MB，1.35V。</b>256M × 16bit = 4Gbit = 512MB；<code>41K</code> 表示 DDR3L 系列，工作电压 1.35V。<b>-107</b> 是速度等级，约 1866MT/s 能力，实际频率由 u-boot 配置决定。</div></details>
+    <details class="quiz"><summary>为什么「先量电源脚，再看信号脚」？</summary><div class="ans">因为没有正确的供电，信号脚上的一切测量都没有意义：芯片不工作，TX 不会输出波形，CS 不会拉低。反过来，如果电源对、时钟在、复位释放，信号仍不对，才说明问题在配置或芯片。这条顺序能把「硬件死」和「软件没配」分开。</div></details>
+    <details class="quiz"><summary>原理图几十页，怎么最快定位一个信号？</summary><div class="ans">用<b>网络名</b>，不要用页码。先在 SoC 页找到引脚名（如 <code>UART1_TXD</code> → <code>UART1_TX_DATA</code>），记住网络名，再全图搜这个网络名，就能看到它连到了 USB 转串口芯片的哪个脚。板厂改版时页码会变，网络名基本不变。</div></details>
+
+    <div class="ch-nav">
+      <a href="ch01.html"><span>上一章</span><b>← 1.1 这块板子是什么</b></a>
+      <a class="nx" href="ch03.html"><span>下一章</span><b>1.3 SoC 里面有什么 →</b></a>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  var P=[
+    {k:'soc',n:'SoC',w:2,c:'#5ff1ef',t:'i.MX6ULL（BGA 焊死）',d:'整块板子的 CPU + 所有控制器。Cortex-A7 单核 + DDR 控制器 + 8×UART + 2×SD/MMC + ENET + USB + IOMUXC。',s:'完全不启动、串口无输出；虚焊时轻压会好。',v:'量 3.3V / 1.35V / 内核电压，看 24MHz 起振，串口有没有字。'},
+    {k:'ddr',n:'DDR',w:1,c:'#8b7bff',t:'DDR3L 颗粒',d:'运行内存，常见 512MB，由片内 MMDC 直接驱动。断电即失。',s:'u-boot 阶段死、随机死机、内存测试报错。',v:'u-boot 内存测试；系统 cat /proc/meminfo。'},
+    {k:'emmc',n:'eMMC',w:1,c:'#8b7bff',t:'eMMC / NAND 系统盘',d:'放 u-boot、内核、根文件系统；eMMC 走 SD2。',s:'卡 Starting kernel、挂根失败、文件系统只读。',v:'mmc list / mmc info；lsblk；dmesg | grep mmc。'},
+    {k:'pwr',n:'电源',w:1,c:'#ffb84d',t:'DC-DC 与电感电容',d:'5V 转 3.3V（外设）、1.35V（DDR）、~1.2V（内核），上电有顺序。',s:'灯不亮、反复重启、发烫。',v:'万用表量 5V / 3.3V；换 5V/2A 电源复测。'},
+    {k:'clk',n:'时钟',w:1,c:'#5ff1ef',t:'24MHz 与 32.768kHz 晶振',d:'24MHz 是 PLL 参考，32.768kHz 给 RTC。晶振不起，全板时序飘。',s:'串口乱码、网口不通、USB 认不到。',v:'示波器看起振；看串口波特率是否整体偏。'},
+    {k:'uart',n:'调试口',w:2,c:'#5ce1a0',t:'UART1 / USB 转串口',d:'115200 8N1，从上电第一行到 login 全靠它。',s:'没输出或乱码，后续调试全失明。',v:'TX/RX 交叉、GND 共地、换数据线。'},
+    {k:'usb',n:'USB',w:2,c:'#ff9c9c',t:'OTG / Host',d:'OTG 用于烧录（下载模式）与 gadget；Host 接 U 盘键鼠。',s:'烧录工具认不到、U 盘无反应。',v:'拨到下载模式重新上电；换数据线；看设备管理器。'},
+    {k:'eth',n:'网口',w:1,c:'#ff9c9c',t:'RJ45 + PHY',d:'MAC 在片内，PHY 在板外，RMII 连接。',s:'灯不亮、能连不通、丢包。',v:'看 PHY 灯；ip link / ethtool；换交换机口。'},
+    {k:'lcd',n:'LCD',w:1,c:'#ff9c9c',t:'RGB 并口 FPC',d:'24bit RGB + 背光使能 + I2C 触摸。',s:'花屏、偏色、不亮、触摸无反应。',v:'重插 FPC；量背光使能；换官方设备树对比。'},
+    {k:'sd',n:'TF 卡',w:1,c:'#ffb84d',t:'SD1 卡槽',d:'可以整机从卡启动，不动 eMMC。',s:'插卡无反应、启动失败。',v:'换 FAT32 卡；dmesg | grep mmc。'},
+    {k:'boot',n:'拨码',w:2,c:'#ff9c9c',t:'启动拨码 BOOT_MODE',d:'上电瞬间决定从 eMMC / TF / USB 加载系统。',s:'明明烧好了却起不来。',v:'对照原理图看电平；两种模式各上电对比串口。'},
+    {k:'pin',n:'排针',w:2,c:'#4a6ea8',t:'2×20 复用排针',d:'把 GPIO / I2C / SPI / UART / PWM / ADC 引出来。',s:'接上去没反应，多半是复用没配。',v:'查原理图脚号；gpioinfo 看谁占用；量电平。'}
+  ];
+  var map=document.getElementById('map'), det=document.getElementById('det');
+  map.innerHTML=P.map(function(p){
+    return '<button data-k="'+p.k+'" style="grid-column:span '+p.w+';text-align:left;cursor:pointer;padding:10px 11px;border-radius:9px;border:1px solid '+(p.k==='soc'?'rgba(95,241,239,.6)':'rgba(120,150,200,.24)')+';background:#0f1522;color:#cfdcf7;font-size:12.5px">'+p.n+'</button>';
+  }).join('');
+  function show(k){
+    var p=P.filter(function(x){return x.k===k})[0];
+    det.innerHTML='<b style="color:#eaf3ff">'+p.t+'</b><br>'+p.d+'<br><span style="color:#ffb4b4">坏了：</span>'+p.s+'<br><span style="color:#9df3c2">验证：</span>'+p.v;
+    Array.prototype.forEach.call(map.querySelectorAll('button'),function(b){
+      var on=b.dataset.k===k;
+      b.style.borderColor=on?'#5ff1ef':'rgba(120,150,200,.24)';
+      b.style.background=on?'rgba(95,241,239,.12)':'#0f1522';
+    });
+  }
+  map.addEventListener('click',function(e){
+    var b=e.target.closest('button[data-k]'); if(!b) return; show(b.dataset.k);
+  });
+  show('soc');
+})();
+</script>
+</body>
+</html>
