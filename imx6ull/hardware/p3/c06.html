@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3.6 核心板第 6 页：复位与晶振 | 第三篇 · 逐页读真实原理图 | i.MX6ULL 学习手册</title>
+<meta name="description" content="MAX809R 复位链、R33 0Ω 与 C14、24MHz 晶振 18pF 的负载电容推导、RTC 32.768kHz；复位与时钟故障的判据。">
+<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第三篇 · 逐页读真实原理图</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 6 章<span class="sep">/</span>约 26 分钟</div>
+    <h1>核心板第 6 页：复位与晶振</h1>
+    <p class="lede">板子「不启动」时，工程师最先量的两样东西就是<b>复位电平</b>和<b>时钟波形</b>。这一页把两件事都画全了：U3（MAX809R）负责上电复位，Y2（24MHz）负责主时钟，另有一路 32.768kHz 给 RTC。</p>
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>顺着 POR_B 走一遍复位链，说出每一颗元件的作用</li>
+        <li>用 CL = C/2 + C<sub>stray</sub> 解释「24MHz 晶振为什么配 18pF」</li>
+        <li>区分「起振慢」「不起振」「频偏大」三种时钟故障与对应原因</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">3.6.1</span>复位链：四颗元件，一条逻辑</h2>
+    <ol class="steps">
+      <li><b>U3（MAX809R）</b>监视 <code>DCDC_3V3</code>：低于阈值 → RST 输出低（复位有效）；回升并延时后释放。</li>
+      <li><b>R33（0Ω）</b>把 RST 连到 <code>POR_B</code>：0Ω 是「可拆」的连接，方便调试时断开、也方便版本改动。</li>
+      <li><b>C14（104）</b>挂在 POR_B 上：吸收复位线上的毛刺，并与 R33/内部上拉形成小的 RC 延时，保证复位脉冲足够宽。</li>
+      <li><b>POR_B 内部上拉</b>：SoC 侧有上拉，外部只需「拉低即复位」，不需要额外驱动能力。</li>
+    </ol>
+    <p>另一颗监控芯片 <b>U10（UM805RE 一类）</b>在部分版本上用于监视 1.35V 或产生第二路复位，用途是「确保内核电压也稳定后才释放复位」。读图时要看清它接的是哪一路、输出连到哪里。</p>
+
+    <div class="box tip">
+      <h5>复位脚的三条实测判据</h5>
+      <p>① 上电后 POR_B 应从低变高（低有效），上升沿要干净；② 松开复位按钮后电压应稳定在高，不能有回沟；③ 若一直为低，先断开 R33 判断是 SoC 侧还是监控芯片侧拉低。</p>
+    </div>
+
+    <h2><span class="n">3.6.2</span>24MHz 晶振：18pF 是怎么来的</h2>
+    <p>晶振规格书里最关键的一项不是频率，而是<b>负载电容 C<sub>L</sub></b>（常见 8pF、12pF、18pF）。外部两只电容与寄生电容共同决定实际负载：</p>
+    <p style="text-align:center">C<sub>L</sub> ≈ (C12 × C13)/(C12 + C13) + C<sub>stray</sub></p>
+    <p>当 C12 = C13 = 18pF 时，串联等效 9pF；PCB 与引脚寄生约 3pF，合计 12pF——所以 <b>18pF 配的是 CL = 12pF 的晶振</b>。如果晶振规格是 CL = 18pF，就要把电容加到约 30pF，否则频率会偏高（振荡在「负载偏轻」状态）。</p>
+    <p>频偏的工程判据：负载电容每偏差 1pF，24MHz 晶振的频率偏移约几十 ppm 量级；对 USB、以太网这类要求 ±50ppm 的接口，几 pF 的偏差就可能出界。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="20" y="18" width="410" height="200" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="36" y="42" fill="#eaf3ff" font-size="11">晶振两端的负载电容</text>
+        <rect x="150" y="80" width="34" height="60" rx="4" fill="rgba(255,255,255,.04)" stroke="#5ff1ef"/>
+        <text x="167" y="116" fill="#9df5f4" font-size="9" text-anchor="middle">Y2</text>
+        <line x1="120" y1="96" x2="150" y2="96" stroke="#5ff1ef"/>
+        <line x1="184" y1="96" x2="214" y2="96" stroke="#5ff1ef"/>
+        <text x="96" y="92" fill="#9fb0c7" font-size="9">XTALI</text>
+        <text x="220" y="92" fill="#9fb0c7" font-size="9">XTALO</text>
+        <rect x="104" y="120" width="26" height="14" rx="3" fill="rgba(92,225,160,.15)" stroke="#5ce1a0"/>
+        <text x="96" y="148" fill="#9df3c2" font-size="9">C12 18pF</text>
+        <rect x="176" y="120" width="26" height="14" rx="3" fill="rgba(92,225,160,.15)" stroke="#5ce1a0"/>
+        <text x="176" y="148" fill="#9df3c2" font-size="9">C13 18pF</text>
+        <line x1="117" y1="134" x2="117" y2="156" stroke="#6f7f9c"/>
+        <line x1="189" y1="134" x2="189" y2="156" stroke="#6f7f9c"/>
+        <text x="36" y="184" fill="#6f7f9c" font-size="9">18/2 = 9pF，加约 3pF 寄生 → CL ≈ 12pF</text>
+
+        <rect x="450" y="18" width="400" height="200" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="466" y="42" fill="#eaf3ff" font-size="11">三种时钟故障</text>
+        <text x="466" y="72" fill="#9df3c2" font-size="10">不起振</text>
+        <text x="466" y="92" fill="#9fb0c7" font-size="9.5">电容值错、晶振坏、焊盘虚焊、驱动强度不足</text>
+        <text x="466" y="118" fill="#ffd79a" font-size="10">起振慢/易停</text>
+        <text x="466" y="138" fill="#9fb0c7" font-size="9.5">负载电容偏大、ESR 偏高的晶振、负阻余量不足</text>
+        <text x="466" y="164" fill="#ffd79a" font-size="10">频偏大</text>
+        <text x="466" y="184" fill="#9fb0c7" font-size="9.5">负载电容不匹配、寄生电容估算错、温度特性差</text>
+
+        <text x="20" y="252" fill="#9fb0c7" font-size="10.5">RTC 用 32.768kHz 音叉晶振，负载电容通常 6–12pF，且对布局极敏感：走线要短、下面不要铺地平面、远离发热源。</text>
+        <text x="20" y="276" fill="#6f7f9c" font-size="10">判据：RTC 走时一天偏差超过几秒，先查晶振负载电容与寄生，再怀疑芯片。</text>
+        <text x="20" y="300" fill="#ff9c9c" font-size="10">坑：用示波器探头直接量晶振脚（探头电容几十 pF），会把振荡「量停」。</text>
+      </svg>
+      <figcaption><b>图 3-6</b>　晶振负载电容的算法与三种故障。</figcaption>
+    </figure>
+
+    <div class="demo">
+      <div class="dh"><b>负载电容计算器</b><span>给晶振 CL 与寄生，算两只电容该取多少</span></div>
+      <div class="db">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div><div style="font-size:12px;color:#9fb0c7">晶振 C<sub>L</sub> <b id="clv" style="color:#5ff1ef">12</b> pF</div><input id="cl" type="range" min="6" max="20" step="0.5" value="12" style="width:100%;accent-color:#5ff1ef"></div>
+          <div><div style="font-size:12px;color:#9fb0c7">寄生电容 <b id="csv" style="color:#5ff1ef">3</b> pF</div><input id="cs" type="range" min="1" max="8" step="0.5" value="3" style="width:100%;accent-color:#5ff1ef"></div>
+        </div>
+        <div id="xtalOut" style="margin-top:14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(95,241,239,.3);background:rgba(95,241,239,.06);font-size:13.5px;line-height:2;color:#cfdcf7"></div>
+      </div>
+    </div>
+
+    <h2><span class="n">3.6.3</span>复位与时钟的联合排查顺序</h2>
+    <ol class="steps">
+      <li>量 <code>POR_B</code>：低 → 复位没释放，查监控芯片与 3.3V；高 → 进入下一步。</li>
+      <li>量 24MHz：无波形 → 查晶振与电容；有波形但幅度小 → 查负载与驱动。</li>
+      <li>量 32.768kHz：只影响 RTC，不影响启动，但会影响时间与唤醒。</li>
+      <li>都正常仍不启动 → 查 BOOT_CFG（下一章）与 DDR（3.4 章）。</li>
+    </ol>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>POR_B 一直是低，怎么快速判断是监控芯片还是 SoC 在拉低？</summary><div class="ans">断开 R33（0Ω）后分别量两侧：若芯片侧仍低 → 监控芯片或 3.3V 异常；若 SoC 侧仍低 → SoC 内部复位逻辑或外部复位按钮/调试器在拉低。</div></details>
+    <details class="quiz"><summary>晶振 CL=18pF，却只装了 18pF 两只电容，会怎样？</summary><div class="ans">实际 CL 只有约 12pF，负载偏轻 → 频率偏高（几十 ppm 量级），可能导致 USB/以太网超出容限，或起振裕度变化。应把电容加到约 30pF。</div></details>
+    <details class="quiz"><summary>为什么示波器探头直接量晶振可能让振荡停止？</summary><div class="ans">探头有几十 pF 电容，并在晶振脚上等于额外增加负载电容，破坏谐振条件，振荡器可能停振或频率被拉偏。应使用高阻/低电容探头或间接测量。</div></details>
+
+    <div class="ch-nav"><a href="c05.html"><span>上一章</span><b>← 3.5 核心板第 4 页</b></a>
+      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.7 核心板第 7 页 →</b></a></div>
+  </main>
+</div>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+<script>
+renderPart('p3','c06.html');
+(function(){
+  function calc(){
+    var cl=+document.getElementById('cl').value, cs=+document.getElementById('cs').value;
+    document.getElementById('clv').textContent=cl.toFixed(1);
+    document.getElementById('csv').textContent=cs.toFixed(1);
+    var c=2*(cl-cs);
+    document.getElementById('xtalOut').innerHTML=
+      '<b style="color:#eaf3ff;font-size:15px">每只电容应取 ≈ '+c.toFixed(1)+' pF</b><br>'+
+      (c>0?'就近取标准值（如 18pF / 22pF / 27pF / 30pF）':'<span style="color:#ff9c9c">寄生已超过 CL，需减少寄生或换更低 CL 的晶振</span>')+'<br>'+
+      '校验：'+(c/2).toFixed(1)+' pF（串联等效）+ '+cs.toFixed(1)+' pF 寄生 = '+((c/2)+cs).toFixed(1)+' pF<br>'+
+      '<span style="color:#6f7f9c;font-size:11.5px">公式：CL = C/2 + Cstray（两只等值时）。寄生含 PCB 走线、焊盘、芯片引脚，通常 2–4pF。</span>';
+  }
+  ['cl','cs'].forEach(function(id){document.getElementById(id).addEventListener('input',calc)});
+  calc();
+})();
+</script>
+</body></html>

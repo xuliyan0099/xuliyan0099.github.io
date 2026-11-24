@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3.5 核心板第 4 页：eMMC 与 NAND | 第三篇 · 逐页读真实原理图 | i.MX6ULL 学习手册</title>
+<meta name="description" content="eMMC 的 CLK/CMD/DAT 与 10k 上拉、NAND 的 CLE/ALE/CE/RB、双存储如何靠 BOOT_CFG 选择。">
+<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第三篇 · 逐页读真实原理图</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 5 章<span class="sep">/</span>约 26 分钟</div>
+    <h1>核心板第 4 页：eMMC 与 NAND</h1>
+    <p class="lede">核心板上同时留了 eMMC 与 NAND 两种存储位置（不同版本贴不同片子）。它们的信号风格完全不同：<b>eMMC 是同步并行总线，NAND 是异步复用总线</b>。看懂这一页，你就明白「为什么有的板子启动要拨码」。</p>
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>说出 eMMC 的 CLK/CMD/DAT0–7/RST/DS 各自作用</li>
+        <li>解释 CMD 与 DAT 上的 10k 上拉为什么必要</li>
+        <li>说出 NAND 的 CLE/ALE/CE/RB/WP 与 eMMC 的对应关系</li>
+        <li>理解 BOOT_CFG 如何决定从哪种介质启动</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">3.5.1</span>eMMC：八根数据线的同步总线</h2>
+    <table>
+      <thead><tr><th>信号</th><th>方向</th><th>作用</th><th>本板处理</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">CLK</td><td>SoC → 卡</td><td>时钟，频率决定速率（HS400 可到 200MHz）</td><td>串联阻尼预留，走线短</td></tr>
+        <tr><td class="nm">CMD</td><td>双向</td><td>命令与响应（开漏式初始阶段）</td><td><b>10k 上拉（R10/R38 一类）</b></td></tr>
+        <tr><td class="nm">DAT0–DAT7</td><td>双向</td><td>数据（1/4/8 位模式）</td><td>每根 <b>10k 上拉</b>，保证空闲高</td></tr>
+        <tr><td class="nm">RST</td><td>SoC → 卡</td><td>硬件复位</td><td>常接 SoC 的复位或 GPIO</td></tr>
+        <tr><td class="nm">DS</td><td>卡 → SoC</td><td>数据选通（HS400 用）</td><td>部分设计不接，按模式定</td></tr>
+      </tbody>
+    </table>
+    <p><b>为什么必须上拉？</b>因为 eMMC 在初始化阶段用「开漏」方式通信（类似 I2C），总线需要外部上拉才能得到高电平；进入高速模式后内部有推挽驱动，上拉仍保留但不参与驱动。上拉值 10k 是「初始阶段够用、高速时不至于太耗电」的折中。</p>
+
+    <h2><span class="n">3.5.2</span>NAND：六根控制线 + 八根数据线</h2>
+    <table>
+      <thead><tr><th>信号</th><th>作用</th><th>对应 eMMC 的什么</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">CLE</td><td>命令锁存使能：数据线上是命令还是数据</td><td>类似 CMD 的「命令阶段」</td></tr>
+        <tr><td class="nm">ALE</td><td>地址锁存使能</td><td>无直接对应（eMMC 地址在命令里）</td></tr>
+        <tr><td class="nm">CE#</td><td>片选</td><td>类似 CS</td></tr>
+        <tr><td class="nm">RE# / WE#</td><td>读/写使能</td><td>类似 CLK 的读写时序</td></tr>
+        <tr><td class="nm">RB#</td><td>忙闲指示（内部操作时拉低）</td><td>eMMC 用响应/超时表达</td></tr>
+        <tr><td class="nm">WP#</td><td>写保护</td><td>无</td></tr>
+        <tr><td class="nm">IO0–IO7</td><td>数据/地址/命令复用</td><td>类似 DAT0–7，但复用</td></tr>
+      </tbody>
+    </table>
+    <p>MINI 核心板用的 NAND 是 <b>MT29F4G08</b> 一类（4Gb，8 位）。它没有时钟线，全靠 RE#/WE# 的边沿采样——这也是为什么 NAND 的时序更依赖「读写使能的脉宽与保持」。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="20" y="18" width="410" height="210" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="36" y="42" fill="#eaf3ff" font-size="11">eMMC 的最小系统</text>
+        <line x1="90" y1="80" x2="200" y2="80" stroke="#5ff1ef"/>
+        <text x="96" y="74" fill="#9df5f4" font-size="9">CLK</text>
+        <line x1="90" y1="108" x2="200" y2="108" stroke="#ffb84d"/>
+        <text x="96" y="102" fill="#ffd79a" font-size="9">CMD（10k 上拉）</text>
+        <line x1="90" y1="136" x2="200" y2="136" stroke="#5ce1a0"/>
+        <text x="96" y="130" fill="#9df3c2" font-size="9">DAT0–7（各 10k 上拉）</text>
+        <line x1="90" y1="164" x2="200" y2="164" stroke="#c8c0ff"/>
+        <text x="96" y="158" fill="#c8c0ff" font-size="9">RST</text>
+        <rect x="200" y="64" width="70" height="120" rx="5" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="235" y="128" fill="#9fb0c7" font-size="9" text-anchor="middle">eMMC</text>
+        <text x="36" y="200" fill="#6f7f9c" font-size="9">上拉不是「锦上添花」，是初始化阶段的必要条件</text>
+
+        <rect x="450" y="18" width="400" height="210" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="466" y="42" fill="#eaf3ff" font-size="11">NAND 的控制线</text>
+        <text x="466" y="72" fill="#9fb0c7" font-size="10">CLE / ALE：告诉芯片「总线上的东西是什么」</text>
+        <text x="466" y="96" fill="#9fb0c7" font-size="10">CE# / RE# / WE#：选中、读、写</text>
+        <text x="466" y="120" fill="#9fb0c7" font-size="10">RB#：忙闲，读的时候要等它释放</text>
+        <text x="466" y="144" fill="#9fb0c7" font-size="10">WP#：写保护，常拉高或接跳线</text>
+        <text x="466" y="170" fill="#ff9c9c" font-size="9.5">没有时钟线：靠 RE/WE 边沿采样，时序更敏感</text>
+        <text x="466" y="194" fill="#6f7f9c" font-size="9">NAND 有坏块，需要软件层 ECC 与坏块管理</text>
+
+        <text x="20" y="258" fill="#9fb0c7" font-size="10.5">双存储的意义：eMMC 可靠但贵、NAND 便宜但有坏块。厂家用同一块 PCB，靠 BOOT_CFG 选择贴哪种、从哪种启动。</text>
+        <text x="20" y="282" fill="#6f7f9c" font-size="10">本板 eMMC 为 KLM8G1GETF 一类（8GB 级），NAND 为 MT29F4G08（4Gb）。位号不同、网络不同，读图别混。</text>
+        <text x="20" y="306" fill="#ff9c9c" font-size="10">坑：eMMC 的数据线上拉漏贴，表现为「能识别但读写随机失败」。</text>
+      </svg>
+      <figcaption><b>图 3-5</b>　eMMC 与 NAND 的信号对照。</figcaption>
+    </figure>
+
+    <h2><span class="n">3.5.3</span>启动介质怎么选：BOOT_CFG</h2>
+    <p>i.MX6ULL 复位释放时，会采样 <b>BOOT_CFG0–7</b>（有的封装还含 BOOT_MODE0/1）决定启动顺序：eMMC、NAND、SD、USB、串口下载。MINI 板用 <b>8 位拨码（D1–D8）</b>+ <b>R43–R50 10k</b> 实现，核心板则用 <b>R4–R24 各 4.7k</b> 上拉到 <code>DCDC_3V3</code>。</p>
+    <p>读图要点：<b>拨码在「ON」时把脚拉低还是拉高？</b>这取决于电路是「上拉 + 开关到地」还是「下拉 + 开关到电源」。搞反了，拨码全 ON 可能对应的是「全部为 1」或「全部为 0」，启动介质完全不同。这类细节必须以原理图为准，不能凭直觉。</p>
+    <div class="box pit">
+      <h5>三个启动相关的故障</h5>
+      <p><b>1. 拨码接触不良：</b>偶发启动到错误介质，表现为「有时能启动、有时串口无输出」。</p>
+      <p><b>2. BOOT_CFG 上拉电阻虚焊：</b>某一位浮空，采样值随机。</p>
+      <p><b>3. eMMC 与 NAND 同时在板：</b>片选/数据总线冲突，需要确认只贴一种。</p>
+    </div>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>eMMC 的 CMD 为什么需要上拉，而 CLK 不需要？</summary><div class="ans">CMD 是双向开漏式信号，初始化阶段靠外部上拉得到高电平；CLK 是单向推挽时钟，由主机驱动，不需要上拉。</div></details>
+    <details class="quiz"><summary>NAND 的 RB# 一直为低说明什么？</summary><div class="ans">芯片忙：擦除/编程/读操作未完成。软件必须等它释放再发下一条命令，否则命令被忽略，表现为「读不出数据」。</div></details>
+    <details class="quiz"><summary>为什么同一块板要留两种存储封装？</summary><div class="ans">成本与可靠性分层：量产低配用 NAND 降成本，高配用 eMMC 提可靠性；同一 PCB 兼容两种 BOM，减少版本管理成本。</div></details>
+
+    <div class="ch-nav"><a href="c04.html"><span>上一章</span><b>← 3.4 核心板第 3 页</b></a>
+      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.6 核心板第 6 页 →</b></a></div>
+  </main>
+</div>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+<script>renderPart('p3','c05.html');</script>
+</body></html>

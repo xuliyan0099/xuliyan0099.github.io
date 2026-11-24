@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3.1 图纸怎么读 | 第三篇 · 逐页读真实原理图 | i.MX6ULL 学习手册</title>
+<meta name="description" content="页序、位号前缀、网络命名、跨页连接、电源符号；用 MINI V2.2 与 CORE V2.0 讲读图五遍法。">
+<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第三篇 · 逐页读真实原理图</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 1 章<span class="sep">/</span>约 24 分钟</div>
+    <h1>图纸怎么读：五遍法</h1>
+    <p class="lede">拿到一张 8 页的核心板原理图，新手的第一反应是「从左上角开始看」。正确做法是<b>先看骨架，再看器官</b>：页序 → 电源树 → 网络名 → 关键器件 → 细节。这一章给出可复用的五遍法，并用本板 12 页图纸演示。</p>
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>30 秒内说出任何一张原理图的「电源从哪来、地怎么分、信号怎么跨页」</li>
+        <li>根据位号前缀认出器件类型（U/R/C/L/D/Q/Y/J/TP/SW/FB）</li>
+        <li>用网络命名规则反推信号方向与电压域，不靠猜</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">3.1.1</span>先认元件前缀</h2>
+    <table>
+      <thead><tr><th>前缀</th><th>器件</th><th>本板实例</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">U</td><td>集成电路</td><td>U1/U1A–U1E（MX6ULL 分 5 部分画）、U3 MAX809R、U5 TJA1050、U11 SR8201F</td></tr>
+        <tr><td class="nm">R / C / L</td><td>电阻 / 电容 / 电感</td><td>R33 0Ω、C14 104、L2 2.2µH</td></tr>
+        <tr><td class="nm">D</td><td>二极管 / LED</td><td>D1 SMBJ5.0A、D3 RB521S-30</td></tr>
+        <tr><td class="nm">Q</td><td>三极管 / MOS</td><td>Q1 SS8550、Q5–Q8 2SK3018</td></tr>
+        <tr><td class="nm">Y / E</td><td>晶振</td><td>Y2 24MHz、RTC 32.768kHz、E1 25MHz</td></tr>
+        <tr><td class="nm">J / P / IMX</td><td>连接器</td><td>P2 SDIO WIFI、P4 44pin 排针、IMX1/IMX2 60pin</td></tr>
+        <tr><td class="nm">TP</td><td>测试点</td><td>TP3 1.35V、TP7 DRAM_1V35、TP8 NVCC_CSI</td></tr>
+        <tr><td class="nm">SW</td><td>开关 / 拨码</td><td>D1–D8 八位拨码（BOOT 配置）</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="n">3.1.2</span>再认网络命名：名字就是说明书</h2>
+    <p>这张图的网络名几乎是「自解释」的，规则可以总结成四类：</p>
+    <ul>
+      <li><b>电源类</b>：<code>DCDC_3V3</code>、<code>VDD_ARM_SOC_IN</code>、<code>NVCC_CSI</code>、<code>NVCC_SD</code>、<code>DRAM_1V35</code>、<code>VDD_SNVS_3V3</code>。看到 <code>NVCC_</code> 前缀就知道是 SoC 的 IO 电压域。</li>
+      <li><b>复位/控制类</b>：<code>POR_B</code>（低有效复位）、<code>BOOT_CFG0–7</code>、<code>DISCHG_EN</code>、<code>SD1_VSELECT</code>。</li>
+      <li><b>总线类</b>：<code>I2C1_SCL/SDA</code>、<code>UART1_TXD/RXD</code>、<code>ENET_*</code>、<code>USB_OTG1_*</code>。</li>
+      <li><b>时钟类</b>：<code>CLK1_P/N</code>（差分）、<code>RTC_XTALI</code>、<code>XTALI</code>。</li>
+    </ul>
+    <p><b>后缀也很重要</b>：<code>_P/_N</code> 是差分对；<code>_B</code> 或前导 <code>n</code> 表示低有效；<code>_EN</code> 是使能；<code>_RST</code> 是复位。<b>看到两个网络名只差一个后缀，先怀疑它们是差分或互补信号</b>。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 860 320" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="20" y="18" width="410" height="200" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="36" y="42" fill="#eaf3ff" font-size="11">五遍法：从骨架到细节</text>
+        <text x="36" y="70" fill="#9df5f4" font-size="10">① 页序与目录：这页负责什么</text>
+        <text x="36" y="92" fill="#9df5f4" font-size="10">② 电源树：输入→各级→负载</text>
+        <text x="36" y="114" fill="#9df5f4" font-size="10">③ 网络名与跨页：信号去哪</text>
+        <text x="36" y="136" fill="#9df5f4" font-size="10">④ 关键器件：SoC/PHY/存储</text>
+        <text x="36" y="158" fill="#9df5f4" font-size="10">⑤ 细节：上下拉、测试点、DNP</text>
+        <text x="36" y="184" fill="#6f7f9c" font-size="9">顺序错了会陷入「一颗电阻看十分钟」</text>
+
+        <rect x="450" y="18" width="390" height="200" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="466" y="42" fill="#eaf3ff" font-size="11">12 页图纸的骨架（本板）</text>
+        <text x="466" y="70" fill="#9fb0c7" font-size="9.5">CORE V2.0：8 页</text>
+        <text x="466" y="90" fill="#9fb0c7" font-size="9.5">1 五路电源 / 2 SoC 电源脚 / 3 DDR / 4 eMMC与NAND</text>
+        <text x="466" y="110" fill="#9fb0c7" font-size="9.5">5 未用页 / 6 复位与晶振 / 7 启动配置 / 8 未用页</text>
+        <text x="466" y="136" fill="#9fb0c7" font-size="9.5">MINI V2.2：4 页</text>
+        <text x="466" y="156" fill="#9fb0c7" font-size="9.5">1 连接器与调试 / 2 TF卡与低速外设</text>
+        <text x="466" y="176" fill="#9fb0c7" font-size="9.5">3 以太网与排针 / 4 输入电源与 USB</text>
+        <text x="466" y="200" fill="#6f7f9c" font-size="9">先记住骨架，再看任何一页都不迷路</text>
+
+        <text x="20" y="246" fill="#9fb0c7" font-size="10.5">跨页连接靠网络名，不靠画线：同名网络在任意页相连。所以「这个信号从哪来」的答案永远在网络名里。</text>
+        <text x="20" y="270" fill="#6f7f9c" font-size="10">低有效信号（POR_B、RST_N）读图时先在脑子里取反，否则逻辑会绕晕。</text>
+        <text x="20" y="294" fill="#ff9c9c" font-size="10">坑：同一网络在两页写法不同（大小写、下划线），实际是两个网络，飞线也连不上。</text>
+      </svg>
+      <figcaption><b>图 3-1</b>　五遍法与 12 页骨架。</figcaption>
+    </figure>
+
+    <h2><span class="n">3.1.3</span>五个「读图习惯」</h2>
+    <ol class="steps">
+      <li><b>先找电源入口</b>：MINI 第 4 页的 DC5V 是最上游，顺着它看两片 DCDC 与各路 LDO。</li>
+      <li><b>再找地</b>：<code>GND</code>、<code>AGND</code>、<code>PGND</code> 是否分平面，单点连接在哪（常是 0Ω 或磁珠）。</li>
+      <li><b>标出「配置脚」</b>：BOOT_CFG、PHYAD、LED、MODE 这类脚在上电时被采样，上下拉错一个就是「不启动/不通」。用荧光笔在纸上标。</li>
+      <li><b>找测试点</b>：TP3–TP8 是厂家留的「体检口」，读图时先记住它们测哪路电压。</li>
+      <li><b>关注 DNP 与 0Ω</b>：它们代表「版本差异」与「调试预留」，是理解板子变体的钥匙。</li>
+    </ol>
+
+    <div class="box tip">
+      <h5>用万用表验证读图结论</h5>
+      <p>断电、蜂鸣档：红黑表笔分别点两个应该相连的焊盘，响=连通。读图得出的「这颗 0Ω 把数字地和模拟地连起来」可以在 10 秒内验证。<b>读图 + 实测</b>才是完整的方法。</p>
+    </div>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>看到网络名 <code>SD1_VSELECT</code>，你判断它是什么信号？</summary><div class="ans">SD 卡 1 的电压选择信号，用于在 1.8V 与 3.3V 之间切换 NVCC_SD 或切换上拉电源。它是「配置/控制」类，不是数据线。</div></details>
+    <details class="quiz"><summary>为什么 SoC 常被拆成 U1A–U1E 五个符号？</summary><div class="ans">因为 BGA 封装有几百个脚，一张图放不下。按功能分组（电源、DDR、IO、时钟等）拆成多个符号，同名网络自动相连，读图更清晰。</div></details>
+    <details class="quiz"><summary>图纸上某个信号只在两页出现，怎么确认是同一个网络？</summary><div class="ans">比对完整网络名（含大小写与后缀），再用万用表蜂鸣档实测两点是否连通。名字差一个字符就是两个网络。</div></details>
+
+    <div class="ch-nav"><a href="../index.html"><span>上一篇</span><b>← 返回总目录</b></a>
+      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.2 核心板第 1 页 →</b></a></div>
+  </main>
+</div>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+<script>renderPart('p3','c01.html');</script>
+</body></html>

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3.7 核心板第 7 页：启动配置 | 第三篇 · 逐页读真实原理图 | i.MX6ULL 学习手册</title>
+<meta name="description" content="BOOT_CFG0–7 的 4.7k 上拉阵列、复位释放时采样、拨码与 10k 下拉；启动失败的排查顺序。">
+<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第三篇 · 逐页读真实原理图</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 7 章<span class="sep">/</span>约 22 分钟</div>
+    <h1>核心板第 7 页：启动配置</h1>
+    <p class="lede">这一页没有芯片，只有一片电阻阵列：<b>R4–R24 各 4.7k</b> 把 BOOT_CFG0–7 上拉到 <code>DCDC_3V3</code>，另有 <b>R2 的 4.7k×4</b> 与底板上的 <b>R43–R50 10k</b> 和 8 位拨码共同决定启动值。<b>这是整块板「第一毫秒」的逻辑。</b></p>
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>说清「复位释放时采样」这件事的时序含义</li>
+        <li>判断拨码在 ON 时该给 0 还是 1（两种电路接法）</li>
+        <li>解释为什么 BOOT_CFG 用 4.7k 而不是 10k</li>
+        <li>按「电压→复位→时钟→BOOT_CFG→介质」的顺序排查启动失败</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">3.7.1</span>采样的时刻：复位释放的那一瞬间</h2>
+    <p>SoC 内部的 Boot ROM 在 <code>POR_B</code> 释放后极短时间内（微秒级）读取 BOOT_CFG 引脚电平，把它锁进寄存器，然后按表决定：从 eMMC、NAND、SD、USB 还是串口下载启动。<b>采样之后，这些脚就可以被复用成普通 IO</b>——所以它们既是配置脚，也是功能脚，这是 i.MX 系列的典型设计。</p>
+    <p>含义很直接：<b>上电期间这些脚的电平必须稳定</b>。如果上拉太弱、走线太长、引脚电容大，RC 建立时间超过采样窗口，Boot ROM 读到的就是随机值——表现为「有时能启动、有时不能」。</p>
+
+    <h2><span class="n">3.7.2</span>两种拨码接法，结论完全相反</h2>
+    <table>
+      <thead><tr><th>接法</th><th>拨到 ON 时</th><th>拨到 OFF 时</th><th>本板</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">上拉 + 开关到地</td><td>该位 = 0</td><td>该位 = 1（被上拉）</td><td>核心板 R4–R24 上拉 + 底板拨码到地，属此类</td></tr>
+        <tr><td class="nm">下拉 + 开关到电源</td><td>该位 = 1</td><td>该位 = 0</td><td>部分底板采用</td></tr>
+      </tbody>
+    </table>
+    <p>读图时必须看拨码的另一端接的是 GND 还是 3.3V。<b>搞反了，整张启动表都读错</b>，而且现象非常迷惑：拨码明明「按手册拨了」，就是不启动。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="20" y="18" width="410" height="180" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="36" y="42" fill="#eaf3ff" font-size="11">一位 BOOT_CFG 的等效电路</text>
+        <line x1="150" y1="64" x2="150" y2="80" stroke="#ffb84d"/>
+        <text x="158" y="72" fill="#ffd79a" font-size="9">DCDC_3V3</text>
+        <rect x="138" y="80" width="24" height="30" rx="3" fill="rgba(255,184,77,.15)" stroke="#ffb84d"/>
+        <text x="168" y="100" fill="#ffd79a" font-size="9">4.7k</text>
+        <line x1="150" y1="110" x2="150" y2="136" stroke="#5ff1ef"/>
+        <text x="160" y="130" fill="#9df5f4" font-size="9">BOOT_CFGx → SoC</text>
+        <line x1="150" y1="136" x2="150" y2="152" stroke="#5ce1a0"/>
+        <text x="106" y="168" fill="#9df3c2" font-size="9">拨码 ON → 接地 = 0</text>
+        <line x1="136" y1="152" x2="164" y2="152" stroke="#6f7f9c"/>
+        <text x="36" y="190" fill="#6f7f9c" font-size="9">ON=0、OFF=1（上拉型）</text>
+
+        <rect x="450" y="18" width="400" height="180" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="466" y="42" fill="#eaf3ff" font-size="11">为什么是 4.7k 而不是 10k</text>
+        <text x="466" y="72" fill="#9fb0c7" font-size="10">RC 建立：t ≈ 0.7×R×C</text>
+        <text x="466" y="96" fill="#9fb0c7" font-size="10">10k + 20pF → 约 140ns</text>
+        <text x="466" y="120" fill="#9fb0c7" font-size="10">4.7k + 20pF → 约 66ns</text>
+        <text x="466" y="144" fill="#9df3c2" font-size="10">采样窗口很窄，越快越稳</text>
+        <text x="466" y="168" fill="#6f7f9c" font-size="9">代价：常态多耗一点电（可忽略）</text>
+
+        <text x="20" y="230" fill="#9fb0c7" font-size="10.5">排查顺序：TP4/TP3 电压 → POR_B → 24MHz → 量 BOOT_CFG0–7 的实际电平 → 最后才怀疑介质本身。</text>
+        <text x="20" y="254" fill="#6f7f9c" font-size="10">用万用表逐位量 8 个脚，对照启动表，比反复拨码快得多。拨码接触不良是常见故障。</text>
+        <text x="20" y="278" fill="#ff9c9c" font-size="10">坑：BOOT_CFG 某位与 SD 卡信号复用，卡插入后电平被拉低，导致「插卡就启动不了」。</text>
+      </svg>
+      <figcaption><b>图 3-7</b>　一位 BOOT_CFG 的等效电路与 4.7k 的理由。</figcaption>
+    </figure>
+
+    <h2><span class="n">3.7.3</span>与复用功能的冲突</h2>
+    <p>BOOT_CFG 脚大多与 SD/eMMC 或 GPIO 复用。设计上通常这样处理：<b>上电时由上拉/下拉定值，启动后由软件切换为功能脚</b>。问题出在「外部电路」：如果该脚外接了强上拉/强下拉（比如 SD 卡的 47k 上拉），就会与 BOOT 电阻分压，改变采样值。</p>
+    <p>本板 TF 卡信号用 <b>R1–R5 47k</b> 上拉，而 BOOT 用 4.7k/10k——两者阻值差一个量级，分压影响有限，这就是「阻值要拉开差距」的设计理由。</p>
+
+    <div class="box pit">
+      <h5>三个启动故障的真实原因</h5>
+      <p><b>1. 拨码氧化/接触不良：</b>某位时高时低，现象是「十次里成功三次」。</p>
+      <p><b>2. 上拉电阻虚焊：</b>该位浮空，Boot ROM 读到不确定值。</p>
+      <p><b>3. 启动表版本不匹配：</b>照着别的板子的表拨码，位定义不同。</p>
+    </div>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>拨码全部拨到 ON 却不启动，第一步做什么？</summary><div class="ans">用万用表逐位量 BOOT_CFG0–7 的实际电平，确认「ON」到底给的是 0 还是 1，再对照本板启动表。不要凭拨码位置推断电平。</div></details>
+    <details class="quiz"><summary>为什么 BOOT_CFG 的阻值要和复用功能的上拉阻值拉开数量级？</summary><div class="ans">避免分压改变采样电平。例如 4.7k 上拉与 47k 上拉并联，等效变化约 9%，仍在阈值内；若两者都是 10k，变化就是 50%，可能读错。</div></details>
+    <details class="quiz"><summary>采样发生在什么时候？之后这些脚能当普通 IO 吗？</summary><div class="ans">在 POR_B 释放后的极短窗口内采样并锁存；之后可由软件复用为功能脚（GPIO/SD 等），所以同一脚既做配置又做功能。</div></details>
+
+    <div class="ch-nav"><a href="c06.html"><span>上一章</span><b>← 3.6 核心板第 6 页</b></a>
+      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.8 MINI 第 1 页 →</b></a></div>
+  </main>
+</div>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+<script>renderPart('p3','c07.html');</script>
+</body></html>

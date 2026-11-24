@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3.3 核心板第 2 页：SoC 电源脚 | 第三篇 · 逐页读真实原理图 | i.MX6ULL 学习手册</title>
+<meta name="description" content="VDD_ARM_CAP/VDD_SOC_CAP 的内置 LDO 与旁路、NVCC 电压域分组、去耦电容怎么配、SNVS 常电脚。">
+<link rel="stylesheet" href="../../assets/style.css"><link rel="stylesheet" href="../../assets/book.css"><link rel="stylesheet" href="../../assets/mobile.css">
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+<div class="shell">
+  <aside id="sidebar"><div class="vol-h">第三篇 · 逐页读真实原理图</div><ol id="sideList"></ol><div class="vol-nav" id="volNav"></div></aside>
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">第三篇 · 读图</span><span class="sep">/</span>第 3 章<span class="sep">/</span>约 24 分钟</div>
+    <h1>核心板第 2 页：SoC 的电源脚怎么接</h1>
+    <p class="lede">i.MX6ULL 有上百个电源/地脚，但归类只有几种：<b>内核（ARM/SOC）</b>、<b>IO 电压域（NVCC_*）</b>、<b>模拟（USB/ADC/PLL）</b>、<b>常电（SNVS）</b>。这一页的关键不是「接上电源」，而是<b>每个域接哪一路、旁路电容放几颗</b>。</p>
+    <div class="goals">
+      <h4>读完这一章，你应该能</h4>
+      <ol>
+        <li>说出 VDD_ARM_CAP / VDD_SOC_CAP 的用途，以及内外部 LDO 两种模式的区别</li>
+        <li>解释 NVCC_* 为什么分这么多组，接错会有什么后果</li>
+        <li>按「大容值 + 小容值 + 靠近引脚」三原则布置去耦</li>
+      </ol>
+    </div>
+
+    <h2><span class="n">3.3.1</span>内核电源：CAP 脚是「内置 LDO 的输出」</h2>
+    <p>i.MX6ULL 内部集成了给 ARM 核与 SOC 逻辑供电的 LDO。规格书里的 <b>VDD_ARM_CAP</b>、<b>VDD_SOC_CAP</b> 就是这些内部 LDO 的输出脚，需要外接电容稳定环路；如果外部另有 DCDC 供电（本板就是），则要走「LDO 旁路（bypass）」配置，把内部 LDO 关掉或短接，避免内外打架。</p>
+    <table>
+      <thead><tr><th>脚</th><th>作用</th><th>外接</th><th>读图要点</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">VDD_ARM_IN / VDD_ARM_CAP</td><td>ARM 核供电与其内部 LDO 输出</td><td>外部 1.35V + 去耦；CAP 脚挂 10µF+0.1µF</td><td>若用外部 DCDC，需按手册设置旁路，CAP 仍要电容</td></tr>
+        <tr><td class="nm">VDD_SOC_IN / VDD_SOC_CAP</td><td>SOC 逻辑供电与内部 LDO 输出</td><td>同上</td><td>两路常同源，但要分别去耦</td></tr>
+        <tr><td class="nm">VDD_SNVS_IN</td><td>常电域输入（2.4–3.6V，典型 3.0V）</td><td>电池或 SNVS LDO</td><td>主电源断开时仍要有电</td></tr>
+        <tr><td class="nm">VDD_HIGH_CAP</td><td>USB PHY / 模拟高压内部稳压输出</td><td>外接电容</td><td>只挂电容，不要外部灌电</td></tr>
+      </tbody>
+    </table>
+    <div class="box deep">
+      <h5>「CAP 脚只挂电容」是一条硬规则</h5>
+      <p>CAP 是内部稳压器的输出，外部再给它加电源等于两个电源并联，轻则环流失稳，重则损坏。读图时看到 CAP 脚只连电容、不连任何电源网络，说明设计正确。</p>
+    </div>
+
+    <h2><span class="n">3.3.2</span>NVCC 电压域：为什么分这么多组</h2>
+    <p><code>NVCC_GPIO</code>、<code>NVCC_UART</code>、<code>NVCC_SD</code>、<code>NVCC_CSI</code>、<code>NVCC_ENET</code> 等是 SoC 的 IO 供电域，分组的目的有两个：</p>
+    <ul>
+      <li><b>电平可配</b>：不同外设可能需要 1.8V 或 3.3V，分组后可以独立设定；</li>
+      <li><b>噪声隔离</b>：SD 卡、以太网这类高速/大电流接口的噪声不污染其他域。</li>
+    </ul>
+    <p>接错的后果很具体：把 1.8V 器件接到 3.3V 域 → 灌电、发热、通信异常；把 3.3V 器件接到 1.8V 域 → 电平不够、读不到高。</p>
+    <p>本板：<b>NVCC_SD</b> 由 U9 可控（1.8/3.3V 切换，TP6）；<b>NVCC_CSI</b> 由 U12（XC6206P282）固定 2.8V（TP8）；<b>NVCC_GPIO</b> 接 <code>DCDC_3V3</code>。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
+        <rect x="20" y="18" width="410" height="220" rx="10" fill="#141c2e" stroke="#3a4560"/>
+        <text x="36" y="42" fill="#eaf3ff" font-size="11">四类电源脚</text>
+        <text x="36" y="70" fill="#9df5f4" font-size="10">内核：VDD_ARM / VDD_SOC（1.35V）</text>
+        <text x="36" y="92" fill="#9fb0c7" font-size="9.5">大电流、对纹波敏感、需要 CAP 电容</text>
+        <text x="36" y="118" fill="#9df3c2" font-size="10">IO 域：NVCC_GPIO / SD / CSI / ENET</text>
+        <text x="36" y="140" fill="#9fb0c7" font-size="9.5">电平可配，接错就通信异常</text>
+        <text x="36" y="166" fill="#c8c0ff" font-size="10">模拟：USB PHY、ADC、PLL</text>
+        <text x="36" y="188" fill="#9fb0c7" font-size="9.5">要低噪声，常加 LC/磁珠隔离</text>
+        <text x="36" y="214" fill="#ffd79a" font-size="10">常电：VDD_SNVS_IN</text>
+        <text x="36" y="232" fill="#9fb0c7" font-size="9.5">断电仍活，靠电池或独立 LDO</text>
+
+        <rect x="450" y="18" width="400" height="220" rx="10" fill="rgba(255,255,255,.03)" stroke="#3a4560"/>
+        <text x="466" y="42" fill="#eaf3ff" font-size="11">去耦三原则</text>
+        <text x="466" y="72" fill="#9df5f4" font-size="10">① 大容值管低频</text>
+        <text x="466" y="94" fill="#9fb0c7" font-size="9.5">22µF/10µF 放在域入口，稳负载跳变</text>
+        <text x="466" y="120" fill="#9df5f4" font-size="10">② 小容值管高频</text>
+        <text x="466" y="142" fill="#9fb0c7" font-size="9.5">0.1µF 放在每个电源脚旁，越近越好</text>
+        <text x="466" y="168" fill="#9df5f4" font-size="10">③ 过孔与回流</text>
+        <text x="466" y="190" fill="#9fb0c7" font-size="9.5">电容地过孔靠 GND 平面，别共用长走线</text>
+        <text x="466" y="216" fill="#ff9c9c" font-size="9.5">只有大容值没有小容值：高频尖峰照过</text>
+
+        <text x="20" y="264" fill="#9fb0c7" font-size="10.5">判定方法：示波器交流耦合、20MHz 带宽限制，量内核轨的纹波峰峰值；超过手册限值先查去耦与布局。</text>
+        <text x="20" y="288" fill="#6f7f9c" font-size="10">「电源脚都接了」不等于「电源设计对了」——去耦的位置比数量更重要。</text>
+        <text x="20" y="312" fill="#ff9c9c" font-size="10">坑：CAP 脚接了外部电源，内部 LDO 与外部 DCDC 对打，电压震荡。</text>
+      </svg>
+      <figcaption><b>图 3-3</b>　四类电源脚与去耦三原则。</figcaption>
+    </figure>
+
+    <h2><span class="n">3.3.3</span>读这一页的顺序</h2>
+    <ol class="steps">
+      <li>找 SoC 符号（U1A–U1E），先看它是哪一部分（电源脚通常单独一页）。</li>
+      <li>把每个电源脚旁的电容数一遍：<b>没有 0.1µF 的脚就是隐患</b>。</li>
+      <li>核对每个 NVCC 域接的是哪一路电压，与本板电源树（3.2 章）对上。</li>
+      <li>找 SNVS 相关脚，确认它接的是常电而不是主 3.3V。</li>
+      <li>找 CAP 脚，确认只挂电容、无外部电源。</li>
+    </ol>
+
+    <h3>自测</h3>
+    <details class="quiz"><summary>VDD_ARM_CAP 上量到 1.35V，但外部 DCDC 也输出 1.35V，这正常吗？</summary><div class="ans">要区分模式：如果设计为外部供电 + 内部 LDO 旁路，CAP 脚应与 1.35V 同电位（通过内部旁路开关），属正常；如果手册要求内部 LDO 工作，CAP 是内部输出，外部再灌电就是错误。</div></details>
+    <details class="quiz"><summary>NVCC_SD 固定接 3.3V 会有什么问题？</summary><div class="ans">SD 卡切到 1.8V 高速模式后，IO 上拉到 3.3V 会经 ESD 二极管持续灌电，卡或 SoC 都可能损坏，通信也不稳。必须跟随切换。</div></details>
+    <details class="quiz"><summary>为什么每个电源脚都要一颗 0.1µF，而不是一个域共用一颗？</summary><div class="ans">因为引脚到共用电容之间有走线电感，高频电流来不及从远处补，只有「就近」的电容才有效。共用一颗等于放弃高频去耦。</div></details>
+
+    <div class="ch-nav"><a href="c02.html"><span>上一章</span><b>← 3.2 核心板第 1 页</b></a>
+      <a class="nx" id="chNavNext" href="../index.html"><span>下一章</span><b>3.4 核心板第 3 页 →</b></a></div>
+  </main>
+</div>
+<script src="../../assets/parts.js"></script><script src="../../assets/part.js"></script>
+<script>renderPart('p3','c03.html');</script>
+</body></html>
