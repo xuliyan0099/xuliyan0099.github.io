@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RM59 看门狗 WDOG</title>
+<title>RM 第 59 章 · 看门狗 WDOG | i.MX6ULL 逐章解读</title>
 <style>/* 白板互动教学设计系统 · 样式。由 scripts/inline.py 整段拼进页面，不要手抄或删减。
  * 页面的全部颜色、字号、间距、圆角、阴影只在 :root 定义；改主题只改这一段。 */
 
@@ -2469,30 +2469,30 @@ text.bd-an-inner { font-size: var(--size-l4); }
   <symbol id="i-reset" viewBox="0 0 24 24"><title>重置</title><path d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5M4.5 4v4.5H9"/></symbol>
   <symbol id="i-prev" viewBox="0 0 24 24"><title>上一步</title><path d="M15 5l-7 7 7 7"/></symbol>
   <symbol id="i-next" viewBox="0 0 24 24"><title>下一步</title><path d="M9 5l7 7-7 7"/></symbol>
-  <symbol id="i-close" viewBox="0 0 24 24"><title>收起</title><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><title>关闭</title><path d="M6 6l12 12M18 6L6 18"/></symbol>
   <symbol id="i-explain" viewBox="0 0 24 24"><title>讲解</title><path d="M3 5.5c3-1 6-.8 9 1 3-1.8 6-2 9-1V19c-3-1-6-.8-9 1-3-1.8-6-2-9-1zM12 6.5V20"/></symbol>
   <symbol id="i-correct" viewBox="0 0 24 24"><title>正确</title><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
   <symbol id="i-wrong" viewBox="0 0 24 24"><title>错误</title><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
-  <symbol id="i-alert" viewBox="0 0 24 24"><title>越界</title><path d="M12 4l9 16H3zM12 10v4.5M12 17.6v.1"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><title>注意</title><path d="M12 4l9 16H3zM12 10v4.5M12 17.6v.1"/></symbol>
   <symbol id="i-drag" viewBox="0 0 24 24"><title>拖动</title><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></symbol>
-  <symbol id="i-speak" viewBox="0 0 24 24"><title>发音</title><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+  <symbol id="i-speak" viewBox="0 0 24 24"><title>朗读</title><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
   <symbol id="i-fullscreen" viewBox="0 0 24 24"><title>全屏</title><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
-  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>退出全屏</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
+  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>RM 第 17 章 · NAND 纠错加速器 BCH | i.MX6ULL 逐章解读</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
 </svg>
 
 <div class="bd-viewport" id="viewport">
   <div class="bd-canvas" id="canvas">
     <header class="bd-titlebar">
-      <h1 class="bd-title">第 59 章 · 看门狗 WDOG</h1>
+      <h1>第 59 章 · 看门狗定时器（WDOG）</h1>
       <span class="bd-hint" id="hint"></span>
       <div class="bd-readings">
         <span class="bd-reading bd-reading-emphasis">
-          <span class="bd-reading-name">最长超时</span>
-          <span class="bd-reading-value">128 s</span>
+          <span class="bd-reading-name">WDOG 实例</span>
+          <span class="bd-reading-value">3 个</span>
         </span>
         <span class="bd-reading">
-          <span class="bd-reading-name">掉电计数</span>
-          <span class="bd-reading-value">16 s</span>
+          <span class="bd-reading-name">超时范围</span>
+          <span class="bd-reading-value">0.5–128 s</span>
         </span>
       </div>
     </header>
@@ -2506,6 +2506,7 @@ text.bd-an-inner { font-size: var(--size-l4); }
         <button class="bd-btn" type="button" id="next"></button>
       </div>
       <div class="bd-actions">
+        <a class="bd-btn" href="c58.html" style="text-decoration:none">← RM58</a> <a class="bd-btn" href="c60.html" style="text-decoration:none">RM60 →</a>
         <a class="bd-btn" href="index.html" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">☰ 目录</a>
         <button class="bd-btn" type="button" id="reset"></button>
       </div>
@@ -3627,6 +3628,283 @@ function reader(root, sentences, opts) {
   };
 }
 </script>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
 <script>
 var $ = function (id) { return document.getElementById(id); };
 var OX = 24, OY = 96;
@@ -3637,10 +3915,20 @@ var INIT = { step: 0 };
 var state = { step: INIT.step };
 
 var STEPS = [
-  { h: '1 / 4 三个看门狗，两个计数器', hint: '复位路与掉电路分开', note: '超时计数器可配 0.5–128 s；掉电计数器固定 16 秒，复位后就开着。' },
-  { h: '2 / 4 超时长度由 WT 决定', hint: '一格 0.5 秒', note: '复位 WCR = 0x0030 已是 24.5 s，但 WDE = 0，所以复位后它并不跑。' },
-  { h: '3 / 4 喂狗与提前预警', hint: '两次写，缺一次不算', note: '喂狗失败是静默的：计数器没重装，也不会报错，只能等它超时。' },
-  { h: '4 / 4 掉电计数器与上板顺序', hint: '16 秒内必须清 PDE', note: '「跑一会儿自己断电」八成是 PWM 之外的这件事：PDE 没清。' }
+  { h: '三个看门狗', hint: '0x020B_C000 起',
+    note: 'WDOG1/2/3 各管一块：WDOG1 常在 A7 侧，WDOG3 管 M4，复位范围不同。' },
+  { h: '超时是 0.5 秒一格', hint: 'WT 8 位',
+    note: '超时 =(WT+1)×0.5 s，从 0.5 s 到 128 s；喂狗是写两个魔数，顺序不能反。' },
+  { h: 'WCR 的锁', hint: '写一次就定终身',
+    note: 'WDE 一旦置 1 软件再也关不掉；WDT 要到下次 POR 才能改 —— 这是保险，也是陷阱。' },
+  { h: '提前预警', hint: 'WICT 预中断',
+    note: '在超时前 WICT×0.5 s 产生中断，给你最后一次机会记录现场或优雅收尾。' },
+  { h: '谁复位了我', hint: 'WRSR 溯源',
+    note: 'POR / TOUT / SFTW 三位，配合 SRC 的 SRSR 就能分清“掉电、狗咬、软复位”。' },
+  { h: '上电 16 秒陷阱', hint: 'PDE 默认开',
+    note: '复位后电源关断计数器就开跑，固定 16 s 后拉 WDOG_B；不清 PDE 就会莫名重启。' },
+  { h: '板上判据', hint: '故意咬一次',
+    note: '不喂狗、计时、读 WRSR、量 WDOG_B，四步走完才算真正验证了看门狗。' }
 ];
 
 function txt(parent, x, y, s, cls, anchor) {
@@ -3649,253 +3937,135 @@ function txt(parent, x, y, s, cls, anchor) {
 function box(x, y, w, h, fill, stroke, sw) {
   return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
 }
-function arrow(x1, y1, x2, y2) {
-  svgEl(scene, 'line', { x1: x1, y1: y1, x2: x2, y2: y2, stroke: 'var(--text-2)', 'stroke-width': 4 });
-  var a = Math.atan2(y2 - y1, x2 - x1), L = 18, W = 9;
-  svgEl(scene, 'path', {
-    d: 'M' + x2 + ' ' + y2 + ' L' + (x2 - L * Math.cos(a) + W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) - W * Math.cos(a)) +
-      ' L' + (x2 - L * Math.cos(a) - W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) + W * Math.cos(a)) + ' Z',
-    fill: 'var(--text-2)', stroke: 'none'
-  });
-}
 function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+function three(a, b, c) {
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(a[0], 214, a[1]); for (var i = 0; i < a[2].length; i++) txt(scene, a[0], 252 + i * 36, a[2][i], a[3] || 't20w');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(b[0], 214, b[1]); for (var j = 0; j < b[2].length; j++) txt(scene, b[0], 252 + j * 36, b[2][j], b[3] || 't20w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(c[0], 214, c[1]); for (var k = 0; k < c[2].length; k++) txt(scene, c[0], 252 + k * 36, c[2][k], c[3] || 't20w');
+}
+function prose(title, lines) {
+  wide(456, 330);
+  txt(scene, 80, 490, title, 't24');
+  for (var i = 0; i < lines.length; i++) txt(scene, 80, 522 + i * 34, lines[i], 't20w');
+}
 
 function drawTop() {
-  txt(scene, 56, 146, '一个超时事件有两条出路：走复位，或者直接把芯片断掉', 't28w');
-
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '时钟只有一个，计数器有两个');
-
-  box(80, 250, 420, 84, 'var(--surface)', 'var(--line)', 2);
-  txt(scene, 104, 286, '低频参考时钟', 't28');
-  txt(scene, 104, 318, '32.768 kHz，计数器靠它走', 't28w');
-
-  box(520, 250, 420, 84, 'var(--surface)', 'var(--line)', 2);
-  txt(scene, 544, 286, 'ipg_clk', 't28');
-  txt(scene, 544, 318, '寄存器读写另走 ipg_clk_s', 't28w');
-
-  arrow(290, 334, 290, 384);
-  arrow(730, 334, 730, 384);
-
-  box(80, 384, 420, 96, 'var(--page)', 'var(--observe-line)', 4);
-  txt(scene, 104, 420, '超时计数器', 't28');
-  txt(scene, 104, 456, 'WDE 使能，0.5 – 128 s', 't28w');
-
-  box(520, 384, 420, 96, 'var(--page)', 'var(--observe-line)', 4);
-  txt(scene, 544, 420, '掉电计数器', 't28');
-  txt(scene, 544, 456, '复位即开，固定 16 s', 't28w');
-
-  arrow(290, 480, 290, 540);
-  arrow(730, 480, 730, 540);
-
-  box(80, 540, 420, 88, 'var(--page)', 'var(--line)', 2);
-  txt(scene, 100, 578, 'WDOG_RESET_B_DEB', 'tnum');
-  txt(scene, 100, 612, '→ SRC，走系统复位', 't28w');
-
-  box(520, 540, 420, 88, 'var(--page)', 'var(--line)', 2);
-  txt(scene, 540, 578, 'WDOG_B', 'tnum');
-  txt(scene, 540, 612, '→ 芯片掉电', 't28w');
-
-  txt(scene, 80, 676, '两个计数器互相独立：一个负责「重启」，一个负责「断电」', 't28w');
-  txt(scene, 80, 716, '掉电计数器的目的，是防止复位后软件挂死而没人管', 't28w');
-  txt(scene, 80, 756, '所以它复位即开，只给你 16 秒去表态', 't28w');
-
-  box(1020, 168, 850, 300, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '三个实例，各自的地址');
-  var inst = [['WDOG1', '0x020B_C000'], ['WDOG2', '0x020C_0000'], ['WDOG3', '0x021E_4000']];
-  inst.forEach(function (r, i) {
-    var y = 268 + i * 52;
-    txt(scene, 1044, y, r[0], 't28');
-    txt(scene, 1240, y, r[1], 'tnum');
-  });
-  txt(scene, 1044, 448, '每个实例 6 个 16 位寄存器，按 2 字节递增', 't28w');
-
-  box(1020, 500, 850, 296, 'var(--page)', 'var(--line)');
-  head(1044, 548, '偏移就这五个');
-  var regs = [
-    ['+0x00  WCR', '控制：使能、长度、挂起'],
-    ['+0x02  WSR', '服务：两次写才重装'],
-    ['+0x04  WRSR', '上次复位是谁干的'],
-    ['+0x06  WICR', '提前中断的开关与提前量'],
-    ['+0x08  WMCR', '掉电计数器那一位']
-  ];
-  regs.forEach(function (r, i) {
-    var y = 592 + i * 44;
-    txt(scene, 1044, y, r[0], 'tnum');
-    txt(scene, 1240, y, r[1], 't28w');
-  });
+  txt(scene, 56, 146, '看门狗是“最后一道保险”：软件跑飞了它替你按复位；但它的配置几乎全是写一次就锁死的', 't24w');
+  three([80, '三个实例', ['WDOG1  0x020B_C000', 'WDOG2  0x020C_0000', 'WDOG3  0x021E_4000', '各占 0x10 字节', '寄存器全为 16 位', '复位范围由 SRC 决定'], 't20s'],
+        [680, '五个寄存器', ['+0x00 WCR 控制', '+0x02 WSR 服务（喂狗）', '+0x04 WRSR 复位原因', '+0x06 WICR 预中断', '+0x08 WMCR 杂项', '复位值 0030/0000/0000/0004/0001'], 't20s'],
+        [1280, '访问约束', ['只支持 16 位访问', '8 位也可以', '32 位访问不报错但危险', '可能让系统进未知状态', '只读寄存器写会总线报错', '别用 memcpy 批量写']]);
+  prose('“复位范围不同”这句最重要：WDOG3 的复位默认可能只作用于 M4 域（由 SRC 的 SCR[24] 选择），所以它未必能救 A7', [
+    'WDOG1 与 WDOG2 分别服务不同的复位域与时钟域，具体哪一路能复位整片要看 SRC 的掩码与选项位（第 51 章）。',
+    '16 位访问是硬约束：用 32 位写会把相邻寄存器的内容一起改掉，而硬件不会报错，属于最阴的一类 bug。',
+    'WRSR 写一下就直接总线报错，这条设计是故意的：防止软件把“谁复位了我”的证据抹掉。',
+    '三个看门狗同时开容易互相“打架”：一个喂了另一个没喂，结果复位时间比你预期的短。',
+    '实际产品通常只用一个，另一个留给安全域或协处理器；把三个都开着不是“更安全”，而是更难定位。',
+    '一句话：先确认“哪一路的复位真的能重启整机”，再谈超时时间与喂狗策略。']);
 }
 
 function drawTimeout() {
-  txt(scene, 56, 146, '超时长度全写在一个 8 位字段里，一格 0.5 秒', 't28w');
-
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, 'WT[7:0] 的换算');
-
-  var chips = [['0x01', '1.0 s'], ['0x0F', '8.0 s'], ['0x30', '24.5 s'], ['0xFF', '128 s']];
-  chips.forEach(function (c, i) {
-    var x = 80 + i * 220;
-    box(x, 252, 200, 84, 'var(--surface)', 'var(--line)', 2);
-    txt(scene, x + 20, 292, 'WT=' + c[0], 'tnum');
-    txt(scene, x + 20, 326, '→ ' + c[1], 't28');
-  });
-
-  arrow(490, 340, 490, 392);
-
-  box(80, 392, 860, 216, 'var(--page)', 'var(--guide)', 3);
-  head(104, 438, '从启动到超时');
-  txt(scene, 104, 484, '① WDE = 1 才启动，装载 WT，每 0.5 s 减 1', 't28w');
-  txt(scene, 104, 524, '② 每次喂狗都重装 WT，归零前都来得及', 't28w');
-  txt(scene, 104, 564, '③ 归零 → 拉 WDOG_RESET_B_DEB 交给 SRC', 't28w');
-  txt(scene, 104, 604, '④ WDT = 1 时同时拉 WDOG_B，把芯片断掉', 't28w');
-
-  txt(scene, 80, 664, '改 WT 不用停计数器：新值在下次喂狗时才装载', 't28w');
-  txt(scene, 80, 704, '复位 WCR = 0x0030 → 24.5 s，但 WDE = 0，所以并不跑', 't28w');
-  txt(scene, 80, 744, '超时不是中断，是复位；想要预警得另开 WICR', 't28w');
-
-  box(1020, 168, 850, 340, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, 'WCR 里真正要动的位');
-  var bits = [
-    ['WDE = 1', '启动超时计数器（复位为 0）'],
-    ['WDT = 1', '超时时同时拉 WDOG_B'],
-    ['WT[7:0]', '超时长度，一格 0.5 s'],
-    ['SRS / SRE', '软件复位入口，配合着用'],
-    ['WDZST = 1', 'STOP / DOZE 里挂起'],
-    ['WDBG = 1', '调试模式下挂起']
-  ];
-  bits.forEach(function (b, i) {
-    var y = 264 + i * 44;
-    txt(scene, 1044, y, b[0], 'tnum');
-    txt(scene, 1240, y, b[1], 't28w');
-  });
-
-  box(1020, 536, 850, 260, 'var(--page)', 'var(--line)');
-  head(1044, 584, '两个输出不能混用');
-  txt(scene, 1044, 632, 'WDOG_RESET_B_DEB：复位源，进 SRC', 't28w');
-  txt(scene, 1044, 676, 'WDOG_B：掉电，不是复位', 't28w');
-  txt(scene, 1044, 720, 'WDOG1_B → GPIO1_IO01(ALT8)', 't28w');
-  txt(scene, 1044, 764, 'WDOG2_B → LCD_VSYNC，WDOG3_B → GPIO1_IO00', 't28w');
+  txt(scene, 56, 146, '超时时间是 8 位字段换算出来的：0.5 秒一格，最大 128 秒；喂狗则是两个固定魔数', 't24w');
+  three([80, 'WT 的算法', ['WCR[15:8] = WT', '超时 =(WT+1)×0.5 s', 'WT=0x00 → 0.5 s', 'WT=0x03 → 2.0 s', 'WT=0xFF → 128 s', '写 WT 后才置 WDE'], 't20s'],
+        [680, '喂狗序列', ['先写 0x5555', '再写 0xAAAA', '顺序不能反', '两次都在超时前完成', '中间可执行任意指令', '写完计数器重装'], 't20s'],
+        [1280, '常见错误', ['只写 0xAAAA', '等于没喂', '喂在超时之后', '下一次照样复位', '在中断里喂但中断被关', '狗照样咬']]);
+  prose('0.5 秒一格意味着“2 秒”是 WT=0x03，而不是 0x04；把“格数”当“秒数”是最常见的算错方式', [
+    '喂狗的两次写必须成对：只写 0x5555 或只写 0xAAAA 都不算完成服务，计数器照样走到底。',
+    '两次写之间可以执行任意指令（手册明确允许），但必须都在超时窗口内 —— 所以别在中间插入可能阻塞的调用。',
+    '如果程序里有长时间关中断的临界区，要把这个最坏时长算进超时值，否则“关中断保护数据”会变成“被狗咬”。',
+    '喂狗最好放在“主循环心跳”里，而不是放在某个高频中断里：后者即使主循环死了也照样喂，等于没保护。',
+    '反过来，喂狗任务本身的优先级要够低，才能证明“整个系统还活着”，而不只是“这个中断还活着”。',
+    '判据：把超时设成 1 s，主循环里加 3 s 延时，应观察到稳定复位；读 WRSR 的 TOUT 应为 1。']);
 }
 
-function drawService() {
-  txt(scene, 56, 146, '喂狗只有一条合法路径：先 0x5555，再 0xAAAA', 't28w');
-
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, 'WSR 的两次写');
-
-  box(80, 256, 380, 96, 'var(--page)', 'var(--observe-line)', 4);
-  txt(scene, 100, 292, 'WSR ← 0x5555', 'tnum');
-  txt(scene, 100, 328, '第一把钥匙', 't28w');
-
-  arrow(462, 304, 508, 304);
-
-  box(520, 256, 380, 96, 'var(--page)', 'var(--line)', 2);
-  txt(scene, 540, 292, 'WSR ← 0xAAAA', 'tnum');
-  txt(scene, 540, 328, '第二把，才重装 WT', 't28w');
-
-  txt(scene, 80, 400, '两次之间可以插任意指令，被打断也没关系', 't28w');
-  txt(scene, 80, 440, '但顺序反了、或第二次不是 0xAAAA，计数器就不动', 't28w');
-  txt(scene, 80, 480, '最要命的是它不报错：喂狗失败是静默的', 't28w');
-
-  box(80, 516, 860, 264, 'var(--surface)', 'var(--guide)');
-  head(104, 562, '提前预警：WICR');
-  txt(scene, 104, 608, 'WIE = 1 才允许中断，WICT 定提前多久', 't28w');
-  txt(scene, 104, 648, 'WICT 0 – 127.5 s，步进 0.5；0x04 = 提前 2 s', 't28w');
-  txt(scene, 104, 692, 'WTIS 置位表示已经报过，得写 1 清掉', 't28w');
-  txt(scene, 104, 732, '在中断点前喂上狗，这次中断根本不会来', 't28w');
-
-  box(1020, 168, 850, 300, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '四种「让它别跑」的场景');
-  var low = [
-    ['WDZST = 1', 'STOP / DOZE 里挂起'],
-    ['WDW = 1', 'WAIT 里挂起'],
-    ['WDBG = 1', 'DEBUG 里挂起，进出各延 2 拍'],
-    ['都不设', '低功耗里照样数，照样咬人']
-  ];
-  low.forEach(function (b, i) {
-    var y = 264 + i * 46;
-    txt(scene, 1044, y, b[0], 'tnum');
-    txt(scene, 1240, y, b[1], 't28w');
-  });
-  txt(scene, 1044, 452, '挂起后忘了喂狗 = 退出低功耗立刻超时', 't28w');
-
-  box(1020, 500, 850, 296, 'var(--page)', 'var(--line)');
-  head(1044, 548, '调试时的一个坑');
-  txt(scene, 1044, 596, 'WDBG 置位后计时停，寄存器照样能读写', 't28w');
-  txt(scene, 1044, 640, '调试模式下改 WDE，退出后仍保持新状态', 't28w');
-  txt(scene, 1044, 684, '掉电计数器不受调试进出影响，照样数 16 秒', 't28w');
-  txt(scene, 1044, 728, '所以调试阶段也得先把 PDE 清掉', 't28w');
+function drawWcr() {
+  txt(scene, 56, 146, 'WCR 十六位里有五个是“写一次就锁”：WDW/WDBG/WDW、WDE、WDT —— 配错就得复位甚至换电', 't24w');
+  three([80, '关键位', ['[2] WDE 使能（写一次）', '[3] WDT 超时拉 WDOG_B', '[4] SRS 软件复位（自清）', '[5] WDA 软件拉 WDOG_B', '[1] WDBG 调试时暂停', '[0] WDZST 低功耗暂停'], 't20s'],
+        [680, '写一次的含义', ['WDE 一旦置 1', '软件再也清不掉', '只有复位能关', 'WDT 要到下次 POR 才解锁', 'WDW/WDBG/WDZST 同样锁', '所以“先想清楚再写”'], 't20s'],
+        [1280, '调试期怎么办', ['WDBG=1 调试时停狗', '否则断点就被复位', '量产构建里必须清 0', '或者用 SRC 掩码', 'SCR[10:7]=0101 掩掉', '两者不要同时依赖']]);
+  prose('调试时先把 WDBG 置 1 是常规操作：否则你在断点上停超过超时时间，芯片就被自己咬复位，调试会话直接断', [
+    '但 WDBG 是写一次的，改了就得复位才能改回来 —— 所以要用“编译期开关”决定这一次到底置不置。',
+    'SRS 是软件复位位：写 0 触发一次系统复位，硬件随后把它自动置回 1；它可以用来做“软重启”，但注意它不是清 WDE 的手段。',
+    'WDA 与 WDT 的区别：WDA 是“软件主动拉 WDOG_B”，WDT 是“超时时拉 WDOG_B”。有的板子 WDOG_B 接 PMIC，拉它等于断电。',
+    'SRE 选择软件复位的新旧方式：新方式更抗干扰，但要求复位电路配合，改之前先看板子是否支持。',
+    'WCR 复位值 0x0030 表示 WDA=1、SRS=1（都是“无效”状态），WDE=0 即默认关闭；所以“默认开着”是错觉。',
+    '判据：置 WDE 后尝试清 0，读回仍为 1 —— 确认锁生效；此时只能靠复位关闭，这一点必须在设计文档里写明。']);
 }
 
-function drawPowerDown() {
-  txt(scene, 56, 146, '掉电计数器不是看门狗的附属功能，它是独立的一条命', 't28w');
+function drawIrq() {
+  txt(scene, 56, 146, '看门狗能在咬之前先叫一声：WICT 决定提前多久，这是保存现场的最后窗口', 't24w');
+  three([80, 'WICR 位域', ['[15] WIE 中断使能（写一次）', '[14] WTIS 中断状态（写 1 清）', '[7:0] WICT 提前量', 'WICT 单位也是 0.5 s', '复位值 WICT=4 → 提前 2 s', '最大 127.5 s'], 't20s'],
+        [680, '怎么用', ['中断里写日志/存寄存器', '或做安全关机', '然后继续等超时', '也可以主动触发 SRS 软复位', '不处理就等着被咬', '别指望中断能“取消”超时'], 't20w'],
+        [1280, '设计要点', ['WICT 要小于超时', '否则永远不预警', '中断优先级要够高', '日志缓冲要预先分配', '别在中断里 malloc', '存完让狗继续跑']]);
+  prose('注意 WICT 是“提前量”而不是“第二次超时”：写 4 表示比超时早 2 秒触发，所以它必须小于整个超时时间', [
+    '如果 WICT 设得比超时还大，中断永远不会来 —— 这是“预警功能配了却没用”的典型原因。',
+    '中断里最该做的是“把关键状态写进保留内存或 flash”，而不是打印：串口打印可能来不及，且会阻塞。',
+    '有些实现会在预警中断里直接触发软复位（写 SRS），这样复位原因就是 SFTW 而不是 TOUT，日志里能区分。',
+    'WTIS 是写 1 清：不清就会反复进中断，看起来像“中断风暴”，实际是标志没清。',
+    'WIE 也是写一次的：开了就锁，所以调试阶段想临时关中断只能靠复位。',
+    '判据：把超时设 4 s、WICT 设 4（提前 2 s），应在第 2 s 左右进一次中断，第 4 s 复位；两个时间点都能实测到。']);
+}
 
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '16 秒的时间轴');
+function drawWrsr() {
+  txt(scene, 56, 146, '复位之后先读 WRSR：POR 说明是上电，TOUT 说明是狗咬，SFTW 说明是软件自己按的', 't24w');
+  three([80, 'WRSR 位', ['[4] POR 上电复位', '[1] TOUT 看门狗超时', '[0] SFTW 软件复位', '[3:2] 保留', '只读，写会总线报错', '不会被硬复位清掉'], 't20s'],
+        [680, '与 SRC 配合', ['SRC SRSR[4] = wdog_rst_b', 'SRSR[3] = 用户复位', 'SRSR[0] = 上电', '两个寄存器互为印证', 'WRSR 只说“狗”', 'SRSR 说“全片”'], 't20s'],
+        [1280, '读的顺序', ['启动最早期就读', '早于任何可能清零的代码', '先存到保留内存', '再打印或上报', '否则证据会丢', '这也是“黑匣子”思路']]);
+  prose('WRSR “不会被硬复位清掉”意味着它能跨多次复位保留：这也是它比日志更可靠的原因', [
+    '优先级是“超时 > 软件复位”，两者同时成立时读出来是 TOUT —— 所以看到 TOUT 就不要怀疑是软复位。',
+    '如果 WRSR 全是 0，可能是你读得太晚（被别的代码清了），或者这一次真不是看门狗导致的复位。',
+    'POR 位能区分“断电重启”与“狗咬重启”，这对现场故障归因极有价值：现场说“它自己重启了”，一读就知道是哪种。',
+    '配合 SRC 的 SRSR 可以交叉验证：若 SRSR 的 bit4 也置了，说明确实是 WDOG 路径；若只有 SRSR[0]，那是掉电。',
+    '注意 SRC 可以“掩掉”看门狗复位（SCR[10:7]=0101），掩掉期间超时会发生但系统不复位，只在 WRSR 留痕。',
+    '判据：手动触发一次超时，复位后读 WRSR 应见 TOUT=1 且 POR=0；再断电重启，应见 POR=1、TOUT=0。']);
+}
 
-  box(80, 272, 260, 96, 'var(--page)', 'var(--line)', 2);
-  txt(scene, 100, 312, '复位释放 t = 0', 't28');
-  txt(scene, 100, 348, 'PDE 已是 1', 't28w');
+function drawPde() {
+  txt(scene, 56, 146, '最容易忽视的一条：复位后“电源关断计数器”默认就开着，固定 16 秒后拉 WDOG_B', 't24w');
+  three([80, '这个计数器', ['WMCR[0] PDE', '复位值 0001，即默认使能', '超时固定 16 秒', '不看 WT 字段', '不喂狗也无所谓', '只管“有没有被清掉”'], 't20s'],
+        [680, '后果', ['上电 16 s 后拉 WDOG_B', 'WDOG_B 常接 PMIC', '表现为“开机十几秒就重启”', '日志还没来得及打完', '很像电源问题', '实际是看门狗'], 't20w'],
+        [1280, '正确做法', ['启动最早期清 PDE', '在串口初始化之前', '在 DDR 初始化之前更好', '或由 bootloader 清', '清完再按需配 WT/WDE', '两者是独立机制']]);
+  prose('“16 秒”这个数字要背下来：现象是“每次开机十几秒后自己重启”，而代码里明明没开看门狗 —— 就是 PDE 没清', [
+    '手册的初始化步骤第一条就是“清 PDE 关掉电源关断计数器”，它排在“配 WT”“置 WDE”之前，说明这是前置条件。',
+    '这个计数器与正常的超时计数器是两套逻辑：清 PDE 只关前者，不影响你后面用 WT/WDE 开正常的看门狗。',
+    'bootloader 若已经清了 PDE，内核就不必再清；但内核也不能假设“一定清过”，读一次 WMCR 最稳。',
+    'WDOG_B 是板级信号，通常接 PMIC 的复位输入或电源使能；所以它“拉低”可能等价于整机断电重启，而不是简单的 CPU 复位。',
+    'WDOG_RESET_B_DEB 才是芯片内部的复位信号；WDT 位置 1 时两者会一起动作，这是“超时同时复位整机”的配置方式。',
+    '判据：上电后立刻读 WMCR 应为 0（已清）；若为 1 且在 16 s 左右复位，就确认是 PDE 没处理。']);
+}
 
-  arrow(342, 320, 370, 320);
-
-  box(372, 272, 260, 96, 'var(--page)', 'var(--observe-line)', 4);
-  txt(scene, 392, 312, '16 s 内清 PDE', 't28');
-  txt(scene, 392, 348, '窗口就这么宽', 't28w');
-
-  arrow(634, 320, 662, 320);
-
-  box(664, 272, 260, 96, 'var(--page)', 'var(--line)', 2);
-  txt(scene, 684, 312, '16 s 到', 't28');
-  txt(scene, 684, 348, '拉 WDOG_B 断电', 't28w');
-
-  txt(scene, 80, 412, 'WMCR 复位值 0x0001，PDE 已经在使能状态', 't28w');
-  txt(scene, 80, 452, '清掉是一次性的：想再开，只能等下次系统复位', 't28w');
-  txt(scene, 80, 492, '没清 → 板子自己断电，很容易误判成供电问题', 't28w');
-
-  box(80, 532, 860, 248, 'var(--surface)', 'var(--guide)');
-  head(104, 578, 'WMCR 就这一位有用');
-  txt(scene, 104, 624, 'PDE = 1 使能掉电计数器（复位即是 1）', 't28w');
-  txt(scene, 104, 664, 'PDE = 0 关掉，且不可逆，直到下次复位', 't28w');
-  txt(scene, 104, 704, '它的目的：防止复位后软件挂死、无人收场', 't28w');
-  txt(scene, 104, 744, '调试模式也救不了它，照样数满 16 秒', 't28w');
-
-  box(1020, 168, 850, 340, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '上板时按这个顺序');
-  var ord = [
-    ['①', '复位释放后，尽早清 PDE'],
-    ['②', 'WCR 定 WT / WDT，最后置 WDE'],
-    ['③', '定时喂狗：0x5555 然后 0xAAAA'],
-    ['④', '调试期把 WDBG 置上，别被咬'],
-    ['⑤', '出异常先读 WRSR，看是谁复的位']
-  ];
-  ord.forEach(function (b, i) {
-    var y = 264 + i * 42;
-    txt(scene, 1044, y, b[0], 'tnum');
-    txt(scene, 1090, y, b[1], 't28w');
-  });
-
-  box(1020, 536, 850, 260, 'var(--page)', 'var(--line)');
-  head(1044, 584, '三个必踩的坑');
-  txt(scene, 1044, 632, '只写 0xAAAA 没写 0x5555 → 一次都没喂上', 't28w');
-  txt(scene, 1044, 672, '忘清 PDE → 16 秒后自动断电，误判成电源', 't28w');
-  txt(scene, 1044, 712, '把 WDOG_B 当复位用 → 它是掉电，不重启', 't28w');
-  txt(scene, 1044, 752, 'WRSR 能告诉你是看门狗咬的，还是上电复位', 't28w');
+function drawBoard() {
+  txt(scene, 56, 146, '验证看门狗要“故意让它咬”：计时、读原因、量信号，三步缺一不可', 't24w');
+  three([80, '实验步骤', ['① 清 PDE，配 WT=1 s', '② 置 WDE，不开 WDBG', '③ 主循环加 3 s 延时', '④ 用示波器量 WDOG_B', '⑤ 记录复位时刻', '⑥ 复位后读 WRSR'], 't20w'],
+        [680, '预期结果', ['约 1 s 后 WDOG_B 拉低', '随后整机复位', 'WRSR 的 TOUT=1', 'SRSR[4]=1', '日志从启动头重新开始', '重复三次时间一致'], 't20w'],
+        [1280, '常见坑', ['调试器连着不复位', 'WDBG 被置 1 了', 'SRC 里被掩掉了', 'SCR[10:7]=0101', 'WDOG_B 没接任何东西', '板子根本不复位']]);
+  prose('“SRC 里被掩掉”是最隐蔽的一种：看门狗确实超时了，但 SRC 按掩码把复位过滤掉了，现象是“时间到了却什么都不发生”', [
+    '此时唯一的痕迹是 WRSR 的 TOUT 位与 SRC 的 SRSR[4]，所以“不复位”也要读这两处，而不是断定看门狗坏了。',
+    'WDOG_B 若在板上悬空，你只能看到寄存器变化而看不到电平；先查原理图它接到了哪里（PMIC、复位芯片还是 LED）。',
+    '调试器连着时，很多调试器会周期性访问 CPU 而让狗“看起来没咬”；把调试器断开再做实验最可信。',
+    '量产配置建议：超时值留 2–3 倍余量、开预中断存日志、WDBG 在发布版清 0，并把“最后复位原因”上报到服务器。',
+    '如果产品要求“永不复位”（如某些实时控制），就不要用看门狗复位，改用预中断做降级处理；但那是产品决策，不是默认行为。',
+    '判据：三次实验复位时间一致（抖动 < 5%）、WRSR 与 SRSR 都能对上、WDOG_B 波形可见 —— 三条齐了才叫验证完成。']);
 }
 
 function draw() {
-  var s = STEPS[state.step];
-  $('hint').textContent = s.hint;
-  $('note').textContent = s.note;
-  scene.textContent = '';
-  if (state.step === 0) drawTop();
-  else if (state.step === 1) drawTimeout();
-  else if (state.step === 2) drawService();
-  else drawPowerDown();
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) drawTimeout();
+  else if (s === 2) drawWcr();
+  else if (s === 3) drawIrq();
+  else if (s === 4) drawWrsr();
+  else if (s === 5) drawPde();
+  else drawBoard();
 }
 
-var step = stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
-void step;
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
 zoomable(document.querySelector('.bd-stage'));
 resetButton($('reset'), function () { state.step = INIT.step; draw(); });
 fitCanvas($('viewport'), $('canvas'), draw);
