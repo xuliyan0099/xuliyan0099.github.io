@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RM45 同步音频接口 SAI</title>
+<title>RM 第 45 章 · 同步音频接口 SAI | i.MX6ULL 逐章解读</title>
 <style>/* 白板互动教学设计系统 · 样式。由 scripts/inline.py 整段拼进页面，不要手抄或删减。
  * 页面的全部颜色、字号、间距、圆角、阴影只在 :root 定义；改主题只改这一段。 */
 
@@ -2469,30 +2469,30 @@ text.bd-an-inner { font-size: var(--size-l4); }
   <symbol id="i-reset" viewBox="0 0 24 24"><title>重置</title><path d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5M4.5 4v4.5H9"/></symbol>
   <symbol id="i-prev" viewBox="0 0 24 24"><title>上一步</title><path d="M15 5l-7 7 7 7"/></symbol>
   <symbol id="i-next" viewBox="0 0 24 24"><title>下一步</title><path d="M9 5l7 7-7 7"/></symbol>
-  <symbol id="i-close" viewBox="0 0 24 24"><title>收起</title><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><title>关闭</title><path d="M6 6l12 12M18 6L6 18"/></symbol>
   <symbol id="i-explain" viewBox="0 0 24 24"><title>讲解</title><path d="M3 5.5c3-1 6-.8 9 1 3-1.8 6-2 9-1V19c-3-1-6-.8-9 1-3-1.8-6-2-9-1zM12 6.5V20"/></symbol>
   <symbol id="i-correct" viewBox="0 0 24 24"><title>正确</title><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
   <symbol id="i-wrong" viewBox="0 0 24 24"><title>错误</title><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
-  <symbol id="i-alert" viewBox="0 0 24 24"><title>越界</title><path d="M12 4l9 16H3zM12 10v4.5M12 17.6v.1"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><title>注意</title><path d="M12 4l9 16H3zM12 10v4.5M12 17.6v.1"/></symbol>
   <symbol id="i-drag" viewBox="0 0 24 24"><title>拖动</title><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></symbol>
-  <symbol id="i-speak" viewBox="0 0 24 24"><title>发音</title><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+  <symbol id="i-speak" viewBox="0 0 24 24"><title>朗读</title><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
   <symbol id="i-fullscreen" viewBox="0 0 24 24"><title>全屏</title><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
-  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>退出全屏</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
+  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>RM 第 17 章 · NAND 纠错加速器 BCH | i.MX6ULL 逐章解读</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
 </svg>
 
 <div class="bd-viewport" id="viewport">
   <div class="bd-canvas" id="canvas">
     <header class="bd-titlebar">
-      <h1 class="bd-title">第 45 章 · 同步音频接口 SAI</h1>
+      <h1>第 45 章 · 同步音频接口（SAI）</h1>
       <span class="bd-hint" id="hint"></span>
       <div class="bd-readings">
         <span class="bd-reading bd-reading-emphasis">
-          <span class="bd-reading-name">实例</span>
-          <span class="bd-reading-value">3 路</span>
+          <span class="bd-reading-name">收发 FIFO</span>
+          <span class="bd-reading-value">32×32 位</span>
         </span>
         <span class="bd-reading">
-          <span class="bd-reading-name">FIFO</span>
-          <span class="bd-reading-value">32 × 32 位</span>
+          <span class="bd-reading-name">最大帧长</span>
+          <span class="bd-reading-value">32 字</span>
         </span>
       </div>
     </header>
@@ -2506,6 +2506,7 @@ text.bd-an-inner { font-size: var(--size-l4); }
         <button class="bd-btn" type="button" id="next"></button>
       </div>
       <div class="bd-actions">
+        <a class="bd-btn" href="c44.html" style="text-decoration:none">← RM44</a> <a class="bd-btn" href="c46.html" style="text-decoration:none">RM46 →</a>
         <a class="bd-btn" href="index.html" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">☰ 目录</a>
         <button class="bd-btn" type="button" id="reset"></button>
       </div>
@@ -3627,6 +3628,199 @@ function reader(root, sentences, opts) {
   };
 }
 </script>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
 <script>
 var $ = function (id) { return document.getElementById(id); };
 var OX = 24, OY = 96;
@@ -3637,10 +3831,20 @@ var INIT = { step: 0 };
 var state = { step: INIT.step };
 
 var STEPS = [
-  { h: '1 / 4 三路音频口，收发各一套时钟', hint: '寄存器只到 +0x100', note: 'I2S 只是它的一种用法，同一套硬件还能跑 AC97、TDM 与 codec/DSP 直连。' },
-  { h: '2 / 4 时钟分两级，帧结构定在 TCR4', hint: '所有分频值都要减一写', note: 'MCLK 12.288 MHz 想跑 48 kHz × 64 位，就是除以 4；除错了听感会快慢一拍。' },
-  { h: '3 / 4 FIFO、水位与那几个标志位', hint: '写 TDR0 灌，读 RDR0 取', note: 'FEF 与 FWF 一旦置位，不先 FR 复位 FIFO，后续数据会继续错位。' },
-  { h: '4 / 4 上电顺序与四个必踩的坑', hint: 'TE 置位后配置寄存器就冻住了', note: '在 TE=1 时改 TCR2，写进去也不生效，这是新手最常见的「配了没反应」。' }
+  { h: '三路 I2S', hint: '1 收 + 1 发',
+    note: '每个 SAI 只有一根收数据线、一根发数据线，全双工靠两套独立时钟。' },
+  { h: '引脚与板上接线', hint: 'SAI2 挂在 JTAG 脚上',
+    note: 'SAI1 在 CSI_DATA 那组，SAI2 在 JTAG/SD1 那组，SAI3 在 LCD 那组。' },
+  { h: '时钟链', hint: 'MCLK → BCLK 分频',
+    note: 'BCLK = MCLK / (2×(DIV+1))，帧长 = 字数 × 位宽，三个数必须闭合。' },
+  { h: '寄存器地图', hint: '0x0202_8000',
+    note: '收发各六个配置寄存器，加数据与 FIFO 计数；偏移 ≥ 0x108 直接总线报错。' },
+  { h: '帧结构', hint: 'FRSZ / SYWD / W0W',
+    note: '字数、同步宽度、字宽全都写「减一」的值，这是这套寄存器的统一习惯。' },
+  { h: 'FIFO 与中断', hint: '32×32 位',
+    note: '收发各有 32 深的 FIFO；水位、空、下溢三类事件分别有标志与使能。' },
+  { h: '主模式初始化', hint: '先配时钟再开 TE',
+    note: 'TE 与 BCE 是「本帧结束才真正生效」的位，关的时候要等帧边界。' }
 ];
 
 function txt(parent, x, y, s, cls, anchor) {
@@ -3649,220 +3853,299 @@ function txt(parent, x, y, s, cls, anchor) {
 function box(x, y, w, h, fill, stroke, sw) {
   return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
 }
-function arrow(x1, y1, x2, y2) {
-  svgEl(scene, 'line', { x1: x1, y1: y1, x2: x2, y2: y2, stroke: 'var(--text-2)', 'stroke-width': 4 });
-  var a = Math.atan2(y2 - y1, x2 - x1), L = 18, W = 9;
-  svgEl(scene, 'path', {
-    d: 'M' + x2 + ' ' + y2 + ' L' + (x2 - L * Math.cos(a) + W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) - W * Math.cos(a)) +
-      ' L' + (x2 - L * Math.cos(a) - W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) + W * Math.cos(a)) + ' Z',
-    fill: 'var(--text-2)', stroke: 'none'
-  });
-}
 function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
 
 function drawTop() {
-  txt(scene, 56, 146, '三路实例、七根信号，收发各走一套位时钟', 't28w');
+  txt(scene, 56, 146, 'SAI 是音频的「串行搬运工」：把采样值按时钟节拍一位一位推出去，或者一位一位收进来', 't24w');
 
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '三个基址');
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '它支持什么');
+  txt(scene, 80, 252, 'I2S：最常见的双声道格式', 't20w');
+  txt(scene, 80, 288, 'AC97：早期 PC 音频', 't20w');
+  txt(scene, 80, 324, 'TDM：一帧多声道', 't20w');
+  txt(scene, 80, 360, 'Codec / DSP 类接口', 't20w');
+  txt(scene, 80, 396, '全双工：收一套、发一套', 't20w');
+  txt(scene, 80, 432, '帧最长 32 个字', 't20w');
 
-  var inst = [
-    ['SAI1', '0x0202_8000'],
-    ['SAI2', '0x0202_C000'],
-    ['SAI3', '0x0203_0000']
-  ];
-  inst.forEach(function (r, i) {
-    var y = 276 + i * 50;
-    txt(scene, 80, y, r[0], 't28');
-    txt(scene, 220, y, r[1], 'tnum');
-  });
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '硬件规格');
+  txt(scene, 680, 252, '字宽 8–32 位', 't20w');
+  txt(scene, 680, 288, '首字与其余字可不同宽', 't20w');
+  txt(scene, 680, 324, '收发各 32×32 位异步 FIFO', 't20w');
+  txt(scene, 680, 360, '收发时钟可完全独立', 't20w');
+  txt(scene, 680, 396, 'FIFO 出错后可优雅重启', 't20w');
+  txt(scene, 680, 432, '每路只有一根数据线', 't20w');
 
-  txt(scene, 80, 448, '每路寄存器占 0x00 – 0x100，再往后访问直接总线错误', 't28w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '三个实例');
+  txt(scene, 1280, 252, 'SAI1 0x0202_8000', 't20s');
+  txt(scene, 1280, 288, 'SAI2 0x0202_C000', 't20s');
+  txt(scene, 1280, 324, 'SAI3 0x0203_0000', 't20s');
+  txt(scene, 1280, 360, '每个占 16 KB（0x4000）', 't20w');
+  txt(scene, 1280, 396, '板上音频 codec 接在 SAI2', 't20w');
+  txt(scene, 1280, 432, 'SAI1/SAI3 的脚多在 CSI/LCD 组', 't20w');
 
-  head(80, 498, '七根信号');
-  box(80, 522, 890, 152, 'var(--surface)', 'var(--guide)');
-  txt(scene, 104, 564, 'MCLK 主时钟：内部产生时是输出，外部供给时是输入', 't28w');
-  txt(scene, 104, 602, 'TX / RX_BCLK 位时钟，各一根，可内部生成也可外部给', 't28w');
-  txt(scene, 104, 640, 'TX / RX_SYNC 帧同步，脉冲宽度与极性都能配', 't28w');
+  wide(456, 330);
+  txt(scene, 80, 490, '它不是「音频解码器」：只负责按时钟搬位流，采样率、增益、混音都在外面的 codec 里做', 't24');
+  txt(scene, 80, 522, 'I2S 的三根线各管一件事：BCLK 是位时钟（每个沿搬一位）、FS/SYNC 是帧同步（一个周期一帧）、DATA 是数据；再加一根 MCLK 给 codec 做参考。', 't20w');
+  txt(scene, 80, 556, '双声道为什么能用一根数据线：一帧里放两个字（左、右），靠 FS 电平与字序号区分，所以叫「时分复用」而不是「两条线并行」。', 't20w');
+  txt(scene, 80, 590, '全双工是本模块的关键设计：发送与接收各有自己的 BCLK 与 FS，可以工作在不同采样率 —— 播放 48 kHz 的同时录制 44.1 kHz 是允许的。', 't20w');
+  txt(scene, 80, 624, '代价是引脚多：主模式下每个方向都要 BCLK/FS/DATA 三根，加 MCLK 一共七根；从模式下时钟由 codec 给，能省几根。', 't20w');
+  txt(scene, 80, 658, '一句话：SAI = 位流搬运 + 帧结构定义 + FIFO 缓冲；声音好不好听由 codec 与时钟质量决定。', 't20w');
+}
 
-  box(80, 690, 890, 86, 'var(--page)', 'var(--line)');
-  txt(scene, 104, 730, 'TX / RX_DATA 各一根数据线，块传输时不用时呈高阻', 't28w');
-  txt(scene, 104, 762, '全双工同时收发：两套时钟各自独立，也能互相同步', 't28w');
+function drawPins() {
+  txt(scene, 56, 146, '三路 SAI 的引脚分散在三组焊盘上：CSI、JTAG/SD1、LCD —— 复用表查错就会「没声音」', 't24w');
 
-  box(1020, 168, 850, 300, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '能干什么');
-  txt(scene, 1044, 264, 'I2S：最常见的音频设备接口', 't28w');
-  txt(scene, 1044, 304, 'AC97：老式编解码器总线', 't28w');
-  txt(scene, 1044, 344, 'TDM：一帧里塞多路时隙', 't28w');
-  txt(scene, 1044, 384, 'codec / DSP 直连：自定义帧格式', 't28w');
-  txt(scene, 1044, 424, '每通道 32 × 32 位 FIFO，能挂 DMA 整块搬', 't28w');
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'SAI1');
+  txt(scene, 80, 252, 'MCLK：CSI_DATA01 ALT6', 't20s');
+  txt(scene, 80, 288, 'TX_DATA：CSI_DATA07 ALT6', 't20s');
+  txt(scene, 80, 324, 'TX_BCLK：CSI_DATA05 ALT6', 't20s');
+  txt(scene, 80, 360, 'TX_SYNC：CSI_DATA04 ALT6', 't20s');
+  txt(scene, 80, 396, 'RX_DATA：CSI_DATA06 ALT6', 't20s');
+  txt(scene, 80, 432, '也可切到 LCD_DATA 组 ALT8', 't20w');
 
-  box(1020, 500, 850, 296, 'var(--page)', 'var(--line)');
-  head(1044, 548, '帧与字的硬限制');
-  txt(scene, 1044, 596, '帧最大 32 个字，写 FRSZ 时填「字数减一」', 't28w');
-  txt(scene, 1044, 636, '字宽 8 – 32 位，首字与其余字可以不同宽', 't28w');
-  txt(scene, 1044, 676, '每方向只有一条数据线，多路靠时隙拆', 't28w');
-  txt(scene, 1044, 716, 'FIFO 出错后支持优雅重启，不必整模块复位', 't28w');
-  txt(scene, 1044, 756, 'Stop 模式会在当前帧结束后才停，不会截断半帧', 't28w');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, 'SAI2：本板用这路');
+  txt(scene, 680, 252, 'MCLK：JTAG_TMS ALT2', 't20s');
+  txt(scene, 680, 288, 'TX_BCLK：JTAG_TDI ALT2', 't20s');
+  txt(scene, 680, 324, 'TX_SYNC：JTAG_TDO ALT2', 't20s');
+  txt(scene, 680, 360, 'TX_DATA：JTAG_TRST ALT2', 't20s');
+  txt(scene, 680, 396, 'RX_DATA：JTAG_TCK ALT2', 't20s');
+  txt(scene, 680, 432, '原理图网名 SAI2_MCLK/BCLK/SYNC/TXD/RXD', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, 'SAI3 与共用脚');
+  txt(scene, 1280, 252, 'SAI3 在 LCD_DATA 组 ALT1/ALT3', 't20s');
+  txt(scene, 1280, 288, 'MCLK 可借 LCD_CLK ALT3', 't20s');
+  txt(scene, 1280, 324, '与 LCD 同时用要算冲突', 't20w');
+  txt(scene, 1280, 360, 'SAI1 的脚与 CSI 共用', 't20w');
+  txt(scene, 1280, 396, '开摄像头就不能再用 SAI1', 't20w');
+  txt(scene, 1280, 432, '先查复用表再画板', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '这块板最省事的做法：只用 SAI2 —— 它落在 JTAG 脚上，而 JTAG 在量产板本来就不用', 't24');
+  txt(scene, 80, 522, '代价是调试：把 JTAG 的 TCK/TDI/TDO/TMS 全切成 SAI2 之后，JTAG 就没了。要么留 SWD 类替代，要么在需要抓内核时改回 ALT0。', 't20w');
+  txt(scene, 80, 556, 'SAI1 与 CSI 共用 CSI_DATA01–07：接摄像头时这七根脚被 CSI 占了，SAI1 只能整体放弃或改到 LCD_DATA 组（ALT8）。', 't20w');
+  txt(scene, 80, 590, 'MCLK 的方向是双向的：主模式下由芯片输出给 codec，从模式下由外部晶振/时钟输入 —— 所以这个脚在 IOMUXC 里不能只按「输出」配。', 't20w');
+  txt(scene, 80, 624, '看原理图的技巧：先按网名找（SAI2_MCLK 这类），再回芯片引脚表查 ALT 号；网名与「信号名」常常不是同一个词，别照名字猜模式。', 't20w');
+  txt(scene, 80, 658, '判据：配完复用后量对应焊盘应有波形；若 MCLK 上没 clock，先查 IOMUXC 的 ALT 与 SION 位，再查 CCM 的时钟门。', 't20w');
 }
 
 function drawClock() {
-  txt(scene, 56, 146, 'MCLK 分频出 BCLK，BCLK 再按帧切片', 't28w');
+  txt(scene, 56, 146, '三个频率必须闭合：MCLK、BCLK、采样率，任何一处算错都表现为「声音变调」或「全是噪声」', 't24w');
 
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '两级分频');
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '三个频率');
+  txt(scene, 80, 252, 'MCLK：codec 的主时钟', 't20w');
+  txt(scene, 80, 288, '常取 256×fs 或 384×fs', 't20w');
+  txt(scene, 80, 324, '48k × 256 = 12.288 MHz', 't20w');
+  txt(scene, 80, 360, 'BCLK：位时钟', 't20w');
+  txt(scene, 80, 396, 'BCLK = 字数 × 位宽 × fs', 't20w');
+  txt(scene, 80, 432, '2 字 × 32 位 → 64×fs', 't20w');
 
-  box(80, 250, 880, 92, 'var(--surface)', 'var(--line)', 2);
-  txt(scene, 104, 306, '三路 audio master clock 或 bus clock，由 MSEL 选', 't28w');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '分频公式');
+  txt(scene, 680, 252, 'BCLK = MCLK / (2×(DIV+1))', 't20s');
+  txt(scene, 680, 288, 'DIV 在 TCR2[7:0]', 't20s');
+  txt(scene, 680, 324, '是「除以 2 再减 1」的写法', 't20w');
+  txt(scene, 680, 360, '12.288 / 3.072 = 4 → DIV=1', 't20w');
+  txt(scene, 680, 396, '44.1k 用 11.2896 MHz', 't20w');
+  txt(scene, 680, 432, '两族时钟不能混用', 't20w');
 
-  arrow(520, 346, 520, 380);
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '算不通会怎样');
+  txt(scene, 1280, 252, 'BCLK 偏了：音调整体变高/变低', 't20w');
+  txt(scene, 1280, 288, '帧长偏了：左右声道错位', 't20w');
+  txt(scene, 1280, 324, 'MCLK 偏了：codec 内部 PLL 锁不上', 't20w');
+  txt(scene, 1280, 360, '48k 与 44.1k 共用一套时钟必有一边偏', 't20w');
+  txt(scene, 1280, 396, '44.1k 的整数倍是 11.2896 MHz', 't20w');
+  txt(scene, 1280, 432, '不是 12.288 MHz', 't20w');
 
-  box(80, 384, 880, 92, 'var(--surface)', 'var(--observe-line)', 4);
-  txt(scene, 104, 440, 'MCLK 分数分频：FRACT / DIVIDE（在 MCR 里配）', 't28w');
+  wide(456, 330);
+  txt(scene, 80, 490, '记住一条：音频时钟只有两族 —— 48k 族（12.288 MHz 的整数分频）与 44.1k 族（11.2896 MHz）', 't24');
+  txt(scene, 80, 522, '48k 族：48 kHz = 12.288 MHz / 256，96 kHz 也是同一族的整数倍；44.1 kHz = 11.2896 MHz / 256，两个族的最小公倍数极大，无法用同一个晶振分出来。', 't20w');
+  txt(scene, 80, 556, '这就是「播放 44.1k 的音乐要用另一颗晶振或 codec 内部 PLL」的原因；用 12.288 分频去凑 44.1k，误差约 0.1%，人耳能明显听出跑调。', 't20w');
+  txt(scene, 80, 590, 'DIV 的公式要背下来：BCLK = MCLK / (2×(DIV+1))。因为内部先把 MCLK 二分再分频，所以「想要 4 分频」就写 DIV=1，而不是 3。', 't20w');
+  txt(scene, 80, 624, '帧长也要对上：I2S 常见 2 字 × 32 位 = 64 个 BCLK 一帧；若 codec 配成 32 位字而 SAI 配成 16 位字，BCLK 数目就对不上，表现为「半个声道被吃掉」。', 't20w');
+  txt(scene, 80, 658, '判据：量 BCLK 与 FS 的比值，应等于「字数 × 位宽」；再量 FS 频率，应等于采样率。两个都对了，时钟链才算闭合。', 't20w');
+}
 
-  arrow(520, 480, 520, 514);
+function drawMap() {
+  txt(scene, 56, 146, '收发各占 0x80 一段：发送从 0x00 起，接收从 0x80 起，结构完全对称', 't24w');
 
-  box(80, 518, 880, 92, 'var(--surface)', 'var(--line)', 2);
-  txt(scene, 104, 574, '位时钟分频：DIV[15:8] 与 BCP / BCD 一起决定', 't28w');
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '发送侧');
+  txt(scene, 80, 252, 'TCSR +0x00 控制与标志', 't20s');
+  txt(scene, 80, 288, 'TCR1 +0x04 水位', 't20s');
+  txt(scene, 80, 324, 'TCR2 +0x08 时钟与主从', 't20s');
+  txt(scene, 80, 360, 'TCR3 +0x0C / TCR4 +0x10', 't20s');
+  txt(scene, 80, 396, 'TCR5 +0x14 字宽与首位移', 't20s');
+  txt(scene, 80, 432, 'TDR +0x20 / TFR +0x40 / TMR +0x60', 't20s');
 
-  arrow(520, 614, 520, 648);
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '接收侧');
+  txt(scene, 680, 252, 'RCSR +0x80', 't20s');
+  txt(scene, 680, 288, 'RCR1 +0x84 / RCR2 +0x88', 't20s');
+  txt(scene, 680, 324, 'RCR3 +0x8C / RCR4 +0x90', 't20s');
+  txt(scene, 680, 360, 'RCR5 +0x94', 't20s');
+  txt(scene, 680, 396, 'RDR +0xA0 / RFR +0xC0', 't20s');
+  txt(scene, 680, 432, '与发送侧一一对应', 't20w');
 
-  box(80, 652, 880, 92, 'var(--page)', 'var(--observe-line)', 4);
-  txt(scene, 104, 708, 'BCLK = 帧字数 × 字宽（I2S 固定 2 字 32 位 = 64）', 't28w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '访问限制');
+  txt(scene, 1280, 252, '偏移 ≥ 0x108 → 总线错误', 't20s');
+  txt(scene, 1280, 324, 'TDR 只写，读恒为 0', 't20s');
+  txt(scene, 1280, 360, 'TFR/RFR 只读，是 FIFO 计数', 't20s');
+  txt(scene, 1280, 396, 'TE=1 时不能改 TCR2–TCR5', 't20w');
+  txt(scene, 1280, 432, '改配置要先关 TE 等帧结束', 't20w');
 
-  box(1020, 168, 850, 330, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, 'TCR2：时钟与同步模式');
-  txt(scene, 1044, 264, 'SYNC[31:30]：00 异步，01 跟接收端同步', 't28w');
-  txt(scene, 1044, 304, 'BCS / BCI：借用另一路的位时钟做收发同源', 't28w');
-  txt(scene, 1044, 344, 'MSEL：选哪一路主时钟', 't28w');
-  txt(scene, 1044, 384, 'BCP / BCD：位时钟方向与分频旁路', 't28w');
-  txt(scene, 1044, 424, 'DIV[15:8]：整数分频值，注意是实际倍数', 't28w');
-  txt(scene, 1044, 468, 'TE 置位后这个寄存器不准改', 't28');
+  wide(456, 330);
+  txt(scene, 80, 490, '「TE=1 不许改配置」是硬约束：手册在每个 TCR 开头都写了这句，违反它不会报错，只会让时序乱掉', 't24');
+  txt(scene, 80, 522, '正确顺序是「关 TE → 等当前帧结束（读回 TE 仍为 1 说明还没到帧边界）→ 改 TCR2–TCR5 → 再开 TE」，中间的等待不能省。', 't20w');
+  txt(scene, 80, 556, 'TFR 不是「发送 FIFO 的数据寄存器」而是「FIFO 计数」：读它得到当前还能塞几个字，调试下溢时最先看的就是它。', 't20w');
+  txt(scene, 80, 590, 'TMR 是掩码寄存器，用于 TDM 多声道时按位屏蔽某几个字（比如把第 3 声道静音），I2S 双声道场景基本不用动它。', 't20w');
+  txt(scene, 80, 624, '偏移从 0x108 起直接总线错误，说明这个模块的寄存器窗口只到 0x100：驱动里如果用结构体整体拷贝，越界会立刻异常，反而好查。', 't20w');
+  txt(scene, 80, 658, '判据：读回 TCSR 的 TE 与 BCE 状态、读 TFR 的深度、读 TCR2 的 DIV，三者与你写的值一致，配置才算落地。', 't20w');
+}
 
-  box(1020, 530, 850, 266, 'var(--page)', 'var(--line)');
-  head(1044, 578, 'TCR4：帧长与同步宽度');
-  txt(scene, 1044, 626, 'FRSZ[20:16]：帧内字数减一，最大 32 字', 't28w');
-  txt(scene, 1044, 666, 'SYWD[12:8]：同步脉冲宽度（位时钟数减一）', 't28w');
-  txt(scene, 1044, 706, 'MF[4]：1 = MSB 先出；FSE[3]：提前一位拉同步', 't28w');
-  txt(scene, 1044, 746, 'FSP[1] 极性；FSD[0]：1 内部产生，0 外部给', 't28w');
-  txt(scene, 1044, 780, '从模式时 FSD 与 BCD 都必须为 0', 't28w');
+function drawFrame() {
+  txt(scene, 56, 146, '帧结构由五个字段决定：几个字、每个字几位、同步多宽、从哪一位开始、MSB 还是 LSB 先', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '字数与同步');
+  txt(scene, 80, 252, 'FRSZ [20:16] = 字数 − 1', 't20s');
+  txt(scene, 80, 288, '最大 32 个字（写 31）', 't20w');
+  txt(scene, 80, 324, 'SYWD [12:8] = 同步拍数 − 1', 't20s');
+  txt(scene, 80, 360, 'I2S 常写 15（16 拍）或 0', 't20w');
+  txt(scene, 80, 396, '同步宽不能超过首字位宽', 't20w');
+  txt(scene, 80, 432, 'FSE=1 让同步提前一位', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '字宽与对齐');
+  txt(scene, 680, 252, 'W0W [20:16] = 首字位宽 − 1', 't20s');
+  txt(scene, 680, 288, 'WNW [28:24] = 其余字位宽 − 1', 't20s');
+  txt(scene, 680, 324, '最小 8 位，最大 32 位', 't20w');
+  txt(scene, 680, 360, 'FBT [12:8] 首个移位位号', 't20s');
+  txt(scene, 680, 396, 'MF [4]：1 = MSB 先', 't20s');
+  txt(scene, 680, 432, 'I2S 标准：MSB 先、左对齐', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '同步极性与方向');
+  txt(scene, 1280, 252, 'FSP [1]：0 高有效、1 低有效', 't20s');
+  txt(scene, 1280, 288, 'FSD [0]：1 = 主模式输出', 't20s');
+  txt(scene, 1280, 324, 'BCP [25]：时钟极性', 't20s');
+  txt(scene, 1280, 360, 'BCD [24]：1 = 主模式出 BCLK', 't20s');
+  txt(scene, 1280, 396, 'MSEL [27:26]：选哪路 MCLK', 't20s');
+  txt(scene, 1280, 432, 'BCI [28]：按焊盘回环时钟', 't20s');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '这套寄存器的统一习惯是「写减一」：要 2 个字就写 1，要 32 位宽就写 31 —— 少减一次是最常见的错', 't24');
+  txt(scene, 80, 522, 'I2S 标准帧的标准参数：FRSZ=1（2 字）、W0W=WNW=31（32 位）、SYWD=15（16 拍同步）、FSE=1、MF=1、FSP=0、主模式 FSD=BCD=1。', 't20w');
+  txt(scene, 80, 556, 'SYWD 与 FSE 的关系决定「同步在哪一位开始」：I2S 要求 FS 比数据提前一个 BCLK 变化，这就是 FSE=1 的物理含义；设成 0 会左右声道整体错一位。', 't20w');
+  txt(scene, 80, 590, 'TDM 模式则把 FRSZ 开到 8 或 16：一帧里塞 8 个声道，靠 TMR 的位掩码决定每声道是否输出；I2S 只是「FRSZ=1」的特例。', 't20w');
+  txt(scene, 80, 624, 'FBT 是「从第几位开始搬」：MSB 先时它要 ≥ 位宽-1，LSB 先时要 ≤ 31-位宽；这个字段配合 W0W/WNW 才能实现「32 位槽里只放 16 位有效数据」的左对齐格式。', 't20w');
+  txt(scene, 80, 658, '判据：用逻辑分析仪抓 FS 与 DATA，确认 FS 变化后第 1 个 BCLK 是数据的最高位；错一位就回查 FSE 与 FBT。', 't20w');
 }
 
 function drawFifo() {
-  txt(scene, 56, 146, '数据面就三个寄存器，收发各一份', 't28w');
+  txt(scene, 56, 146, '32 深的 FIFO 决定「能容忍多少抖动」：CPU 迟一点、DMA 慢一拍，只要没读空就听不出来', 't24w');
 
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '收发镜像布局');
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '两侧 FIFO');
+  txt(scene, 80, 252, '发送 32 字 × 32 位', 't20w');
+  txt(scene, 80, 288, '接收 32 字 × 32 位', 't20w');
+  txt(scene, 80, 324, '异步：与总线时钟无关', 't20w');
+  txt(scene, 80, 360, 'TFR +0x40 / RFR +0xC0 看深度', 't20s');
+  txt(scene, 80, 396, 'TDR +0x20 写、RDR +0xA0 读', 't20s');
+  txt(scene, 80, 432, '32 字 @48k 约 0.67 ms 缓冲', 't20w');
 
-  box(80, 250, 420, 170, 'var(--surface)', 'var(--line)', 2);
-  txt(scene, 104, 292, '发送侧', 't28');
-  txt(scene, 104, 330, '+0x20 TDR0 只写，写进去就进 FIFO', 'tnum');
-  txt(scene, 104, 366, '+0x40 TFR0 读：看 FIFO 指针', 'tnum');
-  txt(scene, 104, 402, '+0x60 TMR 掩码：屏蔽某些字不发', 'tnum');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '三个水位事件');
+  txt(scene, 680, 252, 'FRF [16]：到了水位', 't20s');
+  txt(scene, 680, 288, 'FWF [17]：FIFO 空了', 't20s');
+  txt(scene, 680, 324, 'FEF [18]：下溢（欠数据）', 't20s');
+  txt(scene, 680, 360, '水位在 TCR1 的 TFW', 't20s');
+  txt(scene, 680, 396, 'FRIE [8] 水位中断使能', 't20s');
+  txt(scene, 680, 432, 'FRDE [0] 水位 DMA 使能', 't20s');
 
-  box(530, 250, 440, 170, 'var(--surface)', 'var(--line)', 2);
-  txt(scene, 554, 292, '接收侧', 't28');
-  txt(scene, 554, 330, '+0xA0 RDR0 读取一个字', 'tnum');
-  txt(scene, 554, 366, '+0xC0 RFR0 读：FIFO 指针与状态', 'tnum');
-  txt(scene, 554, 402, '+0xE0 RMR 掩码：忽略某些字', 'tnum');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '出错怎么救');
+  txt(scene, 1280, 252, 'FEF 置位：说明数据没跟上', 't20w');
+  txt(scene, 1280, 288, '先清 FEF（写 1 清）', 't20w');
+  txt(scene, 1280, 324, '再置 FR [25] 复位 FIFO 指针', 't20s');
+  txt(scene, 1280, 360, 'FR 只能在 TE=0 或 FEF 时用', 't20w');
+  txt(scene, 1280, 396, '然后重新填 FIFO 再开 TE', 't20w');
+  txt(scene, 1280, 432, '这就是 graceful restart', 't20w');
 
-  head(80, 470, 'TCSR 里真正要盯的位');
-  var bits = [
-    ['31 TE', '发送使能'],
-    ['28 BCE', '位时钟，置 TE 自动开'],
-    ['25 FR', '复位 FIFO 指针'],
-    ['24 SR', '软件复位内部逻辑'],
-    ['18 FEF', 'FIFO 溢出或下溢，写 1 清'],
-    ['17 FWF', 'FIFO 水位告警']
-  ];
-  bits.forEach(function (r, i) {
-    var x = 80 + (i % 2) * 450;
-    var y = 522 + Math.floor(i / 2) * 44;
-    txt(scene, x, y, r[0], 'tnum');
-    txt(scene, x + 120, y, r[1], 't28w');
-  });
-
-  box(80, 640, 890, 136, 'var(--surface)', 'var(--guide)');
-  txt(scene, 104, 682, '水位在 TCR1.TFW / RCR1.RFW：FIFO 剩几格就报一次', 't28w');
-  txt(scene, 104, 720, '字宽在 TCR5：W0W 是帧首字，WNW 是其余字', 't28w');
-  txt(scene, 104, 756, 'TCR3.TCE 从 bit16 起，每位置一路数据通道', 't28w');
-
-  box(1020, 168, 850, 320, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '一个字怎么变成波形');
-  txt(scene, 1044, 264, '写 TDR0 → 进发送 FIFO → 移位器', 't28w');
-  txt(scene, 1044, 304, '按字宽右对齐到数据线，MSB 或 LSB 由 MF 定', 't28w');
-  txt(scene, 1044, 344, '帧同步脉冲到来时把该字的时隙让出来', 't28w');
-  txt(scene, 1044, 384, '接收侧反向：采样 → 拼字 → RDR0', 't28w');
-  txt(scene, 1044, 428, 'FIFO 深度 32 个字，够扛一次中断延迟', 't28');
-
-  box(1020, 520, 850, 276, 'var(--page)', 'var(--line)');
-  head(1044, 568, 'DMA 与中断');
-  txt(scene, 1044, 616, 'TCSR.FWDE / FRDE 打开 FIFO 的 DMA 请求', 't28w');
-  txt(scene, 1044, 656, 'WSIE / SEIE / FEIE / FWIE / FRIE 分别开中断', 't28w');
-  txt(scene, 1044, 696, '批量播放就挂 DMA，别逐字中断', 't28w');
-  txt(scene, 1044, 736, '事件号在第 03 章的表里，接 SDMA 要走映射', 't28w');
-  txt(scene, 1044, 774, '中断里先读 TCSR 判断是哪种标志，再分别清', 't28w');
+  wide(456, 330);
+  txt(scene, 80, 490, '缓冲账：32 字 × 4 字节 = 128 字节；48 kHz 双声道下约 0.67 ms，这就是中断响应的容忍上限', 't24');
+  txt(scene, 80, 522, '也就是说：只要 CPU 或 DMA 能在 0.67 ms 内补上数据，播放就不会断续；一旦超时，FEF 置位、FIFO 被清，你会听到一声「咔」。', 't20w');
+  txt(scene, 80, 556, '水位怎么设：太高（比如 28）等于只剩 4 字余量，一点抖动就下溢；太低（比如 2）会让中断过于频繁。取一半左右（16）是常见折中。', 't20w');
+  txt(scene, 80, 590, '接收侧对称：RFW 是「收到多少字就通知」，FRF 置位表示可以来取了；取太慢会溢出，取太快会读到空并置 FEF。', 't20w');
+  txt(scene, 80, 624, '实际工程里几乎都用 DMA：把 FRDE 置 1，让 SDMA 按水位自动搬，CPU 只处理周期性的「半缓冲完成」事件，避免每 20 µs 进一次中断。', 't20w');
+  txt(scene, 80, 658, '判据：连续播放 1 小时，FEF 应始终为 0；若偶发置位，先看 DMA 是否被更高优先级外设抢占，再看水位设得是否过高。', 't20w');
 }
 
-function drawFlow() {
-  txt(scene, 56, 146, '配置全部做完再开使能，开了就别再改', 't28w');
+function drawInit() {
+  txt(scene, 56, 146, '主模式初始化是一条固定顺序：时钟 → 帧结构 → FIFO → 开 TE → 喂数据', 't24w');
 
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '上电七步');
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '配置顺序');
+  txt(scene, 80, 252, '① 配 IOMUXC 的 ALT', 't20w');
+  txt(scene, 80, 288, '② 开 CCM 门控与 MCLK 源', 't20w');
+  txt(scene, 80, 324, '③ 写 TCR2：主从/DIV/极性', 't20w');
+  txt(scene, 80, 360, '④ 写 TCR4/TCR5：帧与字宽', 't20w');
+  txt(scene, 80, 396, '⑤ 写 TCR1 水位、清 TCSR 标志', 't20w');
+  txt(scene, 80, 432, '⑥ 填 FIFO，最后置 TE', 't20w');
 
-  var ord = [
-    ['①', 'MCR：选主时钟 MICS，置 MOE 打开分频'],
-    ['②', '算好 DIV / FRACT / DIVIDE，等 DUF 回 0'],
-    ['③', 'TCR2：同步模式、主从、位时钟分频'],
-    ['④', 'TCR4：帧字数、同步宽度、极性、方向'],
-    ['⑤', 'TCR5：首字与其余字的位宽'],
-    ['⑥', '写 TCSR.FR 复位 FIFO，再置 TCE 开通道'],
-    ['⑦', '最后置 TE（或 RE），开始收或发']
-  ];
-  ord.forEach(function (b, i) {
-    var y = 276 + i * 54;
-    txt(scene, 96, y, b[0], 'tnum');
-    txt(scene, 140, y, b[1], 't28w');
-  });
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '开关位的脾气');
+  txt(scene, 680, 252, 'TE [31]：关也要等帧结束', 't20s');
+  txt(scene, 680, 288, 'BCE [28]：置 TE 时自动置位', 't20s');
+  txt(scene, 680, 324, 'SR [24]：软复位，自清', 't20s');
+  txt(scene, 680, 360, 'FR [25]：FIFO 指针复位', 't20s');
+  txt(scene, 680, 396, '读回 TE=1 表示还没到边界', 't20w');
+  txt(scene, 680, 432, '别急着改下一组寄存器', 't20w');
 
-  txt(scene, 80, 700, '第 ⑦ 步之后 FIFO 才能访问，之前写 TDR0 无效', 't28w');
-  txt(scene, 80, 740, '想停就清 TE，硬件会在当前帧末尾才真正停', 't28w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '常见「没声音」');
+  txt(scene, 1280, 252, 'MCLK 没输出：查 CCM 与 ALT', 't20w');
+  txt(scene, 1280, 288, '有 BCLK 无 FS：BCE 开了但 FSD=0', 't20w');
+  txt(scene, 1280, 324, 'FS 有、DATA 平：FIFO 空且 TE 已开', 't20w');
+  txt(scene, 1280, 360, '全是噪声：DIV 算错导致位对齐错', 't20w');
+  txt(scene, 1280, 396, '只有一边声道：FRSZ 写成了 0', 't20w');
+  txt(scene, 1280, 432, '断续咔声：FEF 频繁置位', 't20w');
 
-  box(1020, 168, 850, 370, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '四个必踩的坑');
-  txt(scene, 1044, 264, '① TE=1 时改 TCR2/TCR5：写入被忽略', 't28w');
-  txt(scene, 1044, 304, '② 分频值忘了减一：采样率整体偏移', 't28w');
-  txt(scene, 1044, 344, '③ FIFO 出错只清标志不 FR：数据继续错位', 't28w');
-  txt(scene, 1044, 384, '④ 从模式却把 FSD 置 1：两路都在驱动同步', 't28w');
-  txt(scene, 1044, 430, '排查先看 TCSR：FEF 与 FWF 说明 FIFO 节奏有问题', 't28');
-  txt(scene, 1044, 470, '再看 MCR.DUF：分频还没生效就急着开使能', 't28w');
-  txt(scene, 1044, 510, '听感断续优先怀疑水位与 DMA 周期不匹配', 't28w');
-
-  box(1020, 558, 850, 238, 'var(--page)', 'var(--line)');
-  head(1044, 606, '与相邻章节的分工');
-  txt(scene, 1044, 654, 'ESAI 是另一套更偏多路 TDM 的音频口（第 25 章）', 't28w');
-  txt(scene, 1044, 694, 'MCLK 来源在 CCM 里选（第 18 章）', 't28w');
-  txt(scene, 1044, 734, '引脚复用查 IOMUXC（第 32 章）', 't28w');
-  txt(scene, 1044, 774, 'SAI 只管帧格式与 FIFO，不管采样率换算', 't28w');
+  wide(456, 330);
+  txt(scene, 80, 490, '为什么最后才开 TE：FIFO 空着开 TE 会立刻下溢，标志一置你就要走重启流程，白折腾一次', 't24');
+  txt(scene, 80, 522, '推荐的落地顺序：先把 FIFO 填到水位以上（比如 16 个字），再置 TE；这样第一个 BCLK 到来时就有数据可搬，FEF 不会置位。', 't20w');
+  txt(scene, 80, 556, '关的时候同样要讲顺序：清 TE → 轮询读回直到 TE 变 0（说明到了帧边界）→ 再关 BCE、再改配置；直接改 TCR 会让当前帧变成半截。', 't20w');
+  txt(scene, 80, 590, '软复位 SR 会给一个干净起点，但注意它会清 FIFO 指针与所有标志；调试阶段每次改配置前先软复位，能排除「上一轮残留状态」这类玄学问题。', 't20w');
+  txt(scene, 80, 624, '和 codec 的配合也有一条顺序：先让 codec 进入待机、再改 SAI 配置、最后同时解除待机 —— 否则 codec 会在时钟变化时输出爆音。', 't20w');
+  txt(scene, 80, 658, '判据：示波器四通道同时看 MCLK/BCLK/FS/DATA，比值与相位都对；再听 1 kHz 正弦，用音频分析仪看 THD 与底噪。', 't20w');
 }
 
 function draw() {
-  var s = STEPS[state.step];
-  $('hint').textContent = s.hint;
-  $('note').textContent = s.note;
-  scene.textContent = '';
-  if (state.step === 0) drawTop();
-  else if (state.step === 1) drawClock();
-  else if (state.step === 2) drawFifo();
-  else drawFlow();
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) drawPins();
+  else if (s === 2) drawClock();
+  else if (s === 3) drawMap();
+  else if (s === 4) drawFrame();
+  else if (s === 5) drawFifo();
+  else drawInit();
 }
 
-var step = stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
-void step;
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
 zoomable(document.querySelector('.bd-stage'));
 resetButton($('reset'), function () { state.step = INIT.step; draw(); });
 fitCanvas($('viewport'), $('canvas'), draw);
 </script>
 </body>
 </html>
-
