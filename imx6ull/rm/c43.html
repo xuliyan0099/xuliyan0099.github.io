@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RM43 ROM 控制器与补丁 ROMC</title>
+<title>RM 第 43 章 · ROM 补丁控制器 ROMC | i.MX6ULL 逐章解读</title>
 <style>/* 白板互动教学设计系统 · 样式。由 scripts/inline.py 整段拼进页面，不要手抄或删减。
  * 页面的全部颜色、字号、间距、圆角、阴影只在 :root 定义；改主题只改这一段。 */
 
@@ -2469,30 +2469,30 @@ text.bd-an-inner { font-size: var(--size-l4); }
   <symbol id="i-reset" viewBox="0 0 24 24"><title>重置</title><path d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5M4.5 4v4.5H9"/></symbol>
   <symbol id="i-prev" viewBox="0 0 24 24"><title>上一步</title><path d="M15 5l-7 7 7 7"/></symbol>
   <symbol id="i-next" viewBox="0 0 24 24"><title>下一步</title><path d="M9 5l7 7-7 7"/></symbol>
-  <symbol id="i-close" viewBox="0 0 24 24"><title>收起</title><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><title>关闭</title><path d="M6 6l12 12M18 6L6 18"/></symbol>
   <symbol id="i-explain" viewBox="0 0 24 24"><title>讲解</title><path d="M3 5.5c3-1 6-.8 9 1 3-1.8 6-2 9-1V19c-3-1-6-.8-9 1-3-1.8-6-2-9-1zM12 6.5V20"/></symbol>
   <symbol id="i-correct" viewBox="0 0 24 24"><title>正确</title><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
   <symbol id="i-wrong" viewBox="0 0 24 24"><title>错误</title><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
-  <symbol id="i-alert" viewBox="0 0 24 24"><title>越界</title><path d="M12 4l9 16H3zM12 10v4.5M12 17.6v.1"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><title>注意</title><path d="M12 4l9 16H3zM12 10v4.5M12 17.6v.1"/></symbol>
   <symbol id="i-drag" viewBox="0 0 24 24"><title>拖动</title><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></symbol>
-  <symbol id="i-speak" viewBox="0 0 24 24"><title>发音</title><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+  <symbol id="i-speak" viewBox="0 0 24 24"><title>朗读</title><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
   <symbol id="i-fullscreen" viewBox="0 0 24 24"><title>全屏</title><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
-  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>退出全屏</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
+  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>RM 第 17 章 · NAND 纠错加速器 BCH | i.MX6ULL 逐章解读</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
 </svg>
 
 <div class="bd-viewport" id="viewport">
   <div class="bd-canvas" id="canvas">
     <header class="bd-titlebar">
-      <h1 class="bd-title">第 43 章 · ROM 控制器与补丁 ROMC</h1>
+      <h1>第 43 章 · ROM 补丁控制器（ROMC）</h1>
       <span class="bd-hint" id="hint"></span>
       <div class="bd-readings">
         <span class="bd-reading bd-reading-emphasis">
-          <span class="bd-reading-name">比较器</span>
+          <span class="bd-reading-name">地址比较器</span>
           <span class="bd-reading-value">16 个</span>
         </span>
         <span class="bd-reading">
-          <span class="bd-reading-name">数据修正</span>
-          <span class="bd-reading-value">8 处</span>
+          <span class="bd-reading-name">补丁窗口</span>
+          <span class="bd-reading-value">4 MB</span>
         </span>
       </div>
     </header>
@@ -2506,6 +2506,7 @@ text.bd-an-inner { font-size: var(--size-l4); }
         <button class="bd-btn" type="button" id="next"></button>
       </div>
       <div class="bd-actions">
+        <a class="bd-btn" href="c42.html" style="text-decoration:none">← RM42</a> <a class="bd-btn" href="c44.html" style="text-decoration:none">RM44 →</a>
         <a class="bd-btn" href="index.html" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">☰ 目录</a>
         <button class="bd-btn" type="button" id="reset"></button>
       </div>
@@ -3627,6 +3628,187 @@ function reader(root, sentences, opts) {
   };
 }
 </script>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
 <script>
 var $ = function (id) { return document.getElementById(id); };
 var OX = 24, OY = 96;
@@ -3637,10 +3819,20 @@ var INIT = { step: 0 };
 var state = { step: INIT.step };
 
 var STEPS = [
-  { h: '1 / 4 它是 ROM 前面的一个小关口，能改读回值', hint: '不是可写存储，只是蒙住 ROM', note: 'ROM 里的代码改不了，但可以在读出的那一瞬间换掉一个字的返回值。' },
-  { h: '2 / 4 两种改法：换数据，或换成 SWI 跳走', hint: '数据修正优先于操作码补丁', note: '操作码补丁不复制代码，只把那条指令换成一条软中断，然后靠函数表跳出去。' },
-  { h: '3 / 4 寄存器不多，但编号是倒着排的', hint: 'D 寄存器 7 在前、0 在后', note: 'D 寄存器从 0xD4 往下……写成递增会写错位，补丁于是一直不生效。' },
-  { h: '4 / 4 补丁怎么用，以及四个必踩的坑', hint: 'SVC 里认编号，查表跳过去', note: '补丁数量是硬上限：16 个比较器、8 处数据修正，别指望它能批量替换。' }
+  { h: '给 ROM 打补丁', hint: '总线层偷换数据',
+    note: 'ROMC 不改 ROM 内容，只在「读 ROM」这条路径上把返回值换掉。' },
+  { h: '地址空间', hint: '16 KB 在 0x0',
+    note: '异常向量与安全代码钉在低端 16 KB，其余容量从 0x0040_4000 起。' },
+  { h: '寄存器地图', hint: '0x021A_C000',
+    note: '三个寄存器就够跑：ENL 开比较器、A 放地址、D 放替换值，CNTL 定功能。' },
+  { h: '16 个比较器', hint: '8 数据 + 8 指令',
+    note: '类型优先、同类型编号大的赢；SR 的 SW 位是唯一的冲突信号。' },
+  { h: '数据修正', hint: '整字替换',
+    note: '命中就读出 D 寄存器的整个 32 位，读一个字节也换整字 —— 这是最大的坑。' },
+  { h: '指令补丁', hint: 'SWI 陷进去',
+    note: '把一条指令换成 SWI，注释号当索引去查函数指针表，跳到 RAM 里的新实现。' },
+  { h: '外部启动与判据', hint: '两次修正改 PC',
+    note: '0x0 换成 ldr pc,[pc,#12]，0x14 再换成外部地址，PC 就被骗到外部代码。' }
 ];
 
 function txt(parent, x, y, s, cls, anchor) {
@@ -3649,212 +3841,297 @@ function txt(parent, x, y, s, cls, anchor) {
 function box(x, y, w, h, fill, stroke, sw) {
   return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
 }
-function arrow(x1, y1, x2, y2) {
-  svgEl(scene, 'line', { x1: x1, y1: y1, x2: x2, y2: y2, stroke: 'var(--text-2)', 'stroke-width': 4 });
-  var a = Math.atan2(y2 - y1, x2 - x1), L = 18, W = 9;
-  svgEl(scene, 'path', {
-    d: 'M' + x2 + ' ' + y2 + ' L' + (x2 - L * Math.cos(a) + W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) - W * Math.cos(a)) +
-      ' L' + (x2 - L * Math.cos(a) - W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) + W * Math.cos(a)) + ' Z',
-    fill: 'var(--text-2)', stroke: 'none'
-  });
-}
 function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
 
 function drawTop() {
-  txt(scene, 56, 146, 'AHB 与 ROM 之间的一层，顺手带个补丁器', 't28w');
+  txt(scene, 56, 146, 'ROMC 是 Boot ROM 的补丁层：出厂就固化的代码也能被替换，靠的是总线上的数据替换', 't24w');
 
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '数据通路');
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '它夹在哪');
+  txt(scene, 80, 252, 'AHB-Lite 与 ROM 之间', 't20w');
+  txt(scene, 80, 288, '侦听总线上的读事务', 't20w');
+  txt(scene, 80, 324, '命中就把返回值换掉', 't20w');
+  txt(scene, 80, 360, '写操作完全不参与', 't20w');
+  txt(scene, 80, 396, '寄存器走独立 IP 总线', 't20w');
+  txt(scene, 80, 432, '特权态、只能 32 位写', 't20w');
 
-  box(80, 250, 250, 100, 'var(--surface)', 'var(--line)', 2);
-  txt(scene, 104, 294, 'AHB-Lite', 't28');
-  txt(scene, 104, 330, 'CPU 取指与读数', 't28w');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '能做什么');
+  txt(scene, 680, 252, '16 个地址比较器', 't20w');
+  txt(scene, 680, 288, '8 个指令补丁点', 't20w');
+  txt(scene, 680, 324, '8 个整字数据修正', 't20w');
+  txt(scene, 680, 360, '补 Reset 向量 → 外部启动', 't20w');
+  txt(scene, 680, 396, '4 MB 窗口内寻址', 't20w');
+  txt(scene, 680, 432, '对全部 AHB master 生效', 't20w');
 
-  arrow(334, 300, 394, 300);
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '板子上为什么用');
+  txt(scene, 1280, 252, 'Boot ROM 是硅片里固化的', 't20w');
+  txt(scene, 1280, 288, '流片后发现的 bug 只能这样救', 't20w');
+  txt(scene, 1280, 324, '量产不用换芯片', 't20w');
+  txt(scene, 1280, 360, '安全启动用它禁掉补丁', 't20w');
+  txt(scene, 1280, 396, '也能把某段逻辑短路掉', 't20w');
+  txt(scene, 1280, 432, '代价：补丁表要 nailed 在 RAM', 't20w');
 
-  box(396, 250, 300, 100, 'var(--surface)', 'var(--observe-line)', 4);
-  txt(scene, 420, 294, 'ROMC', 't28');
-  txt(scene, 420, 330, '地址比对 + 读数据改写', 't28w');
-
-  arrow(700, 300, 760, 300);
-
-  box(762, 250, 208, 100, 'var(--page)', 'var(--line)', 2);
-  txt(scene, 786, 294, '片上 ROM', 't28');
-  txt(scene, 786, 330, '只读，不可改', 't28w');
-
-  txt(scene, 80, 396, '命中的读请求，返回数据被 D 寄存器里的值整字替换', 't28w');
-  txt(scene, 80, 434, '没命中就原样透传，额外不增加等待周期', 't28w');
-
-  box(80, 470, 880, 150, 'var(--surface)', 'var(--guide)');
-  txt(scene, 104, 512, 'ROM 容量 16 KB 到 4 MB，按 1 KB 递增', 't28w');
-  txt(scene, 104, 550, '安全码与异常向量必须放在 0x0000_0000 起 16 KB', 't28w');
-  txt(scene, 104, 588, '超过 16 KB 的物理部分映射到 0x0040_4000 起', 't28w');
-
-  box(80, 636, 880, 140, 'var(--page)', 'var(--line)');
-  txt(scene, 104, 678, '万一只做 1 KB 到 16 KB 之间的 ROM，后面会地址别名', 't28w');
-  txt(scene, 104, 716, '复位向量也能补丁：把 0x0000_0000 换成跳去外部启动', 't28w');
-  txt(scene, 104, 754, '所以裸板从外部 QSPI/SD 卡启动，有它一份功劳', 't28w');
-
-  box(1020, 168, 850, 320, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '三个硬上限');
-  txt(scene, 1044, 264, '16 个地址比较器，对应 16 处补丁位置', 't28w');
-  txt(scene, 1044, 304, '前 8 个可改为「整字数据修正」', 't28w');
-  txt(scene, 1044, 344, '其余默认给操作码补丁用', 't28w');
-  txt(scene, 1044, 384, '补丁只在 4 MB ROM 空间内有效', 't28w');
-  txt(scene, 1044, 424, '超出范围的地址比对永远不命中', 't28w');
-
-  box(1020, 508, 850, 288, 'var(--page)', 'var(--line)');
-  head(1044, 556, '访问门槛');
-  txt(scene, 1044, 604, '寄存器只在特权模式可见', 't28w');
-  txt(scene, 1044, 644, '只接受 32 位整字写，半字写无效', 't28w');
-  txt(scene, 1044, 684, '基址 0x021A_C000，走 IP 总线', 'tnum');
-  txt(scene, 1044, 724, '复位后全部比较器关闭，默认什么都不改', 't28w');
-  txt(scene, 1044, 764, '所以要显式写地址、写数据、再使能', 't28w');
+  wide(456, 330);
+  txt(scene, 80, 490, '它不是缓存也不是 MPU：不参与地址翻译，只在「读 ROM」这条路径上偷换数据', 't24');
+  txt(scene, 80, 522, 'ROMC 是硬件级热补丁：ROM 里一段代码有 bug，量产后无法改硅片，就用比较器盯住那个地址，读到这里时把 SWI 指令塞回总线，CPU 跳到 RAM 里的新实现。', 't20w');
+  txt(scene, 80, 556, '这与软件补丁不同：软件补丁改的是 RAM 里的副本，而 Boot ROM 的代码根本改不了副本，只能靠总线层替换返回值。', 't20w');
+  txt(scene, 80, 590, '它也用于「禁用某段 ROM 功能」：把某地址的数据修正成 0 或一条跳转，等于把原来的逻辑短路掉，比改代码省事。', 't20w');
+  txt(scene, 80, 624, '注意它只影响读：写 ROM 无效，ROMC 也不拦写；但它对所有 AHB master 生效（含 DMA），所以补丁是全局的。', 't20w');
+  txt(scene, 80, 658, '一句话：ROMC = 16 个比较器 + 8 个数据替换寄存器 + SWI 生成器，三件东西合起来才能改一段固化的代码。', 't20w');
 }
 
-function drawTwo() {
-  txt(scene, 56, 146, '两种改法，一条通路，优先级不同', 't28w');
+function drawSpace() {
+  txt(scene, 56, 146, 'ROM 的前 16 KB 钉在 0x0000_0000：异常向量必须在 0x0，安全代码必须与向量同区', 't24w');
 
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '数据修正');
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '地址布局');
+  txt(scene, 80, 252, '0x0000_0000 起 16 KB', 't20s');
+  txt(scene, 80, 288, 'ROM 基址 0x0040_0000', 't20s');
+  txt(scene, 80, 324, '0x0040_4000 起是余下容量', 't20s');
+  txt(scene, 80, 360, '容量 16 KB – 4 MB，1 KB 步进', 't20w');
+  txt(scene, 80, 396, '不足 16 KB 时高位地址别名', 't20w');
+  txt(scene, 80, 432, 'MMU 决定谁能读', 't20w');
 
-  box(80, 250, 880, 150, 'var(--surface)', 'var(--line)', 2);
-  txt(scene, 104, 292, '用比较器 0–7，地址写进 A 寄存器', 't28w');
-  txt(scene, 104, 330, '替换值写进同号的 D 寄存器', 't28w');
-  txt(scene, 104, 368, '命中后整个 32 位字被替换，低位地址被忽略', 't28w');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '为什么非要 16 KB');
+  txt(scene, 680, 252, '向量表必须在 0x0', 't20w');
+  txt(scene, 680, 288, '安全代码要与向量同区', 't20w');
+  txt(scene, 680, 324, 'ARM 平台安全码最小值约 16 KB', 't20w');
+  txt(scene, 680, 360, '这段只 supervisor 可读', 't20w');
+  txt(scene, 680, 396, '其余容量按普通内存映射', 't20w');
+  txt(scene, 680, 432, '不是「全部 ROM 都在 0x0」', 't20w');
 
-  head(80, 470, '操作码补丁');
-  box(80, 494, 880, 172, 'var(--surface)', 'var(--observe-line)', 4);
-  txt(scene, 104, 536, '命中后不让 ROM 出数据，改塞一条 SWI 指令', 't28w');
-  txt(scene, 104, 574, 'ARM 模式：0xEF 放 [31:24]，注释里放比较器号', 't28w');
-  txt(scene, 104, 612, 'Thumb 模式：0xDF 放 [15:8]，只占 8 位注释', 't28w');
-  txt(scene, 104, 648, '注释低 5 位就是编号，SVC 处理程序靠它分派', 't28w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '对写代码的含义');
+  txt(scene, 1280, 252, 'Boot ROM 固定占低端', 't20w');
+  txt(scene, 1280, 288, '自写代码落在 0x0040_0000 以上', 't20s');
+  txt(scene, 1280, 324, '链接脚本别指望从 0x0 起', 't20w');
+  txt(scene, 1280, 360, '补丁地址必须在 4 MB 窗口内', 't20w');
+  txt(scene, 1280, 396, '比较器只看 [21:2] 这 20 位', 't20s');
+  txt(scene, 1280, 432, '越界地址根本不会命中', 't20w');
 
-  box(80, 690, 880, 86, 'var(--page)', 'var(--line)');
-  txt(scene, 104, 730, '优先级：数据修正 > 操作码补丁；同类冲突取编号大的', 't28w');
-  txt(scene, 104, 762, '同一地址被两个比较器盯上，编号大的赢，并置 SR.SW', 't28w');
-
-  box(1020, 168, 850, 320, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, 'SWI 之后发生什么');
-  txt(scene, 1044, 264, 'CPU 进 SVC 模式，CPSR 存 SPSR_SVC', 't28w');
-  txt(scene, 1044, 304, '返回地址存 R14_SVC，跳到 0x08 向量', 't28w');
-  txt(scene, 1044, 344, '处理程序读回 SWI 指令取注释', 't28w');
-  txt(scene, 1044, 384, '查一张可写内存里的函数指针表', 't28w');
-  txt(scene, 1044, 424, '跳去补丁代码，做完再回到 R14_SVC', 't28w');
-  txt(scene, 1044, 466, '全程只借用 16 个 SWI 编号', 't28');
-
-  box(1020, 508, 850, 288, 'var(--page)', 'var(--line)');
-  head(1044, 556, '为什么不用跳转指令直接改');
-  txt(scene, 1044, 604, 'ROM 不能写，只能靠「读回值替换」', 't28w');
-  txt(scene, 1044, 644, 'SWI 只有一条指令的空间，跳转必须借表', 't28w');
-  txt(scene, 1044, 684, '所以补丁代码放 RAM 或外部存储，ROM 保持原样', 't28w');
-  txt(scene, 1044, 724, '这也意味着补丁不是「热修复」，是启动期装配', 't28w');
-  txt(scene, 1044, 764, '量产固件升级仍走正常下载通道', 't28w');
+  wide(456, 330);
+  txt(scene, 80, 490, '三个数字别混：ROM 物理容量、比较器窗口 4 MB、映射位置 —— 它们由不同的逻辑决定', 't24');
+  txt(scene, 80, 522, '比较器窗口是 4 MB：地址寄存器只用 ADDRX[21:2] 二十位，正好覆盖 2^20 个字即 4 MB；地址再大也不会命中，所以补丁只能管这一块。', 't20w');
+  txt(scene, 80, 556, '物理容量是 16 KB 到 4 MB：小于 16 KB 时，超出容量的地址会「别名」回低端 16 KB 内的内容，读到的不是全 0 也不是错误，而是重复的旧数据。', 't20w');
+  txt(scene, 80, 590, '映射位置分两段：低 16 KB 在 0x0000_0000，其余在 0x0040_4000 起。所以「ROM 有多大」和「ROM 在哪」是两件事，写链接脚本时两段都要考虑。', 't20w');
+  txt(scene, 80, 624, 'MMU 决定权限：这段 ROM 是否只给 supervisor 读，不由 ROMC 决定，而由页表属性决定 —— 安全启动的隔离靠的是 MMU，不是 ROMC。', 't20w');
+  txt(scene, 80, 658, '判据：读 0x0 与 0x0040_0000 都应拿到合法指令；若读到同一段内容，说明容量不足 16 KB 发生了别名。', 't20w');
 }
 
-function drawRegs() {
-  txt(scene, 56, 146, '寄存器只有三十来个，编号排法却反直觉', 't28w');
+function drawMap() {
+  txt(scene, 56, 146, '寄存器分四组：数据、地址、使能与控制、状态，基址 0x021A_C000', 't24w');
 
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '五组寄存器');
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '数据与地址');
+  txt(scene, 80, 252, 'ROMPATCH0D–7D：0xC0F0 起倒排', 't20s');
+  txt(scene, 80, 288, 'ROMPATCH0A–15A：0xC100–0xC13C', 't20s');
+  txt(scene, 80, 324, '每个比较器一个 A 寄存器', 't20w');
+  txt(scene, 80, 360, '只有 0–7 号配了 D 寄存器', 't20w');
+  txt(scene, 80, 396, 'A 与 D 靠编号配对', 't20w');
+  txt(scene, 80, 432, '复位值全 0', 't20w');
 
-  var regs = [
-    ['+0xD4 – +0xF0', 'D7 … D0，编号越大地址越低'],
-    ['+0xF4 CNTL', 'DIS 总开关与 DATAFIX 八位'],
-    ['+0xF8 ENH', '高位使能，本实现只读'],
-    ['+0xFC ENL', 'bit0–15 对应比较器 0–15'],
-    ['+0x100 – +0x13C', 'A0 … A15，比较地址'],
-    ['+0x208 SR', '最近命中的编号与冲突标志']
-  ];
-  regs.forEach(function (r, i) {
-    var y = 276 + i * 46;
-    txt(scene, 80, y, r[0], 'tnum');
-    txt(scene, 340, y, r[1], 't28w');
-  });
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '控制与使能');
+  txt(scene, 680, 252, 'CNTL 0xC0F4，复位 0x0840_0000', 't20s');
+  txt(scene, 680, 288, 'DIS[29] 一键关掉全部补丁', 't20s');
+  txt(scene, 680, 324, 'DATAFIX[7:0] 逐位选功能', 't20s');
+  txt(scene, 680, 360, 'ENL 0xC0FC，只有 [15:0] 可写', 't20s');
+  txt(scene, 680, 396, 'ENH 0xC0F8 整个只读', 't20s');
+  txt(scene, 680, 432, '上电 ENL 全 0：比较器全关', 't20w');
 
-  box(80, 566, 880, 100, 'var(--surface)', 'var(--guide)');
-  txt(scene, 104, 608, 'CNTL.DIS 在 bit29：置 1 全部功能停摆，用于安全操作', 't28w');
-  txt(scene, 104, 648, 'DATAFIX[15:8]：哪一位为 1，对应比较器就走数据修正', 't28w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '状态');
+  txt(scene, 1280, 252, 'SR 0xC208', 't20s');
+  txt(scene, 1280, 288, 'SOURCE[3:0] 最近命中的编号', 't20s');
+  txt(scene, 1280, 324, 'SW[17] 多次命中冲突，写 1 清', 't20s');
+  txt(scene, 1280, 360, '复位值全 0', 't20w');
+  txt(scene, 1280, 396, '读 SR 是最快的自检手段', 't20w');
+  txt(scene, 1280, 432, '只读位多，别照着手册改', 't20w');
 
-  box(80, 682, 880, 94, 'var(--page)', 'var(--line)');
-  txt(scene, 104, 724, 'A 寄存器：ADDRX[22:2] 是地址，bit1 选半字，bit0 = 1 走 Thumb', 't28w');
-  txt(scene, 104, 760, '数据修正时 bit1 与 bit0 都忽略，因为整字替换', 't28w');
-
-  box(1020, 168, 850, 330, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, 'SR 两个字段就够');
-  txt(scene, 1044, 264, 'SW bit17：多个比较器同时命中', 't28w');
-  txt(scene, 1044, 304, '写 1 清，不清就一直挂着', 't28w');
-  txt(scene, 1044, 344, 'SOURCE[5:0]：最近一次命中的比较器号', 't28w');
-  txt(scene, 1044, 384, '它是最新一次，不是累计列表', 't28w');
-  txt(scene, 1044, 428, '调试补丁不生效时，先读它看有没有命中过', 't28');
-
-  box(1020, 518, 850, 278, 'var(--page)', 'var(--line)');
-  head(1044, 566, '最容易写错的两处');
-  txt(scene, 1044, 614, 'D 寄存器地址是反序：D0 在最高地址', 't28w');
-  txt(scene, 1044, 654, '按数组下标去写，编号会整体错位', 't28w');
-  txt(scene, 1044, 694, 'ENL 只有低 16 位可写，高位读回 0', 't28w');
-  txt(scene, 1044, 734, '写 0xFFFFFFFF 想一次全开，实际只开低 16 个', 't28w');
-  txt(scene, 1044, 774, '比较器就 16 个，刚好够，别浪费', 't28w');
+  wide(456, 330);
+  txt(scene, 80, 490, 'CNTL 复位值 0x0840_0000 里的两个 1 是「保留位恒为 1」，不是配置位，别去动它', 't24');
+  txt(scene, 80, 522, '最小可用配置只有三步：ENL 置对应位打开比较器、A 寄存器放目标地址（含 bit0 选 ARM/THUMB）、CNTL 的 DATAFIX 位决定它是改数据还是改指令。', 't20w');
+  txt(scene, 80, 556, '写寄存器必须是 32 位存储且特权态：用 8 位或 16 位写会被忽略，这是最常见的「配了没反应」—— 现象是没有错误、也没有效果。', 't20w');
+  txt(scene, 80, 590, 'ENL 只有低 16 位可写，因为本芯片只实现 16 个比较器；ENH 全只读 0，往它写既不报错也不生效，属于「看了会以为能用」的陷阱。', 't20w');
+  txt(scene, 80, 624, '上电默认 ENL 全 0，此时 ROMC 完全透明：ROM 读到的就是出厂内容。所以调试「补丁没生效」时，第一件事就是读 ENL 确认位是否真的置上了。', 't20w');
+  txt(scene, 80, 658, '判据：配置后读回 A、D、CNTL、ENL 四个寄存器与写入值逐位比对；再用调试器读目标地址，看返回值是否变成 D 里的内容。', 't20w');
 }
 
-function drawFlow() {
-  txt(scene, 56, 146, '装配顺序对了，补丁才真的生效', 't28w');
+function drawComparators() {
+  txt(scene, 56, 146, '16 个比较器：0–7 可做数据修正（也可做指令补丁），8–15 只能做指令补丁', 't24w');
 
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '挂一个操作码补丁');
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '分工');
+  txt(scene, 80, 252, '0–7：默认指令补丁', 't20w');
+  txt(scene, 80, 288, 'CNTL.DATAFIX 某位置 1 → 改数据', 't20s');
+  txt(scene, 80, 324, '8–15：只能指令补丁', 't20w');
+  txt(scene, 80, 360, '一个比较器只干一件事', 't20w');
+  txt(scene, 80, 396, '最多 8 个数据点 + 8 个指令点', 't20w');
+  txt(scene, 80, 432, '也可以 16 个全做指令补丁', 't20w');
 
-  var ord = [
-    ['①', '选一个比较器号 n，例如 7'],
-    ['②', 'A[n] 写目标地址，Thumb 时置 bit0'],
-    ['③', 'ENL 置第 n 位，打开这个比较器'],
-    ['④', 'CNTL.DATAFIX 对应位清 0，走操作码补丁'],
-    ['⑤', '在可写内存建函数指针表，第 n 项指向补丁'],
-    ['⑥', '写 SVC 处理程序：取注释低 5 位，查表跳转']
-  ];
-  ord.forEach(function (b, i) {
-    var y = 276 + i * 52;
-    txt(scene, 96, y, b[0], 'tnum');
-    txt(scene, 140, y, b[1], 't28w');
-  });
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '优先级规则');
+  txt(scene, 680, 252, '1. 数据修正压过指令补丁', 't20w');
+  txt(scene, 680, 288, '2. 同类型里编号大的赢', 't20w');
+  txt(scene, 680, 324, '例：4 改数据 / 7 改指令 → 4 胜', 't20w');
+  txt(scene, 680, 360, '例：4 与 7 都改数据 → 7 胜', 't20w');
+  txt(scene, 680, 396, '替换值取对应 D 寄存器', 't20w');
+  txt(scene, 680, 432, '编号就是隐式优先级', 't20w');
 
-  txt(scene, 80, 606, '数据修正则是再写 A[n]、D[n]、CNTL.DATAFIX 置位', 't28w');
-  txt(scene, 80, 646, '顺序反过来也行，但 ENL 必须在最后打开，否则可能先命中', 't28w');
-  txt(scene, 80, 686, '全部就绪前若已命中，SR.SOURCE 会留下证据', 't28w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '冲突怎么看出来');
+  txt(scene, 1280, 252, 'SR.SW=1 表示发生过多次命中', 't20s');
+  txt(scene, 1280, 288, 'SR.SOURCE 记录胜者编号', 't20s');
+  txt(scene, 1280, 324, 'SW 写 1 清，SOURCE 随事件更新', 't20w');
+  txt(scene, 1280, 360, '冲突多半是地址少写一位', 't20w');
+  txt(scene, 1280, 396, '查 A 寄存器是否撞区', 't20w');
+  txt(scene, 1280, 432, '再查 DATAFIX 分工是否重复', 't20w');
 
-  box(80, 722, 880, 58, 'var(--surface)', 'var(--guide)');
-  txt(scene, 104, 760, '收尾：开 CNTL.DIS 之前确认没有别的补丁还在依赖它', 't28w');
+  wide(456, 330);
+  txt(scene, 80, 490, '两条规则合起来：类型优先、同类编号大的赢 —— 所以编号是隐式优先级，排补丁表时要利用它', 't24');
+  txt(scene, 80, 522, '把「必须生效」的补丁放在同类型里编号更大的比较器上，否则会被编号更小的邻居盖掉；反过来，想故意覆盖别人就先占大号。', 't20w');
+  txt(scene, 80, 556, '冲突的典型来源是地址算错：ADDRX 只有 [21:2] 参与比较，bit1 与 bit0 各有含义，若把「字节地址」直接写进去，就会命中错误的字甚至两个比较器。', 't20w');
+  txt(scene, 80, 590, '写地址的正确姿势：先把目标字节地址按字对齐（清低 2 位），再做「地址 ÷ 4」放进 ADDRX 的低 20 位；THUMB 补丁另置 bit0，半字选择另置 bit1。', 't20w');
+  txt(scene, 80, 624, 'SR.SOURCE 只记「最近一次」，不记历史；连续两次不同命中会把它覆盖。要排查冲突就每次读后立刻记下来，别指望回看。', 't20w');
+  txt(scene, 80, 658, '判据：读 SR 的 SW 与 SOURCE，与预期编号一致；再把「可疑邻居」比较器临时关掉复测，看行为是否变化。', 't20w');
+}
 
-  box(1020, 168, 850, 380, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '四个必踩的坑');
-  txt(scene, 1044, 264, '① 想批量替换：只有 16 个位置，做不到', 't28w');
-  txt(scene, 1044, 304, '② D 寄存器按下标顺序写：整体错位', 't28w');
-  txt(scene, 1044, 344, '③ 数据修正改了整字，同字内其它字节也被换', 't28w');
-  txt(scene, 1044, 384, '④ 用户态访问寄存器：直接进异常', 't28w');
-  txt(scene, 1044, 430, '排查：先读 SR.SOURCE 确认命中，再看 ENL 位', 't28');
-  txt(scene, 1044, 470, '命中但不生效，八成是 CNTL.DIS 置了 1', 't28w');
-  txt(scene, 1044, 510, 'SVC 里死循环，多半是没认出注释就返回了', 't28w');
+function drawDataFix() {
+  txt(scene, 56, 146, '数据修正只做一件事：命中地址就读出 D 寄存器的整个 32 位，不做部分保留', 't24w');
 
-  box(1020, 566, 850, 230, 'var(--page)', 'var(--line)');
-  head(1044, 614, '与相邻章节的分工');
-  txt(scene, 1044, 662, 'ROM 启动流程与镜像加载见第 08 章', 't28w');
-  txt(scene, 1044, 702, '安全启动与信任链见第 11 章', 't28w');
-  txt(scene, 1044, 742, 'SoC 内 ROM 本身的地址范围见第 02 章', 't28w');
-  txt(scene, 1044, 782, 'ROMC 只负责让 ROM 读起来像被改过', 't28w');
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '机制');
+  txt(scene, 80, 252, '命中读地址就整字替换', 't20w');
+  txt(scene, 80, 288, '读 byte / half 也返回整字', 't20w');
+  txt(scene, 80, 324, 'A[1:0] 在数据修正里被忽略', 't20s');
+  txt(scene, 80, 360, '替换值只在读数据总线上', 't20w');
+  txt(scene, 80, 396, 'hready 拉高后才结束访问', 't20w');
+  txt(scene, 80, 432, '写操作完全不受影响', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '适合改什么');
+  txt(scene, 680, 252, '32 位常数表项', 't20w');
+  txt(scene, 680, 288, '一条 32 位指令', 't20w');
+  txt(scene, 680, 324, '把函数首条改成跳转', 't20w');
+  txt(scene, 680, 360, '修出厂数据的错值', 't20w');
+  txt(scene, 680, 396, '屏蔽某段自检结果', 't20w');
+  txt(scene, 680, 432, '共 8 个位置，够关键修补', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '三个坑');
+  txt(scene, 1280, 252, '结构体里改 1 字节会连带改邻居', 't20w');
+  txt(scene, 1280, 288, 'D 只写目标值会把其余字节清零', 't20w');
+  txt(scene, 1280, 324, '编译器常量折叠后改表无效', 't20w');
+  txt(scene, 1280, 360, '大小端搞反会读出字节反转', 't20w');
+  txt(scene, 1280, 396, '只对读生效，写不进 ROM', 't20w');
+  txt(scene, 1280, 432, '调试器读也算读，会看到替换值', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '整字替换是硬规则：读 1 个字节也把整 4 字节换成 D 的值，没打算动的 3 个字节一起变', 't24');
+  txt(scene, 80, 522, '正确做法是「读原字 → 改目标字段 → 写回 D」：先从 ROM 读出原来的 32 位，只改你要改的那几个 bit，再整字写进 D，这样邻近字节保持原值。', 't20w');
+  txt(scene, 80, 556, '由此可知数据修正只适合独立字：改一个常数、一条指令都安全；改结构体里的单个字段就会误伤同字的其他字段，这种场景应该改用指令补丁去改访问它的代码。', 't20w');
+  txt(scene, 80, 590, '编译器可能把常量折进指令立即数，此时改数据表根本没被读到；判断方法是反汇编目标函数，看它是否真的从那个地址 load。', 't20w');
+  txt(scene, 80, 624, '另一个隐蔽点：调试器/仿真器读同一地址也会被修正，容易误判「ROM 里本来就是新值」；要验原值必须在补丁关闭时读。', 't20w');
+  txt(scene, 80, 658, '判据：关闭比较器读一次得原值，打开后再读得新值；byte/half/word 三种宽度读出来都是同一个整字。', 't20w');
+}
+
+function drawOpcode() {
+  txt(scene, 56, 146, '指令补丁把一条指令换成 SWI：CPU 以为在跑原代码，实际陷进 SVC，由软件跳到新实现', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '生成什么');
+  txt(scene, 80, 252, 'ARM：32 位 SWI', 't20w');
+  txt(scene, 80, 288, 'opcode 0xEF 在 [31:24]', 't20s');
+  txt(scene, 80, 324, '注释 [23:0]，低 5 位是编号', 't20s');
+  txt(scene, 80, 360, 'THUMB：16 位，0xDF 在 [15:8]', 't20s');
+  txt(scene, 80, 396, 'A[0]=1 表示 THUMB 补丁', 't20s');
+  txt(scene, 80, 432, '其余注释位清零', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '半字放哪边');
+  txt(scene, 680, 252, 'THUMB 只占半个字', 't20w');
+  txt(scene, 680, 288, 'A[1] 选低半字或高半字', 't20s');
+  txt(scene, 680, 324, '小端：bit1=0 → [15:0]', 't20s');
+  txt(scene, 680, 360, '大端：规则反过来', 't20w');
+  txt(scene, 680, 396, '另一半被清零', 't20w');
+  txt(scene, 680, 432, '只覆盖半个字，另一个字不动', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '软件侧约定');
+  txt(scene, 1280, 252, '注释 > 16：普通系统调用', 't20w');
+  txt(scene, 1280, 288, '注释 < 16：ROMC 补丁', 't20w');
+  txt(scene, 1280, 324, '用注释号索引函数指针表', 't20w');
+  txt(scene, 1280, 360, '表放可写内存，可换上下文', 't20w');
+  txt(scene, 1280, 396, 'SPSR 的 T 位判 ARM/THUMB', 't20s');
+  txt(scene, 1280, 432, '最多 16 个补丁点', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '为什么用 SWI：ROMC 只能替换「当前读到的那个字」，改不了 PC，SWI 是唯一能就地改变控制流的单条指令', 't24');
+  txt(scene, 80, 522, '处理器的配合是硬件自动的：SWI 把 CPSR 存进 SPSR_SVC、把返回地址存进 LR_SVC、进 SVC 模式、跳到 0x8 向量 —— 所以 handler 一定拿得到「从哪来」。', 't20w');
+  txt(scene, 80, 556, 'handler 的第一件事是区分来源：读 SPSR 的 T 位判断 ARM/THUMB，再从 LR 往回取指令字（ARM 取 -4，THUMB 取 -2），掩掉 opcode 只留注释。', 't20w');
+  txt(scene, 80, 590, '注释号只有 5 位有效，所以最多 16 个补丁点，与比较器数一致；>16 的注释留给操作系统自己的系统调用，两边靠这个阈值划清界限。', 't20w');
+  txt(scene, 80, 624, '函数指针表放在可写内存的意义：不同进程/不同阶段可以换一张表，同一个 ROM 补丁点就能跳到不同的实现 —— 这是它比「直接改代码」灵活的地方。', 't20w');
+  txt(scene, 80, 658, '判据：handler 里打印注释号与 LR，确认命中预期比较器；再核对表项指向的新函数确实被执行（打点或计数器）。', 't20w');
+}
+
+function drawBoot() {
+  txt(scene, 56, 146, '外部启动是「两次数据修正」串起来的：0x0 换成 ldr pc，0x14 再换成外部入口地址', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '触发条件');
+  txt(scene, 80, 252, '复位时 boot_int 为低', 't20w');
+  txt(scene, 80, 288, 'ROMC 对 0x0 做数据修正', 't20w');
+  txt(scene, 80, 324, '换成 0xE59FF00C', 't20s');
+  txt(scene, 80, 360, '即 ldr pc,[pc,#12]', 't20s');
+  txt(scene, 80, 396, 'PC=8 时算出源地址 0x14', 't20w');
+  txt(scene, 80, 432, '这是一条标准的 ARM 指令', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '第二步');
+  txt(scene, 680, 252, '读 0x14 又命中修正', 't20w');
+  txt(scene, 680, 288, '返回外部启动地址', 't20w');
+  txt(scene, 680, 324, '低 2 位被清零', 't20w');
+  txt(scene, 680, 360, 'PC 拿到该地址', 't20w');
+  txt(scene, 680, 396, '从那里取指执行', 't20w');
+  txt(scene, 680, 432, '原 Boot ROM 分支被绕过', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '为什么绕两步');
+  txt(scene, 1280, 252, '直接改 0x0 成跳转也行', 't20w');
+  txt(scene, 1280, 288, '但地址要装进一条指令里', 't20w');
+  txt(scene, 1280, 324, '指令只有 32 位，装不下大地址', 't20w');
+  txt(scene, 1280, 360, '所以先跳到一个「数据槽」', 't20w');
+  txt(scene, 1280, 396, '0x14 就是那个槽', 't20s');
+  txt(scene, 1280, 432, 'PC 相对寻址只需 12 偏移', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '这条链条值得一步步跟：0x0 → ldr pc,[pc,#12] → 读 0x14 → 外部地址 → PC，四步里有两步是 ROMC 在替换', 't24');
+  txt(scene, 80, 522, 'PC 相对取址的细节：ARM 模式下读 PC 时它已经指向「当前指令 + 8」，所以 ldr pc,[pc,#12] 访问的是 8+12=20=0x14，不是 0x0C。', 't20w');
+  txt(scene, 80, 556, '低 2 位清零的用意是保证字对齐：ARM 指令必须 4 字节对齐，若外部启动代码入口带偏移就会被截断；所以入口要按字对齐放，别放在奇地址。', 't20w');
+  txt(scene, 80, 590, '这一步属于 Boot ROM 的启动策略，不是用户代码能改的：用户能做的是「让 boot_int 有效」或「在补丁关闭前把补丁表填好」，具体引脚/熔丝要看芯片启动章节。', 't20w');
+  txt(scene, 80, 624, '安全相关的一点：进安全世界前应置 CNTL.DIS=1 关掉全部补丁，但外部启动这条链不受 DIS 影响 —— 手册明确写了 DIS 不管 External Boot。', 't20w');
+  txt(scene, 80, 658, '判据：单步跟 0x0 → 0x14 → 目标地址，三次读的返回值都要符合预期；再读 SR.SOURCE 确认命中的是比较器几号。', 't20w');
 }
 
 function draw() {
-  var s = STEPS[state.step];
-  $('hint').textContent = s.hint;
-  $('note').textContent = s.note;
-  scene.textContent = '';
-  if (state.step === 0) drawTop();
-  else if (state.step === 1) drawTwo();
-  else if (state.step === 2) drawRegs();
-  else drawFlow();
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) drawSpace();
+  else if (s === 2) drawMap();
+  else if (s === 3) drawComparators();
+  else if (s === 4) drawDataFix();
+  else if (s === 5) drawOpcode();
+  else drawBoot();
 }
 
-var step = stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
-void step;
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
 zoomable(document.querySelector('.bd-stage'));
 resetButton($('reset'), function () { state.step = INIT.step; draw(); });
 fitCanvas($('viewport'), $('canvas'), draw);

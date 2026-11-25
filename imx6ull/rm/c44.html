@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RM44 随机数发生器 RNGB</title>
+<title>RM 第 44 章 · 随机数发生器 RNGB | i.MX6ULL 逐章解读</title>
 <style>/* 白板互动教学设计系统 · 样式。由 scripts/inline.py 整段拼进页面，不要手抄或删减。
  * 页面的全部颜色、字号、间距、圆角、阴影只在 :root 定义；改主题只改这一段。 */
 
@@ -2469,30 +2469,30 @@ text.bd-an-inner { font-size: var(--size-l4); }
   <symbol id="i-reset" viewBox="0 0 24 24"><title>重置</title><path d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5M4.5 4v4.5H9"/></symbol>
   <symbol id="i-prev" viewBox="0 0 24 24"><title>上一步</title><path d="M15 5l-7 7 7 7"/></symbol>
   <symbol id="i-next" viewBox="0 0 24 24"><title>下一步</title><path d="M9 5l7 7-7 7"/></symbol>
-  <symbol id="i-close" viewBox="0 0 24 24"><title>收起</title><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><title>关闭</title><path d="M6 6l12 12M18 6L6 18"/></symbol>
   <symbol id="i-explain" viewBox="0 0 24 24"><title>讲解</title><path d="M3 5.5c3-1 6-.8 9 1 3-1.8 6-2 9-1V19c-3-1-6-.8-9 1-3-1.8-6-2-9-1zM12 6.5V20"/></symbol>
   <symbol id="i-correct" viewBox="0 0 24 24"><title>正确</title><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
   <symbol id="i-wrong" viewBox="0 0 24 24"><title>错误</title><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
-  <symbol id="i-alert" viewBox="0 0 24 24"><title>越界</title><path d="M12 4l9 16H3zM12 10v4.5M12 17.6v.1"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><title>注意</title><path d="M12 4l9 16H3zM12 10v4.5M12 17.6v.1"/></symbol>
   <symbol id="i-drag" viewBox="0 0 24 24"><title>拖动</title><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></symbol>
-  <symbol id="i-speak" viewBox="0 0 24 24"><title>发音</title><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+  <symbol id="i-speak" viewBox="0 0 24 24"><title>朗读</title><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
   <symbol id="i-fullscreen" viewBox="0 0 24 24"><title>全屏</title><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
-  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>退出全屏</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
+  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>RM 第 17 章 · NAND 纠错加速器 BCH | i.MX6ULL 逐章解读</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
 </svg>
 
 <div class="bd-viewport" id="viewport">
   <div class="bd-canvas" id="canvas">
     <header class="bd-titlebar">
-      <h1 class="bd-title">第 44 章 · 随机数发生器 RNGB</h1>
+      <h1>第 44 章 · 随机数发生器（RNGB）</h1>
       <span class="bd-hint" id="hint"></span>
       <div class="bd-readings">
         <span class="bd-reading bd-reading-emphasis">
-          <span class="bd-reading-name">基址</span>
-          <span class="bd-reading-value">0x0228_4000</span>
+          <span class="bd-reading-name">输出 FIFO</span>
+          <span class="bd-reading-value">5 个字</span>
         </span>
         <span class="bd-reading">
-          <span class="bd-reading-name">FIFO</span>
-          <span class="bd-reading-value">5 字</span>
+          <span class="bd-reading-name">重播种上限</span>
+          <span class="bd-reading-value">2^20 字</span>
         </span>
       </div>
     </header>
@@ -2506,6 +2506,7 @@ text.bd-an-inner { font-size: var(--size-l4); }
         <button class="bd-btn" type="button" id="next"></button>
       </div>
       <div class="bd-actions">
+        <a class="bd-btn" href="c43.html" style="text-decoration:none">← RM43</a> <a class="bd-btn" href="c45.html" style="text-decoration:none">RM45 →</a>
         <a class="bd-btn" href="index.html" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">☰ 目录</a>
         <button class="bd-btn" type="button" id="reset"></button>
       </div>
@@ -3627,6 +3628,193 @@ function reader(root, sentences, opts) {
   };
 }
 </script>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
 <script>
 var $ = function (id) { return document.getElementById(id); };
 var OX = 24, OY = 96;
@@ -3637,10 +3825,20 @@ var INIT = { step: 0 };
 var state = { step: INIT.step };
 
 var STEPS = [
-  { h: '1 / 4 六个体积很小的寄存器，产密钥级随机数', hint: '真随机喂种子，伪随机出数据', note: '它不是「够用就行」的随机：输出要能直接当 AES 密钥和会话挑战值。' },
-  { h: '2 / 4 三个模式：自测、播种、出数', hint: '先自测，再播种，最后才读', note: '播种要跑约两百万个时钟周期，开机立刻读随机数一定读到空 FIFO。' },
-  { h: '3 / 4 状态位比数据位重要', hint: 'SDN 与 FIFO_LVL 决定能不能读', note: 'ESR 里的错误都是致命的：不清错误直接复位，后面读出来的数都不能用。' },
-  { h: '4 / 4 上板流程与四个必踩的坑', hint: '读之前先看 FIFO_LVL', note: '读空 FIFO 不会报错，默认返回全 0——用它当密钥就是灾难。' }
+  { h: '两段式随机', hint: 'TRNG 播种 / PRNG 出数',
+    note: '真理发生器只负责「种子」，真正大量出数的是 SHA-1 伪随机引擎。' },
+  { h: '三个子块', hint: 'TRNG · PRNG · XSEED',
+    note: 'XSEED 把 128 位 LFSR 与移位寄存器的熵掺进 256 位 XKEY，重播种才算完成。' },
+  { h: '寄存器地图', hint: '0x0228_4000',
+    note: '六个寄存器：VER、CMD、CR、SR、ESR、OUT，全部 32 位。' },
+  { h: '命令与状态', hint: 'ST / GS · 复位 0x500D',
+    note: '复位态就是「要种子 + 睡眠」；ST 与 GS 同置时自检优先。' },
+  { h: '吞吐与重播种', hint: '112 拍出 5 字',
+    note: '一万亿分之一秒级的开销不在算法，而在「读完 2^20 字必须回去重新播种」。' },
+  { h: '错误与中断', hint: '五个粘滞位',
+    note: '振荡器坏、LFSR 坏、统计不过都是粘滞错误，必须复位，不能只清标志。' },
+  { h: '两条初始化流程', hint: '手动 10 步 / 自动 6 步',
+    note: '自动重播种少 4 步，代价是重播种时读 FIFO 会有短暂停顿。' }
 ];
 
 function txt(parent, x, y, s, cls, anchor) {
@@ -3649,222 +3847,300 @@ function txt(parent, x, y, s, cls, anchor) {
 function box(x, y, w, h, fill, stroke, sw) {
   return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
 }
-function arrow(x1, y1, x2, y2) {
-  svgEl(scene, 'line', { x1: x1, y1: y1, x2: x2, y2: y2, stroke: 'var(--text-2)', 'stroke-width': 4 });
-  var a = Math.atan2(y2 - y1, x2 - x1), L = 18, W = 9;
-  svgEl(scene, 'path', {
-    d: 'M' + x2 + ' ' + y2 + ' L' + (x2 - L * Math.cos(a) + W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) - W * Math.cos(a)) +
-      ' L' + (x2 - L * Math.cos(a) - W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) + W * Math.cos(a)) + ' Z',
-    fill: 'var(--text-2)', stroke: 'none'
-  });
-}
 function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
 
 function drawTop() {
-  txt(scene, 56, 146, '真随机做种子，SHA-1 做扩散，一次吐五个字', 't28w');
+  txt(scene, 56, 146, 'RNGB 的目标不是「随机」，而是「密码学强度的随机」：能被当密钥，且对手猜不出来', 't24w');
 
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '三块拼起来');
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '为什么不能只用 TRNG');
+  txt(scene, 80, 252, '真理源很慢：100 拍才 1 bit', 't20w');
+  txt(scene, 80, 288, '一个 128 位密钥要十几万拍', 't20w');
+  txt(scene, 80, 324, '而且可能被电源噪声带偏', 't20w');
+  txt(scene, 80, 360, '所以要「播种 + 扩流」', 't20w');
+  txt(scene, 80, 396, '扩流用 NIST 批准的 PRNG', 't20w');
+  txt(scene, 80, 432, '种子真随机，输出就够强', 't20w');
 
-  box(80, 250, 880, 110, 'var(--surface)', 'var(--line)', 2);
-  txt(scene, 104, 292, 'TRNG：三路熵源，各带一个 LFSR 做健康检查', 't28w');
-  txt(scene, 104, 330, '输出真正的物理噪声，自己不会产生可预测序列', 't28w');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '硬件能力');
+  txt(scene, 680, 252, 'NIST 批准的伪随机算法', 't20w');
+  txt(scene, 680, 288, '支持 DSS 密钥生成算法', 't20w');
+  txt(scene, 680, 324, '内置熵源（含环振与 LFSR）', 't20w');
+  txt(scene, 680, 360, '自检约 29,000 拍', 't20w');
+  txt(scene, 680, 396, '输出 FIFO 深 5 字', 't20w');
+  txt(scene, 680, 432, '单一中断线，可屏蔽', 't20w');
 
-  arrow(520, 364, 520, 394);
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '典型用途');
+  txt(scene, 1280, 252, '生成密钥与 IV', 't20w');
+  txt(scene, 1280, 288, '每条消息的临时秘密', 't20w');
+  txt(scene, 1280, 324, '随机挑战值（防重放）', 't20w');
+  txt(scene, 1280, 360, 'TLS / IPsec 的 nonce', 't20w');
+  txt(scene, 1280, 396, '安全启动的盐值', 't20w');
+  txt(scene, 1280, 432, '不要用它做「游戏随机数」', 't20w');
 
-  box(80, 398, 880, 110, 'var(--surface)', 'var(--observe-line)', 4);
-  txt(scene, 104, 440, 'XSEED / 种子生成：把熵汇成 256 位 XKEY', 't28w');
-  txt(scene, 104, 478, '约两百万个时钟周期，只为得到第一颗合格种子', 't28w');
-
-  arrow(520, 512, 520, 542);
-
-  box(80, 546, 880, 110, 'var(--page)', 'var(--line)', 2);
-  txt(scene, 104, 588, 'PRNG：NIST 认可的 SHA-1 结构，输出 160 位', 't28w');
-  txt(scene, 104, 626, '160 位正好拆成五个 32 位字，塞进输出 FIFO', 't28w');
-
-  box(80, 672, 880, 104, 'var(--surface)', 'var(--guide)');
-  txt(scene, 104, 714, 'FIFO 深度 5，也是单次生成量；读空后硬件再补满', 't28w');
-  txt(scene, 104, 752, '连续 2^20 个字后必须重播种，否则强度下降', 't28w');
-
-  box(1020, 168, 850, 300, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '六个寄存器');
-  var regs = [
-    ['+0x00 VER', '版本，只读，0x1000_0280'],
-    ['+0x04 CMD', '写命令：自测、播种、清标志'],
-    ['+0x08 CR', '掩中断、自动重播种、下溢策略'],
-    ['+0x0C SR', '状态：种子完成、FIFO 水位'],
-    ['+0x10 ESR', '错误：统计失败、振荡器、LFSR'],
-    ['+0x14 OUT', '读随机字，一次 32 位']
-  ];
-  regs.forEach(function (r, i) {
-    var y = 262 + i * 38;
-    txt(scene, 1044, y, r[0], 'tnum');
-    txt(scene, 1300, y, r[1], 't28w');
-  });
-
-  box(1020, 500, 850, 296, 'var(--page)', 'var(--line)');
-  head(1044, 548, '为什么必须用硬件 RNG');
-  txt(scene, 1044, 596, '软件伪随机用时间戳做种，可被反推', 't28w');
-  txt(scene, 1044, 636, '密钥、挑战值、nonce 都要求不可预测', 't28w');
-  txt(scene, 1044, 676, 'RNGB 自带统计自检，能判定熵源是否坏了', 't28w');
-  txt(scene, 1044, 716, '掉电不会保留状态，每次开机都要重播种', 't28w');
-  txt(scene, 1044, 756, '它产的是数，不是密钥管理——存储另算', 't28w');
+  wide(456, 330);
+  txt(scene, 80, 490, '一句话分工：TRNG 负责「不可预测」，PRNG 负责「产量」；两者串起来才既快又安全', 't24');
+  txt(scene, 80, 522, '纯软件伪随机（如 rand()）的问题是可预测：种子若来自时间戳，攻击者枚举几千个候选就能复现整串输出。RNGB 的第一步就是把种子换成硬件熵。', 't20w');
+  txt(scene, 80, 556, '纯 TRNG 的问题是不可用：每 100 个时钟才产出 1 bit 熵，生成一个 256 位密钥要两万多拍，还得反复做统计检验防止熵源失效。', 't20w');
+  txt(scene, 80, 590, '两段式正好互补：用 TRNG 采 20,000 个熵样本搓成初始种子，再让 SHA-1 型 PRNG 以每 112 拍 5 个字的速度扩流，产出速度提高三个数量级。', 't20w');
+  txt(scene, 80, 624, '用错场景的代价：拿它做游戏随机数并不省事（要等播种），而拿软件 rand() 做密钥则直接毁掉整个加密方案 —— 这是最典型的「用对硬件」问题。', 't20w');
+  txt(scene, 80, 658, '安全前提只有一条：熵源必须真的在抖。环振被固定频率干扰、或电源纹波单一，TRNG 就会输出「看起来随机、其实可预测」的序列。', 't20w');
 }
 
-function drawModes() {
-  txt(scene, 56, 146, '三条路：先证明自己没坏，再拿种子，最后出数', 't28w');
+function drawBlocks() {
+  txt(scene, 56, 146, '三个子块串成一条链：熵 → 种子 → 密钥状态 → 随机字流', 't24w');
 
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '状态流转');
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'TRNG 做什么');
+  txt(scene, 80, 252, '两个熵源，各出 1 bit', 't20w');
+  txt(scene, 80, 288, '拼成 2 bit 输出', 't20w');
+  txt(scene, 80, 324, '约 100 拍才凑出 1 bit 熵', 't20w');
+  txt(scene, 80, 360, '自己跑统计检验', 't20w');
+  txt(scene, 80, 396, '结果写进 SR 与 ESR', 't20w');
+  txt(scene, 80, 432, '不直接对外出数', 't20w');
 
-  box(80, 250, 880, 132, 'var(--surface)', 'var(--line)', 2);
-  txt(scene, 104, 292, '① 自测：写 CMD.ST', 't28');
-  txt(scene, 104, 332, '统计计数器与 PRNG 算法各跑一遍', 't28w');
-  txt(scene, 104, 368, '约 29,000 个周期，完成置 SR.STDN', 't28w');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, 'PRNG 做什么');
+  txt(scene, 680, 252, 'NIST 批准的算法', 't20w');
+  txt(scene, 680, 288, 'SHA-1 出 160 bit → 5 个字', 't20w');
+  txt(scene, 680, 324, '112 拍出 5 个字', 't20w');
+  txt(scene, 680, 360, '2^20 字后要求重播种', 't20w');
+  txt(scene, 680, 396, '初始种子约 200 万拍', 't20w');
+  txt(scene, 680, 432, '种子存 256 位 XKEY', 't20w');
 
-  arrow(520, 386, 520, 416);
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, 'XSEED 做什么');
+  txt(scene, 1280, 252, '两路熵进同一个混合器', 't20w');
+  txt(scene, 1280, 288, '128 位 LFSR', 't20w');
+  txt(scene, 1280, 324, '128 位移位寄存器', 't20w');
+  txt(scene, 1280, 360, '重播种时直接掺进 XKEY', 't20w');
+  txt(scene, 1280, 396, '不需要软件介入', 't20w');
+  txt(scene, 1280, 432, '这就是「透明重播种」', 't20w');
 
-  box(80, 420, 880, 152, 'var(--surface)', 'var(--observe-line)', 4);
-  txt(scene, 104, 462, '② 播种：写 CMD.GS', 't28');
-  txt(scene, 104, 502, 'TRNG 采 20,000 个熵样本灌进 256 位 XKEY', 't28w');
-  txt(scene, 104, 538, '同时跑统计测试：单比特、游程 1–6、长串 >34', 't28w');
-  txt(scene, 104, 570, '通过则置 SR.SDN，失败则 ESR.SATE', 't28w');
-
-  arrow(520, 576, 520, 606);
-
-  box(80, 610, 880, 166, 'var(--page)', 'var(--line)', 2);
-  txt(scene, 104, 652, '③ 出数：FIFO 空就自动补', 't28');
-  txt(scene, 104, 692, '每 112 个时钟补齐五个字（一个 SHA-1 输出）', 't28w');
-  txt(scene, 104, 728, 'FIFO 有数据就进睡眠，SR.SLP 置 1', 't28w');
-  txt(scene, 104, 764, '用满 2^20 字置 SR.RS，提示该重播种', 't28w');
-
-  box(1020, 168, 850, 320, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '自测与播种的优先级');
-  txt(scene, 1044, 264, '同时写 ST 与 GS：先做完自测再播种', 't28w');
-  txt(scene, 1044, 304, '命令在 SR.BUSY 为 0 时才开始执行', 't28w');
-  txt(scene, 1044, 344, 'GS 与 ST 都是自清的，别轮询这两位', 't28w');
-  txt(scene, 1044, 388, '要看结果就查 SR 的 SDN / STDN', 't28');
-  txt(scene, 1044, 428, 'AR 打开后，RS 置位时硬件自己重播种', 't28w');
-  txt(scene, 1044, 470, '想省心就开 AR，代价是偶发几百微秒的等待', 't28w');
-
-  box(1020, 500, 850, 296, 'var(--page)', 'var(--line)');
-  head(1044, 548, '时间量级心里要有数');
-  txt(scene, 1044, 596, '自测：约 2.9 万个周期，几十到几百微秒', 't28w');
-  txt(scene, 1044, 636, '播种：约 200 万个周期，毫秒级', 't28w');
-  txt(scene, 1044, 676, '出五个字：112 个周期', 't28w');
-  txt(scene, 1044, 716, '所以开机第一件事是触发 GS，别等要用时再触发', 't28w');
-  txt(scene, 1044, 756, '驱动里通常放一个后台线程持续把 FIFO 读空', 't28w');
+  wide(456, 330);
+  txt(scene, 80, 490, '三段链条里最容易被误解的是 XSEED：它不是「再一个熵源」，而是「把熵混进密钥状态」的入口', 't24');
+  txt(scene, 80, 522, '链条顺序是熵采集 → 种子生成（20,000 样本写进 256 位 XKEY）→ 随机数生成（SHA-1 引擎按 XKEY 出 5 字）→ 用满 2^20 字再回头掺熵。', 't20w');
+  txt(scene, 80, 556, 'XSEED 的两路（LFSR + 移位寄存器）各 128 位，与 XKEY 的 256 位对齐；重播种时它们的内容「直接加进」密钥状态，所以旧状态不会被完全冲掉。', 't20w');
+  txt(scene, 80, 590, '这个设计的好处是「前向安全」：即使攻击者拿到当前 256 位状态，也无法反推之前输出的序列 —— 因为每次重播种都掺了新熵。', 't20w');
+  txt(scene, 80, 624, '速度对比：TRNG 100 拍 1 bit，PRNG 112 拍 160 bit —— 相差约 143 倍；这就是「必须两段式」的量化理由。', 't20w');
+  txt(scene, 80, 658, '判据：播种完成后 SR[SDN]=1，之后连续读 OUT 应得到看似无规律、且重复率极低的 32 位字。', 't20w');
 }
 
-function drawRegs() {
-  txt(scene, 56, 146, '命令靠写，结果靠读，两者不重叠', 't28w');
+function drawMap() {
+  txt(scene, 56, 146, '六个寄存器，基址 0x0228_4000；读写属性差别很大，别把只读当可写', 't24w');
 
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, 'CMD：五个动作位');
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '身份与输出');
+  txt(scene, 80, 252, 'VER +0x00，只读', 't20s');
+  txt(scene, 80, 288, '复位 0x1000_0280', 't20s');
+  txt(scene, 80, 324, 'TYPE=0001 表示 RNGB', 't20s');
+  txt(scene, 80, 360, 'MAJOR=0x02，MINOR 可变', 't20s');
+  txt(scene, 80, 396, 'OUT +0x14，读即取数', 't20s');
+  txt(scene, 80, 432, '空读按 FUFMOD 处理', 't20w');
 
-  var cmd = [
-    ['bit0 ST', '启动自测'],
-    ['bit1 GS', '启动播种'],
-    ['bit4 CI', '清中断（无错误时）'],
-    ['bit5 CE', '清错误与中断'],
-    ['bit6 SR', '软件复位，自清']
-  ];
-  cmd.forEach(function (r, i) {
-    var y = 276 + i * 44;
-    txt(scene, 80, y, r[0], 'tnum');
-    txt(scene, 260, y, r[1], 't28w');
-  });
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '命令与控制');
+  txt(scene, 680, 252, 'CMD +0x04：SR/CE/CI/GS/ST', 't20s');
+  txt(scene, 680, 288, 'SR[6] 软复位，自清', 't20s');
+  txt(scene, 680, 324, 'CE[5] 清错误，CI[4] 清中断', 't20s');
+  txt(scene, 680, 360, 'GS[1] 播种，ST[0] 自检', 't20s');
+  txt(scene, 680, 396, 'CR +0x08：两位屏蔽 + AR', 't20s');
+  txt(scene, 680, 432, 'CR[1:0] FUFMOD 定空读行为', 't20s');
 
-  head(80, 520, 'CR：三个开关');
-  box(80, 544, 880, 152, 'var(--surface)', 'var(--guide)');
-  txt(scene, 104, 586, 'MASKERR bit6：屏蔽错误中断（调试时可开）', 't28w');
-  txt(scene, 104, 624, 'MASKDONE bit5：屏蔽「完成」中断', 't28w');
-  txt(scene, 104, 662, 'AR bit4：自动重播种，RS 一置就自己跑', 't28w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '状态与错误');
+  txt(scene, 1280, 252, 'SR +0x0C，只读，复位 0x500D', 't20s');
+  txt(scene, 1280, 288, 'ESR +0x10，只读，复位 0', 't20s');
+  txt(scene, 1280, 324, 'ESR 五位粘滞错误', 't20w');
+  txt(scene, 1280, 360, '清错误只能写 CMD.CE', 't20w');
+  txt(scene, 1280, 396, 'OSCE 与 LFE 只能靠复位清', 't20w');
+  txt(scene, 1280, 432, 'STDN 需重新跑自检才清', 't20w');
 
-  box(80, 708, 880, 70, 'var(--page)', 'var(--line)');
-  txt(scene, 104, 752, 'FUFMOD[1:0]：读空时的反应，00/01 回 0，10 总线错，11 中断', 't28w');
-
-  box(1020, 168, 850, 350, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, 'SR：读之前必看');
-  txt(scene, 1044, 264, 'SDN bit5：首颗种子已就绪', 't28w');
-  txt(scene, 1044, 304, 'STDN bit4：自测已完成', 't28w');
-  txt(scene, 1044, 344, 'RS bit3：需要重播种', 't28w');
-  txt(scene, 1044, 384, 'FIFO_LVL[11:8]：现在有几字可读', 't28w');
-  txt(scene, 1044, 424, 'FIFO_SIZE[15:12]：固定为 5', 't28w');
-  txt(scene, 1044, 464, 'SLP bit2 睡眠中，BUSY bit1 正在忙', 't28w');
-  txt(scene, 1044, 504, 'bit0 恒为 1，不是状态，别判它', 't28');
-
-  box(1020, 540, 850, 262, 'var(--page)', 'var(--line)');
-  head(1044, 588, 'ESR：五个错误位');
-  txt(scene, 1044, 636, 'FUFE bit4：FIFO 下溢，刚读的是脏数据', 't28w');
-  txt(scene, 1044, 676, 'SATE bit3：统计测试没过（种子不合格）', 't28w');
-  txt(scene, 1044, 716, 'STE bit2：自测失败', 't28w');
-  txt(scene, 1044, 748, 'OSCE bit1 振荡器异常，LFE bit0 LFSR 故障', 't28w');
-  txt(scene, 1044, 788, '前四者可清，OSCE 与 LFE 只能靠复位', 't28w');
+  wide(456, 330);
+  txt(scene, 80, 490, '先记住三个「只能读」的寄存器：VER、SR、ESR —— 状态类信息全部靠读，不靠写', 't24');
+  txt(scene, 80, 522, 'VER 的复位值 0x1000_0280 是有含义的：高 4 位 TYPE=0001 表示这是 RNGB（RNGA 是 0000、RNGC 是 0010），所以驱动里可以用它做「芯片代际判断」。', 't20w');
+  txt(scene, 80, 556, 'SR 的 FIFO_SIZE[15:12] 恒为 5、FIFO_LVL[11:8] 是当前字数 —— 这两个字段是「读之前先看有没有数」的唯一正规手段，比盲读再处理下溢要稳。', 't20w');
+  txt(scene, 80, 590, 'ESR 是「为什么错」的答案：FUFE 空读、SATE 统计不过、STE 自检失败、OSCE 环振坏、LFE LFSR 坏；五位都是粘滞位，写 CE 才能清前三类。', 't20w');
+  txt(scene, 80, 624, '注意 ESC 里 OSCE 与 LFE 只能靠软/硬复位清：手册明确写「只能用软件或硬件复位」，写 CE 对这两位无效，别指望清标志解决问题。', 't20w');
+  txt(scene, 80, 658, '判据：上电先读 VER 确认 0x1000_0280；再读 SR 看 RS=1、SLP=1 —— 这正是「还没播种所以在睡」的复位态，与 0x500D 完全对应。', 't20w');
 }
 
-function drawFlow() {
-  txt(scene, 56, 146, '它的输出会直接进密钥，所以流程要严', 't28w');
+function drawCmd() {
+  txt(scene, 56, 146, 'CMD 只有五个有效位，却决定了整个模块的状态机走向', 't24w');
 
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '上电五步');
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '五个命令位');
+  txt(scene, 80, 252, '[0] ST 自检', 't20s');
+  txt(scene, 80, 288, '[1] GS 生成种子', 't20s');
+  txt(scene, 80, 324, '[4] CI 清中断', 't20s');
+  txt(scene, 80, 360, '[5] CE 清错误', 't20s');
+  txt(scene, 80, 396, '[6] SR 软复位', 't20s');
+  txt(scene, 80, 432, '全部自清，写 1 有效', 't20w');
 
-  var ord = [
-    ['①', '读 VER 确认是 RNGB（TYPE = 0001）'],
-    ['②', 'CMD.SR 软复位，再 CMD.ST 做自测'],
-    ['③', '等 SR.STDN = 1，查 STE 必须为 0'],
-    ['④', 'CMD.GS 播种，等 SR.SDN = 1，查 SATE'],
-    ['⑤', '循环：查 FIFO_LVL，够数就读 OUT']
-  ];
-  ord.forEach(function (b, i) {
-    var y = 276 + i * 56;
-    txt(scene, 96, y, b[0], 'tnum');
-    txt(scene, 140, y, b[1], 't28w');
-  });
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '执行条件');
+  txt(scene, 680, 252, '都要求 SR[BUSY]=0', 't20s');
+  txt(scene, 680, 288, 'ST 与 GS 同置：ST 先跑', 't20w');
+  txt(scene, 680, 324, '自检完再接着播种', 't20w');
+  txt(scene, 680, 360, 'busy 时写命令无效', 't20w');
+  txt(scene, 680, 396, 'GS 完成自动清位', 't20w');
+  txt(scene, 680, 432, 'CI 只在无错误时清中断', 't20w');
 
-  txt(scene, 80, 590, '第 ⑤ 步要有下限：至少等 FIFO_LVL ≥ 1 再读一个', 't28w');
-  txt(scene, 80, 630, '想一次拿 160 位，就等 FIFO_LVL 到 5 再连读五个', 't28w');
-  txt(scene, 80, 670, '任何一次读回全 0，先查 ESR.FUFE，别把它当随机数', 't28w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '复位值 0x0000_500D');
+  txt(scene, 1280, 252, '[15:12] FIFO_SIZE = 5', 't20s');
+  txt(scene, 1280, 288, '[11:8] FIFO_LVL = 0', 't20s');
+  txt(scene, 1280, 324, '[3] RS = 1 需要重播种', 't20s');
+  txt(scene, 1280, 360, '[2] SLP = 1 在睡眠', 't20s');
+  txt(scene, 1280, 396, '[0] 保留位恒为 1', 't20s');
+  txt(scene, 1280, 432, '这就是「等种子」的状态', 't20w');
 
-  box(80, 706, 880, 74, 'var(--surface)', 'var(--guide)');
-  txt(scene, 104, 752, '量产前记得开 CR.AR，省掉 RS 之后的手工重播种', 't28w');
+  wide(456, 330);
+  txt(scene, 80, 490, '复位值 0x500D 值得逐位读：它不是「随机初值」，而是「FIFO 有 5 格、没数据、要播种、在睡觉」', 't24');
+  txt(scene, 80, 522, '状态机的路径很短：IDLE → （ST）自检 → （GS）播种 → 出数/睡眠循环。出数时每读空 FIFO 就补 5 个字，然后立刻回到睡眠省电。', 't20w');
+  txt(scene, 80, 556, '自检约 29,000 拍、初始播种约 200 万拍：这两个数字决定了上电到「能取随机数」的时间预算，做安全启动时要把它们算进启动超时。', 't20w');
+  txt(scene, 80, 590, '睡眠不是省事，而是必须：SLP=1 时内部时钟全关，只有 FIFO 仍可读；一旦 FIFO 空，它会自己醒来补 5 个字再睡，所以读的节奏就是「读空 → 等 → 再读」。', 't20w');
+  txt(scene, 80, 624, '命令的时序陷阱：写 CMD 之前必须确认 BUSY=0，否则命令被丢弃而且不报错 —— 表现为「我明明写了 GS，SDN 却一直是 0」。', 't20w');
+  txt(scene, 80, 658, '判据：写 ST 后 SR[BUSY] 应为 1、约 29,000 拍后 STDN=1；再写 GS，SDN 在约 200 万拍后置位。', 't20w');
+}
 
-  box(1020, 168, 850, 370, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '四个必踩的坑');
-  txt(scene, 1044, 264, '① 播种没完就读 OUT：全是 0', 't28w');
-  txt(scene, 1044, 304, '② 读空前没查 FIFO_LVL：拿脏数据当密钥', 't28w');
-  txt(scene, 1044, 344, '③ 清了 ESR 就继续用：错误是致命的', 't28w');
-  txt(scene, 1044, 384, '④ 轮询 GS/ST 位：它们自己会清，永远读到 0', 't28w');
-  txt(scene, 1044, 430, '正确做法：只看 SR 的 SDN / STDN / FIFO_LVL', 't28');
-  txt(scene, 1044, 470, '出错流程：CE 清标志 → SR 软复位 → 重新自测与播种', 't28w');
-  txt(scene, 1044, 510, '别用「重试到成功」掩盖统计测试失败', 't28w');
+function drawThroughput() {
+  txt(scene, 56, 146, '出数速度不是瓶颈，瓶颈在「用满 2^20 个字必须回去重新播种」这条硬规则', 't24w');
 
-  box(1020, 558, 850, 238, 'var(--page)', 'var(--line)');
-  head(1044, 606, '与相邻章节的分工');
-  txt(scene, 1044, 654, 'CAAM 里的密钥生成与加密走第 11 章', 't28w');
-  txt(scene, 1044, 694, 'OCOTP 存熔丝密钥，是另一件事（第 37 章）', 't28w');
-  txt(scene, 1044, 734, 'RNGB 只负责产出随机量与自检', 't28w');
-  txt(scene, 1044, 774, '要真随机就用它，别用时间戳凑', 't28w');
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '两个节奏');
+  txt(scene, 80, 252, '112 拍 → 5 个字', 't20w');
+  txt(scene, 80, 288, '即 20 字节 / 112 拍', 't20w');
+  txt(scene, 80, 324, 'FIFO 只有 5 格', 't20w');
+  txt(scene, 80, 360, '读空才补，补完就睡', 't20w');
+  txt(scene, 80, 396, '初始种子约 200 万拍', 't20w');
+  txt(scene, 80, 432, '重播种也要掺新熵', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '带宽算例');
+  txt(scene, 680, 252, '按 ipg 66 MHz 估', 't20w');
+  txt(scene, 680, 288, '66M / 112 × 20 B', 't20s');
+  txt(scene, 680, 324, '≈ 11.8 MB/s', 't20w');
+  txt(scene, 680, 360, '够 AES-128 的密钥需求', 't20w');
+  txt(scene, 680, 396, '不够「整盘加密」的流密码', 't20w');
+  txt(scene, 680, 432, '后者要用 PRNG 软件扩流', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '2^20 字的边界');
+  txt(scene, 1280, 252, '约 104 万个 32 位字', 't20w');
+  txt(scene, 1280, 288, '约 4 MB 随机数据', 't20w');
+  txt(scene, 1280, 324, '用满后 SR[RS]=1', 't20s');
+  txt(scene, 1280, 360, '软件必须再写 GS', 't20w');
+  txt(scene, 1280, 396, '或一开始就置 CR[AR]', 't20s');
+  txt(scene, 1280, 432, '否则输出质量下降', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '算清两笔账：一次播种约 200 万拍（66 MHz 下约 30 ms），之后每 112 拍 5 字', 't24');
+  txt(scene, 80, 522, '带宽账：112 拍产出 20 字节，即 5.6 拍/字节；66 MHz 下约 11.8 MB/s。这个速度足够生成密钥、nonce、挑战值，但撑不起「给整块盘做流加密」。', 't20w');
+  txt(scene, 80, 556, '重播种账：2^20 字（4 MB）后必须换种子，否则 PRNG 的输出长度超过设计上限，安全性下降；软件若忘了这一步，SR[RS] 会一直置位提示。', 't20w');
+  txt(scene, 80, 590, '两笔账合起来的工程结论：把 RNGB 当「高质量种子与密钥源」，把「大量随机字节」交给软件侧的 DRBG（如 CTR_DRBG）去扩流。', 't20w');
+  txt(scene, 80, 624, 'FIFO 只有 5 格，是为了「读空即睡」省电；想连续高速取数就要在 FIFO_LVL 掉到 0 之前补读，否则每次都要等一次 112 拍。', 't20w');
+  txt(scene, 80, 658, '判据：连续读 1000 个字，测总耗时；若明显超过 1000×5.6 拍，说明发生了「读空等待」，要改成按 FIFO_LVL 批量读。', 't20w');
+}
+
+function drawErrors() {
+  txt(scene, 56, 146, '五个错误位全是粘滞位：它们不是「警告」，而是「这块熵源已经不可信了」', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'ESR 五位');
+  txt(scene, 80, 252, '[4] FUFE FIFO 下溢', 't20s');
+  txt(scene, 80, 288, '[3] SATE 统计检验失败', 't20s');
+  txt(scene, 80, 324, '[2] STE 自检失败', 't20s');
+  txt(scene, 80, 360, '[1] OSCE 环振异常', 't20s');
+  txt(scene, 80, 396, '[0] LFE LFSR 故障', 't20s');
+  txt(scene, 80, 432, 'SR[16] ERR 是它们的汇总', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '空读怎么处理');
+  txt(scene, 680, 252, 'CR[1:0] FUFMOD 四档', 't20s');
+  txt(scene, 680, 288, '00/01：返回全 0 并置 FUFE', 't20s');
+  txt(scene, 680, 324, '10：产生总线传输错误', 't20w');
+  txt(scene, 680, 360, '11：置中断并返回全 0', 't20w');
+  txt(scene, 680, 396, '11 会覆盖 MASKERR', 't20w');
+  txt(scene, 680, 432, '默认 00 最「安静」', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '中断怎么配');
+  txt(scene, 1280, 252, 'CR[6] MASKERR 屏蔽错误', 't20s');
+  txt(scene, 1280, 288, 'CR[5] MASKDONE 屏蔽完成', 't20s');
+  txt(scene, 1280, 324, '只有一根中断线', 't20w');
+  txt(scene, 1280, 360, '靠 SR 区分来源', 't20w');
+  txt(scene, 1280, 396, 'MASKERR 只建议调试期用', 't20w');
+  txt(scene, 1280, 432, '所有错误都被视为致命', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '最关键的一句手册警告：屏蔽错误中断会掩盖致命故障，而所有错误都必须靠复位才能恢复', 't24');
+  txt(scene, 80, 522, '为什么「致命」不是夸张：熵源一旦异常，输出就不再具备密码学强度，但它仍然长得像随机数 —— 如果软件只是清标志继续用，密钥就可能退化成可预测值。', 't20w');
+  txt(scene, 80, 556, '清错误的通道只有两个：CMD.CE 能清 FUFE / SATE / STE，OSCE 与 LFE 只能靠软复位或硬复位；清完还要重新自检 + 重新播种，不能直接接着取数。', 't20w');
+  txt(scene, 80, 590, 'FUFMOD 的选择反映策略：00/01 适合「容错取数」（拿 0 当占位，事后补），10 适合「绝不静默失败」的总线（读空立刻异常），11 适合需要立刻告警的系统。', 't20w');
+  txt(scene, 80, 624, '统计检验的八位在 SR[31:24]：长游程、6 连以上、5 连、4 连、3 连、2 连、1 连、单比特，任一位为 1 就说明这个种子分布不对（多半是熵源被干扰）。', 't20w');
+  txt(scene, 80, 658, '判据：读 ESR，五位应全 0；若 FUFE 置位说明读得太快，若 SATE 置位说明熵源环境有问题，若 OSCE/LFE 置位则必须怀疑硬件。', 't20w');
+}
+
+function drawInit() {
+  txt(scene, 56, 146, '初始化只有两条路线：手动播种（10 步）与自动重播种（6 步），差别在「谁负责再播种」', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '手动 10 步');
+  txt(scene, 80, 252, '① 复位 / 初始化', 't20w');
+  txt(scene, 80, 288, '② 写 CR 配功能', 't20w');
+  txt(scene, 80, 324, '③ 写 CMD 跑 ST 或 GS', 't20w');
+  txt(scene, 80, 360, '④ 等中断或轮询 SDN', 't20w');
+  txt(scene, 80, 396, '⑤ 查 FIFO_LVL 再读', 't20w');
+  txt(scene, 80, 432, '⑥ 用满 2^20 字再 GS', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '自动 6 步');
+  txt(scene, 680, 252, '① 复位 / 初始化', 't20w');
+  txt(scene, 680, 288, '② 写 CR，置 AR=1', 't20s');
+  txt(scene, 680, 324, '③ 等第一次种子完成', 't20w');
+  txt(scene, 680, 360, '④ 轮询 FIFO_LVL', 't20w');
+  txt(scene, 680, 396, '⑤ 读数据', 't20w');
+  txt(scene, 680, 432, '⑥ 4–5 循环，不干预', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '两条路线怎么选');
+  txt(scene, 1280, 252, '自动：省软件状态机', 't20w');
+  txt(scene, 1280, 288, '代价是重播种时短暂停顿', 't20w');
+  txt(scene, 1280, 324, '手动：完全可控', 't20w');
+  txt(scene, 1280, 360, '适合「播种时机要卡点」的场景', 't20w');
+  txt(scene, 1280, 396, '两者都要求先自检', 't20w');
+  txt(scene, 1280, 432, '自检不过就别往下走', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '自动重播种的本质是「硬件替软件记着 RS 位」：一旦 RS 置位就自己跑一遍播种，期间输出会暂停', 't24');
+  txt(scene, 80, 522, '手动路线的关键是那个循环：读满 2^20 字后必须回头写 GS，否则 RS 一直挂着；很多「随机数看着一样」的故障，根因就是忘了这一步。', 't20w');
+  txt(scene, 80, 556, '自动路线的代价要接受：重播种期间 FIFO 不再补充，读到的就是 FUFMOD 定义的响应；实时性要求高的系统要在这一小段里容忍停顿或提前多取一些。', 't20w');
+  txt(scene, 80, 590, '自检是两条路线的共同前提：ST 跑 29,000 拍验证内部逻辑，STDN 置位才算过；若 STE 置位，说明硬件本身有问题，继续用只会拿到不可信的随机数。', 't20w');
+  txt(scene, 80, 624, '驱动实现建议：把「自检 → 播种 → 按 FIFO_LVL 读 → 达到上限再播种」写成一个状态机，别在中断里做长流程；RNGB 只有一个中断源，靠 SR 判别来源。', 't20w');
+  txt(scene, 80, 658, '判据：上电后 30 ms 内 SDN 应为 1；连续取 1000 字无 FUFE；用满 4 MB 后 RS 置位并被正确处理。', 't20w');
 }
 
 function draw() {
-  var s = STEPS[state.step];
-  $('hint').textContent = s.hint;
-  $('note').textContent = s.note;
-  scene.textContent = '';
-  if (state.step === 0) drawTop();
-  else if (state.step === 1) drawModes();
-  else if (state.step === 2) drawRegs();
-  else drawFlow();
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) drawBlocks();
+  else if (s === 2) drawMap();
+  else if (s === 3) drawCmd();
+  else if (s === 4) drawThroughput();
+  else if (s === 5) drawErrors();
+  else drawInit();
 }
 
-var step = stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
-void step;
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
 zoomable(document.querySelector('.bd-stage'));
 resetButton($('reset'), function () { state.step = INIT.step; draw(); });
 fitCanvas($('viewport'), $('canvas'), draw);
 </script>
 </body>
 </html>
-
-
