@@ -1,0 +1,173 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0 };
+var state = { step: INIT.step };
+
+var STEPS = [
+  { h: '五个模块各管一段', hint: 'CCM / LPCG / PMU / GPC / SRC',
+    note: 'CCM 管时钟从哪来、怎么分频；LPCG 管每个模块那一路分支开不开；PMU 管片内稳压器的输出；GPC 管整个域断电与唤醒；SRC 管复位与启动。' },
+  { h: '七个 PLL 与时钟根', hint: '源 → PLL/PFD → 根 → 门控',
+    note: '物理源只有 24 MHz 与 32.768 kHz 两个；PLL2/PLL3 各带四个 PFD，可以不重新锁定就瞬间换频。' },
+  { h: '两级门控与换频握手', hint: 'root 分频 + LPCG 2 位',
+    note: '根决定“给多少”，LPCG 决定“用不用”；改根必须等所有使用者应答，否则会出现半拍错位。' },
+  { h: '三种低功耗模式', hint: 'WAIT 关 PLL，STOP 只剩 32k',
+    note: 'IDLE 只停核、低功耗 IDLE 关 PLL，SUSPEND 连晶振都关、只剩 SNVS 的 32k 与 RTC。' },
+  { h: '电源域与状态保持', hint: 'A7 域 / SOC 域 / SNVS',
+    note: '可以“断电保状态”，也可以“彻底断电”；前者唤醒快，后者省得多。' },
+  { h: 'PMU 六个稳压器与 DVFS', hint: '降频必须同时降压',
+    note: 'LDO_ARM / LDO_SOC 可编程（25 mV 一步），LDO_1P1、LDO_2P5、USB LDO、SNVS LDO 各管一类负载。' },
+  { h: '在 MINI 板上对号', hint: '晶振、供电轨、ONOFF',
+    note: 'Y2 24 MHz、Y1 32.768 kHz、VDD_ARM_IN 与 VDD_SOC_IN 经 L1 并成一路，ONOFF 经 R26 进 SNVS_LP。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+function three(a, b, c) {
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(a[0], 214, a[1]); for (var i = 0; i < a[2].length; i++) txt(scene, a[0], 252 + i * 36, a[2][i], a[3] || 't20w');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(b[0], 214, b[1]); for (var j = 0; j < b[2].length; j++) txt(scene, b[0], 252 + j * 36, b[2][j], b[3] || 't20w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(c[0], 214, c[1]); for (var k = 0; k < c[2].length; k++) txt(scene, c[0], 252 + k * 36, c[2][k], c[3] || 't20w');
+}
+function prose(title, lines) {
+  wide(456, 330);
+  txt(scene, 80, 490, title, 't24');
+  for (var i = 0; i < lines.length; i++) txt(scene, 80, 522 + i * 34, lines[i], 't20w');
+}
+
+function drawTop() {
+  txt(scene, 56, 146, '低功耗不是「关个外设时钟」那么简单：控制权被分给五个模块，各管一段，搞混就会在错的寄存器上折腾', 't24w');
+  three([80, '五个模块', ['CCM：时钟源与分频', 'LPCG：每模块那一路开关', 'PMU：片内稳压器输出', 'GPC：域断电与唤醒', 'SRC：复位与启动配置', 'SNVS：常电域与 RTC'], 't20w'],
+        [680, '资源分两级', ['SoC 级集中管理', '模块级本地管理', '时钟、电源、复位都是资源', '两级叠加才是最终功耗', '所以调优要两头看', '只改一处常无用'], 't20w'],
+        [1280, '温度是第三维', ['TEMPMON 测结温（第 52 章）', '超限降频甚至触发复位', '温度感知 DVFS', '三件套：频、压、温', '任一维失控都会出事', '热管理也是省电手段']]);
+  prose('五个模块的分工可以这样记：CCM 是“发电厂”，LPCG 是“每户电闸”，PMU 是“变压器”，GPC 是“分区停电”，SRC 是“总闸与开机键”', [
+    '“发电厂”改的是全局频率，动它影响一大片；“每户电闸”只影响一个外设，最安全也最常用。',
+    'PMU “变压器”决定电压，必须与频率配对；GPC 管的是整片区域的通断，属于“大动作”。',
+    'SRC 管复位与启动配置，是唯一“出事还能救”的模块：它决定从哪启动、为什么复位。',
+    'SNVS 是“最后一口气”，管 RTC、闹钟、ONOFF 按钮，主板断电后靠纽扣电池维持。',
+    '实际调优顺序：先关不用的外设时钟 → 再看核能不能降频降压 → 最后才考虑域断电。',
+    '一句话：改得越局部越安全，改得越全局省得越多 —— 但要承担的验证成本也越大。']);
+}
+
+function drawPll() {
+  txt(scene, 56, 146, '时钟只有两个物理源头，七个 PLL 把 24 MHz 倍频成各路频率，PFD 再做分数分频给不同外设各取所需', 't24w');
+  three([80, 'PLL 清单', ['PLL1 ARM：整数倍频', 'PLL2 528：×22 + 4 PFD', 'PLL3 USB1：×20 = 480 MHz', 'PLL4 Audio：分数倍频', 'PLL5 Video：分数倍频', 'PLL6 ENET：500 MHz'], 't20s'],
+        [680, '还有第七路', ['PLL7 USB2：×20 = 480 MHz', '只给 USBPHY2，不对外', '每路有 enable / bypass', '都有 lock 位表示已锁定', '32.768 kHz 独立晶振', '只供 SNVS 的 RTC'], 't20s'],
+        [1280, 'PFD 的价值', ['用数字插值做分数分频', '不重新锁定就能换频', '528 与 480 各带 4 个', '等于一条 PLL 供多路', '省面积也省锁定时间', '切换瞬间即可']]);
+  prose('“七个 PLL + 四个 PFD”是这颗芯片时钟设计的核心：能用一个晶振伺候所有外设，全靠 PFD 的分数分频', [
+    'PFD 的做法是对 VCO 输出做相位插值再分频，所以能在不打断锁定的情况下改变输出频率，切换没有毛刺。',
+    '代价是 PFD 输出抖动比主 PLL 略大，所以对抖动敏感的接口（如音频、视频）宁愿直接用主 PLL 的分频。',
+    '注意芯片限频：PLL1（ARM）本身能跑更高，但这颗 6ULL 的 A7 只保证到 1.0 GHz 以内，超了不稳。',
+    'PLL3 出来的 480 MHz 不只是给 USB：UART 的分数波特率、部分定时器也从它派生，所以改它影响面比想象的大。',
+    'bypass 是调试救命稻草：怀疑 PLL 有问题时切到 24 MHz 直通，能跑就说明 PLL 配置错，不跑就是别处的问题。',
+    '判据：读各 PLL 的 lock 位应为 1；用 CLK 输出或示波器量目标频率，误差应在 ±1% 内。']);
+}
+
+function drawGate() {
+  txt(scene, 56, 146, '时钟树是“根 + 门”：根决定给多少，LPCG 决定用不用；改根要经过请求-应答，改门只要一位', 't24w');
+  three([80, '根（root）', ['每个 root 选一个源', '再经一级或多级分频', 'root 频率全局统一', '改它影响所有使用者', '常见：ARM/AHB/IPG/PER', 'UART、USDHC 有专用根'], 't20w'],
+        [680, '门（LPCG）', ['每模块 2 位门控', '关掉就断时钟、几乎不耗电', '比关电源快得多', '唤醒不用重新初始化', '粒度按外设细分', '省电第一手段'], 't20w'],
+        [1280, '换频握手', ['改跟要请求-应答', '外设忙时可拒绝', 'CCM 等 ack 才改', 'STOP 与 WFI 也走这套', '别在中断里改频率', '会死等 ack']]);
+  prose('“关模块时钟”优先于“关模块电源”，原因是它不丢状态：寄存器还在，重新开时钟就能接着用', [
+    'LPCG 的 2 位门控是“条件门控”：一位来自软件强制，一位来自硬件自动（模块空闲时自己关），两者取或。',
+    '所以软件写“强制关”后，硬件条件那一位仍可能让它开 —— 排查“关了怎么还有时钟”时要读两位。',
+    '改 root 分频必须走握手：频率在切换瞬间会短暂不稳，外设正在传输时会拒绝，CCM 就阻塞等它答应。',
+    '这也意味着“在中断里改频率”极度危险：中断上下文不能长时间阻塞，而握手可能需要几十微秒。',
+    '调试经验：系统“莫名变慢”时先读各 root 的分频值，往往是被某个驱动改过、没改回来。',
+    '判据：关掉某模块 LPCG 后其寄存器仍可访问（读到旧值或默认值），说明只停了时钟、电源还在。']);
+}
+
+function drawMode() {
+  txt(scene, 56, 146, '手册用三列摊开功耗模式：差别不在 CPU 睡不睡，而在“哪些东西还活着”', 't24w');
+  three([80, 'System IDLE', ['CCM LPM = WAIT', '核停时钟（WFI）', 'PLL 全部保持', 'AHB/IPG/PER 全速', '外设照常工作', '唤醒最快'], 't20s'],
+        [680, 'Low Power IDLE', ['CCM LPM = WAIT 变体', 'PLL 全关', 'AHB 掉到 3 MHz', 'IPG 1.5 MHz、PER 1 MHz', '靠 24M RC 撑着', '唤醒要重新锁 PLL'], 't20s'],
+        [1280, 'SUSPEND', ['CCM LPM = STOP', 'XTAL 与 RC 都关', '只剩 SNVS 的 32 kHz', 'RTC 与闹钟仍走', 'DRAM 必须先进自刷新', '唤醒最慢']]);
+  prose('三档的本质区别是“还留着哪些时钟源”：留着 PLL 就快但费电，留着 RC 就慢一点但省不少，只剩 32k 就是待机', [
+    '进入低功耗 IDLE 前必须让外设先停下来（关 DMA、等串口 FIFO 空），否则时钟一降，正在传输的数据就丢。',
+    '进入 SUSPEND 前必须让 DDR 进自刷新，否则内容全丢；这一步在 MMDC 里做，不在 CCM 里。',
+    '唤醒路径是反的：先恢复晶振与 PLL（等锁定）、再恢复 root 频率、再恢复外设时钟、最后才放开核。',
+    '顺序错会“唤醒来但起不来”：典型现象是能进 STOP、按按钮没反应，因为唤醒源（RTC/GPIO）没配对。',
+    'RC 振荡器精度差（几个百分点），所以低功耗 IDLE 期间串口波特率会偏，只能用“能收不能准”的场合。',
+    '判据：进 STOP 后量电流应在几百 µA 到 mA 级（取决于外设与 DDR 是否自刷新）；唤醒后读 CCM LPM 应回到 RUN。']);
+}
+
+function drawDomain() {
+  txt(scene, 56, 146, '域是更大的省电单位：可以只断电但保持状态，也可以彻底断电；两者代价差一个数量级', 't24w');
+  three([80, '三层域', ['ARM 平台域：核与 L2', 'SOC 域：大部分外设', 'SNVS 域：常电与 RTC', '域之间有依赖', '不能乱关', 'SNVS 永远最后关'], 't20w'],
+        [680, '两种方式', ['retention：断电保状态', 'power gating：彻底断电', 'retention 唤醒快、省得少', 'gating 省得多、要重配', '按场景选', '别一律用最狠的'], 't20w'],
+        [1280, '依赖顺序', ['关域前先关它的时钟', '再确认没主设备在用', '唤醒按相反顺序', 'SNVS 靠电池维持', '丢了就丢时间与闹钟', 'DDR 内容靠自刷新保']]);
+  prose('“断电保状态”靠的是低漏电保持锁存器：电断到接近 0，但寄存器内容还在，唤醒只需重新开时钟', [
+    '代价是保持期间仍有微小漏电，而且不是所有寄存器都支持保持 —— 关键配置要查手册列出的 retention 范围。',
+    '“彻底断电”等于重新上电：所有配置从头来，省电最多、唤醒最慢，适合“长时间不用”的场景。',
+    '域依赖是硬约束：SOC 域关掉时，依赖它的外设时钟必须先关，否则出现“时钟还在、电源没了”的悬空状态。',
+    'GPC 里有一张域依赖表，软件要按它排序；跳过依赖直接关，常见结果是“关了就再也起不来”。',
+    'DDR 自刷新是 MMDC 的事：关 SOC 域前必须让 DDR 进自刷新，否则一断电内容全丢，唤醒读到的全是垃圾。',
+    '判据：进 retention 后量 VDDARM 应接近 0 而 VDD_SNVS 正常；唤醒后读关键寄存器应保持原值。']);
+}
+
+function drawPmu() {
+  txt(scene, 56, 146, 'PMU 把外部两三路电源变成芯片需要的全部轨；DVFS 的本质就是“频率档位与电压档位成对改”', 't24w');
+  three([80, '六个稳压器', ['LDO_ARM：喂 A7 核', 'LDO_SOC：喂 SOC 逻辑', 'LDO_1P1：PLL 与 USB PHY', 'LDO_2P5：DDR IO 等模拟', 'USB LDO：5 V→3.0 V', 'SNVS LDO：RTC 常电'], 't20s'],
+        [680, '可编程细节', ['LDO_ARM/SOC 25 mV 一步', '三种模式：旁路/门控/稳压', 'LDO_2P5 带 2.525 V 弱稳压', '可外接 PMIC 替代', '大小电流两种用法', '混合使用也常见'], 't20s'],
+        [1280, '只降频会怎样', ['动态功耗 ∝ f×V²', '降频一半：动态省一半', '静态漏电一分不少', '所以必须同时降压', '配对表来自数据手册', '跑表外会随机出错']]);
+  prose('公式值得记住：动态功耗 ∝ C×V²×f —— 降压比降频更有效，但降压必须与降频同步，否则时序不满足', [
+    'DVFS 本质是一张“频率 ↔ 最小安全电压”的表，跑在表外（尤其低温或低压角）会随机出错，且很难复现。',
+    'LDO_ARM 与 LDO_SOC 的 25 mV 步进意味着调压不是连续的，做 DVFS 表时要按步进取整，取“够用的高一档”。',
+    '“内部旁路”模式是把 LDO 直通，让外部 PMIC 供电 —— 这就是为什么同一条 VDD_ARM_IN 既能片内稳压也能外部供电。',
+    'LDO_1P1 供 PLL 与 USB PHY，噪声敏感：它不稳会表现为“PLL 锁不住”或“USB 眼图变差”。',
+    'USB LDO 单独一路 5 V→3.0 V，是因为 USB 供电常来自 VBUS，与主电源域不同源。',
+    '判据：量各轨电压应在数据手册范围内；调压后跑压力测试不出现随机死机，说明配对表选对了。']);
+}
+
+function drawBoard() {
+  txt(scene, 56, 146, '把手册对到 MINI 板上只要看三处：两个晶振、一条合并的供电轨、一个 ONOFF 按键网络', 't24w');
+  three([80, '晶振', ['Y2：24 MHz 无源晶振', 'C12/C13 18 pF，R31–R33 0 Ω', '接 XTALI / XTALO', 'Y1：32.768 kHz', '配 C3 18 pF', '只供 SNVS 的 RTC'], 't20s'],
+        [680, '供电轨', ['VDD_ARM_IN / VDD_SOC_IN', '经 L1 2.2 µH 合并', 'R82 0 Ω 短接成一路', '全速时两个 LDO 都旁路', '典型应用共用一路电源', '这就是“能省一颗电感”'], 't20s'],
+        [1280, 'ONOFF 网络', ['按键经 R26 100K', '进 SNVS_LP', '再由 Q4/Q6 驱动', 'PMIC_ON_REQ 拉低', '长按 5 s 才关机', '短按只产生中断']]);
+  prose('“VDD_ARM_IN 与 VDD_SOC_IN 并成一路”不是偷懒，而是手册明确推荐的典型应用：两者电压档位在多数场景下相同', [
+    '代价是失去了“核与 SOC 分开调压”的自由度 —— 如果你要做精细 DVFS，就得把 R82 去掉、分开供电。',
+    'L1 2.2 µH 是储能电感，配合片内 LDO 的开关级工作；它选错会导致上电纹波大、PLL 锁不住。',
+    '两个晶振的负载电容都是 18 pF，这个值必须与晶振规格匹配，偏了会起振慢或根本不起振。',
+    'R31–R33 的 0 Ω 是预留位：可以断开以隔离晶振，方便排查“是不是晶振拖垮了系统”。',
+    'ONOFF 经 100 K 进 SNVS_LP 是“弱上拉 + 按键拉低”的经典结构，Q4/Q6 负责把长按变成 PMIC 的关断信号。',
+    '判据：示波器量 XTALI 应有 24 MHz 正弦（幅度几百 mV）；长按 5 s 量 PMIC_ON_REQ 应拉低；短按只有中断。']);
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) drawPll();
+  else if (s === 2) drawGate();
+  else if (s === 3) drawMode();
+  else if (s === 4) drawDomain();
+  else if (s === 5) drawPmu();
+  else drawBoard();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () { state.step = INIT.step; draw(); });
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>
