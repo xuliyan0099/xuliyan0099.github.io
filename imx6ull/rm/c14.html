@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RM14 外设总线权限：AIPSTZ 桥</title>
+<title>RM 第 14 章 · AHB/IP 桥 AIPSTZ | i.MX6ULL 逐章解读</title>
 <style>/* 白板互动教学设计系统 · 样式。由 scripts/inline.py 整段拼进页面，不要手抄或删减。
  * 页面的全部颜色、字号、间距、圆角、阴影只在 :root 定义；改主题只改这一段。 */
 
@@ -2469,30 +2469,30 @@ text.bd-an-inner { font-size: var(--size-l4); }
   <symbol id="i-reset" viewBox="0 0 24 24"><title>重置</title><path d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5M4.5 4v4.5H9"/></symbol>
   <symbol id="i-prev" viewBox="0 0 24 24"><title>上一步</title><path d="M15 5l-7 7 7 7"/></symbol>
   <symbol id="i-next" viewBox="0 0 24 24"><title>下一步</title><path d="M9 5l7 7-7 7"/></symbol>
-  <symbol id="i-close" viewBox="0 0 24 24"><title>收起</title><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><title>关闭</title><path d="M6 6l12 12M18 6L6 18"/></symbol>
   <symbol id="i-explain" viewBox="0 0 24 24"><title>讲解</title><path d="M3 5.5c3-1 6-.8 9 1 3-1.8 6-2 9-1V19c-3-1-6-.8-9 1-3-1.8-6-2-9-1zM12 6.5V20"/></symbol>
   <symbol id="i-correct" viewBox="0 0 24 24"><title>正确</title><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
   <symbol id="i-wrong" viewBox="0 0 24 24"><title>错误</title><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
-  <symbol id="i-alert" viewBox="0 0 24 24"><title>越界</title><path d="M12 4l9 16H3zM12 10v4.5M12 17.6v.1"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><title>注意</title><path d="M12 4l9 16H3zM12 10v4.5M12 17.6v.1"/></symbol>
   <symbol id="i-drag" viewBox="0 0 24 24"><title>拖动</title><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></symbol>
-  <symbol id="i-speak" viewBox="0 0 24 24"><title>发音</title><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+  <symbol id="i-speak" viewBox="0 0 24 24"><title>朗读</title><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
   <symbol id="i-fullscreen" viewBox="0 0 24 24"><title>全屏</title><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
-  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>退出全屏</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
+  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>RM 第 13 章 · ADC 通道、触发与转换 | i.MX6ULL 逐章解读</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
 </svg>
 
 <div class="bd-viewport" id="viewport">
   <div class="bd-canvas" id="canvas">
     <header class="bd-titlebar">
-      <h1 class="bd-title">第 14 章 · 外设总线权限 AIPSTZ</h1>
+      <h1>第 14 章 · AHB 到 IP 桥（AIPSTZ）</h1>
       <span class="bd-hint" id="hint"></span>
       <div class="bd-readings">
         <span class="bd-reading bd-reading-emphasis">
-          <span class="bd-reading-name">外设槽</span>
-          <span class="bd-reading-value">16 KB</span>
+          <span class="bd-reading-name">AIPS 桥</span>
+          <span class="bd-reading-value">3 块</span>
         </span>
         <span class="bd-reading">
-          <span class="bd-reading-name">AIPS 块</span>
-          <span class="bd-reading-value">3</span>
+          <span class="bd-reading-name">外设槽位</span>
+          <span class="bd-reading-value">32 + 2</span>
         </span>
       </div>
     </header>
@@ -2506,7 +2506,7 @@ text.bd-an-inner { font-size: var(--size-l4); }
         <button class="bd-btn" type="button" id="next"></button>
       </div>
       <div class="bd-actions">
-        <a class="bd-btn" href="c13.html" style="text-decoration:none">← RM13</a>
+        <a class="bd-btn" href="c13.html" style="text-decoration:none">← RM13</a> <a class="bd-btn" href="c15.html" style="text-decoration:none">RM15 →</a>
         <a class="bd-btn" href="index.html" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">☰ 目录</a>
         <button class="bd-btn" type="button" id="reset"></button>
       </div>
@@ -3628,33 +3628,56 @@ function reader(root, sentences, opts) {
   };
 }
 </script>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
 <script>
 var $ = function (id) { return document.getElementById(id); };
 var OX = 24, OY = 96;
 var svg = $('figure'), scene = $('scene');
 svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
 
-var AIPS = [
-  ['AIPS-1', '0x0200_0000', 'AIPSTZ1 @ 0x0207_C000'],
-  ['AIPS-2', '0x0210_0000', 'AIPSTZ2 @ 0x0217_C000'],
-  ['AIPS-3', '0x0220_0000', 'AIPSTZ3 @ 0x0227_C000']
-];
-var MPR = [
-  ['M0', '其余 master 共用', 7],
-  ['M1', 'A7 核', 7],
-  ['M2', 'CAAM（6ULL 无）', 0],
-  ['M3', 'SDMA', 0],
-  ['M4–M15', '保留', 0]
-];
-
 var INIT = { step: 0 };
 var state = { step: INIT.step };
 
 var STEPS = [
-  { h: '1 / 4 桥在哪、干什么', hint: 'AHB 一侧与 IPS 一侧，各是什么', note: 'AIPSTZ 只做协议翻译与权限过滤，不缓存、不做交易合并；所有 IPS 外设都得过它。' },
-  { h: '2 / 4 1 MB 里的 32 个槽', hint: '一个外设一格，16 KB 一格', note: '槽号决定地址，外设编号决定名字：AIPS-1 叫 n-1，AIPS-2 叫 n-2，AIPS-3 叫 n-3。' },
-  { h: '3 / 4 master 侧：MPR', hint: '16 个字段，一位一个 master', note: '复位只信任 master 0 与 1；MPL=0 会把访问硬压成 user 模式，hprot 说了不算。' },
-  { h: '4 / 4 外设侧：OPACR 与叠加策略', hint: '四位决定一个外设能怎么被碰', note: 'AIPSTZ 与 CSU 是两套并联策略，任一方拒绝就阻断；RDC 的资源域再叠一层。' }
+  { h: 'AHB 到外设的桥', hint: '三块 AIPS',
+    note: 'CPU 走 AHB，外设挂在低带宽 IPS 上，中间这座桥负责翻译协议、切地址、查权限。' },
+  { h: '协议怎么翻译', hint: '拆拍与位宽',
+    note: '64 位访问拆成两次 32 位；8/16 位外设只接受不超宽的访问，超了不报错但结果未定义。' },
+  { h: '主设备侧：MPR', hint: '可信与监管级',
+    note: '每个主设备一个 4 位字段：能否缓冲写、是否可信读/写、是否强制降为用户态。' },
+  { h: '外设侧：OPACR', hint: 'TP/WP/SP/BW',
+    note: '每个外设一个 4 位字段：要不要可信主设备、允不允许写、要不要监管级、能否缓冲。' },
+  { h: '权限判定链', hint: 'RDC→CSU→AIPS',
+    note: '域先筛一遍，CSU 的 sec_level 再筛一遍，AIPSTZ 里两道策略任一拒绝就拦住。' },
+  { h: '寄存器地图', hint: '0x0207_C000',
+    note: '三块桥的基址只差在 0x07/0x17/0x27；MPR 在 +0x00，OPACR 五连在 +0x40。' },
+  { h: '板上判据', hint: '用户态读一下',
+    note: '把某外设设成 supervisor-only，再用用户态去读 —— 应该 fault；能读到就说明策略没生效。' }
 ];
 
 function txt(parent, x, y, s, cls, anchor) {
@@ -3663,206 +3686,138 @@ function txt(parent, x, y, s, cls, anchor) {
 function box(x, y, w, h, fill, stroke, sw) {
   return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
 }
-function arrow(x1, y1, x2, y2) {
-  svgEl(scene, 'line', { x1: x1, y1: y1, x2: x2, y2: y2, stroke: 'var(--text-2)', 'stroke-width': 4 });
-  var a = Math.atan2(y2 - y1, x2 - x1), L = 18, W = 9;
-  svgEl(scene, 'path', {
-    d: 'M' + x2 + ' ' + y2 + ' L' + (x2 - L * Math.cos(a) + W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) - W * Math.cos(a)) +
-      ' L' + (x2 - L * Math.cos(a) - W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) + W * Math.cos(a)) + ' Z',
-    fill: 'var(--text-2)', stroke: 'none'
-  });
-}
 function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
-
-function drawBridge() {
-  txt(scene, 56, 146, 'AHB 主设备写下的一条「读写」，在这里变成 IPS 外设能懂的一笔交易', 't28w');
-
-  box(80, 220, 280, 96, 'var(--page)', 'var(--line)', 2);
-  txt(scene, 104, 258, 'AHB 主设备', 't28');
-  txt(scene, 104, 296, 'core / SDMA / DCP …', 't28w');
-  arrow(360, 268, 402, 268);
-
-  box(404, 196, 260, 144, 'var(--surface)', 'var(--observe-line)', 5);
-  txt(scene, 428, 246, 'AIPSTZ', 't44');
-  txt(scene, 428, 290, '协议翻译', 't28w');
-  txt(scene, 428, 326, '权限过滤', 't28w');
-
-  AIPS.forEach(function (a, i) {
-    var y = 196 + i * 100;
-    arrow(664, 268, 700, y + 40);
-    box(702, y, 292, 80, 'var(--page)', 'var(--line)', 2);
-    txt(scene, 722, y + 34, a[0] + '  ' + a[1], 't28');
-    txt(scene, 722, y + 68, '寄存器在 +0x7_C000', 't28w');
-  });
-
-  txt(scene, 80, 560, '三个 AIPS 各占 1 MB，是芯片里所有 IPS 外设的入口。', 't28w');
-  txt(scene, 80, 604, 'AIPSTZ1/2/3 就挂在每块的最后一个 16 KB 槽里。', 't28w');
-
-  box(1020, 168, 850, 300, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '它只做三件事');
-  txt(scene, 1044, 268, '把 AHB 交易翻译成 IPS 的片选、地址、字节使能', 't28w');
-  txt(scene, 1044, 310, '按 master 与外设的策略决定放行还是拒绝', 't28w');
-  txt(scene, 1044, 352, '把读回的数据摆回 AHB 上，交给发起方', 't28w');
-  txt(scene, 1044, 394, '不缓存、不合并、不预取，所以延迟是可预期的', 't28w');
-
-  box(1020, 486, 850, 350, 'var(--page)', 'var(--line)');
-  head(1044, 534, '代价与时钟');
-  txt(scene, 1044, 584, '一次读至少 2 个 hclk，非缓冲写至少 3 个 hclk', 't28w');
-  txt(scene, 1044, 624, 'hclk 来自 ahb_clk_root，一个全局时钟、一个异步复位', 't28w');
-  txt(scene, 1044, 664, '64 位访问或跨 32 位边界的访问，拆成两次 IPS 交易', 't28w');
-  txt(scene, 1044, 704, '只支持 8 / 16 / 32 位外设，比外设宽的访问不支持', 't28w');
-  txt(scene, 1044, 744, '例外的例外：32 位内存可以放到 IPS 上，允许非对齐访问', 't28w');
-  txt(scene, 1044, 784, '所以别把 IPS 当内存用，它天生是给寄存器准备的', 't28w');
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+function three(a, b, c) {
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(a[0], 214, a[1]); for (var i = 0; i < a[2].length; i++) txt(scene, a[0], 252 + i * 36, a[2][i], a[3] || 't20w');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(b[0], 214, b[1]); for (var j = 0; j < b[2].length; j++) txt(scene, b[0], 252 + j * 36, b[2][j], b[3] || 't20w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(c[0], 214, c[1]); for (var k = 0; k < c[2].length; k++) txt(scene, c[0], 252 + k * 36, c[2][k], c[3] || 't20w');
+}
+function prose(title, lines) {
+  wide(456, 330);
+  txt(scene, 80, 490, title, 't24');
+  for (var i = 0; i < lines.length; i++) txt(scene, 80, 522 + i * 34, lines[i], 't20w');
 }
 
-function drawSlots() {
-  txt(scene, 56, 146, '一个 AIPS 就是 32 个 16 KB 的格子，加两个扩展空间', 't28w');
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, 'AIPS 的 1 MB 空间');
+function drawTop() {
+  txt(scene, 56, 146, '所有片上外设都在“桥后面”：AIPSTZ 是 AHB 与低速 IPS 之间的翻译官，也是第一个查权限的关卡', 't24w');
+  three([80, '三块桥', ['AIPSTZ1  0x0207_C000', 'AIPSTZ2  0x0217_C000', 'AIPSTZ3  0x0227_C000', '各占 1 MB 地址窗', '每块后面挂一组外设', '时钟为 ahb_clk_root'], 't20s'],
+        [680, '地址规则', ['每 16 KB 一个外设槽', '最多 32 个槽', '另有 2 个全局扩展槽', '一个“非全局”块使能汇总', '槽位决定片选', '外设寄存器在槽内偏置'], 't20s'],
+        [1280, '桥做什么', ['协议转换（AHB→IPS）', '生成块使能与地址', '传递字节使能与写数据', '回读数据驱动到 AHB', '查主设备与外设权限', '决定 supervisor/user 属性']]);
+  prose('“每 16 KB 一个槽”是这颗芯片外设地址表的骨架：算外设地址时先找它属于哪一块 AIPS、再算槽内偏移', [
+    '这也是为什么外设基址总是 0x4000 的整数倍：一个槽就是 0x4000，硬件只译高位地址，低位透传给外设。',
+    '三块桥把外设分成三组，主要是为了平衡总线负载与地址空间；分组结果决定了某个外设归哪块桥管。',
+    '桥的复位值里已经带了一组“默认可用”的策略，所以裸机不改它也能跑；一旦要隔离，就必须改这里。',
+    '访问外设的延迟是固定的：读至少要 2 个 hclk，无缓冲写至少 3 个 hclk —— 这解释了为什么寄存器读写比内存慢。',
+    '在实时性要求高的代码里，把频繁访问的寄存器连续读会明显变慢，不是编译器的问题，是桥的固定开销。',
+    '一句话：外设不通，先确认地址在不在桥后面的某个槽里，再谈寄存器。']);
+}
 
-  var x0 = 100, y0 = 258, w = 92, h = 62, gx = 12, gy = 12;
-  for (var i = 0; i < 32; i++) {
-    var c = i % 8, r = Math.floor(i / 8);
-    svgEl(scene, 'rect', { x: x0 + c * (w + gx), y: y0 + r * (h + gy), width: w, height: h, rx: 8, fill: 'var(--surface)', stroke: 'var(--line)', 'stroke-width': 2 });
-    txt(scene, x0 + c * (w + gx) + 46, y0 + r * (h + gy) + 42, String(i), 'tnum', 'middle');
-  }
-  txt(scene, 100, 556, '32 个槽：0 … 31，每格 16 KB', 't28w');
-
-  box(100, 584, 380, 76, 'var(--page)', 'var(--line)', 2);
-  txt(scene, 122, 616, '2 个 global 扩展空间', 't28w');
-  txt(scene, 122, 650, '留给自定义外设', 't28w');
-  box(500, 584, 380, 76, 'var(--page)', 'var(--line)', 2);
-  txt(scene, 522, 616, 'both non-global 使能', 't28w');
-  txt(scene, 522, 650, '任选一个就一起拉起', 't28w');
-  txt(scene, 100, 692, '地址 = 块基址 + 槽号 × 16 KB；寄存器偏移在槽内继续算。', 't28w');
-  txt(scene, 100, 736, 'AIPSTZ 自己占最后那块 16 KB（+0x7_C000），所以它也算一个槽。', 't28w');
-  txt(scene, 100, 776, '槽号是硬连线，由芯片设计决定，软件只按表查地址。', 't28w');
-
-  box(1020, 168, 850, 320, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '三块的地址与命名');
-  AIPS.forEach(function (a, i) {
-    txt(scene, 1044, 268 + i * 44, a[0] + '：' + a[1] + ' – +0x0F_FFFF', 't28w');
-  });
-  txt(scene, 1044, 412, '外设按块编号：AIPS-1 里叫 n-1，依此类推', 't28w');
-  txt(scene, 1044, 452, '同一个外设不会被放到两块里，编号唯一', 't28w');
-
-  box(1020, 506, 850, 330, 'var(--page)', 'var(--line)');
-  head(1044, 554, '为什么分三块');
-  txt(scene, 1044, 604, '把外设按功能/频率/权限切开，一块一个 AIPSTZ', 't28w');
-  txt(scene, 1044, 644, '策略也就能按块分开配，互不牵连', 't28w');
-  txt(scene, 1044, 684, '某个块的桥出问题，不会把别的块一起拖下去', 't28w');
-  txt(scene, 1044, 724, '代价是多一层地址判断，换来分域管理', 't28w');
-  txt(scene, 1044, 764, '查基址请回第 2 章的地址地图，别硬背', 't28w');
+function drawProto() {
+  txt(scene, 56, 146, '桥不做“智能重试”，它只做拆拍与位宽检查：拆不了就报错，超宽访问则不报错但结果未定义', 't24w');
+  three([80, '会拆成两次', ['64 位对齐访问', '字节偏移 1/2/3 的字访问', '字节偏移 3 的半字访问', '其余都是一次', '拆拍对外设是两次事务', '外设看到的仍是 32 位'], 't20w'],
+        [680, '位宽限制', ['32 位外设：字节/半字/字都行', '16 位外设：只允许对齐字节/半字', '8 位外设：只允许字节', '超宽访问不报错', '但结果未定义', '这是最阴的一类 bug'], 't20s'],
+        [1280, '时序代价', ['读 ≥ 2 个 hclk', '无缓冲写 ≥ 3 个 hclk', '缓冲写本桥不提供', 'BW 位必须写 0', '所以别指望写合并', '连续写寄存器 3 拍一个']]);
+  prose('“结果未定义”比报错更可怕：它不会触发 abort，只会读回一个看似合理的值，让你以为寄存器写成了', [
+    '典型事故：给 8 位寄存器做 32 位读改写，读回的高位是垃圾，写回去把相邻字段一起改掉，现象是“配置偶尔错一位”。',
+    '正确做法是按外设宽度访问：8 位外设用 8 位指针，16 位用 16 位，32 位才用 32 位。',
+    '非对齐访问在 32 位外设上被拆成两次，如果这个寄存器有“读即清”或“写即触发”的语义，两次访问会触发两次。',
+    '例如 FIFO 数据口被非对齐读，硬件可能弹出两个数据；看起来像“丢了一个字”，实际是多访问了一次。',
+    '64 位访问在 64 位平台上才会出现（如 DDR 侧的 DMA），对外设无意义，别拿 memcpy 的 64 位优化去碰寄存器。',
+    '判据：用 8/16/32 位正确宽度访问同一组寄存器，值应一致；用错宽度时读回值随相邻字段变化。']);
 }
 
 function drawMpr() {
-  txt(scene, 56, 146, 'MPR 一位一份信任：16 个 4 位字段', 't28w');
-  box(56, 176, 940, 300, 'var(--page)', 'var(--line)');
-  head(80, 226, 'AIPSTZx_MPR（复位 0x7700_0000）');
-  for (var i = 0; i < 16; i++) {
-    var x = 80 + i * 54, y = 250;
-    var on = i <= 1;
-    svgEl(scene, 'rect', { x: x, y: y, width: 48, height: 62, rx: 6, fill: on ? 'var(--surface)' : 'var(--page)', stroke: on ? 'var(--observe-line)' : 'var(--line)', 'stroke-width': on ? 4 : 2 });
-    txt(scene, x + 24, y + 28, 'M' + i, 'tnum', 'middle');
-    txt(scene, x + 24, y + 54, on ? '7' : '0', 'tnum', 'middle');
-  }
-  txt(scene, 80, 344, '字段 15 → master 15，字段 0 → master 0（通常是核）', 't28w');
-  txt(scene, 80, 388, '复位后 M0 与 M1 = 7：可信读、可信写、允许缓冲、不强制 user', 't28w');
-  txt(scene, 80, 432, '其余字段为 0：既不信任、也不缓冲写', 't28w');
-
-  box(56, 492, 940, 344, 'var(--surface)', 'var(--guide)');
-  head(80, 540, '每个字段的 4 个位');
-  var bits = [
-    ['bit3 MBW', '该 master 的写能不能被缓冲'],
-    ['bit2 MTR', '该 master 是否可信「读」'],
-    ['bit1 MTW', '该 master 是否可信「写」'],
-    ['bit0 MPL', '0 = 强制按 user 模式发；1 = 照 hprot 走']
-  ];
-  bits.forEach(function (b, i) {
-    var y = 588 + i * 58;
-    txt(scene, 80, y, b[0], 't28');
-    txt(scene, 400, y, b[1], 't28w');
-  });
-  txt(scene, 80, 812, 'MPL=0 是硬覆盖：hprot[1] 说自己是 supervisor，也会被压成 user。', 't28w');
-
-  box(1020, 168, 850, 340, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, 'master 编号表');
-  MPR.forEach(function (m, i) {
-    txt(scene, 1044, 268 + i * 48, m[0], 't28');
-    txt(scene, 1184, 268 + i * 48, m[1], 't28w');
-  });
-
-  box(1020, 526, 850, 310, 'var(--page)', 'var(--line)');
-  head(1044, 574, '读这张表的两个坑');
-  txt(scene, 1044, 624, 'M0 不是「0 号设备」，而是「除核、SDMA、CAAM 外的所有」', 't28w');
-  txt(scene, 1044, 664, '6ULL 没有 CAAM 与 M4，M2、M5 这两个字段实际闲置', 't28w');
-  txt(scene, 1044, 704, '可信 ≠ 有特权：可信只决定能不能过外设的 TP 检查', 't28w');
-  txt(scene, 1044, 744, '改 MPR 要趁启动早期，别在运行中被别的 master 抢跑', 't28w');
+  txt(scene, 56, 146, 'MPR 是“主设备档案”：每个主设备四位，决定它是否可信、是否被强制降级为用户态、写能不能缓冲', 't24w');
+  three([80, '四位的含义', ['[3] MBW 允许缓冲写', '[2] MTR 可信读', '[1] MTW 可信写', '[0] MPL 保留监管级', 'MPL=0 强制降为用户态', '复位 master0/1 = 0111'], 't20s'],
+        [680, '主设备索引', ['0 = 除 A7/SDMA/CAAM 外', '1 = Cortex-A7 核', '2 = CAAM', '3 = SDMA', '5 = Cortex-M4', '其余保留'], 't20s'],
+        [1280, '复位值的含义', ['MPR 复位 0x7700_0000', '最高两个字段 = 0111', '即 master0/1 可信且不降级', '其余主设备字段全 0', '全 0 = 不可信、强制用户态', '所以 DMA 默认是“低权限”']]);
+  prose('复位后 DMA（SDMA、CAAM）默认是“不可信 + 强制用户态”，这正是安全设计的起点：外设不能替内核越权', [
+    '如果某个 DMA 需要访问被保护的外设，必须显式把它的 MTW/MTR 置 1 并清 MPL，否则会被桥拦住。',
+    '反过来，把内核的 MPL 清 0 就等于“让内核以用户态访问所有外设”，访问受保护寄存器会立刻 fault。',
+    'MBW 在这颗芯片上没意义（桥不支持缓冲写），所以四位里实际只用三位，写 1 到 MBW 也不会有额外效果。',
+    '“可信”是相对 CSU 的 sec_level 而言：外设要求“只允许可信主设备”时（TP=0），不可信的主设备即使有监管级也进不去。',
+    '改 MPR 是全局性动作，会影响所有主设备的所有访问，所以要在启动早期一次配好，不要运行中反复改。',
+    '判据：读 MPR 复位值应为 0x7700_0000；把 master3 改成 0x7 后，SDMA 访问受保护外设应不再被拒。']);
 }
 
 function drawOpacr() {
-  txt(scene, 56, 146, 'OPACR：一个外设四位，复位值 0x4444_4444', 't28w');
-  box(56, 176, 940, 320, 'var(--page)', 'var(--line)');
-  head(80, 226, 'AIPSTZx_OPACR（8 个字段 × 4 位）');
-  for (var i = 0; i < 8; i++) {
-    var x = 80 + i * 108, y = 252;
-    svgEl(scene, 'rect', { x: x, y: y, width: 96, height: 62, rx: 6, fill: 'var(--surface)', stroke: 'var(--line)', 'stroke-width': 2 });
-    txt(scene, x + 48, y + 28, 'OPAC' + i, 'tnum', 'middle');
-    txt(scene, x + 48, y + 54, '0100', 'tnum', 'middle');
-  }
-  txt(scene, 80, 350, '0100 = BW 0、SP 1、WP 0、TP 0：要求内核态，可写，不要求可信', 't28w');
-  txt(scene, 80, 394, '5 个 OPACR（0x40–0x50）：共 40 个 off-platform 外设', 't28w');
-  txt(scene, 80, 438, '每个 OPACR 管 8 个连续槽，槽位顺序就是位顺序', 't28w');
+  txt(scene, 56, 146, 'OPACR 是“外设档案”：每外设四位，决定谁能碰它；复位值 0x4444_4444 表示只要监管级', 't24w');
+  three([80, '四位的含义', ['[3] BW 允许缓冲写（须 0）', '[2] SP 要求监管级', '[1] WP 允许写', '[0] TP 要可信主设备', '复位值 4 = 0100', '即“要监管级、可写、不查可信”'], 't20s'],
+        [680, '八种常用组合', ['0x0 谁都能读写', '0x1 只可信主设备', '0x2 只读', '0x3 可信 + 只读', '0x4 只监管级（默认）', '0x7 完全禁止'], 't20s'],
+        [1280, '选策略的思路', ['用户态能碰的用 0x0', '只读状态用 0x2', '安全外设用 0x5 / 0x7', '调试口千万别 0x7', '否则串口都打不出来', '改之前先想好回滚']]);
+  prose('默认 0x4 意味着“裸机与内核都行，用户态一律不行”；这解释了为什么用户态程序直接 mmap 外设会 fault', [
+    '用户态驱动想访问外设，有两条路：内核里代为访问，或把该外设的 SP 清 0（但这等于放弃保护）。',
+    '把调试串口的 OPACR 误设成 0x7，就会“系统还在跑但一句话都看不到”，这类事故只能靠提前备份寄存器值来救。',
+    'TP=0（要求可信）配合 MPR 的 MTW/MTR，能挡住不可信的 DMA；这是防止“外设被滥用绕过 MMU”的关键一环。',
+    'WP=0 可以让某个外设变成只读：适合放“校准参数/版本号”这类不该被改的寄存器块。',
+    'BW 位手册明确写了本桥不支持缓冲写，必须写 0；写 1 不会生效，但会让配置读回来“看起来不一样”。',
+    '判据：把某外设设 0x5（只监管级读），用户态读应 fault、内核读应成功；再设 0x7，内核读也应 fault。']);
+}
 
-  box(56, 512, 940, 324, 'var(--surface)', 'var(--guide)');
-  head(80, 560, '四位各管什么');
-  var bits = [
-    ['bit3 BW', '缓冲写；AIPSTZ 不支持缓冲，必须写 0'],
-    ['bit2 SP', '要求 supervisor；置 1 后 user 模式直接被挡'],
-    ['bit1 WP', '写保护；置 1 后只读，写会被拒'],
-    ['bit0 TP', '可信保护；置 1 后非可信 master 一律拒绝']
-  ];
-  bits.forEach(function (b, i) {
-    var y = 608 + i * 56;
-    txt(scene, 80, y, b[0], 't28');
-    txt(scene, 320, y, b[1], 't28w');
-  });
+function drawChain() {
+  txt(scene, 56, 146, '一次访问要过三道闸：RDC 的域、CSU 的 sec_level、AIPSTZ 的主/从策略 —— 任一拒绝就拦住', 't24w');
+  three([80, '第一道：RDC', ['按“资源域”切分外设', '主设备也分配到域', '跨域访问默认被拒', '域号在 RDC 里配', 'AIPSTZ 只做二次判断', '移植时最容易忘'], 't20w'],
+        [680, '第二道：CSU', ['sec_level[2:0] 三位', '0 全放行 … 7 全禁止', '4 = 只安全侧可访问', '6 = 安全侧也只读', '展开成 8 位 sec_config', '按 4 类事务逐位允许'], 't20s'],
+        [1280, '第三道：AIPSTZ', ['MPR 判主设备', 'OPACR 判外设', '两个策略是“与”的关系', '被拒则返回总线错误', '不会返回假数据', '错误会被 CSU/RDC 记录']]);
+  prose('CSU 的 8 位向量对应四类事务 × 读/写：非安全用户、非安全监管、安全用户、安全监管，每一位代表“允许”', [
+    '例如 sec_config = 0b0011_0011 表示只允许安全事务（低四位安全读/写、高四位安全），非安全访问直接报错。',
+    '这解释了为什么很多参考代码里 CSU 的配置看着“什么都没干”：默认 sec_level=0，全放行。',
+    'RDC 是更粗的一层：它按“域”切分，一旦跨域就拒，连 AIPSTZ 都不用看；所以调试“访问被拒”要先确认域。',
+    '三层都允许才放行，这就是“纵深防御”；反过来说，任何一层配错都会表现为同一个现象（abort）。',
+    '定位方法：读 CSU 的状态看是否有违规记录，再读 RDC 的域配置，最后才看 AIPSTZ —— 从粗到细。',
+    '判据：只改 AIPSTZ 不改 RDC/CSU，若访问仍被拒，说明前两道闸先拦下了，别误判成 AIPSTZ 没生效。']);
+}
 
-  box(1020, 168, 850, 330, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '两套策略并联，任一拒绝即挡');
-  txt(scene, 1044, 268, 'AIPSTZ 的 OPACR：按外设看特权、写、可信', 't28w');
-  txt(scene, 1044, 308, 'CSU 的 CSL：8 档，按四类主体算读写', 't28w');
-  txt(scene, 1044, 348, '两者都放行才真的能访问，谁说不都不行', 't28w');
-  txt(scene, 1044, 388, 'RDC 再把 master 与外设分到资源域，跨域另算', 't28w');
-  txt(scene, 1044, 428, 'CSU 的 3 位档位会译成 8 位 sec_config 向量', 't28w');
+function drawMap() {
+  txt(scene, 56, 146, '每块桥只有六个寄存器：MPR 一个，OPACR 五个；三块桥的布局完全一样，只换基址', 't24w');
+  three([80, '地址', ['AIPSTZ1 0x0207_C000', 'AIPSTZ2 0x0217_C000', 'AIPSTZ3 0x0227_C000', '+0x00 MPR（复位 0x7700_0000）', '+0x40 OPACR 起，共 5 个', '每个 +4 字节'], 't20s'],
+        [680, 'OPACR 覆盖范围', ['5 × 8 个字段 = 40 个外设', '前 32 个对应 16 KB 槽', '后 8 个是全局扩展', '字段顺序：低地址先', 'OPACR 内 [3:0] 是最低编号', '查表别错位'], 't20s'],
+        [1280, '读写注意', ['全部 32 位 R/W', '没有 SET/CLR 别名', '要读-改-写', '改 OPACR 立即生效', '没有“提交”这一步', '顺序与原子性要自己保证']]);
+  prose('“没有提交这一步”意味着改到一半就已经生效：多任务环境下同时改两个外设的字段，必须临界区保护', [
+    '典型竞态：两个线程各自读-改-写同一 OPACR，其中一个的修改被另一个覆盖，结果是“某个外设权限莫名变了”。',
+    '建议做法：把权限配置集中在启动阶段一次做完，运行期不再改；要改就加锁并整字写。',
+    '字段顺序容易错位：OPACR0 的 [3:0] 是编号最小的外设，[31:28] 是 +7；算外设编号时先定位寄存器再定位半字节。',
+    '三块桥的寄存器布局完全镜像，所以写驱动时可以只传基址；但“哪个外设属于哪块桥”必须查地址表。',
+    'MPR 只有一份，影响该桥后面所有外设；改它等于改“这一组”的全局策略。',
+    '判据：读 AIPSTZ1 的 +0x40 应为 0x4444_4444；写一个字段后立即读回应变化 —— 说明无缓冲、即时生效。']);
+}
 
-  box(1020, 514, 850, 322, 'var(--page)', 'var(--line)');
-  head(1044, 562, '位宽与拆分的硬规矩');
-  txt(scene, 1044, 610, '8 位外设：只支持 byte 访问，其他未定义', 't28w');
-  txt(scene, 1044, 650, '16 位外设：只支持对齐的 halfword 与 byte', 't28w');
-  txt(scene, 1044, 690, '32 位外设：byte / halfword / word 都可以', 't28w');
-  txt(scene, 1044, 730, '不支持的访问不报错，结果未定义 —— 最容易查不出', 't28w');
-  txt(scene, 1044, 770, '外设寄存器不能非对齐；桥不检查，写下去就是错的', 't28w');
+function drawBoard() {
+  txt(scene, 56, 146, '验证权限只要三步：改一个外设、从两个特权级各访问一次、看是否只在预期的那一侧失败', 't24w');
+  three([80, '实验', ['① 选一个无害外设', '② 把它设成 SP=1（0x4）', '③ 内核态读 → 应成功', '④ 用户态读 → 应 fault', '⑤ 再设 0x7 → 内核也 fault', '⑥ 恢复 0x4'], 't20w'],
+        [680, '看什么', ['abort 的地址是否对', 'CSU 有没有违规记录', 'RDC 域是否跨了', '别只看“程序崩了”', '崩的位置可能是调用栈', '先看 fault 地址'], 't20w'],
+        [1280, '别自伤', ['改 OPACR 前先备份', '串口/时钟别设 0x7', '改了要能回滚', '量产由安全启动配置', '运行期只读回验证', '不要动态改权限']]);
+  prose('最实用的“判据”是拿 GPIO 做实验：它无害、可观察，用户态读它会 fault，内核读它能拿到值，一次验证整条链', [
+    '如果用户态居然读到了，先查 RDC 是否把该外设划给了“用户域”，或 CSU 的 sec_level 是否为 0（全放行）。',
+    '如果内核态也 fault，多半是把 SP 置了却仍以用户态访问（例如内核里错误地走了用户访问路径）。',
+    '注意 Linux 下“用户态直接 mmap 外设”需要 /dev/mem 且内核配置允许，这本身就绕过很多保护，别用它验证权限。',
+    '真正的产品做法：由 bootloader 或安全固件一次性配置好 MPR/OPACR，内核只读回校验，不在运行期改。',
+    '若你看到“某个外设偶发访问失败”，先怀疑有别的代码在改 OPACR（并发写覆盖），而不是硬件坏了。',
+    '判据：三种配置（0x0 / 0x4 / 0x7）下，用户态与内核态的四种组合结果与预期完全一致。']);
 }
 
 function draw() {
-  var s = STEPS[state.step];
-  $('hint').textContent = s.hint;
-  $('note').textContent = s.note;
-  scene.textContent = '';
-  if (state.step === 0) drawBridge();
-  else if (state.step === 1) drawSlots();
-  else if (state.step === 2) drawMpr();
-  else drawOpacr();
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) drawProto();
+  else if (s === 2) drawMpr();
+  else if (s === 3) drawOpacr();
+  else if (s === 4) drawChain();
+  else if (s === 5) drawMap();
+  else drawBoard();
 }
 
-var step = stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
-void step;
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
 zoomable(document.querySelector('.bd-stage'));
 resetButton($('reset'), function () { state.step = INIT.step; draw(); });
 fitCanvas($('viewport'), $('canvas'), draw);
 </script>
 </body>
 </html>
-
-
