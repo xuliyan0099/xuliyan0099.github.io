@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RM49 共享外设总线仲裁器 SPBA</title>
+<title>RM 第 49 章 · 共享外设总线仲裁 SPBA | i.MX6ULL 逐章解读</title>
 <style>/* 白板互动教学设计系统 · 样式。由 scripts/inline.py 整段拼进页面，不要手抄或删减。
  * 页面的全部颜色、字号、间距、圆角、阴影只在 :root 定义；改主题只改这一段。 */
 
@@ -2469,30 +2469,30 @@ text.bd-an-inner { font-size: var(--size-l4); }
   <symbol id="i-reset" viewBox="0 0 24 24"><title>重置</title><path d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5M4.5 4v4.5H9"/></symbol>
   <symbol id="i-prev" viewBox="0 0 24 24"><title>上一步</title><path d="M15 5l-7 7 7 7"/></symbol>
   <symbol id="i-next" viewBox="0 0 24 24"><title>下一步</title><path d="M9 5l7 7-7 7"/></symbol>
-  <symbol id="i-close" viewBox="0 0 24 24"><title>收起</title><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><title>关闭</title><path d="M6 6l12 12M18 6L6 18"/></symbol>
   <symbol id="i-explain" viewBox="0 0 24 24"><title>讲解</title><path d="M3 5.5c3-1 6-.8 9 1 3-1.8 6-2 9-1V19c-3-1-6-.8-9 1-3-1.8-6-2-9-1zM12 6.5V20"/></symbol>
   <symbol id="i-correct" viewBox="0 0 24 24"><title>正确</title><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
   <symbol id="i-wrong" viewBox="0 0 24 24"><title>错误</title><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
-  <symbol id="i-alert" viewBox="0 0 24 24"><title>越界</title><path d="M12 4l9 16H3zM12 10v4.5M12 17.6v.1"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><title>注意</title><path d="M12 4l9 16H3zM12 10v4.5M12 17.6v.1"/></symbol>
   <symbol id="i-drag" viewBox="0 0 24 24"><title>拖动</title><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></symbol>
-  <symbol id="i-speak" viewBox="0 0 24 24"><title>发音</title><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+  <symbol id="i-speak" viewBox="0 0 24 24"><title>朗读</title><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
   <symbol id="i-fullscreen" viewBox="0 0 24 24"><title>全屏</title><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
-  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>退出全屏</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
+  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>RM 第 17 章 · NAND 纠错加速器 BCH | i.MX6ULL 逐章解读</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
 </svg>
 
 <div class="bd-viewport" id="viewport">
   <div class="bd-canvas" id="canvas">
     <header class="bd-titlebar">
-      <h1 class="bd-title">第 49 章 · 共享外设总线仲裁器 SPBA</h1>
+      <h1>第 49 章 · 共享外设总线仲裁（SPBA）</h1>
       <span class="bd-hint" id="hint"></span>
       <div class="bd-readings">
         <span class="bd-reading bd-reading-emphasis">
-          <span class="bd-reading-name">主控</span>
-          <span class="bd-reading-value">3 路</span>
+          <span class="bd-reading-name">主口</span>
+          <span class="bd-reading-value">3 个</span>
         </span>
         <span class="bd-reading">
-          <span class="bd-reading-name">外设窗口</span>
-          <span class="bd-reading-value">31 × 16 KB</span>
+          <span class="bd-reading-name">共享外设</span>
+          <span class="bd-reading-value">31 个</span>
         </span>
       </div>
     </header>
@@ -2506,6 +2506,7 @@ text.bd-an-inner { font-size: var(--size-l4); }
         <button class="bd-btn" type="button" id="next"></button>
       </div>
       <div class="bd-actions">
+        <a class="bd-btn" href="c48.html" style="text-decoration:none">← RM48</a> <a class="bd-btn" href="c50.html" style="text-decoration:none">RM50 →</a>
         <a class="bd-btn" href="index.html" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">☰ 目录</a>
         <button class="bd-btn" type="button" id="reset"></button>
       </div>
@@ -3627,6 +3628,223 @@ function reader(root, sentences, opts) {
   };
 }
 </script>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
 <script>
 var $ = function (id) { return document.getElementById(id); };
 var OX = 24, OY = 96;
@@ -3637,10 +3855,20 @@ var INIT = { step: 0 };
 var state = { step: INIT.step };
 
 var STEPS = [
-  { h: '1 / 4 三路主控抢三十一个槽', hint: '每个外设一个 16 KB 窗口', note: 'SPBA 自己不占外设编号，它是第 32 个窗口，专门放 PRR。' },
-  { h: '2 / 4 四种状态，三种是「不用时钟」', hint: '只有配置、仲裁、abort 要时钟', note: '访问外设时它是透明的：你感觉不到它的存在，只看到转发的总线。' },
-  { h: '3 / 4 PRR 就 5 个有效位', hint: '首写夺主，之后只有 owner 能改', note: '复位值 0x0000_0007：三路都能访问，但还没有主。' },
-  { h: '4 / 4 带外信号与排障', hint: 'obsc 决定中断和 DMA 归谁', note: '某外设突然报总线错误，八成是有人把它的 RAR 位关了。' }
+  { h: '三主一从的门房', hint: '31 个共享外设',
+    note: '三个主口抢同一批外设，每个外设 16 KB 空间；SPBA 自己算第 32 个。' },
+  { h: '轮转与等待', hint: '后到的等一拍',
+    note: '单请求直通，多请求时后授予者被 xfr_wait 挡住；复位后首次按 A>B>C 定优先级。' },
+  { h: '三个权限位', hint: '没有就报错',
+    note: 'RARA/RARB/RARC 每位管一个主口；权限位为 0 的访问直接变成总线错误。' },
+  { h: '谁拥有这张表', hint: 'ROI 是钥匙',
+    note: 'ROI 记录谁有权改 PRR；写完必须回读 RMO=11 才算抢到，两人同抢只有一人赢。' },
+  { h: '交还与死主', hint: '写 0 就放手',
+    note: '写 0 到自己的 RAR 释放所有权；主口复位时 dead_owner 会自动清 ROI。' },
+  { h: '寄存器细节', hint: '0x0203_C000',
+    note: '32 个 PRR 连续排布，每个 4 字节；复位值 0x7 意味着三个主口全被允许。' },
+  { h: '板上为什么要管它', hint: 'CPU 与 SDMA 抢外设',
+    note: '共享外设的寄存器被 CPU 与 DMA 同时访问，权限配错就变成“DMA 静默失败”。' }
 ];
 
 function txt(parent, x, y, s, cls, anchor) {
@@ -3649,206 +3877,135 @@ function txt(parent, x, y, s, cls, anchor) {
 function box(x, y, w, h, fill, stroke, sw) {
   return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
 }
-function arrow(x1, y1, x2, y2) {
-  svgEl(scene, 'line', { x1: x1, y1: y1, x2: x2, y2: y2, stroke: 'var(--text-2)', 'stroke-width': 4 });
-  var a = Math.atan2(y2 - y1, x2 - x1), L = 18, W = 9;
-  svgEl(scene, 'path', {
-    d: 'M' + x2 + ' ' + y2 + ' L' + (x2 - L * Math.cos(a) + W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) - W * Math.cos(a)) +
-      ' L' + (x2 - L * Math.cos(a) - W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) + W * Math.cos(a)) + ' Z',
-    fill: 'var(--text-2)', stroke: 'none'
-  });
-}
 function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+function three(a, b, c) {
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(a[0], 214, a[1]); for (var i = 0; i < a[2].length; i++) txt(scene, a[0], 252 + i * 36, a[2][i], a[3] || 't20w');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(b[0], 214, b[1]); for (var j = 0; j < b[2].length; j++) txt(scene, b[0], 252 + j * 36, b[2][j], b[3] || 't20w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(c[0], 214, c[1]); for (var k = 0; k < c[2].length; k++) txt(scene, c[0], 252 + k * 36, c[2][k], c[3] || 't20w');
+}
+function prose(title, lines) {
+  wide(456, 330);
+  txt(scene, 80, 490, title, 't24');
+  for (var i = 0; i < lines.length; i++) txt(scene, 80, 522 + i * 34, lines[i], 't20w');
+}
 
 function drawTop() {
-  txt(scene, 56, 146, '一个三进一出的总线开关，外加一套所有权登记簿', 't28w');
-
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '拓扑');
-
-  var m = ['Master A', 'Master B', 'Master C'];
-  m.forEach(function (n, i) {
-    var y = 258 + i * 78;
-    box(80, y, 220, 62, 'var(--surface)', 'var(--line)', 2);
-    txt(scene, 100, y + 42, n, 'tnum');
-    arrow(304, y + 31, 396, 380);
-  });
-
-  box(400, 300, 260, 164, 'var(--page)', 'var(--observe-line)', 4);
-  txt(scene, 422, 344, 'SPBA', 't44');
-  txt(scene, 422, 388, 'IPMUX + 仲裁', 't28w');
-  txt(scene, 422, 424, 'PRR 所有权', 't28w');
-
-  arrow(664, 382, 740, 382);
-
-  box(744, 258, 196, 248, 'var(--surface)', 'var(--line)', 2);
-  txt(scene, 764, 298, 'Per0', 'tnum');
-  txt(scene, 764, 336, 'Per1', 'tnum');
-  txt(scene, 764, 374, '…', 'tnum');
-  txt(scene, 764, 412, 'Per30', 'tnum');
-  txt(scene, 764, 456, '各 16 KB', 't28w');
-
-  txt(scene, 80, 524, '三路主控在手册里只编号 A/B/C，没有点名', 't28w');
-  txt(scene, 80, 564, '实际是 CPU 一路 + 两路 DMA 类主控', 't28w');
-
-  box(80, 600, 860, 180, 'var(--surface)', 'var(--guide)');
-  head(104, 644, '三个功能');
-  txt(scene, 104, 686, '① IP Bus Line：把某一路主控接到某个外设', 't28w');
-  txt(scene, 104, 722, '② 仲裁：同时来请求时按 round-robin 轮转', 't28w');
-  txt(scene, 104, 758, '③ PRR：给每个外设登记「谁能访问」', 't28w');
-
-  box(1020, 168, 850, 300, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '几个硬数字');
-  txt(scene, 1044, 264, '基址 0x0203_C000，PRR0–PRR31 每 4 字节一个', 't28w');
-  txt(scene, 1044, 304, '31 个共享外设，每个 16 KB 地址空间', 't28w');
-  txt(scene, 1044, 344, 'SPBA 自己是第 32 个窗口，放 PRR', 't28w');
-  txt(scene, 1044, 384, '31 组 OBSC 带外信号，送给中断/DMA 转向逻辑', 't28w');
-  txt(scene, 1044, 424, '最高 67 MHz，时钟是 ipg_clk 与 ipg_clk_s', 't28w');
-
-  box(1020, 500, 850, 296, 'var(--page)', 'var(--line)');
-  head(1044, 548, '为什么需要它');
-  txt(scene, 1044, 596, 'IP 总线只有一套，三路主控都要用', 't28w');
-  txt(scene, 1044, 636, '没有仲裁就会同时驱总线，直接冲突', 't28w');
-  txt(scene, 1044, 676, '有了 PRR 就能把某个外设「判给」某一路', 't28w');
-  txt(scene, 1044, 716, '中断与 DMA 请求也随之转向对应主控', 't28w');
-  txt(scene, 1044, 756, '本质：一套很朴素的总线复用 + 权限表', 't28w');
+  txt(scene, 56, 146, 'SPBA 是三个主口到一批共享外设的“门房”：谁先到、能不能进、谁有钥匙，都由它一张表决定', 't24w');
+  three([80, '三个主口', ['Master A：Arm 平台侧', 'Master B：SDMA 侧', 'Master C：第三方主口', '同一时刻只放一个进门', '轮转仲裁防饿死', '后到者用 xfr_wait 挡住'], 't20w'],
+        [680, '31 个共享外设', ['每个占 16 KB 地址空间', '寄存器集中在一张表里', 'SPBA 自身算第 32 个外设', '每外设一份 PRR', '最高工作频率 67 MHz', 'ipg_clk / ipg_clk_s 两时钟'], 't20w'],
+        [1280, '它能干的四件事', ['把一个主口接到一个外设', '在三个主口之间仲裁', '按表放行或拒绝访问', '把带外信号转给中断/DMA 逻辑', '待机不需要时钟', '只在访问 PRR 与仲裁时需要时钟']]);
+  prose('为什么需要它：外设只有一个 IP 总线口，CPU 与 DMA 都想读同一个 UART 的状态寄存器，必须有人排队', [
+    '共享外设（UART、SPI、SAI、定时器等）的寄存器不是双口的：同一拍只能有一个主口读写，冲突必须有硬件排队。',
+    'SPBA 的做法很直接：一路 IPMUX 把选定主口的信号接到外设，仲裁器决定“这一拍接谁”，其余主口的传输被 xfr_wait 拉低卡住。',
+    '“带外信号”是重点：外设的中断与 DMA 请求不是总线数据，SPBA 通过 31 组 OBSC 把它们按所有权转给正确的主口逻辑。',
+    '31 与 32 的关系：31 个真正的外设加 SPBA 自己这一份“权限表外设”，正好填满 32 个槽；所以 PRR 表本身也在这个地址窗口里。',
+    '它对外是透明的：正常读写外设时你感觉不到 SPBA 存在，只有权限配错、或多主并发时才会看到等待与总线错误。',
+    '一句话：它不是性能器件而是“规则器件”——决定谁能碰哪个外设，碰不到就报错而不是静默。']);
 }
 
-function drawModes() {
-  txt(scene, 56, 146, '它平时是隐形的，只在四种时刻现身', 't28w');
-
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '四种状态');
-
-  var md = [
-    ['Reset / Abort', '复位所有 PRR 与仲裁状态，主控可 abort 释放所有权'],
-    ['Functional', '请求被批准后，把主控的 IP 总线接到目标外设'],
-    ['Standby', '完全不要时钟，靠两个 clock enable 通知外面开时钟'],
-    ['Configuration', '主控访问 PRR，此时 SPBA 自己就是个外设']
-  ];
-  md.forEach(function (b, i) {
-    var y = 268 + i * 96;
-    box(80, y, 860, 78, 'var(--surface)', i === 1 ? 'var(--guide)' : 'var(--line)', 2);
-    txt(scene, 100, y + 32, b[0], 't28');
-    txt(scene, 100, y + 66, b[1], 't28w');
-  });
-
-  txt(scene, 80, 690, 'Standby 不要时钟，是它能省电的关键：不访问就不耗电', 't28w');
-  txt(scene, 80, 730, '仲裁是 round-robin，没有优先级，谁也别想饿死别人', 't28w');
-
-  box(1020, 168, 850, 330, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '一次访问在内部发生什么');
-  txt(scene, 1044, 264, '① 主控发地址，落在某个 16 KB 槽里', 't28w');
-  txt(scene, 1044, 304, '② 仲裁器判这次请求归谁，不批就等下一轮', 't28w');
-  txt(scene, 1044, 344, '③ IPMUX 把总线接到那个外设', 't28w');
-  txt(scene, 1044, 384, '④ 同时查 PRR 的 RAR 位，没权限直接返回总线错误', 't28w');
-  txt(scene, 1044, 424, '⑤ 访问结束，释放总线给下一路', 't28w');
-  txt(scene, 1044, 464, '全程对外设透明：外设只看到一笔普通的 IP 总线访问', 't28w');
-
-  box(1020, 530, 850, 266, 'var(--page)', 'var(--line)');
-  head(1044, 578, '谁会被拦下来');
-  txt(scene, 1044, 626, 'RAR 位为 0 的主控 → <master>_ips_xfr_err', 't28w');
-  txt(scene, 1044, 666, '这不是外设报错，是 SPBA 在总线上打回的', 't28w');
-  txt(scene, 1044, 706, '所以外设寄存器看起来「读全 0、写不进」', 't28w');
-  txt(scene, 1044, 746, '先查 PRR，别急着怀疑外设时钟没开', 't28w');
+function drawArb() {
+  txt(scene, 56, 146, '仲裁是轮转的：单请求直通零等待，两个以上请求时后授予者被 wait 挡住，被挡的请求不会丢', 't24w');
+  three([80, '三种场景', ['只有一个主口请求：直通', '无仲裁、无等待拍', '两个主口同抢：后授予者等', '三个主口同抢：后两个都等', '同拍请求也算数', '被 wait 的请求保持有效'], 't20w'],
+        [680, '复位后的优先级', ['第一次多主访问时无人被授予', '于是走静态优先级', 'Master A 最高', 'Master B 次之', 'Master C 最后', '之后进入轮转，不再固定'], 't20w'],
+        [1280, '等待的代价', ['被挡的传输会拉长', '但不会丢数据', '实时流（音频）最怕被挡', '所以优先级要按通路配', '不能靠“反正会轮到”', '必要时让出主口所有权']]);
+  prose('轮转保证公平，静态优先级保证“复位后第一次不打架”：两者组合起来，既不会饿死也不会开机抢成一团', [
+    '“后授予者被 wait 挡住”是逐拍的：已经授予的那个主口把整笔传输做完，下一个才被放行；期间 wait 一直保持有效电平。',
+    '由于请求不会丢，主机看到的是“变慢”而不是“失败”；所以并发问题在功能测试里常常表现为性能抖动，而不是报错。',
+    '如果两个主口都不停地请求，轮转会把带宽大致均分；但实时音频这种需要固定节拍的流，均分反而会造成周期性抖动。',
+    '实践中的调法：给实时流所在主口在别处提高优先级（总线矩阵那一层），SPBA 这一层的轮转无法细调 —— 它只有轮转与复位静态优先级。',
+    '判据：用总线探针或在 xfr_wait 上挂逻辑分析仪，若某主口的传输被插入了额外一拍，说明同一窗口有另一个主口在抢。',
+    '注意“同拍请求也算数”：两个主口在同一时钟沿同时发起，仲裁器仍然只授予一个，另一个从下一拍开始等。']);
 }
 
-function drawPrr() {
-  txt(scene, 56, 146, '每个外设一个 PRR，只有 5 位有意义', 't28w');
-
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, 'PRRn 的字段');
-
-  box(80, 258, 860, 150, 'var(--surface)', 'var(--guide)');
-  txt(scene, 104, 300, 'RMO[31:30]   00 无主 / 10 别人有 / 11 是你', 't28w');
-  txt(scene, 104, 342, 'ROI[17:16]   00 无主 / 01 A / 10 B / 11 C', 't28w');
-  txt(scene, 104, 384, 'RAR[2:0]     对应 C / B / A 的访问权', 't28w');
-
-  txt(scene, 80, 448, '复位值 0x0000_0007：三路都能访问，但谁都还没「拥有」', 't28w');
-
-  box(80, 486, 860, 130, 'var(--surface)', 'var(--line)');
-  head(104, 528, '所有权怎么产生');
-  txt(scene, 104, 570, '第一个往 RAR 位写 1 的主控，自动把 ROI 写成自己的 ID', 't28w');
-  txt(scene, 104, 606, '此后只有 ROI 指向的主控能再改这个 PRR', 't28w');
-
-  box(80, 634, 860, 146, 'var(--page)', 'var(--observe-line)', 3);
-  txt(scene, 104, 676, '别的 master 来写 → 直接忽略，不报错', 't28w');
-  txt(scene, 104, 712, '别的 master 来读外设 → 看 RAR 位，没开就总线错误', 't28w');
-  txt(scene, 104, 748, 'owner 想放手：把 RAR 位写 0，ROI 自动回 00', 't28w');
-
-  box(1020, 168, 850, 320, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '四个典型动作');
-  var act = [
-    ['独占', '只留自己那一位，等于锁给本主控'],
-    ['共享', '三位都置 1，谁都能访问'],
-    ['让出', '把自己那一位写 0，ROI 清空'],
-    ['抢回', '等对方 dead_owner 后再写 RAR'],
-    ['只读给别人', 'RAR 只有「能/不能」，没有读写之分']
-  ];
-  act.forEach(function (b, i) {
-    var y = 262 + i * 40;
-    txt(scene, 1044, y, b[0], 'tnum');
-    txt(scene, 1220, y, b[1], 't28w');
-  });
-
-  box(1020, 520, 850, 276, 'var(--page)', 'var(--line)');
-  head(1044, 568, '两个容易忽略的点');
-  txt(scene, 1044, 616, 'RMO 是「相对当前请求者」的视角，不是全局值', 't28w');
-  txt(scene, 1044, 656, '同一个 PRR，A 读到 10，B 读到 11', 't28w');
-  txt(scene, 1044, 696, 'ROI 只能被 owner 释放，别人清不掉', 't28w');
-  txt(scene, 1044, 736, 'master 复位会拉 dead_owner，强制放手', 't28w');
+function drawRar() {
+  txt(scene, 56, 146, 'PRR 的低三位就是三张门票：谁的门票是 0，谁的访问就当场变成总线错误', 't24w');
+  three([80, '三位门票', ['RARA[0]：允许 Master A', 'RARB[1]：允许 Master B', 'RARC[2]：允许 Master C', '复位值 0x7 = 三个全允许', '写 0 就是禁止', '可以三个都允许'], 't20s'],
+        [680, '允许不等于独占', ['三个都允许也只有一个在访问', '同一拍仍由仲裁决定', '所以“允许”是资格不是权利', '要独占就把别人的位置 0', '独占后再改回开放', '典型用于临界配置窗口'], 't20w'],
+        [1280, '越权会怎样', ['SPBA 拉高 xfr_err', '主口收到一次总线错误', '读可能返回 0 或异常', '写被丢弃，不落到外设', '错误不会重试', '表现为“突然读不到外设”']]);
+  prose('权限位为 0 的访问不是“排队等”，而是“直接拒绝”：这是硬错误，驱动里通常表现为一次 abort 或 bus fault', [
+    '对 CPU 而言，越权访问会变成一次数据 abort；对 DMA 而言，会变成一次传输错误，SDMA 的 SF/DF 标志就是这样被置起来的。',
+    '这解释了嵌入式里一个经典现象：CPU 能正常读写 UART，但一开 DMA 就“没有任何数据”，也没有明显报错 —— 去查 PRR 里 RARB 是不是 0。',
+    '复位值 0x7（三位全 1）意味着默认谁都能访问：所以大多数板子在裸机阶段不会遇到权限问题，问题都出在后来“加固”时把某位清了。',
+    '声音、显示这类外设常被 CPU 与 DMA 同时访问：正确做法是两位都允许，让仲裁去排队，而不是把 DMA 那位关掉。',
+    '只有“配置窗口”才适合独占：改外设时钟或复位序列时，暂时关掉别的门票，改完立刻恢复，避免半配置状态被 DMA 撞上。',
+    '判据：读 PRRn 低三位，与预期允许的主口一一对应；出现 abort 时先读回这张表，很多时候它已经被别的代码改过。']);
 }
 
-function drawUse() {
-  txt(scene, 56, 146, '它还把中断与 DMA 请求「转」给对应的主控', 't28w');
-
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, 'OBSC 五根线');
-
-  box(80, 262, 860, 96, 'var(--surface)', 'var(--guide)');
-  txt(scene, 104, 300, 'obsc[n] = { roi[n][1], roi[n][0], rar[n][2:0] }', 'tnum');
-  txt(scene, 104, 342, '五根线送到块外的转向逻辑', 't28w');
-
-  txt(scene, 80, 392, '转向逻辑据此决定：这个外设的中断送给哪一路', 't28w');
-  txt(scene, 80, 432, 'DMA 请求也一样，跟着所有权走', 't28w');
-  txt(scene, 80, 472, '所以「改了 PRR 之后中断没了」是正常现象', 't28w');
-
-  box(80, 508, 860, 272, 'var(--surface)', 'var(--line)');
-  head(104, 552, '排障清单：外设突然不响应');
-  txt(scene, 104, 594, '① 读 PRR，看 RAR 位是否还给自己开着', 't28w');
-  txt(scene, 104, 632, '② 读 ROI，看是不是被另一路抢走了', 't28w');
-  txt(scene, 104, 670, '③ 看有没有 master 复位留下的 dead_owner', 't28w');
-  txt(scene, 104, 708, '④ 确认访问地址确实落在这个 16 KB 槽里', 't28w');
-  txt(scene, 104, 746, '⑤ 最后才怀疑外设自己的时钟与复位', 't28w');
-
-  box(1020, 168, 850, 320, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '在 i.MX6ULL 上为什么很少碰到');
-  txt(scene, 1044, 264, '复位后三路都能访问，日常读写不会触发限制', 't28w');
-  txt(scene, 1044, 304, 'Linux 用设备树给每个外设指定归属，天然不抢', 't28w');
-  txt(scene, 1044, 344, '真正会动 PRR 的是 bootloader 与 TEE', 't28w');
-  txt(scene, 1044, 384, 'U-Boot 里那几行 spba 初始化就是给它开权限', 't28w');
-  txt(scene, 1044, 424, '跑裸机双核 / 双 OS 时才会明显感到它的存在', 't28w');
-
-  box(1020, 520, 850, 276, 'var(--page)', 'var(--line)');
-  head(1044, 568, '和 AIPSTZ 的区别');
-  txt(scene, 1044, 616, 'AIPSTZ 管「这个主控能不能写这个外设」，按主控分档', 't28w');
-  txt(scene, 1044, 656, 'SPBA 管「这个外设这一刻归谁」，还带仲裁', 't28w');
-  txt(scene, 1044, 696, '两者叠加：先过 SPBA 的路由，再过 AIPSTZ 的权限', 't28w');
-  txt(scene, 1044, 736, '都配错时才最难查：两边都报错，现象却一样', 't28w');
+function drawOwner() {
+  txt(scene, 56, 146, 'ROI 是“谁能改这张表”的钥匙：无主时谁先写谁拿到，拿到后回读 RMO=11 才能确认', 't24w');
+  three([80, '抢锁流程', ['① 读 PRR 看 ROI 是否为 00', '② 写自己要的 RAR 位', '③ 硬件自动把 ROI 写成本主口', '④ 回读 RMO', '⑤ RMO=11 才算成功', 'RMO=10 说明被别人抢先'], 't20s'],
+        [680, '两种回读值', ['RMO=00：资源无主', 'RMO=10：别的 master 拥有', 'RMO=11：本 master 拥有', 'ROI 记录拥有者 ID', '01 是保留值', '回读是唯一可靠的判据'], 't20w'],
+        [1280, '并发抢锁', ['两个主口同拍写 PRR', '只有第一个被接受', '后者的写被忽略', '后者回读得 RMO=10', '所以要“写后读”而非只写', '这是标准的抢锁协议']]);
+  prose('这套“写后回读”是硬件提供的唯一原子性：没有它，两个主口同时初始化外设就会互相覆盖对方的配置', [
+    '关键细节：写 RAR 位的同时，硬件把请求主口的 ID 打进 ROI；所以“拥有 PRR”和“设置权限”是同一个动作完成的。',
+    '拿到所有权之后，你可以继续改 RAR 位（因为 ROI 已是你的 ID），别的 master 再来写就会被忽略 —— 这就是“独占配置权”。',
+    '但注意手册的警告：拥有 PRR 不等于自动拥有外设访问权，你还得给自己的 RAR 位写 1，否则自己的访问照样被拒。',
+    '回读一定要读 RMO 而不是只读 ROI：RMO 是“相对请求者”的答案，ROI 是绝对 ID；多主口场景下 RMO 更好用。',
+    'RMO=10 时不要重试到死：说明别人正持有，正确做法是等对方释放（ROI 回 0）再抢，或走“谁负责初始化”的软件约定。',
+    '判据：初始化共享外设的代码段应包在“抢所有权 → 配寄存器 → 释放”三明治里；中途崩溃会让该外设一直被别人锁着。']);
 }
+
+function drawRelease() {
+  txt(scene, 56, 146, '所有权有两种结束方式：自己写 0 交还，或者主口被复位时由 dead_owner 自动清掉', 't24w');
+  three([80, '主动交还', ['把自己的 RAR 位写 0', 'ROI 自动清为 00', '资源回到无主状态', '别的 master 可再抢', '交还前先让外设进安全态', '否则下一位接手会看到半配置'], 't20w'],
+        [680, '被动失效', ['主口复位时置 dead_owner', 'SPBA 清该主口的 ROI', '它拥有的外设全部变无主', '这就是“死主”处理', '防止复位后资源被永久占住', '但外设本身状态不会被复位'], 't20w'],
+        [1280, '无主状态的风险', ['ROI=00 时所有主口可读写', 'RAR 也可被任意主口改', '硬件不做任何一致性保护', '全靠软件自律', '典型事故：两个驱动同时配一个 UART', '表现为寄存器“自己变了”']]);
+  prose('“无主”是最危险的稳定状态：所有人都有权改，硬件不拦，出事只能靠软件约定', [
+    '所以正常流程应该尽快从“无主”过渡到“有主”：启动早期由单一初始化者抢下所有权，配好外设后再交还并保持权限位合理。',
+    'dead_owner 是给“主口异常复位”兜底的：SDMA 或某个核被复位后，它名下的外设不会永远锁死，而是回到可抢状态。',
+    '但兜底只清所有权，不复位外设：接管者必须先假设外设处于任意中间状态，重新做一遍完整初始化。',
+    '主动交还时的手册提醒很重要：交还前要把外设放到“安全态”（停 DMA、关中断、清 FIFO），否则下一位在跑的传输上继续配置会出怪现象。',
+    '一个常见 bug：驱动在 probe 里抢了所有权但出错路径直接 return，没交还；下次 insmod 就永远抢不到，只能重启。',
+    '判据：模块卸载后读 PRR，ROI 应回到 00；若仍是某个主口，说明释放路径漏了，长期会积累成“第二次加载失败”。']);
+}
+
+function drawRegs() {
+  txt(scene, 56, 146, '整个 SPBA 就是 32 张一模一样的表：0x0203_C000 起每 4 字节一张，字段排布固定', 't24w');
+  three([80, '地址与排布', ['基址 0x0203_C000', 'PRRn = 基址 + 4×n', 'n = 0…31，共 32 个', '复位值全部 0x0000_0007', '每个管一个共享外设', 'n 与外设编号一一对应'], 't20s'],
+        [680, '字段位域', ['RMO[31:30] 相对本主口的归属', 'ROI[17:16] 绝对拥有者 ID', 'RARC[2] / RARB[1] / RARA[0]', '其余位保留', 'ROI 只读，由硬件写', 'RMO 只读，由硬件算'], 't20s'],
+        [1280, '怎么定位某个外设', ['先查芯片的外设编号', '再算 基址 + 4×编号', '例如编号 2 就是 0x0203_C008', '未知编号就读整片扫一遍', '扫 32 个字很快', '看 RAR 三位与 ROI 即可判断']]);
+  prose('如果不知道该改哪张表，最快的办法是把 32 个字全读出来：RAR 三位全 1 且 ROI=00 的那张就是默认状态', [
+    '把 0x0203_C000 起 32 个字 dump 出来，按“外设编号 ↔ 地址偏移”对照表就能定位到具体外设，不需要翻原理图。',
+    '复位后全部是 0x7：低三位全 1、ROI 全 0、RMO 全 0 —— 这正好是“无主且全开放”，与手册描述一致。',
+    '若某个外设的 PRR 低三位不是 0x7，说明有代码改过；若 ROI 非 0，说明有个主口还锁着它，这通常就是“某个驱动没跑完”。',
+    'ROI 编码：00 无主、01 Master A、10 Master B、11 Master C；注意这与 RMO 的 00/10/11 编码含义不同，别混用。',
+    '写寄存器只能动 RAR 三位（以及通过写 0 释放）；其他位是只读或保留，整字覆盖写会把 ROI 也写乱（虽然硬件可能忽略）。',
+    '判据：改完立即回读，低三位应等于你写的值、ROI 应等于你的主口 ID（若你抢了所有权）；两者都对才继续初始化外设。']);
+}
+
+function drawBoard() {
+  txt(scene, 56, 146, '这块板上 SPBA 最现实的冲突：CPU 配外设、SDMA 搬数据，两者都走共享外设这条 IP 总线', 't24w');
+  three([80, '谁在抢', ['CPU 写 UART 的 CR 寄存器', 'SDMA 读 UART 的 RX FIFO', 'CPU 改 SAI 的 TCR 时', 'SDMA 正在搬 TX 数据', '同一拍只有一个能进', '靠 xfr_wait 排队'], 't20w'],
+        [680, '典型故障', ['DMA 一个字节都收不到', '但 CPU 读外设一切正常', '读写偶发返回错误', '外设寄存器“自己变了”', '第二次 insmod 失败', '都和 PRR 有关'], 't20w'],
+        [1280, '排查顺序', ['① dump 32 个 PRR', '② 看目标外设 RAR 位', '③ 看 ROI 是否被别人锁', '④ 查是否漏了释放', '⑤ 再看 xfr_wait 是否被拉低', '⑥ 最后才怀疑外设本身']]);
+  prose('这一章的价值不在写驱动，而在“当 CPU 正常、DMA 全废”时，知道还有这么一张权限表可以查', [
+    '本板上 SDMA 走 Peripheral DMA 服务片上外设，与 CPU 的访问在 SPBA 这一层汇合；两者都会读写同一批外设寄存器。',
+    '因此“CPU 轮询能收到串口数据、DMA 收不到”这类现象，第一怀疑对象就是 PRR 里 SDMA 对应的门票被清了。',
+    '另一个常见来源是 bootloader：U-Boot 可能为了独占配置把某位清了却没恢复，内核起来后 SDMA 就一直越权。',
+    '调试手段很朴素：在越权访问前后读 PRR 与 EVTERR/中断状态，看差在哪一步；SPBA 本身没有错误状态寄存器，错误只体现在主口的 abort。',
+    '如果确实需要独占，请在“短窗口”内做：抢所有权 → 停 DMA → 改配置 → 恢复权限 → 交还，中间不要睡眠、不要打印。',
+    '判据：连续跑 1 小时音频录放，DMA 传输计数与 CPU 读到的样本数一致；出现丢样时先 dump PRR，再看 SDMA 的 SF/DF 是否被置起。']);
+}
+
 function draw() {
-  var s = STEPS[state.step];
-  $('hint').textContent = s.hint;
-  $('note').textContent = s.note;
-  scene.textContent = '';
-  if (state.step === 0) drawTop();
-  else if (state.step === 1) drawModes();
-  else if (state.step === 2) drawPrr();
-  else drawUse();
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) drawArb();
+  else if (s === 2) drawRar();
+  else if (s === 3) drawOwner();
+  else if (s === 4) drawRelease();
+  else if (s === 5) drawRegs();
+  else drawBoard();
 }
 
-var step = stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
-void step;
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
 zoomable(document.querySelector('.bd-stage'));
 resetButton($('reset'), function () { state.step = INIT.step; draw(); });
 fitCanvas($('viewport'), $('canvas'), draw);
