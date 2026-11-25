@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RM15 APBH 桥与专用 DMA</title>
+<title>RM 第 15 章 · APBH 桥与专用 DMA | i.MX6ULL 逐章解读</title>
 <style>/* 白板互动教学设计系统 · 样式。由 scripts/inline.py 整段拼进页面，不要手抄或删减。
  * 页面的全部颜色、字号、间距、圆角、阴影只在 :root 定义；改主题只改这一段。 */
 
@@ -2477,22 +2477,22 @@ text.bd-an-inner { font-size: var(--size-l4); }
   <symbol id="i-drag" viewBox="0 0 24 24"><title>拖动</title><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></symbol>
   <symbol id="i-speak" viewBox="0 0 24 24"><title>朗读</title><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
   <symbol id="i-fullscreen" viewBox="0 0 24 24"><title>全屏</title><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
-  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>退出全屏</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
+  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>RM 第 13 章 · ADC 通道、触发与转换 | i.MX6ULL 逐章解读</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
 </svg>
 
 <div class="bd-viewport" id="viewport">
   <div class="bd-canvas" id="canvas">
     <header class="bd-titlebar">
-      <h1 class="bd-title">第 15 章 · APBH 桥与专用 DMA</h1>
+      <h1>第 15 章 · AHB 到 APBH 桥与 DMA</h1>
       <span class="bd-hint" id="hint"></span>
       <div class="bd-readings">
         <span class="bd-reading bd-reading-emphasis">
           <span class="bd-reading-name">DMA 通道</span>
-          <span class="bd-reading-value">4</span>
+          <span class="bd-reading-value">4 个</span>
         </span>
         <span class="bd-reading">
-          <span class="bd-reading-name">PIO 词/条</span>
-          <span class="bd-reading-value">0–15</span>
+          <span class="bd-reading-name">信号量</span>
+          <span class="bd-reading-value">8 位</span>
         </span>
       </div>
     </header>
@@ -2506,8 +2506,7 @@ text.bd-an-inner { font-size: var(--size-l4); }
         <button class="bd-btn" type="button" id="next"></button>
       </div>
       <div class="bd-actions">
-        <a class="bd-btn" href="c14.html" style="text-decoration:none">← RM14</a>
-        <a class="bd-btn" href="c16.html" style="text-decoration:none">RM16 →</a>
+        <a class="bd-btn" href="c14.html" style="text-decoration:none">← RM14</a> <a class="bd-btn" href="c16.html" style="text-decoration:none">RM16 →</a>
         <a class="bd-btn" href="index.html" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">☰ 目录</a>
         <button class="bd-btn" type="button" id="reset"></button>
       </div>
@@ -3629,37 +3628,62 @@ function reader(root, sentences, opts) {
   };
 }
 </script>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
 <script>
 var $ = function (id) { return document.getElementById(id); };
 var OX = 24, OY = 96;
 var svg = $('figure'), scene = $('scene');
 svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
 
-var CMDS = [
-  ['00', 'NO_DMA_XFER', '只写 PIO 词，不搬数据'],
-  ['01', 'DMA_WRITE', '先写 PIO，再从外设搬进内存'],
-  ['10', 'DMA_READ', '先写 PIO，再从内存写到外设'],
-  ['11', 'DMA_SENSE', '按 sense 线分支，仅 GPMI 有效']
-];
-var BITS = [
-  ['CHAIN', '后面还有描述符；为 0 就是链尾'],
-  ['IRQ_COMPLETE', '本条完成后置位该通道中断'],
-  ['NAND_LOCK', '抢到仲裁后锁住其它 NAND 通道'],
-  ['NAND_WAIT4READY', '等 GPMI 的 ready 线拉高才发'],
-  ['WAIT4ENDCMD', '等外设 endcmd 翻转再取下一条'],
-  ['DECREMENT_SEMAPHORE', '本条完成后信号量减 1'],
-  ['HALTONTERMINATE', '外设报错即中止并中断（建议恒置 1）'],
-  ['CMDPIOWORDS', '0–15 个 PIO 词，从外设基址逐拍写']
-];
-
 var INIT = { step: 0 };
 var state = { step: INIT.step };
 
 var STEPS = [
-  { h: '1 / 4 桥里塞了三样东西', hint: 'PIO 桥、专用 DMA、向量中断', note: '这条总线是给 NAND 造的：4 条 DMA 通道全绑 GPMI，别的外设只能走 PIO。' },
-  { h: '2 / 4 一条通道命令四个字', hint: '下一条地址、命令字、缓冲、PIO 词', note: '命令名是站在内存这边起的：DMA_WRITE 是写内存，DMA_READ 是读内存，别看反。' },
-  { h: '3 / 4 控制位与信号量', hint: 'NAND 的三个专用位最要命', note: 'HALTONTERMINATE 建议每条都置 1：外设一报错就停在这条，不会带着错往下跑。' },
-  { h: '4 / 4 寄存器、启动与轮询', hint: '从 0x0180_4000 起，通道每 0x70 一组', note: '启动只有两步：NXTCMDAR 放首条地址，SEMA 写 1；剩下交给 DMA 自己跑。' }
+  { h: 'NAND 专用的小 DMA', hint: '0x0180_4000',
+    note: 'APBH 桥里塞了一个中央 DMA，只服务 GPMI（NAND）；它不是通用 DMA，命令表在内存里。' },
+  { h: '和 AHB 抢总线', hint: 'DMA 优先',
+    note: 'DMA 与 CPU 共用 HCLK 上的 APBH，DMA 抢赢；仲裁器保证每第 4 次让给 ARM。' },
+  { h: '一条命令长什么样', hint: 'CCW 两字 + PIO',
+    note: '第一个字是下一个命令地址，第二个字装命令码、长度、各种标志，后面可跟 0–15 个 PIO 字。' },
+  { h: '四种命令码', hint: '00/01/10/11',
+    note: '不搬数据、外设→内存、内存→外设、按 sense 分支；只有 GPMI 支持分支这一种。' },
+  { h: '信号量决定跑不跑', hint: '8 位计数',
+    note: 'SEMA 非 0 才动；每完成一条可减 1，减到 0 就停。这是“软件追加任务”的同步点。' },
+  { h: '寄存器地图', hint: 'CHn 步长 0x70',
+    note: 'CTRL0/1/2 在 0x00/0x10/0x20，通道寄存器从 0x100 起每通道 0x70 一组。' },
+  { h: '板上判据', hint: '看 CURCMDAR',
+    note: '启动后 CURCMDAR 应逐条前进、SEMA 归零、完成中断只来一次；不动就是信号量没加。' }
 ];
 
 function txt(parent, x, y, s, cls, anchor) {
@@ -3668,190 +3692,138 @@ function txt(parent, x, y, s, cls, anchor) {
 function box(x, y, w, h, fill, stroke, sw) {
   return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
 }
-function arrow(x1, y1, x2, y2) {
-  svgEl(scene, 'line', { x1: x1, y1: y1, x2: x2, y2: y2, stroke: 'var(--text-2)', 'stroke-width': 4 });
-  var a = Math.atan2(y2 - y1, x2 - x1), L = 18, W = 9;
-  svgEl(scene, 'path', {
-    d: 'M' + x2 + ' ' + y2 + ' L' + (x2 - L * Math.cos(a) + W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) - W * Math.cos(a)) +
-      ' L' + (x2 - L * Math.cos(a) - W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) + W * Math.cos(a)) + ' Z',
-    fill: 'var(--text-2)', stroke: 'none'
-  });
-}
 function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
-
-function drawTopo() {
-  txt(scene, 56, 146, '一条便宜的外设总线：和 HCLK 同步，DMA 与 PIO 桥共用', 't28w');
-
-  box(80, 220, 250, 130, 'var(--page)', 'var(--line)', 2);
-  txt(scene, 104, 266, 'AHB', 't44');
-  txt(scene, 104, 306, 'Slave / Master', 't28w');
-  txt(scene, 104, 340, '核与外设发起', 't28w');
-  arrow(332, 286, 372, 286);
-
-  box(374, 216, 300, 140, 'var(--surface)', 'var(--observe-line)', 5);
-  txt(scene, 398, 262, 'AHB-to-APBH 桥', 't28');
-  txt(scene, 398, 302, 'PIO 桥 + 专用 DMA', 't28w');
-  txt(scene, 398, 336, '向量中断控制器', 't28w');
-  arrow(524, 356, 524, 400);
-
-  svgEl(scene, 'rect', { x: 80, y: 400, width: 910, height: 64, rx: 14, fill: 'var(--page)', stroke: 'var(--observe-line)', 'stroke-width': 4 });
-  txt(scene, 104, 442, 'APBH 总线：同步 HCLK，DMA 与 PIO 桥分时', 't28w');
-
-  var gx = [80, 396, 712];
-  ['GPMI 0–3', '向量中断', 'APB 外设'].forEach(function (t, i) {
-    arrow(gx[i] + 150, 464, gx[i] + 150, 500);
-    box(gx[i], 500, 288, 86, 'var(--page)', 'var(--line)', 2);
-    txt(scene, gx[i] + 24, 552, t, 't28');
-  });
-  txt(scene, 80, 640, 'NAND 的 ECC、命令字与数据搬运都走这条链路', 't28w');
-  txt(scene, 80, 684, 'DMA 抢到 APBH 就压住 AHB slave，让它报 not-ready', 't28w');
-  txt(scene, 80, 728, '仲裁器数着连续被挡的次数，反转优先级', 't28w');
-  txt(scene, 80, 772, '保证 ARM 每第 4 笔 APB 交易一定拿到总线', 't28w');
-  txt(scene, 80, 816, '所以这条桥不怕饿死 CPU，怕的是 NAND 时序被打断', 't28w');
-
-  box(1020, 168, 850, 340, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '它到底解决什么');
-  txt(scene, 1044, 268, '把 32 位 PIO 写和 DMA 搬数据揉进一条链', 't28w');
-  txt(scene, 1044, 308, '固件写一次描述符，硬件自己跑完整个页', 't28w');
-  txt(scene, 1044, 348, '中断频率被设计压到 1 kHz 以下', 't28w');
-  txt(scene, 1044, 388, 'NAND 命令、地址都在链里，不用 CPU 逐拍喂', 't28w');
-  txt(scene, 1044, 428, '代价是：只有 GPMI 能用，别的外设别想蹭', 't28w');
-
-  box(1020, 526, 850, 310, 'var(--page)', 'var(--line)');
-  head(1044, 574, '硬约束');
-  txt(scene, 1044, 624, '没有独立 DMA 总线，读和写都压在 APBH 上', 't28w');
-  txt(scene, 1044, 664, '模块时钟 hclk 来自 bch_clk_root', 't28w');
-  txt(scene, 1044, 704, 'DMA 只发普通读写，不发 set/clear/toggle', 't28w');
-  txt(scene, 1044, 744, 'PIO 词只能写寄存器，不能当数据搬', 't28w');
-  txt(scene, 1044, 784, '4 条通道固定绑 GPMI0–3，改不了', 't28w');
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+function three(a, b, c) {
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(a[0], 214, a[1]); for (var i = 0; i < a[2].length; i++) txt(scene, a[0], 252 + i * 36, a[2][i], a[3] || 't20w');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(b[0], 214, b[1]); for (var j = 0; j < b[2].length; j++) txt(scene, b[0], 252 + j * 36, b[2][j], b[3] || 't20w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(c[0], 214, c[1]); for (var k = 0; k < c[2].length; k++) txt(scene, c[0], 252 + k * 36, c[2][k], c[3] || 't20w');
+}
+function prose(title, lines) {
+  wide(456, 330);
+  txt(scene, 80, 490, title, 't24');
+  for (var i = 0; i < lines.length; i++) txt(scene, 80, 522 + i * 34, lines[i], 't20w');
 }
 
-function drawCommand() {
-  txt(scene, 56, 146, '一条命令 = 三个字 + 后面挂 0～15 个 PIO 词', 't28w');
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '命令结构（在内存里）');
-
-  var rows = [
-    ['word 0', 'NEXTCMD_ADDR', '下一条描述符的地址；为 0 且 CHAIN=0 即链尾'],
-    ['word 1', '命令字', 'XFER_COUNT + 控制位 + COMMAND[1:0] + CHAIN'],
-    ['word 2', 'BUFFER_ADDR', '数据缓冲；DMA_SENSE 时它当备用链指针'],
-    ['word 3+', 'PIO 词 0…n', '按 CMDPIOWORDS 填，从外设基址起逐拍写']
-  ];
-  rows.forEach(function (r, i) {
-    var y = 246 + i * 96;
-    box(80, y, 700, 86, 'var(--surface)', 'var(--line)', 2);
-    txt(scene, 100, y + 32, r[0], 'tnum');
-    txt(scene, 208, y + 32, r[1], 't28');
-    txt(scene, 100, y + 72, r[2], 't28w');
-  });
-
-  txt(scene, 80, 690, 'CHAIN 是唯一的链有效标志：指针填 0 硬件也发现不了。', 't28w');
-  txt(scene, 80, 730, 'PIO 词走 APB 写寄存器，和 DMA 搬数据共用同一套控制。', 't28w');
-  txt(scene, 80, 770, '所以「发命令 + 搬一页」能压进一条链，中途不用 CPU。', 't28w');
-
-  box(1020, 168, 850, 400, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, 'COMMAND[1:0] 四条');
-  CMDS.forEach(function (c, i) {
-    var y = 272 + i * 72;
-    box(1044, y - 34, 62, 52, 'var(--page)', 'var(--line)', 2);
-    txt(scene, 1075, y, c[0], 'tnum', 'middle');
-    txt(scene, 1126, y, c[1], 't28');
-    txt(scene, 1044, y + 34, c[2], 't28w');
-  });
-
-  box(1020, 594, 850, 242, 'var(--page)', 'var(--line)');
-  head(1044, 642, '名字是站在内存那边起的');
-  txt(scene, 1044, 692, 'DMA_WRITE = 往内存里写 = 外设 → 内存', 't28w');
-  txt(scene, 1044, 732, 'DMA_READ = 从内存里读 = 内存 → 外设', 't28w');
-  txt(scene, 1044, 772, '按外设方向记就会写反，NAND 读页会变成写页', 't28w');
+function drawTop() {
+  txt(scene, 56, 146, 'APBH 是一条“便宜的外设总线”：挂在 AHB 的 HCLK 上，自己带 DMA 与中断控制器，主要服务 NAND', 't24w');
+  three([80, '桥里有什么', ['AHB→APB 的 PIO 桥', '中央 DMA（4 通道）', '向量中断控制器', '挂的是 GPMI（NAND）', '不是通用 DMA 控制器', '时钟 bch_clk_root'], 't20w'],
+        [680, '谁在用', ['GPMI0–3 各占一通道', 'NAND 读写靠它搬', 'ECC 由 BCH 模块算', 'CPU 只维护命令链', '中断频率目标 < 1 kHz', '所以能“发出去就不管”'], 't20w'],
+        [1280, '和 SDMA 的区别', ['SDMA 服务全片外设', 'APBH 只服务 GPMI', 'SDMA 用脚本/上下文', 'APBH 用内存命令链', '两者别混着用', 'NAND 一定走 APBH']]);
+  prose('为什么 NAND 要单独一个 DMA：NAND 的时序要求“命令字节、地址字节、数据”按固定节奏发出，CPU 逐字节写根本跟不上', [
+    'APBH 的价值在于“把一串操作写成命令链”：软件一次性描述“发命令、发地址、读 N 字节、查状态、再循环”，之后全由硬件执行。',
+    '这也是为什么这一章的描述符里有 PIO 字（直接写外设寄存器）与 DMA 字节（搬数据）两种动作 —— NAND 两者都要。',
+    '“中断频率低于 1 kHz”是设计目标：一次传输动辄几十 KB，CPU 只在整链结束时被打断一次。',
+    'i.MX6ULL 上 NAND 的 ECC 由第 17 章的 BCH 完成，APBH 只负责搬运，二者是流水线关系。',
+    '如果你的板子用 eMMC 或 SD 卡启动，APBH 基本用不到；但只要碰 NAND，就绕不开这一章。',
+    '一句话：APBH 是“NAND 的专属发动机”，CPU 负责写剧本，它负责按拍演。']);
 }
 
-function drawBits() {
-  txt(scene, 56, 146, '八个控制位，每个都在回答「这条要不要等」', 't28w');
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '命令字里的控制位');
-  BITS.forEach(function (b, i) {
-    var y = 274 + i * 70;
-    txt(scene, 80, y, b[0], 't28');
-    txt(scene, 452, y, b[1], 't28w');
-  });
-
-  box(1020, 168, 850, 340, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, 'NAND 通道的三个专用位');
-  txt(scene, 1044, 266, 'NAND_LOCK：抢到仲裁就独占', 't28w');
-  txt(scene, 1044, 300, '直到不带 LOCK 的最后一条完成才放', 't28w');
-  txt(scene, 1044, 348, 'NAND_WAIT4READY：GPMI 采样 ready', 't28w');
-  txt(scene, 1044, 382, '没就绪就把整条通道压住', 't28w');
-  txt(scene, 1044, 430, 'HALTONTERMINATE：外设发 HOT 就中止', 't28w');
-  txt(scene, 1044, 464, '通道复位、读外设错误寄存器，由软件收拾', 't28w');
-
-  box(1020, 526, 850, 310, 'var(--page)', 'var(--line)');
-  head(1044, 574, '信号量：8 位计数');
-  txt(scene, 1044, 624, '计数大于 0 才跑，减到 0 就进 idle', 't28w');
-  txt(scene, 1044, 664, '软件写 SEMA 是「加」，不是覆盖', 't28w');
-  txt(scene, 1044, 704, 'idle 时写 1，通道重新读 NXTCMDAR', 't28w');
-  txt(scene, 1044, 744, '双间接：跑动中还能往链尾追加描述符', 't28w');
-  txt(scene, 1044, 784, 'CURCMDAR 随时可读，用来判断跑到哪了', 't28w');
+function drawArb() {
+  txt(scene, 56, 146, 'DMA 与 CPU 共用一条 APBH：DMA 优先，但仲裁器保证 ARM 每第 4 次能拿到总线，防止饿死', 't24w');
+  three([80, '争用规则', ['DMA 优先使用 APBH', 'AHB 从口回 not-ready', 'CPU 被“拉住”等待', '仲裁器记录连续抢占', '每第 4 次强制给 ARM', '防止 CPU 饿死'], 't20w'],
+        [680, '对软件的影响', ['CPU 读写 NAND 寄存器会变慢', '因为要让路给 DMA', '大传输时 CPU 延迟抖动', '实时任务要避开 NAND 高峰', '这不是 bug，是设计', '要快就让 DMA 一次搬够'], 't20w'],
+        [1280, '为什么会这样', ['只有一个 APBH 主口', 'DMA 与 PIO 共享', '没有独立 DMA 总线', '省面积、省功耗', '代价是 CPU 被拖慢', '所以叫“便宜的总线”']]);
+  prose('“每第 4 次让给 ARM”是个很朴素的公平算法：既保证 DMA 吞吐，又不让 CPU 完全拿不到总线', [
+    '实测表现：NAND 连续读时，CPU 去读别的外设（不在 APBH 上）不受影响；但读 GPMI 寄存器会明显变慢。',
+    '这也意味着不要在 NAND 传输正忙时去轮询 NAND 状态寄存器 —— 你既慢又抢不到，应该用中断或轮询完成标志。',
+    '如果系统对延迟极敏感（比如音频），把 NAND 操作安排到不影响音频的时段，或者用大块传输减少次数。',
+    '仲裁器的“连续抢占计数”是硬件内部状态，软件看不到；你能观察到的只是访问延迟的变化。',
+    '理解这一点能解释很多“为什么加了 NAND 驱动后串口偶发丢字节”的怪现象：不是串口坏了，是总线被抢。',
+    '判据：NAND 大传输期间用 GPIO 翻转测中断响应延迟，应看到抖动增加但不超过可接受上限。']);
 }
 
-function drawRegs() {
-  txt(scene, 56, 146, '寄存器从 0x0180_4000 起，通道每 0x70 一组', 't28w');
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, 'APBH 寄存器地图');
-  var regs = [
-    ['0x4000', 'CTRL0', '复位 E000_0000'],
-    ['0x4010', 'CTRL1', '通道中断状态'],
-    ['0x4020', 'CTRL2', 'DMA 运行控制'],
-    ['0x4030', 'CHANNEL_CTRL', '通道使能与复位'],
-    ['0x4040', 'DEVICE_ASSIGN', '设备与通道绑定'],
-    ['0x4050', 'BURST_SIZE', 'AHB 突发长度'],
-    ['0x4100', 'CH0 起', '每通道 +0x70']
-  ];
-  regs.forEach(function (r, i) {
-    var y = 274 + i * 58;
-    txt(scene, 80, y, r[0], 'tnum');
-    txt(scene, 216, y, r[1], 't28');
-    txt(scene, 560, y, r[2], 't28w');
-  });
+function drawCcw() {
+  txt(scene, 56, 146, '命令链的最小单位是 CCW：两个字加 0–15 个 PIO 字，全部放在内存里，硬件按指针追着跑', 't24w');
+  three([80, '第一个字', ['[31:0] NEXT_COMMAND_ADDRESS', '指向下一条 CCW', '为 0 也不代表结束', '要靠 CHAIN 位判断', '必须 4/8 字节对齐', '地址错 → 取到垃圾'], 't20s'],
+        [680, '第二个字', ['[31:16] 传输字节数', '[15:12] PIO 字数（0–15）', '[2] CHAIN 有下一条', '[3] IRQ_COMPLETE', '[4] NAND_LOCK', '[5] NAND_WAIT4READY'], 't20s'],
+        [1280, '其余标志', ['[6] WAIT4ENDCMD', '[7] DECREMENT_SEMAPHORE', '[8] HALTONTERMINATE', '[1:0] COMMAND 两比特', '之后是 PIO 字 0..n', '排版错一位就全乱']]);
+  prose('第二个字是“位图 + 计数”的混合体：低 12 位全是标志，高 16 位是字节数，[15:12] 是 PIO 字数', [
+    '看手册图 15-2 的编号时要注意：它把 COMMAND 画在 bit1:0、CHAIN 在 bit2，别把“传输字节数”当成低 16 位。',
+    'PIO 字是“直接写外设寄存器”的 32 位值：写完 N 个字后，硬件才开始 DMA 搬数据，顺序不能颠倒。',
+    'NAND_LOCK 是仲裁器的锁：一旦带着它抢到总线，其它 NAND 通道就被晾着，直到某条不带 LOCK 的命令结束。',
+    '所以“最后一个原子命令”一定不要置 NAND_LOCK，否则整条链会把其它通道永久饿死 —— 这是最典型的死锁写法。',
+    'WAIT4ENDCMD 让通道等外设回 endcmd 再走下一条，用于“命令发出后要等设备真的接收”的场景。',
+    '判据：单条 CCW 的 DMA 传输结束后，CURCMDAR 应等于 NEXT_COMMAND_ADDRESS；不等就说明链断了。']);
+}
 
-  box(80, 700, 880, 78, 'var(--surface)', 'var(--guide)');
-  txt(scene, 104, 734, '通道内偏移：+0 CURCMDAR  +10 NXTCMDAR  +20 CMD', 't28w');
-  txt(scene, 104, 766, '+30 BAR  +40 SEMA  +50/+60 DEBUG 各一', 't28w');
+function drawCmdCode() {
+  txt(scene, 56, 146, '四种命令码其实是四种“动作语义”：不搬、搬进内存、搬出内存、按条件跳转', 't24w');
+  three([80, '00 不搬数据', ['只做 PIO 字写入', '常用：发命令字节', '或触发 CHECKSTATUS', '然后结束本条', '不含 DMA 传输', '最简单的“打一拍”'], 't20w'],
+        [680, '01 / 10 搬数据', ['01 DMA_WRITE：外设→内存', '10 DMA_READ：内存→外设', '长度在 CCW 高 16 位', '地址在 BUFFER_ADDRESS', '字节对齐由硬件处理', '小端 32 位对齐'], 't20s'],
+        [1280, '11 条件跳转', ['DMA_SENSE 查外设 sense 线', 'false → 走 NEXT 指针', 'true → 走 BUFFER 指针', '忽略 CHAIN 位', '两个指针都必须有效', '仅 GPMI 通道有效']]);
+  prose('“外设→内存叫 WRITE、内存→外设叫 READ”容易记反：这里的读/写是以 DMA 主设备视角命名的，不是以 CPU 视角', [
+    'NAND 读数据 = 数据从 NAND（外设）进入内存 = DMA_WRITE；NAND 写数据 = 内存→外设 = DMA_READ。',
+    '写反了不会报错，只会把数据搬向错误的方向：内存被写进垃圾，或者 NAND 收到一堆内存内容。',
+    'DMA_SENSE 是“轮询状态”的硬件化：CHECKSTATUS 把比较结果打到 sense 线，SENSE 命令据此选择下一段链。',
+    '因为没有循环指令，NAND 的“等忙”是靠“SENSE 跳回自己”形成的环，所以两个指针必须都指向有效 CCW。',
+    'DMA_SENSE 忽略 CHAIN 位：即使你把它清 0，也必须提供两个有效指针，否则一跳就飞。',
+    '判据：写一条 DMA_READ 给 NAND 发数据，读回 NAND 内容应与缓冲区一致；方向写反时读回全是 0 或旧值。']);
+}
 
-  box(1020, 168, 850, 400, 'var(--page)', 'var(--line)');
-  head(1044, 216, '第一次启动只有两步');
-  txt(scene, 1044, 266, '① 把首条描述符地址写进 NXTCMDAR', 't28w');
-  txt(scene, 1044, 306, '② 往 SEMA 写 1，通道就被调度起来', 't28w');
-  txt(scene, 1044, 346, '之后每条完成，硬件自己摘 NXTCMDAR', 't28w');
-  txt(scene, 1044, 386, '像刚跑完上一条一样，接着往下走', 't28w');
-  txt(scene, 1044, 436, 'NAND 轮询则用 NO_DMA_XFER 写 CHECKSTATUS，', 't28w');
-  txt(scene, 1044, 480, '再用 DMA_SENSE 看 sense 线决定回路还是前进', 't28w');
-  txt(scene, 1044, 520, '失败分支换成不带 CHAIN 的中断命令，立刻停', 't28w');
+function drawSema() {
+  txt(scene, 56, 146, '通道“跑不跑”由一个 8 位计数信号量决定：SEMA 非 0 才动，减到 0 就停 —— 这是软件与硬件的交接口', 't24w');
+  three([80, '启动', ['写 NXTCMDAR 指向首条 CCW', '写 SEMA += 1', '硬件开始取指执行', 'CURCMDAR 记录当前位置', '顺序：先指针后信号量', '反了就取到旧指针'], 't20s'],
+        [680, '运行中', ['每条可带 DECREMENT 位', '完成即 SEMA 减 1', '减到 0 → 进入 idle', '再写 SEMA += 1 继续', '硬件加法保证不丢', '可安全追加命令'], 't20s'],
+        [1280, '为什么这么设计', ['软件可动态追加任务', '硬件不会自己乱跑', '等于一个硬件队列', '要注意初值别设大', '设大 = 提前跑空链', '调试点：读 SEMA 与 CUR']]);
+  prose('把 SEMA 理解成“任务令牌”最直观：有几张令牌就跑几条，跑完就停，不会去猜“还有没有下一条”', [
+    '所以“写完命令链没反应”的第一嫌疑就是忘了写 SEMA（或写了 0）—— 硬件一直在 idle 等令牌。',
+    '“跑飞了取到垃圾”则是令牌给多了：SEMA 比实际命令条数多，硬件会按 NEXT 指针继续追，追到 0 地址就取非法数据。',
+    'CHAIN 位与 SEMA 是两套机制：CHAIN 决定“下一条在哪”，SEMA 决定“要不要继续跑”，两者都要对。',
+    'DECREMENT_SEMAPHORE 可以不置：那样这条命令不消耗令牌，适合“循环体内部的中间命令”。',
+    '调试时同时读 CURCMDAR（跑到哪）与 SEMA（还剩几张令牌），比在中断里打日志有效得多。',
+    '判据：写 SEMA=1 启动一条命令，完成后应见 SEMA=0、CURCMDAR 停在最后一条。']);
+}
 
-  box(1020, 594, 850, 242, 'var(--surface)', 'var(--guide)');
-  head(1044, 642, '为什么值得单独一章');
-  txt(scene, 1044, 692, '裸机写 NAND 驱动，难点几乎全在这套描述符', 't28w');
-  txt(scene, 1044, 732, '命令位配错，表现为时序乱、读回页全 0xFF', 't28w');
-  txt(scene, 1044, 772, '先把 LOCK 与 WAIT4READY 配对，再谈 ECC', 't28w');
+function drawMap() {
+  txt(scene, 56, 146, '全局寄存器在 0x00–0x5C，通道寄存器从 0x100 起、每通道 0x70；全部带 SET/CLR/TOG 别名', 't24w');
+  three([80, '全局', ['+0x00 CTRL0（复位 0xE000_0000）', '+0x10 CTRL1（通道中断状态）', '+0x20 CTRL2', '+0x30 CHANNEL_CTRL 通道使能', '+0x40 DEVSEL 通道→设备', '+0x50 BURST_SIZE（0x0055_5555）'], 't20s'],
+        [680, '每通道七个', ['+0x00 CURCMDAR 当前地址', '+0x10 NXTCMDAR 下一条', '+0x20 CMD 命令缓存', '+0x30 BAR 缓冲地址', '+0x40 SEMA 信号量', '+0x50/+0x60 DEBUG1/2'], 't20s'],
+        [1280, '通道基址', ['CH0 = 0x100', 'CH1 = 0x170', 'CH2 = 0x1E0', 'CH3 = 0x250', '步长 0x70', 'CHn = 0x100 + 0x70×n']]);
+  prose('CTRL0 复位值 0xE000_0000 高三位全 1，按 i.MX 的惯例是“软复位 + 时钟门控”默认生效，用之前必须先清', [
+    '这与其它外设一致：上电默认省电/复位，写 CTRL0_CLR 清掉对应位后才开始工作；不清就“寄存器写得进去但不动”。',
+    'CTRL1 汇总各通道的完成与错误中断状态，是写 1 清的；只清 CTRL1 不清通道内状态，会“中断来了但说不清是谁”。',
+    'DEVSEL 把通道映射到设备号：GPMI0–3 对应 4 个设备，映射错了会出现“命令发给了错的外设”。',
+    'BURST_SIZE 复位 0x0055_5555 表示每个通道默认突发为 5（单位是 4 字节拍），改大能提高吞吐但要与设备节奏匹配。',
+    '通道寄存器也带 SET/CLR/TOG 别名，写 SEMA 用 SEMA_SET（+0x44）最安全：只加不减，天然避免竞争。',
+    '判据：读 CTRL0 复位值应为 0xE000_0000；读 CH0 的 NXTCMDAR 应等于你写的首条 CCW 地址。']);
+}
+
+function drawBoard() {
+  txt(scene, 56, 146, '验证 APBH 有三个硬指标：指针在前进、字节数对得上、完成中断只来一次', 't24w');
+  three([80, '三点观察', ['CURCMDAR 逐条前进', 'SEMA 逐次减到 0', '传输完成后数据一致', '中断只来一次（IRQ_COMPLETE）', '有 HOT 则说明外设报错', '错误后必须复位通道'], 't20w'],
+        [680, '常见故障', ['SEMA 忘写 → 完全不动', 'NEXT 指针为 0 → 飞掉', 'NAND_LOCK 忘了清 → 死锁', '方向位写反 → 数据颠倒', 'CCW 未对齐 → 取指异常', '缓存未清 → 读到旧命令'], 't20w'],
+        [1280, '必须做的两件事', ['CCW 缓冲区 cache 一致', '写完 clean，改前 invalidate', 'HALTONTERMINATE 恒置 1', '让错误能终止整链', '否则外设错、DMA 还在跑', '最后同步错位']]);
+  prose('“CCW 在缓存里”是这套机制最容易被忽略的坑：DMA 看到的是内存，不是你的 cache，写完不清就等于没写', [
+    '典型现象：改了命令链但行为没变，或者“偶尔”生效 —— 因为 cache 时好时坏地回写。',
+    '正确做法：CCW 与数据缓冲都按“DMA 一致性”处理（clean/invalidate 或放在非缓存区）。',
+    'HALTONTERMINATE 建议恒置 1：外设出错时会发 HOT，DMA 终止当前命令并中断，让软件能复位通道。',
+    '不置 HOT 的后果是：外设已经报错，DMA 还按原计划继续搬，最后外设与 DMA 状态不同步，只能整块复位。',
+    '中断处理里第一步读 CTRL1 判断是完成还是错误，第二步复位通道并清状态，第三步才重新挂链。',
+    '判据：故意把 NEXT 指针写错，应看到通道停住且无完成中断；改回正确地址后应恢复正常 —— 说明指针链是活的。']);
 }
 
 function draw() {
-  var s = STEPS[state.step];
-  $('hint').textContent = s.hint;
-  $('note').textContent = s.note;
-  scene.textContent = '';
-  if (state.step === 0) drawTopo();
-  else if (state.step === 1) drawCommand();
-  else if (state.step === 2) drawBits();
-  else drawRegs();
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) drawArb();
+  else if (s === 2) drawCcw();
+  else if (s === 3) drawCmdCode();
+  else if (s === 4) drawSema();
+  else if (s === 5) drawMap();
+  else drawBoard();
 }
 
-var step = stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
-void step;
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
 zoomable(document.querySelector('.bd-stage'));
 resetButton($('reset'), function () { state.step = INIT.step; draw(); });
 fitCanvas($('viewport'), $('canvas'), draw);
 </script>
 </body>
 </html>
-
