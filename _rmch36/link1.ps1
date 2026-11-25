@@ -2,12 +2,12 @@ $root = 'D:\Workspace\MainPage'
 $la = [string][char]8592
 $ra = [string][char]8594
 $n = [int]$args[0]
-$p = Join-Path $root ("imx6ull\rm\c{0}.html" -f $n)
+$p = Join-Path $root ("imx6ull\rm\c{0:d2}.html" -f $n)
 $s = [IO.File]::ReadAllText($p)
-$prev = $n - 1
-$next = $n + 1
-$anchor = ('<a class="bd-btn" href="c{0}.html" style="text-decoration:none">' -f $prev) + $la + (' RM{0:d2}</a>' -f $prev)
-$fwd = (' <a class="bd-btn" href="c{0}.html" style="text-decoration:none">' -f $next) + ('RM{0:d2} ' -f $next) + $ra + '</a>'
+$prev = '{0:d2}' -f ($n - 1)
+$next = '{0:d2}' -f ($n + 1)
+$anchor = '<a class="bd-btn" href="c' + $prev + '.html" style="text-decoration:none">' + $la + ' RM' + $prev + '</a>'
+$fwd = ' <a class="bd-btn" href="c' + $next + '.html" style="text-decoration:none">RM' + $next + ' ' + $ra + '</a>'
 if ($s.Contains($fwd)) { "SKIP $n" }
 elseif (-not $s.Contains($anchor)) { "MISS $n" }
 else {
