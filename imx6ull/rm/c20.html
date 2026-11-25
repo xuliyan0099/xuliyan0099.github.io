@@ -2483,11 +2483,11 @@ text.bd-an-inner { font-size: var(--size-l4); }
 <div class="bd-viewport" id="viewport">
   <div class="bd-canvas" id="canvas">
     <header class="bd-titlebar">
-      <h1>第 20 章 · 增强可配置 SPI（ECSPI）</h1>
+      <h1>第 20 章 · ECSPI：FIFO 水位、四片选与收发流程</h1>
       <span class="bd-hint" id="hint"></span>
       <div class="bd-readings">
         <span class="bd-reading bd-reading-emphasis">
-          <span class="bd-reading-name">寄存器基址</span>
+          <span class="bd-reading-name">基址</span>
           <span class="bd-reading-value">0x0200_8000</span>
         </span>
         <span class="bd-reading">
@@ -2506,8 +2506,8 @@ text.bd-an-inner { font-size: var(--size-l4); }
         <button class="bd-btn" type="button" id="next"></button>
       </div>
       <div class="bd-actions">
-        <a class="bd-btn" href="c19.html" style="text-decoration:none">← RM19</a>
-<a class="bd-btn" href="c21.html" style="text-decoration:none">RM21 →</a>
+        <a class="bd-btn" href="c19.html" style="text-decoration:none">← RM19</a> <a class="bd-btn" href="c21.html" style="text-decoration:none">RM21 →</a>
+       
         <a class="bd-btn" href="index.html" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">☰ 目录</a>
         <button class="bd-btn" type="button" id="reset"></button>
       </div>
@@ -3690,6 +3690,10 @@ var STEPS = [
     note: 'CONREG 定位宽、片选、分频、通道主从和使能；CONFIGREG 定每路通道的 POL/PHA、片选极性、片选波形。两者都是「每通道一位」的位域，写之前先想清楚是哪一路。' },
   { h: '四种时序与握手', hint: 'POL/PHA · SPI_RDY',
     note: 'POL/PHA 四个组合就是 SPI mode 0–3，配错就是从机认不出数据。SS_CTL 决定一帧一拉还是多帧连续；SMC=1 写 FIFO 就发；DRCTL 让外部 SPI_RDY 决定什么时候发。' },
+  { h: 'FIFO 水位与 burst', hint: 'THRESHOLD · 64 深',
+    note: '收发各 64 条 32 位；THRESHOLD 决定“水到多少才请求 DMA/发中断”。水位设太高 → 一次搬得爽但延迟大；设太低 → 中断风暴。' },
+  { h: '四片选与多从机', hint: 'SS0–3 · 独立时序',
+    note: '四路片选可挂四颗从机，但 POL/PHA、位宽、分频都是“每通道一位”，换通道就得整组一起改；SS_CTL 决定连续拉还是分帧拉。' },
   { h: '收发流程与判据', hint: 'EN · XCH · STATREG',
     note: 'EN=0 时其余寄存器读出来全是 0、写进去也不生效，这是第一个坑。填 TXFIFO、置 XCH、等 TC 或轮询 XCH 自动清零、读 RXFIFO —— 四个动作构成一次完整交换。' }
 ];
@@ -3912,6 +3916,82 @@ function drawFlow() {
   txt(scene, 80, 760, '三条同时成立才算通：XCH 会自己清零、TC 会置、读回的字和你发的一致（或从机确实应答）。', 't20w');
 }
 
+function drawFifo() {
+  txt(scene, 56, 146, 'ECSPI 的吞吐全在 FIFO 上：64 条 32 位、收发各一，水位决定什么时候找 CPU 或 DMA 要数据', 't24w');
+
+  box(56, 176, 560, 236, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '容量');
+  txt(scene, 80, 252, 'TXFIFO 64 × 32 bit', 't20w');
+  txt(scene, 80, 288, 'RXFIFO 64 × 32 bit', 't20w');
+  txt(scene, 80, 324, '每帧 1–32 位可配', 't20w');
+  txt(scene, 80, 360, '32 位一帧时刚好 64 次交换', 't20w');
+  txt(scene, 80, 396, '满/空各有状态位', 't20w');
+
+  box(656, 176, 560, 236, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '水位（THRESHOLD）');
+  txt(scene, 680, 252, 'TX 低于阈值 → 请求填充', 't20w');
+  txt(scene, 680, 288, 'RX 高于阈值 → 请求取走', 't20w');
+  txt(scene, 680, 324, '中断与 DMA 都看这个数', 't20w');
+  txt(scene, 680, 360, '设一半（32）最常用', 't20w');
+  txt(scene, 680, 396, '设太高 → 延迟大、易欠载', 't20w');
+
+  box(1256, 176, 612, 236, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '三种搬运方式');
+  txt(scene, 1280, 252, '① 轮询：读 STATREG 的 TE/RE', 't20w');
+  txt(scene, 1280, 288, '② 中断：按水位触发', 't20w');
+  txt(scene, 1280, 360, '③ DMA：SDMA 按请求搬', 't20w');
+  txt(scene, 1280, 396, '长帧用 DMA 最省 CPU', 't20w');
+  txt(scene, 1280, 324, '短帧用轮询最简单', 't20w');
+
+  box(56, 432, 1812, 360, 'var(--surface)', 'var(--guide)');
+  head(80, 470, '水位设错的两种典型症状');
+  txt(scene, 80, 508, '症状一：数据偶发错位。TX 水位设太高，FIFO 被一次灌满后 SCKL 连续跑，中途没补上就出现空帧。', 't20w');
+  txt(scene, 80, 542, '症状二：CPU 占用 100%。水位设太低（比如 4），每 4 个字就中断一次，中断开销比搬数据还大。', 't20w');
+  txt(scene, 80, 576, '经验值：DMA 模式设 32（半满），中断模式设 16，纯轮询不需要设水位。', 't20w');
+  txt(scene, 80, 610, 'burst 长度要与水位匹配：一次 DMA 搬的字节数应是水位整数倍，否则会出现“搬一半、剩一半”。', 't20w');
+  txt(scene, 80, 644, 'SPI 是“发一个收一个”的：只发不收也会把 RXFIFO 灌满，所以读操作必须同时把假数据发出去。', 't20w');
+  txt(scene, 80, 678, '判据：连续发 1000 帧，RXFIFO 溢出位应始终为 0、TX 欠载位不应置 1。', 't20w');
+  txt(scene, 80, 712, '若溢出位置 1，先查水位与 burst 是否匹配，再查从机是否“回得比你要得慢”。', 't20w');
+}
+
+function drawMulti() {
+  txt(scene, 56, 146, '四路片选能挂四颗从机，但时分复用一条总线：谁的时序、谁的位宽，都要在换通道时一起改', 't24w');
+
+  box(56, 176, 560, 236, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '四路片选');
+  txt(scene, 80, 252, 'SS0–SS3 各一根低有效线', 't20w');
+  txt(scene, 80, 288, 'CONREG 里 CHANNEL_MODE 选当前路', 't20w');
+  txt(scene, 80, 324, '一次只有一路在动', 't20w');
+  txt(scene, 80, 360, '换路前要等上一帧结束', 't20w');
+  txt(scene, 80, 396, '别在两帧之间硬切', 't20w');
+
+  box(656, 176, 560, 236, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '每通道独立项');
+  txt(scene, 680, 252, 'POL / PHA（mode 0–3）', 't20w');
+  txt(scene, 680, 288, '位宽（1–32 bit）', 't20w');
+  txt(scene, 680, 324, '片选极性与波形', 't20w');
+  txt(scene, 680, 360, '分频是全局还是每路', 't20w');
+  txt(scene, 680, 396, '以 CONREG 位域为准', 't20w');
+
+  box(1256, 176, 612, 236, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '总线上挂多颗的坑');
+  txt(scene, 1280, 252, 'MISO 是三态，未选中的必须高阻', 't20w');
+  txt(scene, 1280, 288, '否则两颗同时驱动 → 数据打架', 't20w');
+  txt(scene, 1280, 324, '上拉/下拉决定空闲电平', 't20w');
+  txt(scene, 1280, 360, '片选间要留空隙（PERIODREG）', 't20w');
+  txt(scene, 1280, 396, '太密 → 从机来不及释放', 't20w');
+
+  box(56, 432, 1812, 360, 'var(--surface)', 'var(--guide)');
+  head(80, 470, '换通道的正确姿势');
+  txt(scene, 80, 508, '① 等 TC（当前帧结束）→ ② 改 CONREG 的通道与位宽 → ③ 改 CONFIGREG 的 POL/PHA → ④ 填 TXFIFO → ⑤ 置 XCH。', 't20w');
+  txt(scene, 80, 542, '顺序错在第①步最常见：上一帧还在发就切通道，从机会收到一串“半个时钟”的垃圾。', 't20w');
+  txt(scene, 80, 576, '若两颗从机的 mode 不同（一颗 mode0、一颗 mode3），必须整组改 POL/PHA，不能只改片选。', 't20w');
+  txt(scene, 80, 610, '分频若是全局的，两颗从机就只能共用同一个 SCLK；想各跑各的，就得用两路 ECSPI。', 't20w');
+  txt(scene, 80, 644, '用逻辑分析仪同时抓 SCLK、MOSI、SS：换通道时应该看到 SS 先高、再低，中间没有多余时钟。', 't20w');
+  txt(scene, 80, 678, '判据：切换后用示波器量未选中从机的 MISO 应为高阻（电平由上拉决定），不是被拉低。', 't20w');
+  txt(scene, 80, 712, '多从机项目里最值的投资是一份“通道表”：路号、从机、mode、位宽、分频，写死一处，别散在驱动里。', 't20w');
+}
+
 function draw() {
   while (scene.firstChild) scene.removeChild(scene.firstChild);
   var s = state.step;
@@ -3919,6 +3999,8 @@ function draw() {
   else if (s === 1) drawClock();
   else if (s === 2) drawRegs();
   else if (s === 3) drawTiming();
+  else if (s === 4) drawFifo();
+  else if (s === 5) drawMulti();
   else drawFlow();
 }
 
