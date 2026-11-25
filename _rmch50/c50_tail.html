@@ -1,0 +1,173 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0 };
+var state = { step: INIT.step };
+
+var STEPS = [
+  { h: '一根线的数字音频', hint: 'IEC60958 收发器',
+    note: '左右声道、通道状态、用户位全塞进一根双相码线里；内部只有 24 位有效。' },
+  { h: '位流长什么样', hint: '双相标记 + 64 位一帧',
+    note: '每位用两次电平跳变表达，一帧 64 位，192 帧一个 block —— C 通道就是按 block 传的。' },
+  { h: '引脚与板上接线', hint: 'GPIO1 上那两个脚',
+    note: '输入在 GPIO1_IO09、输出在 GPIO1_IO08，都是 ALT2；板上另有 SPDIF_TX 网络。' },
+  { h: '时钟链', hint: 'tx_clk 与 DPLL',
+    note: '发送靠 tx_clk 分频，接收靠 DPLL 从 SPDIF_IN 恢复时钟；LOCK 位是锁定的唯一证据。' },
+  { h: '寄存器地图', hint: '0x0200_4000',
+    note: 'SCR 管总开关，SRPC 管时钟源，SIE/SIS/SIC 管中断，SRL/SRR 收发数据。' },
+  { h: 'FIFO 与自动重同步', hint: '左右各 16 深',
+    note: '左右 FIFO 独立会走偏，硬件提供“填多少补多少”的重同步与相应中断。' },
+  { h: '软件写法与判据', hint: '成对读写',
+    note: '左右样本必须在半个采样周期内成对读写，否则重同步逻辑会把你的数据当成错位。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+function three(a, b, c) {
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(a[0], 214, a[1]); for (var i = 0; i < a[2].length; i++) txt(scene, a[0], 252 + i * 36, a[2][i], a[3] || 't20w');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(b[0], 214, b[1]); for (var j = 0; j < b[2].length; j++) txt(scene, b[0], 252 + j * 36, b[2][j], b[3] || 't20w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(c[0], 214, c[1]); for (var k = 0; k < c[2].length; k++) txt(scene, c[0], 252 + k * 36, c[2][k], c[3] || 't20w');
+}
+function prose(title, lines) {
+  wide(456, 330);
+  txt(scene, 80, 490, title, 't24');
+  for (var i = 0; i < lines.length; i++) txt(scene, 80, 522 + i * 34, lines[i], 't20w');
+}
+
+function drawTop() {
+  txt(scene, 56, 146, 'SPDIF 把整条立体声音轨压进一根线：采样值、通道状态、用户位、有效性位，全在一串双相码里', 't24w');
+  three([80, '它能做什么', ['立体声收 + 立体声发', '接收端恢复位时钟', '测出对方采样频率', '收发 C 通道状态位', '收发 U 通道用户位', '接收 Q 通道子码'], 't20w'],
+        [680, '内部只有 24 位', ['数据宽度固定 24 位', '寄存器高 8 位读回恒为 0', '写高 8 位无意义', '16 深 × 24 位 的收发 FIFO', '左右声道各一套 FIFO', 'C 通道 48 位分两个寄存器'], 't20w'],
+        [1280, '两种用法', ['当普通音频口：接 codec', '当 SPDIF 桥：直通转发', '直通不改数据只整形', '也可当作采样率测量仪', '还带环回时钟给 SAI', '低功耗可整块关掉']]);
+  prose('它和 SAI 的分工：SAI 说“多线并行、主从时钟”，SPDIF 说“一根线、自带时钟恢复”，两者常配对使用', [
+    'SAI 需要 BCLK/FS/DATA 三根以上信号线，适合板内短距离；SPDIF 只有一根线，靠双相码自带时钟信息，适合拉出去接音响。',
+    '所以常见架构是：codec 用 SAI 接，codec 的 SPDIF 输出再进这颗芯片的 SPDIF_IN —— 一条链上两种格式各管一段。',
+    '“上位 8 位读回为 0”是很实用的判据：如果你读 SRL 得到 0x00AB_CDEF 这种高字节非 0 的值，说明地址或对齐搞错了。',
+    'C 通道是“控制信息”：采样率码、声道数、是否专业格式、版权位都在里面；本模块只搬运不解释，解释要靠软件。',
+    'U 通道在 CD 模式下承载 98 符号一包的子码，非 CD 模式就只是一串用户位；两种模式由 SRCD 的 USyncMode 选。',
+    '一句话：SPDIF 不是“更好的音频接口”，而是“能跨设备、能自恢复时钟、能带控制信息”的消费级数字音频标准。']);
+}
+
+function drawBits() {
+  txt(scene, 56, 146, '双相标记编码：每个数据位都保证有一次跳变，靠“中间有没有跳”区分 0 和 1，所以时钟可以从数据里恢复', 't24w');
+  three([80, '编码规则', ['每位占两个半位时间', '位中间跳变 = 1', '位中间不跳变 = 0', '位边界必定跳变一次', '所以不会有直流分量', '接收端靠跳变锁相'], 't20w'],
+        [680, '帧结构', ['一帧 = 两个子帧', '每子帧 32 位', '前 4 位是前导码', '中间 20 位音频（24 位里截）', '末 4 位 V/U/C/P', '一帧共 64 位'], 't20w'],
+        [1280, '块与通道状态', ['192 帧 = 一个 block', 'C 通道一位一帧', '一个 block 传 192 位 C', '本模块只给出前 48 位', '前导码 B/M/W 标子帧边界', 'W 同时是 block 起点']]);
+  prose('算位率很简单：位率 = 采样率 × 64。48 kHz 就是 3.072 Mbit/s，96 kHz 就是 6.144 Mbit/s', [
+    '前导码三种：B 表示子帧 1（左）、M 表示子帧 2（右）、W 表示子帧 2 且是 block 的第一个 —— 靠它对齐 192 帧边界。',
+    '音频字段名义 24 位，但子帧里只留 20 位给它，另 4 位是 V/U/C/P；所以 SPDIF 的“24 位”是打包后的结果，不是每帧 24 个数据位。',
+    '正因为一帧只有 64 位，SPDIF 的有效音频带宽比同采样率的 I2S 低一点点 —— 差距就在这些控制位上。',
+    '直流平衡是双相码的天然属性：0 和 1 都保证单位时间内跳变次数对称，便于变压器隔离耦合（这正是 SPDIF 常用隔离变压器的原因）。',
+    '接收端恢复时钟靠 DPLL：监测跳变间隔，若跳变落在“半位”位置就是 1，落在“整位”位置就是 0，同时把相位锁到发送端。',
+    '判据：示波器上看 SPDIF_OUT，任意一位中间必有一次跳变；若看到连续两个位宽都没有中间跳变，那不是 SPDIF 波形。']);
+}
+
+function drawPins() {
+  txt(scene, 56, 146, '只有三根功能脚：输入、输出、外部时钟；另外还有锁定指示与 SR 时钟两根辅助脚', 't24w');
+  three([80, '数据脚', ['SPDIF_IN：GPIO1_IO09 ALT2', '兼 LCD_DATA08 ALT4', '兼 SD1_CLK ALT1', '兼 UART1_RX ALT6', 'SPDIF_OUT：GPIO1_IO08 ALT2', '兼 JTAG_MOD ALT4 / LCD_DATA05 ALT1'], 't20s'],
+        [680, '时钟与辅助', ['SPDIF_EXT_CLK：LCD_DATA07 ALT4', '或 NAND_DQS ALT1', 'SPDIF_LOCK：LCD_DATA06 ALT4', '锁定指示输出，可接 LED', 'SPDIF_SR_CLK：LCD_DATA04 ALT4', '给外部 ADC/DAC 的采样时钟'], 't20s'],
+        [1280, '板上接线', ['原理图有 SPDIF_TX 网络', '属于音频 codec 那一组', '与 SAI2_* 网名并列出现', '所以 codec 的 SPDIF 口接本模块', 'GPIO1_IO08/09 另作他用要避让', '与 PWM1/2 复用同两个脚']]);
+  prose('注意 GPIO1_IO08 与 GPIO1_IO09 这两个焊盘：它们同时是 PWM1_OUT 与 PWM2_OUT，也是 SPDIF 的收发脚', [
+    '这块板把 PWM1/PWM2 也引到了这两个脚上（原理图里 GPIO1_IO08/PWM1_OUT、GPIO1_IO09/PWM2_OUT），所以同一时刻只能选一个功能。',
+    'SPDIF_EXT_CLK 有两个可选焊盘：LCD_DATA07 与 NAND_DQS；后者是 NAND 的 DQS 脚，用 NAND 启动时不能占。',
+    'SPDIF_LOCK 是输出脚，可以接一颗 LED 做“已锁定”指示，调试时比读寄存器直观。',
+    'SPDIF_SR_CLK 是给外部 ADC/DAC 的采样时钟输出，用途是把恢复出来的节拍送给模拟侧，省一颗晶振。',
+    '所有这些脚都要在 IOMUXC 里把 ALT 配对，并注意 SION 位：输入脚必须开 SION 才能回读电平。',
+    '判据：配好 ALT2 后量 GPIO1_IO09 上应有双相码波形（有信号源时）；若无波形，先确认不是被 PWM2 抢了复用。']);
+}
+
+function drawClock() {
+  txt(scene, 56, 146, '发送用本地 tx_clk 分频，接收用 DPLL 从数据里恢复时钟；两套时钟可以完全不相干', 't24w');
+  three([80, '发送侧', ['源可选 REF_CLK_32K', '或 tx_clk（SPDIF0_CLK_ROOT）', '或 SPDIF_EXT_CLK', '或 ipg_clk 分频', 'TxClk_DF[6:0]：1–128', 'SYSCLK_DF[19:11]：2–512'], 't20s'],
+        [680, '接收侧', ['DPLL 跟踪 SPDIF_IN 跳变', '锁定后输出 SPDIF_RxClk', 'ClkSrc_Sel[10:7] 选源', '0000：锁定则用 RxClk', '否则回退 32 kHz', 'LOCK[6] 只读，看是否锁定'], 't20s'],
+        [1280, '算分频', ['目标位率 = fs × 64', 'TxClk_DF = 源/位率 − 1? 查表', '典型 48 kHz：3.072 MHz', '源 24.576 MHz 则 8 分频', 'SYSCLK_DF 影响内部系统节拍', '写 0 等于关时钟']]);
+  prose('分频要按“位率 = 采样率 × 64”倒推：先算想要的位率，再让 tx_clk 除到位率，别直接照抄别人的寄存器值', [
+    'TxClk_DF 的字段语义是“分频因子 1–128”，写 0 表示 1 分频、写 1 表示 2 分频，与 I2S 那套“写减一”一致。',
+    'SYSCLK_DF 是内部系统时钟分频（2–512），影响 FIFO 与状态机的节拍，不直接决定输出位率，但配错会让 FIFO 吞吐跟不上。',
+    'ClkSrc_Sel 的设计很巧：0000 表示“锁定就用恢复时钟，没锁定就退回 32 kHz”——这让系统在没接信号时也能跑，接上后自动切换。',
+    'SPDIF_EXT_CLK 存在的意义是“外部同步”：多台设备共用一个时钟时，用它保证双方位率严格一致，避免慢慢累积漂移。',
+    'DPLL 的锁定不是瞬时的：上电或换源后要给它时间，期间 LOCK 位为 0；此时读数据会得到垃圾，必须等锁定。',
+    '判据：LOCK=1 且 SRFM 的频率读数稳定在你的预期（如 48000），才算时钟链通了；LOCK 抖动说明输入信号质量差或增益选错。']);
+}
+
+function drawMap() {
+  txt(scene, 56, 146, '0x0200_4000 起：前 0x40 是控制与状态，0x50 是发送时钟；每个寄存器都只有低 24 位有效', 't24w');
+  three([80, '控制与中断', ['+0x00 SCR 总配置（复位 0x0400）', '+0x04 SRCD CD/U 通道模式', '+0x08 SRPC 时钟源（复位 0）', '+0x0C SIE 中断使能', '+0x10 SIS 状态 / SIC 写 1 清', '+0x14 起是收发数据寄存器'], 't20s'],
+        [680, '数据与状态', ['+0x14 SRL 左声道读', '+0x18 SRR 右声道读', '+0x1C SRCSH C 通道高 24 位', '+0x20 SRCSL C 通道低 24 位', '+0x24 SRU 用户位 / +0x28 SRQ', '+0x2C STL / +0x30 STR 发送数据'], 't20s'],
+        [1280, '其余', ['+0x34/+0x38 发送 C 通道', '+0x44 SRFM 频率测量', '+0x50 STC 发送时钟（复位 0x00020F00）', 'SIS 复位值 0x2 = TxEm 置起', 'SIS 与 SIC 共用地址 0x10', '读得到状态、写就是清']]);
+  prose('SCR 的位排布值得单独记：低两位选 U 通道来源，[4:2] 选发送模式，[23:15] 全是 FIFO 的开关与水位', [
+    'SCR[1:0] USrc_Sel：00 不嵌 U 通道、01 用接收块的 U 通道、11 用片上发送器；[4:2] TxSel：000 关并输出 0、001 直通输入、101 正常发送。',
+    'SCR[5] ValCtrl 决定“发出去的 V 位恒 1 还是恒 0”，正常音频应为 0（V=0 表示样本有效）。',
+    'SCR[11:10] TxFIFO_Ctrl：00 发数字零、01 正常、10 复位到只剩 1 样本 —— 想要“静音但不停止时钟”就用 00。',
+    'SCR[9]/[8] 分别是接收/发送 DMA 请求使能：置上后 FIFO 满/空会自动向 DMA 发请求，CPU 不必轮询。',
+    'SIS 与 SIC 同地址是常见设计：读 0x10 得到状态，写 0x10 就是清对应位；复位值 0x2 说明“发送 FIFO 空”默认成立。',
+    '判据：写 SCR 后回读，[4:2] 应为 101、[0] 按需；若回读为 0，说明模块时钟没开（ipg_clk 门控在 CCM 里）。']);
+}
+
+function drawFifo() {
+  txt(scene, 56, 146, '左右两个 FIFO 各 16 深：它们独立推进，硬件提供“满水位报警 + 自动重同步”来防止左右错位', 't24w');
+  three([80, '水位可配', ['RxFIFOFull_Sel[20:19]', '00：1 样本就报满', '01：4 样本 / 10：8 / 11：16', 'TxFIFOEmpty_Sel[16:15]', '00：0 样本报空', '01–11：4/8/12 样本报空'], 't20s'],
+        [680, '自动重同步', ['RxAutoSync[18] / TxAutoSync[17]', '开启后比较左右填充数', '不等就把右 FIFO 指针对齐到左', '并置 RxFIFOResyn/TxResyn', '任何 CPU 读写都会让它退回 Off', '读左后读右才进入 On'], 't20w'],
+        [1280, '中断位（SIE/SIS）', ['[0] RxFIFOFul，[1] TxEm', '[2] LockLoss，[3] RxFIFOResyn', '[4] RxFIFOUnOv', '[5] UQErr，[6] UQSync', '[20] Lock']]);
+  prose('重同步状态机的“Off”是常态：它对 CPU 的每一次读写都清零，所以你越是成对地读，它越不会乱动指针', [
+    '状态机三段：Off（不工作）→ Standby（读到/写了左样本）→ On（读到/写了右样本才算完成一对），然后比较左右填充数。',
+    '这就解释了手册的软件规则：读写左之后必须紧接着读写右（差距不超过半个采样周期），否则它会以为你只处理了一侧。',
+    '另一半规则是“至少 2 个样本一起处理”：因为重同步逻辑可能在你最后一次读写后一拍才动作，成批处理留出余量。',
+    'full 的判据是“左右都满”，不是“任一侧满”；所以读到 full 中断时，两个 FIFO 里都至少有 FullSel 那么多数据。',
+    'underrun/overrun 只要任一侧发生就置位，且硬件会做“对称丢弃”：一侧溢出时，另一侧的下一拍也不写入，避免左右永久错位。',
+    '判据：连续采 1 分钟，RxFIFOResyn 应为 0；若频繁置位，先查软件是否成对读写，再查 FullSel 是否设得过高导致来不及取。']);
+}
+
+function drawWrite() {
+  txt(scene, 56, 146, '软件侧只有三件事：选源与时钟、配 FIFO 与中断、成对读写样本；剩下全靠硬件恢复时钟', 't24w');
+  three([80, '发送最小步骤', ['① CCM 开 SPDIF 时钟', '② IOMUXC 配 ALT2', '③ STC 选源与分频', '④ SCR.TxSel = 101', '⑤ STCSCH/CSL 写 C 通道', '⑥ 写 STL/STR，等 TxEm'], 't20s'],
+        [680, '接收最小步骤', ['① SCR 开 Rx FIFO', '② SRPC 选恢复时钟源', '③ SRCD 选 U 通道模式', '④ SIE 开 RxFIFOFul 中断', '⑤ 等 SRPC.LOCK=1', '⑥ 读 SRFM 验采样率'], 't20w'],
+        [1280, '判据三条', ['LOCK=1 且稳定', 'SRFM 读数 = 采样率', 'C 通道读回与源一致', '示波器见中间跳变', '长时间无 Resyn 中断', '数据高位字节为 0']]);
+  prose('最容易误判的一条：SPDIF 正常但“没有声音”，往往不是数据错，而是 C 通道里的采样率码与声道码没写对，接收端拒绝解码', [
+    'C 通道前 24 位包含“专业/消费格式”“采样率码”“声道数”等；写错了，下游 DAC 会静音或按错误采样率解码（表现为音调不对）。',
+    '发送必须写 STL 与 STR 两个寄存器，缺一个就只有一个声道；写顺序无所谓，但必须成对且时间接近。',
+    '接收读 SRL/SRR 也要成对：先读左再读右，或先右再左都行，但同一批样本要在半个采样周期内完成，配合自动重同步才不出错。',
+    '想检测“信号有没有”而不读数据：看 LOCK 位与 SIS 的 LockLoss 中断；想测“对方采样率”：读 SRFM 并换算。',
+    '低功耗场景直接写 SCR[13] LOW_POWER 把整块关掉，比逐位关 FIFO 干净；唤醒后要重新走一遍锁定流程。',
+    '判据：示波器量 SPDIF_OUT 的位宽应对应 3.072 Mbit/s（48 kHz），同时读回 STC 的分频值与你的计算一致；两者不符就回查时钟源。']);
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) drawBits();
+  else if (s === 2) drawPins();
+  else if (s === 3) drawClock();
+  else if (s === 4) drawMap();
+  else if (s === 5) drawFifo();
+  else drawWrite();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () { state.step = INIT.step; draw(); });
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>
