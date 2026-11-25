@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RM55 通用异步收发器 UART</title>
+<title>RM 第 55 章 · 串口 UART | i.MX6ULL 逐章解读</title>
 <style>/* 白板互动教学设计系统 · 样式。由 scripts/inline.py 整段拼进页面，不要手抄或删减。
  * 页面的全部颜色、字号、间距、圆角、阴影只在 :root 定义；改主题只改这一段。 */
 
@@ -2469,30 +2469,30 @@ text.bd-an-inner { font-size: var(--size-l4); }
   <symbol id="i-reset" viewBox="0 0 24 24"><title>重置</title><path d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5M4.5 4v4.5H9"/></symbol>
   <symbol id="i-prev" viewBox="0 0 24 24"><title>上一步</title><path d="M15 5l-7 7 7 7"/></symbol>
   <symbol id="i-next" viewBox="0 0 24 24"><title>下一步</title><path d="M9 5l7 7-7 7"/></symbol>
-  <symbol id="i-close" viewBox="0 0 24 24"><title>收起</title><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><title>关闭</title><path d="M6 6l12 12M18 6L6 18"/></symbol>
   <symbol id="i-explain" viewBox="0 0 24 24"><title>讲解</title><path d="M3 5.5c3-1 6-.8 9 1 3-1.8 6-2 9-1V19c-3-1-6-.8-9 1-3-1.8-6-2-9-1zM12 6.5V20"/></symbol>
   <symbol id="i-correct" viewBox="0 0 24 24"><title>正确</title><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
   <symbol id="i-wrong" viewBox="0 0 24 24"><title>错误</title><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
-  <symbol id="i-alert" viewBox="0 0 24 24"><title>越界</title><path d="M12 4l9 16H3zM12 10v4.5M12 17.6v.1"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><title>注意</title><path d="M12 4l9 16H3zM12 10v4.5M12 17.6v.1"/></symbol>
   <symbol id="i-drag" viewBox="0 0 24 24"><title>拖动</title><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></symbol>
-  <symbol id="i-speak" viewBox="0 0 24 24"><title>发音</title><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+  <symbol id="i-speak" viewBox="0 0 24 24"><title>朗读</title><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
   <symbol id="i-fullscreen" viewBox="0 0 24 24"><title>全屏</title><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
-  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>退出全屏</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
+  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>RM 第 17 章 · NAND 纠错加速器 BCH | i.MX6ULL 逐章解读</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
 </svg>
 
 <div class="bd-viewport" id="viewport">
   <div class="bd-canvas" id="canvas">
     <header class="bd-titlebar">
-      <h1 class="bd-title">第 55 章 · 串口 UART</h1>
+      <h1>第 55 章 · 通用异步收发器（UART）</h1>
       <span class="bd-hint" id="hint"></span>
       <div class="bd-readings">
         <span class="bd-reading bd-reading-emphasis">
-          <span class="bd-reading-name">实例</span>
-          <span class="bd-reading-value">8 路</span>
+          <span class="bd-reading-name">UART 实例</span>
+          <span class="bd-reading-value">8 个</span>
         </span>
         <span class="bd-reading">
-          <span class="bd-reading-name">FIFO</span>
-          <span class="bd-reading-value">32 字节</span>
+          <span class="bd-reading-name">寄存器宽度</span>
+          <span class="bd-reading-value">16 位</span>
         </span>
       </div>
     </header>
@@ -2506,6 +2506,7 @@ text.bd-an-inner { font-size: var(--size-l4); }
         <button class="bd-btn" type="button" id="next"></button>
       </div>
       <div class="bd-actions">
+        <a class="bd-btn" href="c54.html" style="text-decoration:none">← RM54</a> <a class="bd-btn" href="c56.html" style="text-decoration:none">RM56 →</a>
         <a class="bd-btn" href="index.html" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">☰ 目录</a>
         <button class="bd-btn" type="button" id="reset"></button>
       </div>
@@ -3627,6 +3628,259 @@ function reader(root, sentences, opts) {
   };
 }
 </script>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
 <script>
 var $ = function (id) { return document.getElementById(id); };
 var OX = 24, OY = 96;
@@ -3637,10 +3891,22 @@ var INIT = { step: 0 };
 var state = { step: INIT.step };
 
 var STEPS = [
-  { h: '1 / 4 八路串口，各挂 0xC0 字节', hint: '地址不连续，别按顺序推', note: '八路 UART 的寄存器布局完全一致，换一路只是换基址，代码不用重写。' },
-  { h: '2 / 4 波特率是算出来的，不是配出来的', hint: '模块时钟 → 16 倍过采样', note: 'UBMR 永远写「除数减一」；忘了减一，实测波特率会差一点点，长帧就错位。' },
-  { h: '3 / 4 一帧数据怎么进出 FIFO', hint: '写 UTXD 就发，读 URXD 就收', note: '收发都不需要搬指针，FIFO 自己排队；你只管看 RRDY 和触发水位。' },
-  { h: '4 / 4 上电顺序与三个必踩的坑', hint: 'UARTEN 最后开', note: '先开 UARTEN 再改波特率，第一帧一定废；这是裸机调试最常见的顺序错误。' }
+  { h: '八个串口，一张表', hint: '地址先记牢',
+    note: 'UART1–8 分散在三处地址窗口，写驱动第一件事就是把实例到基址的表列出来。' },
+  { h: '偏移不是连续的', hint: '0x00 / 0x40 / 0x80',
+    note: '接收与发送各占一个 0x40 的槽，中间全是空洞，误碰就是传输错误。' },
+  { h: '波特率是一个比值', hint: 'UBIR 与 UBMR',
+    note: 'BRM 用分数分频：波特率 = 参考时钟/(16 × (UBMR+1)/(UBIR+1))，两个都要写减一。' },
+  { h: '帧格式', hint: 'UCR2 决定 8N1',
+    note: '数据位、停止位、校验、流控都在这一个寄存器里，复位值不是“能用”的配置。' },
+  { h: 'FIFO 与触发', hint: 'UFCR 三件事',
+    note: '发送阈值、接收阈值、参考时钟分频；阈值决定中断多久来一次，直接影响延迟。' },
+  { h: '状态与错误', hint: '写 1 清',
+    note: '有没有数据、发完没有、溢出没有，全在 USR1/USR2；错误位都是写 1 清。' },
+  { h: '初始化顺序', hint: '软复位先行',
+    note: '先 SRST 再配参数，否则写到一半的配置会被状态机吃掉，表现为“配了没用”。' },
+  { h: '板上判据', hint: '先回环再外接',
+    note: '短接 TX/RX 自发自收，是最快的自检；再用示波器量位宽确认波特率真的对。' }
 ];
 
 function txt(parent, x, y, s, cls, anchor) {
@@ -3649,239 +3915,153 @@ function txt(parent, x, y, s, cls, anchor) {
 function box(x, y, w, h, fill, stroke, sw) {
   return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
 }
-function arrow(x1, y1, x2, y2) {
-  svgEl(scene, 'line', { x1: x1, y1: y1, x2: x2, y2: y2, stroke: 'var(--text-2)', 'stroke-width': 4 });
-  var a = Math.atan2(y2 - y1, x2 - x1), L = 18, W = 9;
-  svgEl(scene, 'path', {
-    d: 'M' + x2 + ' ' + y2 + ' L' + (x2 - L * Math.cos(a) + W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) - W * Math.cos(a)) +
-      ' L' + (x2 - L * Math.cos(a) - W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) + W * Math.cos(a)) + ' Z',
-    fill: 'var(--text-2)', stroke: 'none'
-  });
-}
 function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+function three(a, b, c) {
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(a[0], 214, a[1]); for (var i = 0; i < a[2].length; i++) txt(scene, a[0], 252 + i * 36, a[2][i], a[3] || 't20w');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(b[0], 214, b[1]); for (var j = 0; j < b[2].length; j++) txt(scene, b[0], 252 + j * 36, b[2][j], b[3] || 't20w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(c[0], 214, c[1]); for (var k = 0; k < c[2].length; k++) txt(scene, c[0], 252 + k * 36, c[2][k], c[3] || 't20w');
+}
+function prose(title, lines) {
+  wide(456, 330);
+  txt(scene, 80, 490, title, 't24');
+  for (var i = 0; i < lines.length; i++) txt(scene, 80, 522 + i * 34, lines[i], 't20w');
+}
 
 function drawTop() {
-  txt(scene, 56, 146, '八路实例、同一套寄存器、两种时钟各管一半', 't28w');
+  txt(scene, 56, 146, 'UART 是最“老派”也最不可少的外设：八个实例，十六位寄存器，一颗 16 倍过采样时钟', 't24w');
+  three([80, '实例与基址', ['UART1  0x0202_0000', 'UART2  0x021E_8000', 'UART3  0x021E_C000', 'UART4  0x021F_0000', 'UART5  0x021F_4000', 'UART6  0x021F_C000'], 't20s'],
+        [680, '还有两个', ['UART7  0x0201_8000', 'UART8  0x0228_8000', '每个实例占 0x4000 空间', 'UART1 常作调试口', 'UART3/5 常用作外设', '先按板子原理图定用途'], 't20s'],
+        [1280, '访问规则', ['全部寄存器是 16 位', 'ONEMS 是 24 位例外', '32 位写：高半字被丢弃', '32 位读：高半字返回 0', '空地址访问 → 传输错误', '别用 memcpy 整块拷']]);
+  prose('本板最常用的就是 UART1：上电 115200 8N1 打日志，所有调试都靠它，因此这一章的每个细节都能在板上验证', [
+    '32 位访问的“高半字被丢弃”很容易踩坑：如果你用 32 位写去同时改两个 16 位寄存器，第二个改动会静默丢失。',
+    'RX 与 TX 之间有大段空洞（0x04–0x3F），访问这段会直接产出传输错误 —— 这反而是好事：地址算错会当场报错，不会静默写坏别的寄存器。',
+    '每个实例占 0x4000 空间，但实际只用了前 0xBC，所以“基址 + 偏移”写法比“结构体整块映射”更安全。',
+    'UART 的时钟来自 CCM 的 uart_clk_root，改波特率前先确认这一路的频率，否则算出来的分频值全错。',
+    'UART1 与 UART2 在部分引脚上与其他外设复用，改引脚复用（IOMUXC）时要确认 ALT 模式号，别把调试串口自己关掉。',
+    '一句话：先把八个基址抄进头文件，再谈寄存器，否则后面每一章都会写错地址。']);
+}
 
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '八个基址，跨度很大');
-
-  var inst = [
-    ['UART1', '0x0202_0000'], ['UART2', '0x021E_8000'],
-    ['UART3', '0x021E_C000'], ['UART4', '0x021F_0000'],
-    ['UART5', '0x021F_4000'], ['UART6', '0x021F_C000'],
-    ['UART7', '0x0201_8000'], ['UART8', '0x0228_8000']
-  ];
-  inst.forEach(function (r, i) {
-    var x = 80 + (i % 2) * 440;
-    var y = 276 + Math.floor(i / 2) * 46;
-    txt(scene, x, y, r[0], 't28');
-    txt(scene, x + 130, y, r[1], 'tnum');
-  });
-
-  box(80, 468, 860, 116, 'var(--surface)', 'var(--guide)');
-  txt(scene, 104, 508, 'module_clock（UART_CLK）→ 只决定波特率', 't28w');
-  txt(scene, 104, 548, 'ipg_clk → 寄存器读写，随 DVFS 变频也不影响收发', 't28w');
-
-  box(80, 604, 860, 176, 'var(--page)', 'var(--line)');
-  head(104, 648, '支持的三种帧格式');
-  txt(scene, 104, 692, 'NRZ 异步：普通串口，8N1 那一套', 't28w');
-  txt(scene, 104, 728, 'RS485 9 位：第 9 位当地址/数据标志', 't28w');
-  txt(scene, 104, 764, 'IrDA SIR：低速红外，上限 115.2 kbit/s', 't28w');
-
-  box(1020, 168, 850, 300, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '每路都带 32 字节双 FIFO');
-  txt(scene, 1044, 264, '发送 FIFO 32 深，接收 FIFO 32 深', 't28w');
-  txt(scene, 1044, 304, '收满不取 → 溢出置 OR，新数据被丢', 't28w');
-  txt(scene, 1044, 344, '触发水位由 UFCR 的 TXTL / RXTL 定', 't28w');
-  txt(scene, 1044, 384, '两路都能挂 DMA 请求，适合整包搬运', 't28w');
-  txt(scene, 1044, 424, '地址跨度大：从 0x0201_8000 到 0x0228_8000', 't28w');
-
-  box(1020, 500, 850, 296, 'var(--page)', 'var(--line)');
-  head(1044, 548, '偏移 0x00 – 0xB8，共 12 个寄存器');
-  var regs = [
-    ['+0x00 URXD / +0x40 UTXD', '收一个 / 发一个'],
-    ['+0x80 UCR1 – +0x8C UCR4', '四个控制寄存器'],
-    ['+0x90 UFCR', '水位与参考时钟分频'],
-    ['+0x94 USR1 / +0x98 USR2', '状态与标志'],
-    ['+0xA4 UBIR / +0xA8 UBMR', '波特率分子与分母'],
-    ['+0xB4 UTS / +0xB8 UMCR', '自测与 RS485']
-  ];
-  regs.forEach(function (r, i) {
-    var y = 592 + i * 34;
-    txt(scene, 1044, y, r[0], 'tnum');
-    txt(scene, 1460, y, r[1], 't28w');
-  });
+function drawMap() {
+  txt(scene, 56, 146, '七个关键偏移：0x00 收、0x40 发、0x80–0x8C 四个控制、0x90 FIFO、0x94/0x98 状态，其余是波特率与测试', 't24w');
+  three([80, '收发与控制', ['+0x00 URXD（只读）', '+0x40 UTXD（只写）', '+0x80 UCR1 复位 0x0000', '+0x84 UCR2 复位 0x0001', '+0x88 UCR3 复位 0x0700', '+0x8C UCR4 复位 0x8000'], 't20s'],
+        [680, 'FIFO 与状态', ['+0x90 UFCR 复位 0x0801', '+0x94 USR1（含状态位）', '+0x98 USR2（含状态位）', '+0x9C UESC 转义序列', '+0xA0 UTIM 老化定时', '+0xAC UIPCR 脉冲检测'], 't20s'],
+        [1280, '波特率与自测', ['+0xA4 UBIR 增量分子', '+0xA8 UBMR 模分母', '+0xB0 UTS 测试寄存器', '+0xB4 UBRC 实际分频（只读）', '+0xB8 ONEMS 1 ms 计数（24 位）', '0xBC 之后为空']]);
+  prose('UTS 与 UBRC 是这套 UART 的“自测插座”：UTS 可把收发内部串起来，UBRC 直接告诉你硬件算出来的分频值', [
+    '调试波特率不对时，先读 UBRC：它反映的是硬件实际用的分频，与你写的 UBIR/UBMR 对不对得上，一眼就能看出“写没写进去”。',
+    'UTS 提供内部回环：不用短接引脚就能自发自收，适合在板上验证“控制器本身好使”，把引脚问题排除掉。',
+    'UESC 与转义序列（比如 IrDA 的 BOF）相关；普通串口不用碰，误配可能把正常字节当转义序列吃掉。',
+    'UTIM 是老化定时器（aging timer），用于在没有新数据时提前触发接收中断，避免“最后几个字节卡在 FIFO 里等阈值”。',
+    'ONEMS 是 24 位，计算方式为“内部参考频率 ÷ 1000”，用于把时间换算成计数；32 位访问时最高字节读回 0。',
+    '判据：写 UBIR 再写 UBMR 后读 UBRC，其值应与预期分频一致；不一致说明顺序错了（没按 UBIR 先写）。']);
 }
 
 function drawBaud() {
-  txt(scene, 56, 146, '从模块时钟到采样点：两级分频，最后乘 16', 't28w');
-
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '时钟链只有三级');
-
-  box(200, 246, 600, 72, 'var(--surface)', 'var(--line)', 2);
-  txt(scene, 224, 290, 'module_clock', 't28');
-  txt(scene, 470, 290, '来自 CCM', 't28w');
-
-  arrow(500, 320, 500, 356);
-
-  box(200, 358, 600, 72, 'var(--surface)', 'var(--line)', 2);
-  txt(scene, 224, 402, 'RFDIV：÷1 – ÷6', 't28');
-  txt(scene, 540, 402, 'UFCR[9:7]', 'tnum');
-
-  arrow(500, 432, 500, 468);
-
-  box(200, 470, 600, 72, 'var(--surface)', 'var(--observe-line)', 4);
-  txt(scene, 224, 514, 'ref_clk', 't28');
-  txt(scene, 480, 514, 'BRM 的输入', 't28w');
-
-  arrow(500, 544, 500, 580);
-
-  box(200, 582, 600, 84, 'var(--page)', 'var(--observe-line)', 4);
-  txt(scene, 224, 618, 'brm_clk = 16 × baud', 't28');
-  txt(scene, 224, 650, '接收端在每个位时间中间采 16 次', 't28w');
-
-  txt(scene, 80, 712, '最高速率就是 module_clock ÷ 16，没有别的上限', 't28w');
-  txt(scene, 80, 752, '66.5 MHz 的模块时钟 → 4.15 Mbit/s', 't28w');
-
-  box(1020, 168, 850, 330, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '整数分频就用这个式子');
-  txt(scene, 1044, 262, 'baud = ref_clk ÷ (16 × (UBMR + 1))', 't28');
-  txt(scene, 1044, 302, 'UBIR 写 0x000F，表示分子是 16', 't28w');
-  txt(scene, 1044, 342, 'UBMR 写「除数 − 1」，绝不能写原值', 't28w');
-  txt(scene, 1044, 388, '例：80 MHz、115200', 't28');
-  txt(scene, 1044, 428, '除数 = 80M ÷ (16 × 115200) = 43.4', 't28w');
-  txt(scene, 1044, 468, '→ UBMR = 42 或 43，误差 0.9% 以内', 't28w');
-
-  box(1020, 530, 850, 266, 'var(--page)', 'var(--line)');
-  head(1044, 578, '两个常被忽略的约束');
-  txt(scene, 1044, 626, '外设时钟不再要求 ≥16 倍波特率，但模块时钟要', 't28w');
-  txt(scene, 1044, 666, 'IrDA 跑 115.2 k，模块时钟至少 1.8432 MHz', 't28w');
-  txt(scene, 1044, 706, '自动波特率：置 UCR1.ADBR，收到 A/a 锁定', 't28w');
-  txt(scene, 1044, 746, '锁定后 UBRC 存实测值，UBMR = UBRC − 1', 't28w');
+  txt(scene, 56, 146, '波特率不是“除一个整数”，而是 BRM 生成一个分数比值：分子 UBIR、分母 UBMR', 't24w');
+  three([80, '公式', ['Baud = Ref / (16 × r)', 'r = (UBMR+1)/(UBIR+1)', '16 是过采样倍数', 'Ref 是 RFDIV 之后的时钟', '两个寄存器都写“减一”', '写 0 会除零，必须避开'], 't20s'],
+        [680, '整数解（80 MHz）', ['目标 115200', 'r = 80e6/(16×115200) ≈ 43.40', '取整 43 → UBMR=42', 'UBIR=0x0F（即 16）', '实际 116279，误差 +0.94%', '短帧可用，长帧会累积'], 't20s'],
+        [1280, '分数解（80 MHz）', ['取 r = 43403/1000', 'UBIR = 999（0x3E7）', 'UBMR = 43402（0xA99A）', '实际 115200.4，误差 4 ppm', '代价是两个 16 位值都要算', '推荐用于 115200 以上']]);
+  prose('误差为什么要算：UART 是异步的，收发双方各自用自己的时钟采样，累计 10 位就可能错位，通常要求误差 < 2%', [
+    '整数解在 115200 上 +0.94% 还勉强能用，但换成 921600 就会明显累积；分数解能把误差压到几十 ppm，代价只是多两个除法。',
+    '算分数解的方法：把 r 化成分数 r ≈ N/D（连分数或直接按 1/1000 精度取），然后 UBIR = D−1、UBMR = N−1。',
+    '注意 UBMR 只有 16 位（最大 65535），所以 N 不能随意取大；80 MHz 下 115200 用 1000 作分母正好塞得下。',
+    '写寄存器的顺序是硬要求：必须先 UBIR 后 UBMR，硬件在写 UBMR 的那一刻才把两个值一起生效。',
+    '若参考时钟被 RFDIV 分过频，公式里的 Ref 要用“分频之后”的频率；很多人算错就是漏了这一步。',
+    '判据：读 UBRC 得到硬件实际分频，再反推波特率；同时用示波器量一位宽度（115200 时约 8.68 µs），两者一致才算对。']);
 }
 
 function drawFrame() {
-  txt(scene, 56, 146, '一帧就是一条流水线：起始、数据、校验、停止', 't28w');
+  txt(scene, 56, 146, '8N1 不是默认值，是你要显式配出来的：UCR2 的复位值 0x0001 只是“软复位在跑”', 't24w');
+  three([80, 'UCR2 关键位', ['[0] SRST 软复位（自清）', '[1] RXEN 接收使能', '[2] TXEN 发送使能', '[5] WS 字长（0=8 位）', '[6] STPB 停止位（0=1 位）', '[7] PROE / [8] PREN 校验'], 't20s'],
+        [680, '流控与其它', ['[10] IRTS 忽略 RTS', '[11] CTSC CTS 控制发送', '[12] CTS 当前 CTS 状态', '[14] RTSEN 硬件流控', '[15] ATEN 自动波特率', '8N1 就是只置 RXEN/TXEN'], 't20s'],
+        [1280, '帧长怎么算', ['1 起始 + 数据位 + 校验 + 停止', '8N1 = 10 位/字节', '115200 → 11520 字节/秒', '理论值，实际受 FIFO 与中断影响', '9 位模式要开多机位', '校验位会多吃一位时间']]);
+  prose('把 8N1 的寄存器值算出来更实用：只置 RXEN 与 TXEN，其余全 0，于是 UCR2 = 0x0006（软复位已自清）', [
+    '若加偶校验：PREN=1、PROE=1 → 帧变 11 位，吞吐降到 10472 字节/秒，这一点在高速日志里能明显看出来。',
+    '若用 2 位停止位：STPB=1，用于老式设备或长线，代价同样是帧变长。',
+    'SRST 是自清的：写 1 后等它读回 0，再配其它位；不等就直接配，可能被软复位冲掉。',
+    '流控要成对：RTSEN 表示本机输出 RTS 控制对方，CTSC 表示本机按对方 CTS 决定能不能发；只开一半会出现“发不出去”或“一直发”。',
+    '9 位模式用于多机（如 RS485 地址帧），i.MX 的 UART 支持通过 UCR3/UCR4 配置唤醒与地址检测，普通点对点通信不需要。',
+    '判据：写 UCR2 后读回应为 0x0006（8N1）；若读到 bit0 仍为 1，说明软复位尚未完成，此时一切配置都不可靠。']);
+}
 
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '8N1 的一帧');
+function drawFifo() {
+  txt(scene, 56, 146, '32 字节 FIFO 是缓冲，阈值是“什么时候叫醒 CPU”：这两个数决定延迟与中断频率', 't24w');
+  three([80, 'UFCR 三段', ['[15:10] TXTL 发送阈值', '[9:7] RFDIV 参考时钟分频', '[6] DCEDTE DCE 模式', '[5:0] RXTL 接收阈值', '复位 0x0801', 'TXTL=2、RXTL=1、RFDIV=000'], 't20s'],
+        [680, '阈值怎么选', ['RXTL=1：每字节中断', '延迟最低、中断最多', 'RXTL=8：8 字节一批', '吞吐高、延迟变大', '高速日志建议 4–8', '交互命令建议 1–2'], 't20w'],
+        [1280, 'RFDIV 编码', ['101 = 除 1', '100 = 除 2', '011 = 除 3', '010 = 除 4', '001 = 除 5', '000 = 除 6（递减编码）']]);
+  prose('RXTL 是“水位线”：FIFO 里数据达到这个字节数才置 RRDY/RDR，不到就等，或者等老化定时器兜底', [
+    '所以 RXTL 设得大，最后一个不满水位的字节会一直不触发中断 —— 这就是为什么要配 aging timer（UTIM）。',
+    'TXTL 是“低水位”：FIFO 空到这个程度才请求下一批数据；设得大，会提前要数据，适合 CPU 忙、想攒批的场景。',
+    'FIFO 满而 CPU 没取走 → ORE（溢出）置位，且是写 1 清；一旦溢出，丢的是“新来的”还是“旧的”取决于实现，别指望它保证。',
+    'RFDIV 是递减编码（101 除 1、100 除 2……），不是二进制值，这一点与常见分频器相反，写错会导致波特率整体偏 2–6 倍。',
+    'DCEDTE 只在数据终端设备（DCE）方向使用，做 USB 转串口类应用才需要，普通板级通信保持 0。',
+    '判据：RXTL 设 8 后连续发 7 个字节，应“没有中断”；发第 8 个才进中断，说明阈值生效。']);
+}
 
-  box(80, 250, 96, 84, 'var(--page)', 'var(--observe-line)', 4);
-  txt(scene, 96, 302, '起始', 't28');
-  txt(scene, 88, 360, '0', 'tnum');
-
-  var i;
-  for (i = 0; i < 8; i++) {
-    box(182 + i * 70, 250, 66, 84, 'var(--surface)', 'var(--line)', 2);
-    txt(scene, 197 + i * 70, 302, 'D' + i, 't28');
-  }
-
-  box(748, 250, 76, 84, 'var(--page)', 'var(--line)', 2);
-  txt(scene, 762, 302, '校验', 't28');
-  box(828, 250, 76, 84, 'var(--page)', 'var(--observe-line)', 4);
-  txt(scene, 842, 302, '停止', 't28');
-
-  txt(scene, 80, 394, '起始位下降沿把接收端唤醒，之后每 16 个 brm_clk 采一次', 't28w');
-  txt(scene, 80, 434, '采到第 8 个采样点正好在位中央，所以时钟漂移能容忍一半', 't28w');
-
-  box(80, 470, 860, 148, 'var(--surface)', 'var(--guide)');
-  head(104, 514, '帧长由 UCR2 三个位说清');
-  txt(scene, 104, 556, 'WS 数据位宽（0 = 8 位），STPB 停止位（0 = 1 位）', 't28w');
-  txt(scene, 104, 594, 'PREN 开校验，PROE 选奇偶：0 偶 1 奇', 't28w');
-
-  box(80, 634, 860, 146, 'var(--page)', 'var(--line)');
-  txt(scene, 104, 676, '写 UTXD 一字节 → 进发送 FIFO，硬件自己移位输出', 't28w');
-  txt(scene, 104, 714, 'USR1.RRDY = 1 表示接收 FIFO 里至少有一个字节', 't28w');
-  txt(scene, 104, 752, 'USR1.TXDC = 1 表示移位器已空，最后一帧真的上过线', 't28w');
-
-  box(1020, 168, 850, 300, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '三个标志决定你写不写');
-  var flags = [
-    ['USR1.RRDY', 'FIFO 里有数据，读 URXD 取走'],
-    ['USR1.TXDC', '发送彻底完成，可以关时钟'],
-    ['USR2.TXFE', '发送 FIFO 空了，还能再灌'],
-    ['USR1.PARITYERR', '校验错，写 1 清'],
-    ['USR2.OR', '接收溢出，说明你读慢了']
-  ];
-  flags.forEach(function (b, i) {
-    var y = 262 + i * 38;
-    txt(scene, 1044, y, b[0], 'tnum');
-    txt(scene, 1320, y, b[1], 't28w');
-  });
-  txt(scene, 1044, 448, '前三个是流程，后两个是事故', 't28w');
-
-  box(1020, 500, 850, 296, 'var(--page)', 'var(--line)');
-  head(1044, 548, '水位与中断/DMA');
-  txt(scene, 1044, 596, 'UFCR.TXTL：发送 FIFO 低于几格就报「可再灌」', 't28w');
-  txt(scene, 1044, 636, 'UFCR.RXTL：收到几格就报「该来取了」', 't28w');
-  txt(scene, 1044, 676, '两个水位都能直接触发 DMA，不必逐字节中断', 't28w');
-  txt(scene, 1044, 716, 'UCR1 里 RRDYEN / TRDYEN / TXMPTYEN 各自开关', 't28w');
-  txt(scene, 1044, 756, 'UCR4.DREN 打开接收 DMA 请求', 't28w');
+function drawStatus() {
+  txt(scene, 56, 146, '四个状态位决定一切：有没有数据、发完没有、溢出没有、成帧对不对；错误位全是写 1 清', 't24w');
+  three([80, 'USR1（+0x94）', ['[13] TRDY 发送就绪', '[9] RRDY 收到数据', '[15] PARITYERR 校验错', '[10] FRAMERR 帧错', '[8] AGTIM 老化超时', '多数位写 1 清'], 't20s'],
+        [680, 'USR2（+0x98）', ['[0] RDR 有数据可读', '[3] TXDC 发送完成', '[14] TXFE 发送 FIFO 空', '[1] ORE 接收溢出', '[2] BRCD 间隔检测', '[0]/[1]/[2]/[3] 写 1 清'], 't20s'],
+        [1280, '两个“完成”的区别', ['RRDY：FIFO 有数据', 'RDR：接收器有数据（更早）', 'TRDY：能再写一个', 'TXDC：整帧已移位出去', '关电/切 RS485 前要等 TXDC', '等 TRDY 就会截断最后一字节']]);
+  prose('“发完”这件事必须用 TXDC，不能用 TRDY：TRDY 只表示 FIFO 里还有空位，数据可能还在移位寄存器里没出去', [
+    '典型事故：写完最后一字节就切 RS485 方向（或断电、关时钟），最后一个字节被截断 —— 就是等了 TRDY 而不是 TXDC。',
+    '读数据要先查 RRDY 或 RDR，再读 URXD；读 URXD 会自动弹出 FIFO，多读一次就丢掉下一个字节。',
+    'ORE 一旦置位，说明你读得太慢；它不会自动恢复，必须写 1 清，否则后续判断会被污染。',
+    'PARITYERR 与 FRAMERR 通常一起出现：波特率不对时，采样点漂移，先出帧错，再出校验错 —— 别一上来就怀疑校验配置。',
+    'AGTIM 是老化定时器触发的“部分数据到达”标志，配合小流量场景使用；如果你没开 aging，它不会置位。',
+    '判据：发一个字节后立刻读 USR2，应见 TXDC 由 0 变 1；再读 USR1 应见 TRDY=1 —— 两个都对，发送路径就通了。']);
 }
 
 function drawInit() {
-  txt(scene, 56, 146, '顺序错了不会报错，只会让第一帧悄悄丢掉', 't28w');
+  txt(scene, 56, 146, '初始化是固定六步：软复位 → 关收发 → 配帧与时序 → 配波特率 → 开 FIFO 阈值 → 开中断与使能', 't24w');
+  three([80, '六步', ['① UCR2 SRST=1，等回 0', '② UCR1 UARTEN=0 先关', '③ 配 UCR2 帧格式', '④ 写 UBIR 再写 UBMR', '⑤ 配 UFCR 阈值与分频', '⑥ UCR1 使能 + 开中断'], 't20s'],
+        [680, '收数据路径', ['轮询：查 RRDY 再读 URXD', '中断：开 RRDYEN 进 ISR', 'DMA：开 RXDMAEN 挂 DMA', '三者选一即可', '别同时开又同时轮询', '会重复取走字节'], 't20w'],
+        [1280, '常见失败', ['忘了 UARTEN → 全无反应', '忘了 TXEN/RXEN → 只通一半', 'UBMR 先于 UBIR 写 → 不生效', '软复位没等完就配 → 被冲掉', '中断里没清标志 → 反复进中断', '轮询与中断混用 → 丢字节']]);
+  prose('顺序里最容易被忽略的是“先关再配”：UARTEN 还开着时改帧格式，可能正好撞上移位中的一帧，产生一个帧错并丢掉数据', [
+    '软复位之后所有控制位回默认，所以寄存器的配置必须放在软复位之后，而不是之前。',
+    '轮询与中断不要混用：中断里读走字节后，轮询代码再读一次会拿到下一个字节，看起来像“丢字节”。',
+    '若用 DMA，接收阈值与 DMA 突发长度要匹配，否则会出现“DMA 搬了半包”。',
+    '发送侧若开了 TXTL 中断，务必在 ISR 里补数据并清中断，否则会陷入“中断风暴”。',
+    '初始化完成后先做一次内部回环（UTS）或短接 TX/RX，确认“控制器通”，再插外部设备，能把问题切两半。',
+    '判据：初始化后读 UCR1 应见 UARTEN=1、读 UCR2 应见 RXEN/TXEN 均 1、读 UBRC 应为预期分频 —— 三项都对再发第一个字节。']);
+}
 
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '上电按这五步');
-
-  var ord = [
-    ['①', 'UCR2.SRST = 0 软复位，等它自清回 1'],
-    ['②', '配 UCR1：关 UARTEN，先把其它位摆好'],
-    ['③', 'UFCR 定 RFDIV 与水位，UBIR/UBMR 算波特率'],
-    ['④', 'UCR2 开 RXEN / TXEN，定帧长与校验'],
-    ['⑤', '最后置 UCR1.UARTEN = 1，串口才开始干活']
-  ];
-  ord.forEach(function (b, i) {
-    var y = 276 + i * 56;
-    txt(scene, 96, y, b[0], 'tnum');
-    txt(scene, 140, y, b[1], 't28w');
-  });
-
-  txt(scene, 80, 590, 'SRST 是低有效：写 0 触发复位，硬件自清成 1 才算完成', 't28w');
-  txt(scene, 80, 630, 'UARTEN 一置 1，收发立即按当前寄存器状态跑', 't28w');
-  txt(scene, 80, 670, '所以波特率和帧长必须在它之前全部写好', 't28w');
-
-  box(80, 706, 860, 74, 'var(--surface)', 'var(--guide)');
-  txt(scene, 104, 752, '自测不必接线：UTS 置 LOOP / TXRST / RXRST 走内部回环', 't28w');
-
-  box(1020, 168, 850, 320, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '三个必踩的坑');
-  txt(scene, 1044, 264, '① UBMR 忘了减一 → 波特率偏，长帧错位', 't28w');
-  txt(scene, 1044, 304, '② 先开 UARTEN 再改配置 → 残帧发到线上', 't28w');
-  txt(scene, 1044, 344, '③ 只开 UARTEN 没开 TXEN / RXEN → 静默', 't28w');
-  txt(scene, 1044, 392, '排查顺序：先读 USR2，再看 UFCR 水位', 't28');
-  txt(scene, 1044, 432, 'USR2 全 0 且 TXFE = 1 → 大概率时钟没开', 't28w');
-  txt(scene, 1044, 470, '收到乱码先怀疑波特率误差，不是接线', 't28w');
-
-  box(1020, 520, 850, 276, 'var(--page)', 'var(--line)');
-  head(1044, 568, '低功耗里还能不能收');
-  txt(scene, 1044, 616, 'STOP 模式不要时钟，靠异步中断唤醒', 't28w');
-  txt(scene, 1044, 656, 'UCR3.RTSDEN 打开后，RTS 变化就能叫醒系统', 't28w');
-  txt(scene, 1044, 696, 'RTS 早已为低时，第一个起始位下降沿发 AWAKE', 't28w');
-  txt(scene, 1044, 736, '唤醒后时钟先到，起始位不会丢', 't28w');
-  txt(scene, 1044, 772, 'DOZE / WAIT / DEBUG 下还能挂起 UART 时钟', 't28w');
+function drawBoard() {
+  txt(scene, 56, 146, '上板验证只需三步：内部回环、引脚短接、示波器量位宽；每一步都把可能的故障范围砍一半', 't24w');
+  three([80, '内部回环', ['UTS 把收发在内部接通', '自发自收不依赖引脚', '通 → 控制器与配置没问题', '不通 → 查 UARTEN 与波特率', '这是最快的自检', '不用动硬件'], 't20w'],
+        [680, '引脚短接', ['把 TXD 与 RXD 短接', '发什么应收回什么', '不通 → 查 IOMUXC 与电平', '注意 3.3 V 与 5 V 电平', '不可直接接 RS232 电平', '会烧 IO'], 't20w'],
+        [1280, '示波器', ['量一位宽度验证波特率', '115200 → 约 8.68 µs', '量空闲电平应为高', '起始位是一个低脉冲', '波形畸变 → 查地线与终端电阻', '长线加匹配']]);
+  prose('8.68 µs 这个数字要背下来：115200 的位周期就是 1/115200 秒，量出来差 10% 以上，先怀疑参考时钟而不是寄存器', [
+    '正点原子板的 UART1 通过 CH340 类芯片接到 USB，所以 PC 端看到的是“虚拟串口”；此时板上 TXD 的电平是 3.3 V TTL，不是 RS232 的 ±12 V。',
+    '千万不要把 TTL 的 TXD 直接接到 RS232 接口：那一路有负电压，会把 IO 打坏；需要 MAX3232 之类做电平转换。',
+    '如果自发自收正常但接 PC 不通，问题几乎必然在“电平/接线/驱动”，而不是 UART 寄存器 —— 这就是分步验证的价值。',
+    '长线或强干扰环境下，串口误码会先表现为 FRAMERR 增多；此时降波特率、加屏蔽、加匹配电阻比改寄存器有效。',
+    '用 DMA 收大数据时，要确保 DMA 缓冲是 cache 一致的，否则 CPU 看到的是旧数据（与第 46 章 SDMA 的坑同源）。',
+    '判据：回环 1000 字节无误码 + 示波器位宽在 ±2% 内 + PC 端能收到日志，三项都过，这条串口就可以交付了。']);
 }
 
 function draw() {
-  var s = STEPS[state.step];
-  $('hint').textContent = s.hint;
-  $('note').textContent = s.note;
-  scene.textContent = '';
-  if (state.step === 0) drawTop();
-  else if (state.step === 1) drawBaud();
-  else if (state.step === 2) drawFrame();
-  else drawInit();
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) drawMap();
+  else if (s === 2) drawBaud();
+  else if (s === 3) drawFrame();
+  else if (s === 4) drawFifo();
+  else if (s === 5) drawStatus();
+  else if (s === 6) drawInit();
+  else drawBoard();
 }
 
-var step = stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
-void step;
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
 zoomable(document.querySelector('.bd-stage'));
 resetButton($('reset'), function () { state.step = INIT.step; draw(); });
 fitCanvas($('viewport'), $('canvas'), draw);
 </script>
 </body>
 </html>
-
