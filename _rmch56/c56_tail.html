@@ -1,0 +1,190 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0 };
+var state = { step: INIT.step };
+
+var STEPS = [
+  { h: '一颗 IP，两种角色', hint: '同一套寄存器',
+    note: '主机与设备不是两个外设，而是同一个控制器切换模式；USBMODE 决定它现在是哪一边。' },
+  { h: '谁来定角色', hint: 'ID 脚 + VBUS',
+    note: 'OTG 靠 ID 脚电平与 VBUS 状态判断自己是 A 设备还是 B 设备，然后切 host/device。' },
+  { h: '核心与非核心', hint: '分两段地址',
+    note: '核心寄存器（0x4000 起）是标准 IP；非核心（0x4800 起）是 NXP 加的集成控制。' },
+  { h: '命令与状态', hint: 'USBCMD / USBSTS',
+    note: '一个 RS 位启停整条控制器，一个 RST 位复位它；状态位告诉你它停没停、有没有出错。' },
+  { h: '设备模式', hint: '端点列表 + dTD',
+    note: '硬件自己走描述符：端点列表对齐、dQH 48 字节、dTD 32 字节，任何错位都会静默失败。' },
+  { h: '主机模式', hint: '帧列表 + PORTSC',
+    note: '主模式靠帧列表调度，端口状态全在 PORTSC1：接上没、复位没、能不能使能。' },
+  { h: 'OTG 与低功耗', hint: '会话与唤醒',
+    note: 'A/B 会话有效位决定谁能供电；挂起后靠 WKUP 位感知 VBUS/ID/DPDM 变化。' },
+  { h: '板上判据', hint: '先看 ID 脚',
+    note: '插上 OTG 线先量 ID 与 VBUS，再看枚举日志；顺序反了就会把硬件问题当驱动问题。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+function three(a, b, c) {
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(a[0], 214, a[1]); for (var i = 0; i < a[2].length; i++) txt(scene, a[0], 252 + i * 36, a[2][i], a[3] || 't20w');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(b[0], 214, b[1]); for (var j = 0; j < b[2].length; j++) txt(scene, b[0], 252 + j * 36, b[2][j], b[3] || 't20w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(c[0], 214, c[1]); for (var k = 0; k < c[2].length; k++) txt(scene, c[0], 252 + k * 36, c[2][k], c[3] || 't20w');
+}
+function prose(title, lines) {
+  wide(456, 330);
+  txt(scene, 80, 490, title, 't24');
+  for (var i = 0; i < lines.length; i++) txt(scene, 80, 522 + i * 34, lines[i], 't20w');
+}
+
+function drawTop() {
+  txt(scene, 56, 146, 'USB 控制器是“双面人”：同一套硬件既能当主机枚举别人，也能当设备被别人枚举', 't24w');
+  three([80, '两个实例', ['OTG1 基址 0x0218_4000', 'OTG2 基址 0x0218_4200', 'ID 寄存器偏移步长 0x200', '各自一套核心寄存器', '各自一套 PHY', '板级只用了其中一路'], 't20s'],
+        [680, '能力写在只读寄存器里', ['+0x00 ID 复位 0xE4A1_FA05', '+0x04 HWGENERAL 0x35', '+0x08 HWHOST 0x1002_0001', '+0x0C HWDEVICE 0x0000_0011', '+0x10 HWTXBUF 0x8008_0B08', '+0x14 HWRXBUF 0x0000_0808'], 't20s'],
+        [1280, '读到什么信息', ['hwhost 说明支持主机', 'hwdevice 说明支持设备', 'hwtxbuf 给出发送缓冲大小', 'hwrxbuf 给出接收缓冲大小', '这些只读值别写', '用来算缓冲分配']]);
+  prose('这两组只读寄存器就是“芯片自述”：HWHOST 非 0 表示能当主机，HWDEVICE 非 0 表示能当设备，两个都非 0 才是 OTG', [
+    '缓冲大小决定你能挂几个端点：发送缓冲被所有 IN 端点共享，接收缓冲被所有 OUT 端点共享，端点开太多就会互相抢缓冲。',
+    '同一个 IP 里主机与设备共用一条数据通路，所以“同时当主机和当设备”是不可能的，模式切换必须先停控制器。',
+    'i.MX6ULL 上通常只有一路 OTG 可用（另一路做主机或复用其他封装差异），具体看原理图上哪一路有 VBUS 与 ID。',
+    '这块板的 USB OTG 接口既用于烧录（USB 下载模式）也用于接 U 盘/键鼠，因此驱动里必须能动态切模式。',
+    'USB 与第 46 章 SDMA、第 49 章总线仲裁都有关系：枚举期间的中断延迟与 DMA 突发会互相影响，别在枚举时跑大流量。',
+    '一句话：先读 ID 与 HWHOST/HWDEVICE，你就知道这颗控制器“理论上能做什么”，再谈板子接了什么。']);
+}
+
+function drawRole() {
+  txt(scene, 56, 146, '角色不是软件随便选的：插头方向（ID 脚）与谁供电（VBUS）先决定了身份，然后软件才切模式', 't24w');
+  three([80, '三种形态', ['Host：只当主机', 'Device：只当设备', 'OTG：两者都能切', 'USBMODE[1:0] 选模式', '00 空闲 / 10 设备 / 11 主机', '切之前必须停控制器'], 't20s'],
+        [680, '为什么 OTG 特别', ['ID 脚接地 = A 设备', 'ID 悬空 = B 设备', 'A 设备负责供 VBUS', 'B 设备等待 VBUS', '还要能“角色互换”', 'HNP 协议完成交换'], 't20w'],
+        [1280, '板上的现实', ['多数开发板按 ID 硬连', '固定为 device 或 host', '想切模式要改电阻', '软件切模式需先 RS=0', '再改 USBMODE', '最后重新开 RS']]);
+  prose('USBMODE 的 CM 字段是关键：00 是空闲、10 是设备、11 是主机；写完必须“停控制器 → 改模式 → 再启动”三步', [
+    '很多“切了模式没反应”的案例，都是没先清 RS（Run/Stop）：控制器还在跑时改 CM，硬件直接忽略。',
+    'ID 脚的状态可以从 OTGSC 读（也有独立 GPIO 路径），所以调试时先量它对地电压：接地 0 V、悬空约 3.3 V。',
+    'OTG 的角色互换（HNP）需要两边的 PHY 与协议都支持；开发板上如果只用一根 OTG 线接 PC，通常只做 device。',
+    '本板烧录用的就是 device 模式（USB 下载），所以“烧录能用”本身就说明 device 通路、PHY、时钟都是好的。',
+    '如果 device 能烧录但接 U 盘不认，那问题在 host 侧：VBUS 供电、ID 脚、以及主机模式下的帧列表配置。',
+    '判据：USBMODE 读回 CM=10 且 USBCMD 的 RS=1，说明设备模式真的在跑；读回 CM 与预期不符就说明有别的代码改过。']);
+}
+
+function drawSplit() {
+  txt(scene, 56, 146, '地址分两段：0x4000 起是标准的 ARM/ Synopsis 核心，0x4800 起是 NXP 加的“集成外壳”', 't24w');
+  three([80, '核心段（通用）', ['+0x100 CAPLENGTH/HCIVERSION', '+0x104 HCSPARAMS', '+0x108 HCCPARAMS', '+0x10C DCIVERSION', '+0x110 DCCPARAMS', '这套换任何芯片都一样'], 't20s'],
+        [680, '核心段（操作）', ['+0x140 USBCMD', '+0x144 USBSTS', '+0x148 USBINTR', '+0x14C FRINDEX', '+0x154 周期帧列表基址', '+0x158 异步/端点列表基址'], 't20s'],
+        [1280, '非核心段', ['+0x800 OTG1_CTRL（复位 0x3000_1000）', '+0x804 OTG2_CTRL', '+0x818 OTG1_PHY_CTRL_0', '+0x81C OTG2_PHY_CTRL_0', '属 NXP 集成：上电、唤醒、过流', '换芯片就变，驱动需区分']]);
+  prose('分两段的实际意义：通用驱动（如 Linux 的 chipidea 核心）只碰 0x000–0x1FF，NXP 特有的上电顺序与唤醒逻辑放在另一段', [
+    '这意味着你抄别的芯片的 USB 驱动，核心寄存器部分能直接用，但非核心部分（尤其 PHY 上电与过流极性）必须按本芯片改。',
+    'OTG1_CTRL 复位值 0x3000_1000：高位的默认值说明“DPDM 唤醒使能”与“ID 唤醒使能”默认是开的，这解释了挂起后为什么插线能唤醒。',
+    'PHY_CTRL_0 是 NXP 用来补偿 PHY 工艺偏差的；具体位域在第 57 章讲，这里只需知道它属于“非核心”。',
+    'PHY 上电顺序错了，表现为“寄存器读得出、枚举却失败”：核心看起来全对，但总线上没有信号。',
+    '两个实例的核心段是“同一个模板复制”，所以 OTG2 的偏移就是 OTG1 加 0x200；非核心段则按 0x804/0x81C 单独排。',
+    '判据：读 +0x00 应得 0xE4A1_FA05（ID 寄存器），读 +0x800 应得 0x3000_1000，两组都一读即知地址映射是否正确。']);
+}
+
+function drawCmd() {
+  txt(scene, 56, 146, '一个 RS 位让控制器跑起来，一个 RST 位把它按回去；所有状态都汇总进 USBSTS', 't24w');
+  three([80, 'USBCMD', ['[0] RS 运行/停止', '[1] RST 控制器复位', '[1] 是自清位', '写 1 后要等它归 0', '[23:16] 中断阈值 ITC', '主机模式另有帧列表尺寸位'], 't20s'],
+        [680, 'USBSTS', ['UI：完成一次传输/中断', 'UEI：出错', 'PCD：端口状态变化', 'HCH：主机控制器已停', '都是写 1 清', '读之前先确认 HCH'], 't20s'],
+        [1280, '正确启停顺序', ['启动：配置 → 清状态 → RS=1', '停止：RS=0 → 等 HCH=1', '复位：RST=1 → 等自动清 0', '复位后要重配所有寄存器', '别在 RS=1 时改配置', '改了会被忽略或出错']]);
+  prose('“先停再改”是这颗控制器的铁律：RS=1 时写端点列表基址、改 USBMODE、重配端点控制，都可能被硬件丢弃', [
+    '停止的正确判据是 USBSTS 的 HCH（Host Controller Halted）置位，而不是“等了 1 ms 应该好了”。',
+    '复位（RST）会把端点状态、帧列表指针、端口状态全部清零，所以复位后必须重新写整套配置 —— 这一步漏了就是“复位后不动了”。',
+    'ITC 是中断合并阈值：设大可以降低中断频率，代价是延迟；枚举阶段建议设 0（每传输都中断），跑起来后再调大。',
+    'USBSTS 的位都是写 1 清：若在中断里只读不清，会立刻再次进中断，看起来像“中断风暴”。',
+    '上电后 USBSTS 的初值可能已经有一些位（来自 PHY 或端口状态），所以启动前先写 1 全清一次，避免误判。',
+    '判据：RS=0 后轮询 USBSTS 应见 HCH=1；RS=1 后应见 HCH=0 —— 两位互为反相，是控制器“活着”的最直接证据。']);
+}
+
+function drawDevice() {
+  txt(scene, 56, 146, '设备模式是“硬件替你跑协议”：你只需摆好端点列表与传输描述符，剩下的握手由控制器完成', 't24w');
+  three([80, '端点列表', ['+0x158 ENDPOINTLISTADDR', '必须 2 KB 对齐', '每端点一个 dQH（48 字节）', '内含当前 dTD 指针', '与传输进度字段', '地址错位 → 全都不通'], 't20s'],
+        [680, 'dTD 描述符', ['32 字节（用前 28）', '含 next 指针、token、缓冲地址', 'token 里有长度与状态', '一次传输可链多个 dTD', '缓冲地址要 4 字节对齐', 'DMA 要 cache 一致'], 't20s'],
+        [1280, '四个动作寄存器', ['+0x1AC ENDPTSETUPSTAT', '+0x1B0 ENDPTPRIME 置位启动', '+0x1B4 ENDPTFLUSH 取消', '+0x1B8 ENDPTSTAT 就绪状态', '+0x1BC ENDPTCOMPLETE 完成', 'bit n=TX n，bit 16+n=RX n']]);
+  prose('EPNTPRIME 的位映射要背：bit n 对应发送端点 n，bit 16+n 对应接收端点 n；所以 RX 端点 1 是 bit17，不是 bit1', [
+    '每挂一个传输都要 prime 一次；如果忘了 prime，端点就永远“没在跑”，表现为“主机发来数据，设备毫无反应”。',
+    '完成时 ENDPTCOMPLETE 对应位置 1（写 1 清），并且 dTD 的 token 里状态位会更新 —— 两处都要看，只看一处容易误判。',
+    'SETUP 阶段是特殊的：它走 ENDPTSETUPSTAT，收到后必须尽快读走 setup 数据包并清该位，否则后续控制传输全部卡住。',
+    '缓冲区必须 cache 一致：USB 控制器是 DMA 主设备，CPU 写完描述符后要 clean，读完成状态前要 invalidate。',
+    '端点列表 2 KB 对齐是硬要求，底层两位被硬件当作 0；如果你 malloc 出来只有 32 字节对齐，一切都会“看起来配好了但不工作”。',
+    '判据：prime 之后读 ENDPTSTAT 对应位应为 1；传输完成后再读应为 0 且 COMPLETE 置位 —— 这个来回就是端点活着。']);
+}
+
+function drawHost() {
+  txt(scene, 56, 146, '主机模式靠“帧列表”调度：每 1 ms（或 125 µs）扫一遍，端口状态单独放在 PORTSC1', 't24w');
+  three([80, '两种列表', ['+0x154 周期帧列表基址', '用于中断/同步传输', '必须 4 KB 对齐', '+0x158 异步列表基址', '用于批量/控制传输', 'FRINDEX 是当前帧号'], 't20s'],
+        [680, 'PORTSC1 关键位', ['[0] CCS 当前连接状态', '[1] CSC 连接变化（写清）', '[2] PED 端口已使能', '[3] PE 使能变化', '[7] SUSP 挂起', '[12] PP 端口供电 / [8] PR 复位'], 't20s'],
+        [1280, '枚举流程', ['① 给端口供电 PP=1', '② 等 CCS=1', '③ 发复位 PR=1 保持', '④ 等 PED=1', '⑤ 读设备描述符', '⑥ 分配地址并设置']]);
+  prose('PP（端口供电）是很多板子“插 U 盘没反应”的真凶：没有 VBUS 或没有置 PP，设备根本没上电', [
+    '如果板上 VBUS 是常供电（不受控制器管），PP 位可能读回固定值，此时别拿它当判据，直接量 VBUS 电压更靠谱。',
+    '复位要保持一段时间（USB 规范 10 ms 以上），不是写一下就完；写 PR=1 后要等它自清并确认 PED=1。',
+    'CSC/CONNECT 这类变化位都是写 1 清，中断里不清就会反复进中断。',
+    '帧列表对齐 4 KB，且每一项是 32 位指针；错位会导致控制器取到垃圾描述符，表现为“一插设备就崩”或“HCH 一直为 1”。',
+    '低速/全速/高速设备的枚举路径不同，但都要经过“复位 → 读描述符 → 设地址 → 读配置”四步，日志里能清楚看到。',
+    '判据：插一个 U 盘，USBSTS 应出现 PCD，PORTSC1 的 CCS 由 0 变 1，复位后 PED 变 1 —— 三个位按序变化就说明主机通路正常。']);
+}
+
+function drawOtg() {
+  txt(scene, 56, 146, 'OTG 的难点不在协议，而在“会话”：谁供电、谁先动、挂起后怎么被叫醒', 't24w');
+  three([80, 'OTGSC（+0x1A4）', ['读 ID 脚当前电平', '读 A/B 会话是否有效', '控制 VBUS 充电/放电', '提供会话变化中断', '也管 ID 上拉', '是 OTG 状态总入口'], 't20w'],
+        [680, '非核心唤醒位', ['OTG1_CTRL[31] WIR 唤醒请求', '[10] WIE 唤醒中断使能', '[16] WKUP_ID_EN', '[17] WKUP_VBUS_EN', '[29] WKUP_DPDM_EN', '[15]/[14] 软件唤醒'], 't20s'],
+        [1280, '低功耗顺序', ['① 清中断与状态', '② 置 SUSP 进入挂起', '③ 开 WKUP_* 使能', '④ 等唤醒事件', '⑤ 清 WIR 再重开', '⑥ 恢复前先关 WIR']]);
+  prose('手册里那句“收到唤醒中断后应先关 WIE、进挂起前再打开”很关键：不清就会在唤醒后立刻再触发一次，形成“假唤醒”循环', [
+    '软件唤醒（WKUP_SW）用于“自己叫醒自己”的测试：不开 WIE 也能验证唤醒路径，调试时很好用。',
+    'DPDM 唤醒只对设备模式有意义：主机模式下 DPDM 变化不会唤醒你，因为那时你是供电方。',
+    '过流检测的极性由 OVER_CUR_POL 决定，且可以被 OVER_CUR_DIS 关掉；板子上没有过流检测电路时，一定要关掉，否则会一直上报过流。',
+    'PWR_POL 要与板上 PMIC 或 VBUS 开关的极性一致，写反了就是“该供电时断电”。',
+    'PHY 上电与时钟（第 57 章）不完成，OTG 的会话检测也读不到有效值 —— 两者是串联依赖。',
+    '判据：插不同方向的 OTG 线，ID 电平与 A/B 会话位应相应变化；拔线后挂起应能被插线唤醒，日志里有对应 WIR。']);
+}
+
+function drawBoard() {
+  txt(scene, 56, 146, '上板排查顺序：先量电（VBUS/ID），再看控制器状态位，最后才看枚举日志与驱动', 't24w');
+  three([80, '第一步：电', ['USB_OTG1_VBUS 是否 5 V', 'ID 脚接地还是悬空', 'D+/D− 是否有 1.5 k 上拉', '设备模式下 D+ 上拉是身份', '主机模式要有 VBUS 开关', '先排除供电问题'], 't20w'],
+        [680, '第二步：状态位', ['ID 寄存器读 0xE4A1_FA05', 'USBMODE 的 CM 是否符合', 'USBSTS 的 HCH 是否合理', 'PORTSC1 的 CCS 是否变化', 'ENDPTSTAT 是否被 prime', '任何一项不符就停在这'], 't20s'],
+        [1280, '第三步：日志', ['Linux 下看 dmesg', '出现 “new high-speed USB device” 才叫成功', '只有 “reset” 没有枚举 → 信号问题', '枚举后掉线 → 供电或线材', '加 hub 试试排除供电', '别先怀疑驱动']]);
+  prose('烧录能用说明 device 通路通；接 U 盘不认说明 host 侧还没通，这个二分法能省掉一半排查时间', [
+    'D+ 上的 1.5 k 上拉是“我是个设备”的物理标志，很多自制板忘了它，结果 PC 完全看不到设备。',
+    '主机模式必须给 VBUS 供电（或至少给足 100 mA 让设备上电），只连 D+/D− 而不供电，设备永远不会枚举。',
+    '如果 dmesg 里反复出现 “device descriptor read/64, error -71”，那是信号完整性问题：查线材、查终端匹配、查 D+/D− 是否等长。',
+    'USB 高速要求 90 Ω 差分阻抗；飞线接出来的 USB 口几乎必然只能跑全速或直接失败。',
+    '调试时不要把 USB 与 SDMA/网络大流量混在一起：总线争用会让枚举超时，看起来像“随机失败”。',
+    '判据：插 U 盘 → dmesg 出现设备名与容量 → 挂载成功；拔插 20 次不失败，这条 USB 才算过关。']);
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) drawRole();
+  else if (s === 2) drawSplit();
+  else if (s === 3) drawCmd();
+  else if (s === 4) drawDevice();
+  else if (s === 5) drawHost();
+  else if (s === 6) drawOtg();
+  else drawBoard();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () { state.step = INIT.step; draw(); });
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>

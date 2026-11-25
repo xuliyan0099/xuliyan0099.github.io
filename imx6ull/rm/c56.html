@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RM56 USB 控制器</title>
+<title>RM 第 56 章 · USB 控制器 | i.MX6ULL 逐章解读</title>
 <style>/* 白板互动教学设计系统 · 样式。由 scripts/inline.py 整段拼进页面，不要手抄或删减。
  * 页面的全部颜色、字号、间距、圆角、阴影只在 :root 定义；改主题只改这一段。 */
 
@@ -2469,30 +2469,30 @@ text.bd-an-inner { font-size: var(--size-l4); }
   <symbol id="i-reset" viewBox="0 0 24 24"><title>重置</title><path d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5M4.5 4v4.5H9"/></symbol>
   <symbol id="i-prev" viewBox="0 0 24 24"><title>上一步</title><path d="M15 5l-7 7 7 7"/></symbol>
   <symbol id="i-next" viewBox="0 0 24 24"><title>下一步</title><path d="M9 5l7 7-7 7"/></symbol>
-  <symbol id="i-close" viewBox="0 0 24 24"><title>收起</title><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><title>关闭</title><path d="M6 6l12 12M18 6L6 18"/></symbol>
   <symbol id="i-explain" viewBox="0 0 24 24"><title>讲解</title><path d="M3 5.5c3-1 6-.8 9 1 3-1.8 6-2 9-1V19c-3-1-6-.8-9 1-3-1.8-6-2-9-1zM12 6.5V20"/></symbol>
   <symbol id="i-correct" viewBox="0 0 24 24"><title>正确</title><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
   <symbol id="i-wrong" viewBox="0 0 24 24"><title>错误</title><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
-  <symbol id="i-alert" viewBox="0 0 24 24"><title>越界</title><path d="M12 4l9 16H3zM12 10v4.5M12 17.6v.1"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><title>注意</title><path d="M12 4l9 16H3zM12 10v4.5M12 17.6v.1"/></symbol>
   <symbol id="i-drag" viewBox="0 0 24 24"><title>拖动</title><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></symbol>
-  <symbol id="i-speak" viewBox="0 0 24 24"><title>发音</title><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+  <symbol id="i-speak" viewBox="0 0 24 24"><title>朗读</title><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
   <symbol id="i-fullscreen" viewBox="0 0 24 24"><title>全屏</title><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
-  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>退出全屏</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
+  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>RM 第 17 章 · NAND 纠错加速器 BCH | i.MX6ULL 逐章解读</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
 </svg>
 
 <div class="bd-viewport" id="viewport">
   <div class="bd-canvas" id="canvas">
     <header class="bd-titlebar">
-      <h1 class="bd-title">第 56 章 · USB 控制器</h1>
+      <h1>第 56 章 · 通用串行总线控制器（USB）</h1>
       <span class="bd-hint" id="hint"></span>
       <div class="bd-readings">
         <span class="bd-reading bd-reading-emphasis">
-          <span class="bd-reading-name">端点</span>
-          <span class="bd-reading-value">8 双向</span>
+          <span class="bd-reading-name">控制器实例</span>
+          <span class="bd-reading-value">2 个</span>
         </span>
         <span class="bd-reading">
-          <span class="bd-reading-name">端口</span>
-          <span class="bd-reading-value">2</span>
+          <span class="bd-reading-name">ID 复位值</span>
+          <span class="bd-reading-value">0xE4A1_FA05</span>
         </span>
       </div>
     </header>
@@ -2506,7 +2506,7 @@ text.bd-an-inner { font-size: var(--size-l4); }
         <button class="bd-btn" type="button" id="next"></button>
       </div>
       <div class="bd-actions">
-        <a class="bd-btn" href="c57.html" style="text-decoration:none">← RM57</a>
+        <a class="bd-btn" href="c55.html" style="text-decoration:none">← RM55</a> <a class="bd-btn" href="c57.html" style="text-decoration:none">RM57 →</a>
         <a class="bd-btn" href="index.html" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">☰ 目录</a>
         <button class="bd-btn" type="button" id="reset"></button>
       </div>
@@ -3628,6 +3628,265 @@ function reader(root, sentences, opts) {
   };
 }
 </script>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
 <script>
 var $ = function (id) { return document.getElementById(id); };
 var OX = 24, OY = 96;
@@ -3638,10 +3897,22 @@ var INIT = { step: 0 };
 var state = { step: INIT.step };
 
 var STEPS = [
-  { h: '1 / 4 两个核，两个口', hint: '核管协议，PHY 管电气', note: '一个核只有一个口，同一时刻只能是主机或者设备，不能两样都干。' },
-  { h: '2 / 4 寄存器分四段', hint: '主机与设备共用偏移', note: '同一个偏移，在主机视角和设备视角下是两个不同的寄存器。' },
-  { h: '3 / 4 设备模式的数据结构', hint: 'dQH 48 字节，64 字节对齐', note: '队列头放错对齐，控制器 DMA 出去就是乱码，而且不会报错。' },
-  { h: '4 / 4 切角色与主机侧启动', hint: 'CM 只能写一次', note: '切模式必须先复位控制器，这条约束让很多「直接改 USBMODE」的代码白跑。' }
+  { h: '一颗 IP，两种角色', hint: '同一套寄存器',
+    note: '主机与设备不是两个外设，而是同一个控制器切换模式；USBMODE 决定它现在是哪一边。' },
+  { h: '谁来定角色', hint: 'ID 脚 + VBUS',
+    note: 'OTG 靠 ID 脚电平与 VBUS 状态判断自己是 A 设备还是 B 设备，然后切 host/device。' },
+  { h: '核心与非核心', hint: '分两段地址',
+    note: '核心寄存器（0x4000 起）是标准 IP；非核心（0x4800 起）是 NXP 加的集成控制。' },
+  { h: '命令与状态', hint: 'USBCMD / USBSTS',
+    note: '一个 RS 位启停整条控制器，一个 RST 位复位它；状态位告诉你它停没停、有没有出错。' },
+  { h: '设备模式', hint: '端点列表 + dTD',
+    note: '硬件自己走描述符：端点列表对齐、dQH 48 字节、dTD 32 字节，任何错位都会静默失败。' },
+  { h: '主机模式', hint: '帧列表 + PORTSC',
+    note: '主模式靠帧列表调度，端口状态全在 PORTSC1：接上没、复位没、能不能使能。' },
+  { h: 'OTG 与低功耗', hint: '会话与唤醒',
+    note: 'A/B 会话有效位决定谁能供电；挂起后靠 WKUP 位感知 VBUS/ID/DPDM 变化。' },
+  { h: '板上判据', hint: '先看 ID 脚',
+    note: '插上 OTG 线先量 ID 与 VBUS，再看枚举日志；顺序反了就会把硬件问题当驱动问题。' }
 ];
 
 function txt(parent, x, y, s, cls, anchor) {
@@ -3650,196 +3921,150 @@ function txt(parent, x, y, s, cls, anchor) {
 function box(x, y, w, h, fill, stroke, sw) {
   return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
 }
-function arrow(x1, y1, x2, y2) {
-  svgEl(scene, 'line', { x1: x1, y1: y1, x2: x2, y2: y2, stroke: 'var(--text-2)', 'stroke-width': 4 });
-  var a = Math.atan2(y2 - y1, x2 - x1), L = 18, W = 9;
-  svgEl(scene, 'path', {
-    d: 'M' + x2 + ' ' + y2 + ' L' + (x2 - L * Math.cos(a) + W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) - W * Math.cos(a)) +
-      ' L' + (x2 - L * Math.cos(a) - W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) + W * Math.cos(a)) + ' Z',
-    fill: 'var(--text-2)', stroke: 'none'
-  });
-}
 function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
-
-function drawCore() {
-  txt(scene, 56, 146, '两套同样的核，各自带一个口，各自一套寄存器', 't28w');
-
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '地址就这三组');
-
-  box(80, 252, 860, 88, 'var(--surface)', 'var(--line)', 2);
-  txt(scene, 104, 288, 'USB_UOG1    0x0218_4000', 'tnum');
-  txt(scene, 104, 324, 'OTG1 口，寄存器从 +0x000 到 +0x1DC', 't28w');
-
-  box(80, 368, 860, 88, 'var(--surface)', 'var(--line)', 2);
-  txt(scene, 104, 404, 'USB_UOG2    0x0218_4200', 'tnum');
-  txt(scene, 104, 440, 'OTG2 口，偏移与上面完全一致', 't28w');
-
-  box(80, 484, 860, 88, 'var(--page)', 'var(--observe-line)', 4);
-  txt(scene, 104, 520, 'USBNC       0x0218_4800 / 4804', 'tnum');
-  txt(scene, 104, 556, '核外控制：时钟、唤醒、PHY_CTRL_0 在 +0x4818', 't28w');
-
-  txt(scene, 80, 620, '每核 8 个双向端点，单端口，HS / FS / LS 都支持', 't28w');
-  txt(scene, 80, 660, 'HNP / SRP 的 OTG 协商、充电器检测都在核内做完', 't28w');
-  txt(scene, 80, 700, 'UTMI 出去接第 57 章那两片 PHY，DP / DN 才到座子', 't28w');
-  txt(scene, 80, 740, '一个核一个口：同一时刻只能是主机，或者设备', 't28w');
-
-  box(1020, 168, 850, 320, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '能力寄存器先告诉你上限');
-  txt(scene, 1044, 264, 'HWHOST / HWDEVICE   主机与设备的能力位', 'tnum');
-  txt(scene, 1044, 304, 'HWTXBUF  0x8008_0B08   发送缓冲配置', 'tnum');
-  txt(scene, 1044, 344, 'HWRXBUF  0x0000_0808   接收缓冲配置', 'tnum');
-  txt(scene, 1044, 384, 'DCCPARAMS 在 +0x124，端点数量在这里', 'tnum');
-  txt(scene, 1044, 424, '这些是只读的，写进去也不会变', 't28w');
-  txt(scene, 1044, 464, '分配缓冲前先读，别照抄别人的数字', 't28w');
-
-  box(1020, 516, 850, 280, 'var(--page)', 'var(--line)');
-  head(1044, 564, '三条硬约束');
-  txt(scene, 1044, 612, '① 一个核一个口，不能同时当主机和设备', 't28w');
-  txt(scene, 1044, 652, '② 端点固定 8 个，EP0 是双向的控制端点', 't28w');
-  txt(scene, 1044, 692, '③ 换角色必须复位控制器，不能直接改寄存器', 't28w');
-  txt(scene, 1044, 732, '这三点在手册开头就写了，但最容易在驱动里违反', 't28w');
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+function three(a, b, c) {
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(a[0], 214, a[1]); for (var i = 0; i < a[2].length; i++) txt(scene, a[0], 252 + i * 36, a[2][i], a[3] || 't20w');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(b[0], 214, b[1]); for (var j = 0; j < b[2].length; j++) txt(scene, b[0], 252 + j * 36, b[2][j], b[3] || 't20w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(c[0], 214, c[1]); for (var k = 0; k < c[2].length; k++) txt(scene, c[0], 252 + k * 36, c[2][k], c[3] || 't20w');
+}
+function prose(title, lines) {
+  wide(456, 330);
+  txt(scene, 80, 490, title, 't24');
+  for (var i = 0; i < lines.length; i++) txt(scene, 80, 522 + i * 34, lines[i], 't20w');
 }
 
-function drawMap() {
-  txt(scene, 56, 146, '偏移从头排到尾，主机段和设备段是叠在同一片地址上的', 't28w');
+function drawTop() {
+  txt(scene, 56, 146, 'USB 控制器是“双面人”：同一套硬件既能当主机枚举别人，也能当设备被别人枚举', 't24w');
+  three([80, '两个实例', ['OTG1 基址 0x0218_4000', 'OTG2 基址 0x0218_4200', 'ID 寄存器偏移步长 0x200', '各自一套核心寄存器', '各自一套 PHY', '板级只用了其中一路'], 't20s'],
+        [680, '能力写在只读寄存器里', ['+0x00 ID 复位 0xE4A1_FA05', '+0x04 HWGENERAL 0x35', '+0x08 HWHOST 0x1002_0001', '+0x0C HWDEVICE 0x0000_0011', '+0x10 HWTXBUF 0x8008_0B08', '+0x14 HWRXBUF 0x0000_0808'], 't20s'],
+        [1280, '读到什么信息', ['hwhost 说明支持主机', 'hwdevice 说明支持设备', 'hwtxbuf 给出发送缓冲大小', 'hwrxbuf 给出接收缓冲大小', '这些只读值别写', '用来算缓冲分配']]);
+  prose('这两组只读寄存器就是“芯片自述”：HWHOST 非 0 表示能当主机，HWDEVICE 非 0 表示能当设备，两个都非 0 才是 OTG', [
+    '缓冲大小决定你能挂几个端点：发送缓冲被所有 IN 端点共享，接收缓冲被所有 OUT 端点共享，端点开太多就会互相抢缓冲。',
+    '同一个 IP 里主机与设备共用一条数据通路，所以“同时当主机和当设备”是不可能的，模式切换必须先停控制器。',
+    'i.MX6ULL 上通常只有一路 OTG 可用（另一路做主机或复用其他封装差异），具体看原理图上哪一路有 VBUS 与 ID。',
+    '这块板的 USB OTG 接口既用于烧录（USB 下载模式）也用于接 U 盘/键鼠，因此驱动里必须能动态切模式。',
+    'USB 与第 46 章 SDMA、第 49 章总线仲裁都有关系：枚举期间的中断延迟与 DMA 突发会互相影响，别在枚举时跑大流量。',
+    '一句话：先读 ID 与 HWHOST/HWDEVICE，你就知道这颗控制器“理论上能做什么”，再谈板子接了什么。']);
+}
 
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '四段');
+function drawRole() {
+  txt(scene, 56, 146, '角色不是软件随便选的：插头方向（ID 脚）与谁供电（VBUS）先决定了身份，然后软件才切模式', 't24w');
+  three([80, '三种形态', ['Host：只当主机', 'Device：只当设备', 'OTG：两者都能切', 'USBMODE[1:0] 选模式', '00 空闲 / 10 设备 / 11 主机', '切之前必须停控制器'], 't20s'],
+        [680, '为什么 OTG 特别', ['ID 脚接地 = A 设备', 'ID 悬空 = B 设备', 'A 设备负责供 VBUS', 'B 设备等待 VBUS', '还要能“角色互换”', 'HNP 协议完成交换'], 't20w'],
+        [1280, '板上的现实', ['多数开发板按 ID 硬连', '固定为 device 或 host', '想切模式要改电阻', '软件切模式需先 RS=0', '再改 USBMODE', '最后重新开 RS']]);
+  prose('USBMODE 的 CM 字段是关键：00 是空闲、10 是设备、11 是主机；写完必须“停控制器 → 改模式 → 再启动”三步', [
+    '很多“切了模式没反应”的案例，都是没先清 RS（Run/Stop）：控制器还在跑时改 CM，硬件直接忽略。',
+    'ID 脚的状态可以从 OTGSC 读（也有独立 GPIO 路径），所以调试时先量它对地电压：接地 0 V、悬空约 3.3 V。',
+    'OTG 的角色互换（HNP）需要两边的 PHY 与协议都支持；开发板上如果只用一根 OTG 线接 PC，通常只做 device。',
+    '本板烧录用的就是 device 模式（USB 下载），所以“烧录能用”本身就说明 device 通路、PHY、时钟都是好的。',
+    '如果 device 能烧录但接 U 盘不认，那问题在 host 侧：VBUS 供电、ID 脚、以及主机模式下的帧列表配置。',
+    '判据：USBMODE 读回 CM=10 且 USBCMD 的 RS=1，说明设备模式真的在跑；读回 CM 与预期不符就说明有别的代码改过。']);
+}
 
-  var segs = [
-    ['0x000 – 0x014', '标识与硬件参数', 'ID / HWGENERAL / HWTXBUF'],
-    ['0x080 – 0x08C', '两个通用定时器', '给 OTG 计时用'],
-    ['0x100 – 0x124', '能力寄存器', 'CAPLENGTH / HCSPARAMS / DCCPARAMS'],
-    ['0x140 – 0x1DC', '操作寄存器', '命令、状态、端口、端点']
-  ];
-  segs.forEach(function (g, i) {
-    var y = 264 + i * 96;
-    box(80, y, 860, 76, 'var(--surface)', 'var(--line)', 2);
-    txt(scene, 100, y + 34, g[0], 'tnum');
-    txt(scene, 340, y + 34, g[1], 't28');
-    txt(scene, 100, y + 66, g[2], 't28w');
-  });
+function drawSplit() {
+  txt(scene, 56, 146, '地址分两段：0x4000 起是标准的 ARM/ Synopsis 核心，0x4800 起是 NXP 加的“集成外壳”', 't24w');
+  three([80, '核心段（通用）', ['+0x100 CAPLENGTH/HCIVERSION', '+0x104 HCSPARAMS', '+0x108 HCCPARAMS', '+0x10C DCIVERSION', '+0x110 DCCPARAMS', '这套换任何芯片都一样'], 't20s'],
+        [680, '核心段（操作）', ['+0x140 USBCMD', '+0x144 USBSTS', '+0x148 USBINTR', '+0x14C FRINDEX', '+0x154 周期帧列表基址', '+0x158 异步/端点列表基址'], 't20s'],
+        [1280, '非核心段', ['+0x800 OTG1_CTRL（复位 0x3000_1000）', '+0x804 OTG2_CTRL', '+0x818 OTG1_PHY_CTRL_0', '+0x81C OTG2_PHY_CTRL_0', '属 NXP 集成：上电、唤醒、过流', '换芯片就变，驱动需区分']]);
+  prose('分两段的实际意义：通用驱动（如 Linux 的 chipidea 核心）只碰 0x000–0x1FF，NXP 特有的上电顺序与唤醒逻辑放在另一段', [
+    '这意味着你抄别的芯片的 USB 驱动，核心寄存器部分能直接用，但非核心部分（尤其 PHY 上电与过流极性）必须按本芯片改。',
+    'OTG1_CTRL 复位值 0x3000_1000：高位的默认值说明“DPDM 唤醒使能”与“ID 唤醒使能”默认是开的，这解释了挂起后为什么插线能唤醒。',
+    'PHY_CTRL_0 是 NXP 用来补偿 PHY 工艺偏差的；具体位域在第 57 章讲，这里只需知道它属于“非核心”。',
+    'PHY 上电顺序错了，表现为“寄存器读得出、枚举却失败”：核心看起来全对，但总线上没有信号。',
+    '两个实例的核心段是“同一个模板复制”，所以 OTG2 的偏移就是 OTG1 加 0x200；非核心段则按 0x804/0x81C 单独排。',
+    '判据：读 +0x00 应得 0xE4A1_FA05（ID 寄存器），读 +0x800 应得 0x3000_1000，两组都一读即知地址映射是否正确。']);
+}
 
-  txt(scene, 80, 700, '操作段从 +0x140 开始，能力段是只读的参数区', 't28w');
-  txt(scene, 80, 740, 'CAPLENGTH 给出能力段的长度，剩下的才是可写的', 't28w');
-
-  box(1020, 168, 850, 300, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '两个偏移，两副面孔');
-  txt(scene, 1044, 264, '0x154  主机：PERIODICLISTBASE', 'tnum');
-  txt(scene, 1044, 304, '0x154  设备：DEVICEADDR', 'tnum');
-  txt(scene, 1044, 344, '0x158  主机：ASYNCLISTADDR', 'tnum');
-  txt(scene, 1044, 384, '0x158  设备：ENDPTLISTADDR', 'tnum');
-  txt(scene, 1044, 424, '看手册先确认自己在哪一侧', 't28w');
-
-  box(1020, 496, 850, 300, 'var(--page)', 'var(--line)');
-  head(1044, 544, '最常碰的五个');
-  txt(scene, 1044, 592, 'USBCMD    0x140   跑不跑、复位', 'tnum');
-  txt(scene, 1044, 632, 'USBSTS    0x144   中断与端口事件', 'tnum');
-  txt(scene, 1044, 672, 'PORTSC1   0x184   端口的连接与使能', 'tnum');
-  txt(scene, 1044, 712, 'USBMODE   0x1A8   这次当主机还是设备', 'tnum');
-  txt(scene, 1044, 752, 'OTGSC     0x1A4   VBUS / ID / 会话', 'tnum');
+function drawCmd() {
+  txt(scene, 56, 146, '一个 RS 位让控制器跑起来，一个 RST 位把它按回去；所有状态都汇总进 USBSTS', 't24w');
+  three([80, 'USBCMD', ['[0] RS 运行/停止', '[1] RST 控制器复位', '[1] 是自清位', '写 1 后要等它归 0', '[23:16] 中断阈值 ITC', '主机模式另有帧列表尺寸位'], 't20s'],
+        [680, 'USBSTS', ['UI：完成一次传输/中断', 'UEI：出错', 'PCD：端口状态变化', 'HCH：主机控制器已停', '都是写 1 清', '读之前先确认 HCH'], 't20s'],
+        [1280, '正确启停顺序', ['启动：配置 → 清状态 → RS=1', '停止：RS=0 → 等 HCH=1', '复位：RST=1 → 等自动清 0', '复位后要重配所有寄存器', '别在 RS=1 时改配置', '改了会被忽略或出错']]);
+  prose('“先停再改”是这颗控制器的铁律：RS=1 时写端点列表基址、改 USBMODE、重配端点控制，都可能被硬件丢弃', [
+    '停止的正确判据是 USBSTS 的 HCH（Host Controller Halted）置位，而不是“等了 1 ms 应该好了”。',
+    '复位（RST）会把端点状态、帧列表指针、端口状态全部清零，所以复位后必须重新写整套配置 —— 这一步漏了就是“复位后不动了”。',
+    'ITC 是中断合并阈值：设大可以降低中断频率，代价是延迟；枚举阶段建议设 0（每传输都中断），跑起来后再调大。',
+    'USBSTS 的位都是写 1 清：若在中断里只读不清，会立刻再次进中断，看起来像“中断风暴”。',
+    '上电后 USBSTS 的初值可能已经有一些位（来自 PHY 或端口状态），所以启动前先写 1 全清一次，避免误判。',
+    '判据：RS=0 后轮询 USBSTS 应见 HCH=1；RS=1 后应见 HCH=0 —— 两位互为反相，是控制器“活着”的最直接证据。']);
 }
 
 function drawDevice() {
-  txt(scene, 56, 146, '设备模式不是「配寄存器」，是把内存里的链表交给控制器', 't28w');
-
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, '两个结构体');
-
-  box(80, 252, 420, 120, 'var(--surface)', 'var(--observe-line)', 4);
-  txt(scene, 104, 292, 'dQH', 't44');
-  txt(scene, 104, 330, '48 字节，必须 64 字节对齐', 't28w');
-
-  box(520, 252, 420, 120, 'var(--surface)', 'var(--line)', 2);
-  txt(scene, 544, 292, 'dTD', 't44');
-  txt(scene, 544, 330, '描述一笔传输，挂在 dQH 上', 't28w');
-
-  box(80, 400, 860, 220, 'var(--page)', 'var(--guide)', 3);
-  head(104, 446, '一个端点的四步');
-  txt(scene, 104, 492, '① 建 dQH：给端点号、方向、包长、传输类型', 't28w');
-  txt(scene, 104, 532, '② 挂 dTD：给缓冲地址、长度、下一个描述符', 't28w');
-  txt(scene, 104, 572, '③ 写 ENDPTPRIME 置位，等 ENDPTSTAT 回 1', 't28w');
-  txt(scene, 104, 612, '④ 完成看 ENDPTCOMPLETE，出错要 ENDPTFLUSH', 't28w');
-
-  txt(scene, 80, 672, 'EP0 是唯一的双向端点，setup 包放在 dQH 的 SetupBuffer', 't28w');
-  txt(scene, 80, 712, 'EP0 的队列头必须先初始化好，再去使能端点', 't28w');
-  txt(scene, 80, 752, '对齐错了不会报错，只会 DMA 到别的地方去', 't28w');
-
-  box(1020, 168, 850, 320, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '设备侧的六个寄存器');
-  txt(scene, 1044, 264, 'ENDPTSETUPSTAT  0x1AC  收到 setup 包', 'tnum');
-  txt(scene, 1044, 304, 'ENDPTPRIME      0x1B0  置位即启动', 'tnum');
-  txt(scene, 1044, 344, 'ENDPTFLUSH      0x1B4  停掉并清空', 'tnum');
-  txt(scene, 1044, 384, 'ENDPTSTAT       0x1B8  当前已就绪的端点', 'tnum');
-  txt(scene, 1044, 424, 'ENDPTCOMPLETE  0x1BC  哪笔传完了', 'tnum');
-  txt(scene, 1044, 464, 'ENDPTCTRL0–7    0x1C0  使能与类型', 'tnum');
-
-  box(1020, 516, 850, 280, 'var(--page)', 'var(--line)');
-  head(1044, 564, 'setup 包的两道保险');
-  txt(scene, 1044, 612, 'SLOM=1：关掉 setup lockout，别丢重复包', 'tnum');
-  txt(scene, 1044, 652, 'SUTW 置位：抄 SetupBuffer 时防被新包冲掉', 'tnum');
-  txt(scene, 1044, 692, '抄完清 SUTW，再清对应 ENDPTSETUPSTAT 位', 't28w');
-  txt(scene, 1044, 732, '顺序乱了，长中断延迟下会漏掉 setup 包', 't28w');
+  txt(scene, 56, 146, '设备模式是“硬件替你跑协议”：你只需摆好端点列表与传输描述符，剩下的握手由控制器完成', 't24w');
+  three([80, '端点列表', ['+0x158 ENDPOINTLISTADDR', '必须 2 KB 对齐', '每端点一个 dQH（48 字节）', '内含当前 dTD 指针', '与传输进度字段', '地址错位 → 全都不通'], 't20s'],
+        [680, 'dTD 描述符', ['32 字节（用前 28）', '含 next 指针、token、缓冲地址', 'token 里有长度与状态', '一次传输可链多个 dTD', '缓冲地址要 4 字节对齐', 'DMA 要 cache 一致'], 't20s'],
+        [1280, '四个动作寄存器', ['+0x1AC ENDPTSETUPSTAT', '+0x1B0 ENDPTPRIME 置位启动', '+0x1B4 ENDPTFLUSH 取消', '+0x1B8 ENDPTSTAT 就绪状态', '+0x1BC ENDPTCOMPLETE 完成', 'bit n=TX n，bit 16+n=RX n']]);
+  prose('EPNTPRIME 的位映射要背：bit n 对应发送端点 n，bit 16+n 对应接收端点 n；所以 RX 端点 1 是 bit17，不是 bit1', [
+    '每挂一个传输都要 prime 一次；如果忘了 prime，端点就永远“没在跑”，表现为“主机发来数据，设备毫无反应”。',
+    '完成时 ENDPTCOMPLETE 对应位置 1（写 1 清），并且 dTD 的 token 里状态位会更新 —— 两处都要看，只看一处容易误判。',
+    'SETUP 阶段是特殊的：它走 ENDPTSETUPSTAT，收到后必须尽快读走 setup 数据包并清该位，否则后续控制传输全部卡住。',
+    '缓冲区必须 cache 一致：USB 控制器是 DMA 主设备，CPU 写完描述符后要 clean，读完成状态前要 invalidate。',
+    '端点列表 2 KB 对齐是硬要求，底层两位被硬件当作 0；如果你 malloc 出来只有 32 字节对齐，一切都会“看起来配好了但不工作”。',
+    '判据：prime 之后读 ENDPTSTAT 对应位应为 1；传输完成后再读应为 0 且 COMPLETE 置位 —— 这个来回就是端点活着。']);
 }
 
 function drawHost() {
-  txt(scene, 56, 146, '角色切换是一次性的：CM 写完就锁，改主意得先复位', 't28w');
+  txt(scene, 56, 146, '主机模式靠“帧列表”调度：每 1 ms（或 125 µs）扫一遍，端口状态单独放在 PORTSC1', 't24w');
+  three([80, '两种列表', ['+0x154 周期帧列表基址', '用于中断/同步传输', '必须 4 KB 对齐', '+0x158 异步列表基址', '用于批量/控制传输', 'FRINDEX 是当前帧号'], 't20s'],
+        [680, 'PORTSC1 关键位', ['[0] CCS 当前连接状态', '[1] CSC 连接变化（写清）', '[2] PED 端口已使能', '[3] PE 使能变化', '[7] SUSP 挂起', '[12] PP 端口供电 / [8] PR 复位'], 't20s'],
+        [1280, '枚举流程', ['① 给端口供电 PP=1', '② 等 CCS=1', '③ 发复位 PR=1 保持', '④ 等 PED=1', '⑤ 读设备描述符', '⑥ 分配地址并设置']]);
+  prose('PP（端口供电）是很多板子“插 U 盘没反应”的真凶：没有 VBUS 或没有置 PP，设备根本没上电', [
+    '如果板上 VBUS 是常供电（不受控制器管），PP 位可能读回固定值，此时别拿它当判据，直接量 VBUS 电压更靠谱。',
+    '复位要保持一段时间（USB 规范 10 ms 以上），不是写一下就完；写 PR=1 后要等它自清并确认 PED=1。',
+    'CSC/CONNECT 这类变化位都是写 1 清，中断里不清就会反复进中断。',
+    '帧列表对齐 4 KB，且每一项是 32 位指针；错位会导致控制器取到垃圾描述符，表现为“一插设备就崩”或“HCH 一直为 1”。',
+    '低速/全速/高速设备的枚举路径不同，但都要经过“复位 → 读描述符 → 设地址 → 读配置”四步，日志里能清楚看到。',
+    '判据：插一个 U 盘，USBSTS 应出现 PCD，PORTSC1 的 CCS 由 0 变 1，复位后 PED 变 1 —— 三个位按序变化就说明主机通路正常。']);
+}
 
-  box(56, 176, 940, 620, 'var(--page)', 'var(--line)');
-  head(80, 226, 'USBMODE 的三档');
+function drawOtg() {
+  txt(scene, 56, 146, 'OTG 的难点不在协议，而在“会话”：谁供电、谁先动、挂起后怎么被叫醒', 't24w');
+  three([80, 'OTGSC（+0x1A4）', ['读 ID 脚当前电平', '读 A/B 会话是否有效', '控制 VBUS 充电/放电', '提供会话变化中断', '也管 ID 上拉', '是 OTG 状态总入口'], 't20w'],
+        [680, '非核心唤醒位', ['OTG1_CTRL[31] WIR 唤醒请求', '[10] WIE 唤醒中断使能', '[16] WKUP_ID_EN', '[17] WKUP_VBUS_EN', '[29] WKUP_DPDM_EN', '[15]/[14] 软件唤醒'], 't20s'],
+        [1280, '低功耗顺序', ['① 清中断与状态', '② 置 SUSP 进入挂起', '③ 开 WKUP_* 使能', '④ 等唤醒事件', '⑤ 清 WIR 再重开', '⑥ 恢复前先关 WIR']]);
+  prose('手册里那句“收到唤醒中断后应先关 WIE、进挂起前再打开”很关键：不清就会在唤醒后立刻再触发一次，形成“假唤醒”循环', [
+    '软件唤醒（WKUP_SW）用于“自己叫醒自己”的测试：不开 WIE 也能验证唤醒路径，调试时很好用。',
+    'DPDM 唤醒只对设备模式有意义：主机模式下 DPDM 变化不会唤醒你，因为那时你是供电方。',
+    '过流检测的极性由 OVER_CUR_POL 决定，且可以被 OVER_CUR_DIS 关掉；板子上没有过流检测电路时，一定要关掉，否则会一直上报过流。',
+    'PWR_POL 要与板上 PMIC 或 VBUS 开关的极性一致，写反了就是“该供电时断电”。',
+    'PHY 上电与时钟（第 57 章）不完成，OTG 的会话检测也读不到有效值 —— 两者是串联依赖。',
+    '判据：插不同方向的 OTG 线，ID 电平与 A/B 会话位应相应变化；拔线后挂起应能被插线唤醒，日志里有对应 WIR。']);
+}
 
-  box(80, 264, 200, 84, 'var(--page)', 'var(--line)', 2);
-  txt(scene, 100, 304, 'CM = 00', 'tnum');
-  txt(scene, 100, 340, 'idle', 't28w');
-  box(320, 264, 200, 84, 'var(--page)', 'var(--observe-line)', 4);
-  txt(scene, 340, 304, 'CM = 10', 'tnum');
-  txt(scene, 340, 340, 'device', 't28w');
-  box(560, 264, 200, 84, 'var(--page)', 'var(--line)', 2);
-  txt(scene, 580, 304, 'CM = 11', 'tnum');
-  txt(scene, 580, 340, 'host', 't28w');
-
-  txt(scene, 80, 404, '复位后是 idle，只有写一次的机会：组合控制器只认第一次', 't28w');
-  txt(scene, 80, 444, '想换角色：先 USBCMD.RST 复位控制器，再改 USBMODE', 't28w');
-
-  box(80, 484, 860, 300, 'var(--page)', 'var(--guide)', 3);
-  head(104, 530, '主机侧启动五步');
-  txt(scene, 104, 578, '① 写 USBMODE=11，再写 USBCMD.RS 让它开始跑', 't28w');
-  txt(scene, 104, 618, '② 周期表基址写 PERIODICLISTBASE，帧号在 FRINDEX', 'tnum');
-  txt(scene, 104, 658, '③ 异步表写 ASYNCLISTADDR，队头挂 bulk / control', 'tnum');
-  txt(scene, 104, 698, '④ PORTSC1 上电、检测 CCS，再发复位、置 PED', 'tnum');
-  txt(scene, 104, 738, '⑤ USBINTR 按事件开，别全开', 'tnum');
-
-  box(1020, 168, 850, 300, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, 'USBCMD 里的四位');
-  txt(scene, 1044, 264, 'RS        开始 / 停止调度', 'tnum');
-  txt(scene, 1044, 304, 'RST       控制器复位，配置会被清', 'tnum');
-  txt(scene, 1044, 344, 'FS1 / FS0 帧列表长度（1K / 512 / 256）', 'tnum');
-  txt(scene, 1044, 384, 'SUTW      setup 抄写的临时锁', 'tnum');
-  txt(scene, 1044, 424, '写 1 复位后要等它自己归零再继续', 't28w');
-
-  box(1020, 496, 850, 300, 'var(--page)', 'var(--line)');
-  head(1044, 544, '端口状态怎么读');
-  txt(scene, 1044, 592, 'CCS   有没有设备插上', 'tnum');
-  txt(scene, 1044, 632, 'CSC   插拔变化，写 1 清', 'tnum');
-  txt(scene, 1044, 672, 'PED   端口已使能，复位完成后才置位', 'tnum');
-  txt(scene, 1044, 712, 'SLI   空闲 3 ms 会挂起，不是故障', 'tnum');
-  txt(scene, 1044, 752, '枚举失败先看这四位，再翻 PHY', 't28w');
+function drawBoard() {
+  txt(scene, 56, 146, '上板排查顺序：先量电（VBUS/ID），再看控制器状态位，最后才看枚举日志与驱动', 't24w');
+  three([80, '第一步：电', ['USB_OTG1_VBUS 是否 5 V', 'ID 脚接地还是悬空', 'D+/D− 是否有 1.5 k 上拉', '设备模式下 D+ 上拉是身份', '主机模式要有 VBUS 开关', '先排除供电问题'], 't20w'],
+        [680, '第二步：状态位', ['ID 寄存器读 0xE4A1_FA05', 'USBMODE 的 CM 是否符合', 'USBSTS 的 HCH 是否合理', 'PORTSC1 的 CCS 是否变化', 'ENDPTSTAT 是否被 prime', '任何一项不符就停在这'], 't20s'],
+        [1280, '第三步：日志', ['Linux 下看 dmesg', '出现 “new high-speed USB device” 才叫成功', '只有 “reset” 没有枚举 → 信号问题', '枚举后掉线 → 供电或线材', '加 hub 试试排除供电', '别先怀疑驱动']]);
+  prose('烧录能用说明 device 通路通；接 U 盘不认说明 host 侧还没通，这个二分法能省掉一半排查时间', [
+    'D+ 上的 1.5 k 上拉是“我是个设备”的物理标志，很多自制板忘了它，结果 PC 完全看不到设备。',
+    '主机模式必须给 VBUS 供电（或至少给足 100 mA 让设备上电），只连 D+/D− 而不供电，设备永远不会枚举。',
+    '如果 dmesg 里反复出现 “device descriptor read/64, error -71”，那是信号完整性问题：查线材、查终端匹配、查 D+/D− 是否等长。',
+    'USB 高速要求 90 Ω 差分阻抗；飞线接出来的 USB 口几乎必然只能跑全速或直接失败。',
+    '调试时不要把 USB 与 SDMA/网络大流量混在一起：总线争用会让枚举超时，看起来像“随机失败”。',
+    '判据：插 U 盘 → dmesg 出现设备名与容量 → 挂载成功；拔插 20 次不失败，这条 USB 才算过关。']);
 }
 
 function draw() {
-  var s = STEPS[state.step];
-  $('hint').textContent = s.hint;
-  $('note').textContent = s.note;
-  scene.textContent = '';
-  if (state.step === 0) drawCore();
-  else if (state.step === 1) drawMap();
-  else if (state.step === 2) drawDevice();
-  else drawHost();
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) drawRole();
+  else if (s === 2) drawSplit();
+  else if (s === 3) drawCmd();
+  else if (s === 4) drawDevice();
+  else if (s === 5) drawHost();
+  else if (s === 6) drawOtg();
+  else drawBoard();
 }
 
-var step = stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
-void step;
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
 zoomable(document.querySelector('.bd-stage'));
 resetButton($('reset'), function () { state.step = INIT.step; draw(); });
 fitCanvas($('viewport'), $('canvas'), draw);
