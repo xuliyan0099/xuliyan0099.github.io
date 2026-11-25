@@ -1,0 +1,190 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0 };
+var state = { step: INIT.step };
+
+var STEPS = [
+  { h: '不是普通 DMA', hint: '一个会跑脚本的核',
+    note: 'SDMA 内部有一台 16 位指令的 RISC 核，搬运由“脚本”驱动，而不是固定状态机。' },
+  { h: '谁被选中', hint: '四个标志的与或',
+    note: '可运行 = (HE 或 HO) 且 DO 且 (EP 或 EO)；优先级只决定谁先跑，不决定能不能跑。' },
+  { h: '48 个事件', hint: '一幅位图对应一个事件',
+    note: 'CHNENBL 是“事件号 → 通道位图”的查找表，复位后内容是随机值。' },
+  { h: '寄存器地图', hint: '0x020E_C000',
+    note: '主机侧只有三十来个寄存器；通道上下文与脚本都在 SDMA 自己的 RAM 里。' },
+  { h: 'CCB 与 BD', hint: '三字描述一块缓冲',
+    note: '命令、标志、计数、地址各占一段；D 位就是所有权，谁置 1 谁负责。' },
+  { h: '通道 0 的命令', hint: '下载脚本与上下文',
+    note: '通道 0 是唯一的“管理通道”，靠 BD 里的命令把代码和数据灌进 SDMA RAM。' },
+  { h: '上下文与切换', hint: '0x0800 起',
+    note: '每通道 24 或 32 字，动态切换 5 拍、静态 26 拍，差价就是吞吐。' },
+  { h: '顺序与判据', hint: '先 CHNENBL 后开跑',
+    note: '顺序错一步就是“随机通道乱跑”，判据要看 EVTERR、PSW 和 ONCE_STAT。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+function three(a, b, c) {
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(a[0], 214, a[1]); for (var i = 0; i < a[2].length; i++) txt(scene, a[0], 252 + i * 36, a[2][i], a[3] || 't20w');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(b[0], 214, b[1]); for (var j = 0; j < b[2].length; j++) txt(scene, b[0], 252 + j * 36, b[2][j], b[3] || 't20w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(c[0], 214, c[1]); for (var k = 0; k < c[2].length; k++) txt(scene, c[0], 252 + k * 36, c[2][k], c[3] || 't20w');
+}
+function prose(title, lines) {
+  wide(456, 330);
+  txt(scene, 80, 490, title, 't24');
+  for (var i = 0; i < lines.length; i++) txt(scene, 80, 522 + i * 34, lines[i], 't20w');
+}
+
+function drawCore() {
+  txt(scene, 56, 146, 'SDMA 是“会跑程序的 DMA”：内部一台小 RISC 核按脚本搬数据，主机只负责下发脚本和上下文', 't24w');
+  three([80, '三块拼起来', ['16 位指令的 RISC 核', '4 KB ROM：启动脚本', '8 KB RAM：上下文 + 脚本', '两个 DMA 单元', 'Peripheral DMA 服务片上外设', 'Burst DMA 走外部存储器']],
+        [680, '两个 DMA 单元', ['都是 32 位 AHB 主设备', '挂在不同的总线上', '因此可以并发搬', 'Per DMA 冲片上外设', 'Burst DMA 打外部存储', '各带 8 字突发与预取']],
+        [1280, '为什么需要它', ['CPU 不必逐字搬数据', '搬运策略可运行时换', '32 通道共享一台核', '靠优先级抢占调度', '脚本可放在外部存储', '用的时候再下载']]);
+  prose('“Smart”体现在可编程：同一套硬件，换一段脚本就能从 UART 搬运变成 SPI 收发，而不是焊死的固定时序', [
+    '传统 DMA 是状态机：只能做“源地址到目的地址的线形搬运”，遇到 FIFO 式外设就要额外逻辑。SDMA 把搬运写成脚本，脚本里可以有循环、有条件、有握手。',
+    '代价是启动复杂：必须先由主机把脚本与上下文灌进 SDMA 的 RAM，再触发通道。所以这一章的篇幅几乎都在讲“怎么把东西放进去、怎么让它跑起来”。',
+    'SDMA 的地址空间与主机完全独立：内部 32 位数据线、16 位地址线；主机通过 AHB 只能看到那三十来个控制寄存器，看不到 SDMA 内部 RAM。',
+    '主机侧基址是 0x020E_C000（注意不是 0x0209_0000 那组），所有 AP 可见寄存器都在 0x00–0x74 与 0x100–0x23C 两段。',
+    '两个 DMA 单元的并发才是性能关键：Peripheral DMA 走 AIPS 服务片上外设，Burst DMA 直连 MMDC 打 DDR，两条路互不排队。',
+    '一句话：SDMA 不是“更快的 memcpy”，而是“一个专职搬数据的协处理器”，脚本就是它的程序。']);
+}
+
+function drawSelect() {
+  txt(scene, 56, 146, '一个通道要跑，必须四个条件同时成立；优先级只回答“同时就绪时先跑谁”，不回答“能不能跑”', 't24w');
+  three([80, '可运行公式', ['(HE 或 HO) 且 DO 且 (EP 或 EO)', 'HE：主机置位的使能', 'HO：主机“放行”覆盖位', 'EP：事件触发挂起', 'EO：事件覆盖位', 'DO：调试覆盖，恒为 1']],
+        [680, '标志谁来动', ['HE 由 HSTART 置、STOP 清', 'EP 由事件置、脚本清', '脚本 done/notify 可清 HE 或 EP', 'HO/EO/DO 只能主机写', '一次只能清一个标志', '复位时 DO 全为 1']],
+        [1280, '谁赢', ['优先级 1–7，非 0 才能跑', '同优先级取通道号大的', 'yield 让给严格更高优先级', 'yieldge 让给同级或更高', 'done 会重新调度', 'CHNERR 记事件溢出']]);
+  prose('最容易踩的坑：CHNPRI 写 0 的通道永远不会被调度，哪怕 HE、EP 都置了也一样', [
+    '主机下发一个传输有两种风格：软件触发（置 HE）适合内存到内存的一次性搬；硬件触发（CHNENBL 映射事件，让 EP 置位）适合外设流式收发。',
+    'HO 的语义很反直觉：它让通道“不需要主机参与也能跑”。配硬件触发时通常 HO=1、HE=0，这样每来一个事件就自动跑一次，主机完全不管。',
+    'EO 用于内存到内存：没有外设事件可等，就把 EO=1 让公式里的 (EP 或 EO) 恒真，通道只等 HE。',
+    '同一事件可以点亮多个通道（CHNENBL 的位图有多位），此时靠优先级与通道号定序；调试多通道互相抢时先查这条。',
+    'CHNERR 是“事件来得太密”的证据：上一拍的事件还没被处理，新事件又来了，硬件只在 CHNERR 里留一个位，不排队。',
+    '判据：读 EVTPEND 看到哪个通道挂着、读 PSW 看到当前跑的是谁、读 INTR 看到谁 done 了，三者对不上就是公式里某个标志没置对。']);
+}
+
+function drawEvents() {
+  txt(scene, 56, 146, '48 个硬件事件对应 16 个 32 位寄存器：第 n 个事件查 CHNENBLn，得到“该点亮哪些通道”的位图', 't24w');
+  three([80, '映射关系', ['EP = EP 或 CHNENBL[n]', '每个事件一个 32 位位图', '位 i = 1 就点亮通道 i', '一个事件可点多通道', '48 事件 = 16 个寄存器', 'CHNENBL0 在 0x20E_C200'], 't20s'],
+        [680, '复位后是随机值', ['CHNENBL 物理上是 RAM', '复位内容不可预测', '必须先编程再放事件', '否则随机通道自己跑起来', 'CHNPRI 也在 0x20E_C100 起', '非 0 才可能被调度'], 't20s'],
+        [1280, '事件长什么样', ['单拍脉冲也能抓到', '电平型（FIFO 阈值）也行', '边沿检测：低→高才算', '同拍多事件不丢', '每拍转发一个', 'EVT_MIRROR 可回读线路']]);
+  prose('事件号是芯片级的固定编号（UART 收满、SPI 空、定时器到点……），写错一位就等于把别人的中断接进了自己的通道', [
+    '检测的是“上升沿”：信号从若干个周期的低电平变成若干个周期的高电平就被记为一次，所以无论脉冲多窄都不会漏，但持续高电平只算一次。',
+    '正因为是边沿，脚本跑完必须自己把 EP 清掉（done/notify 指令），否则下一次边沿到来时 EP 还是 1，看起来“又触发了”，实际是旧账。',
+    '电平型事件（比如 FIFO 到水位就一直高）适合脚本自己在循环里读 EVT_MIRROR 判断“还有没有数据”，而不是靠边沿反复触发。',
+    '事件号与通道号是两套编号：0–47 是事件，0–31 是通道。CHNENBL 的第 n 个寄存器只对应事件 n，不要与 CHNPRI 的第 n 个寄存器混为一谈。',
+    'CHNENBL 与 CHNPRI 的复位值都不可靠（前者是 RAM），所以初始化顺序必须是“先写映射与优先级，再打开任何外设的 DMA 请求”。',
+    '判据：外设侧确认已发出请求（查外设的 DMA 使能位），SDMA 侧读 EVT_MIRROR 对应位为 1，再看 EVTPEND 是否点亮了预期通道。']);
+}
+
+function drawMap() {
+  txt(scene, 56, 146, '主机侧寄存器只有三十来个：前 0x80 管调度，0x100 起是优先级，0x200 起是事件使能，0x800 以上留给内部', 't24w');
+  three([80, '调度与状态 0x00–0x38', ['MC0PTR +0x00：CCB 地址', 'INTR +0x04：HI，写 1 清', 'STOP_STAT +0x08：HE 状态/清', 'HSTART +0x0C：置 HE', 'EVTOVR +0x10：EO', 'DSPOVR +0x14：DO，复位全 1'], 't20s'],
+        [680, '其余控制 0x18–0x5C', ['HOSTOVR +0x18：HO', 'EVTPEND +0x1C：EP 镜像', 'EVTERR +0x28：读即清', 'INTRMASK +0x2C', 'PSW +0x30：当前通道', 'CONFIG +0x38 / LOCK +0x3C'], 't20s'],
+        [1280, '三段大数组', ['CHNPRI0–31：0x20E_C100 起', 'CHNENBL0–15：0x20E_C200 起', 'CHN0ADDR +0x5C 复位 0x50', 'ILLINSTADDR +0x58 复位 0x01', 'ONCE 0x40–0x50 调试口', '0x800 以上是内部 RAM'], 't20s']);
+  prose('手册里最容易看错的三个点：基址是 0x020E_C000、CHNENBL 只有 16 个而事件有 48 个、CONFIG 复位值是 0x3 不是 0', [
+    '基址 0x020E_C000 与 I2C/SAI 那些 0x020x_xxxx 完全不同段落，写驱动时如果按 0x0209_0000 去找，读回来全是 0 或触发总线错误。',
+    'INTR、STOP_STAT、EVTPEND、EVTERR 都是“读即清”或“写 1 清”，调试时随手一读就把证据抹了；要观察请用 EVTERRDBG（读不清）与 EVT_MIRROR。',
+    'CONFIG 的 ACR[4] 必须与 CCM 实际给的时钟比一致（DMA 是核心的 2 倍写 0、1 倍写 1）；CSM[1:0] 复位为 3（动态切换）。',
+    '第一次跑通道 0 之前 CSM 必须改成 0（静态），原因是通道 0 的上下文 RAM 需要在 SAVE 阶段被初始化；跑过一次之后再切回动态。',
+    'SDMA_LOCK 的 LOCK 位一置，CHN0ADDR 与脚本 RAM 就不能再被改写 —— 这是防止用户态程序往 SDMA 里塞代码的安全闸，量产前务必置上。',
+    '判据：读 CONFIG 应得 0x013 或 0x003（取决于时钟比与是否已改 CSM）、读 CHN0ADDR 应得 0x0000_0050、读 ONCE_STAT 应得 0x0000_E000。']);
+}
+
+function drawBD() {
+  txt(scene, 56, 146, 'CCB 四字指向一串 BD，每个 BD 三字：一个字命令加标志，一个字计数，两个字地址', 't24w');
+  three([80, 'CCB 四字', ['status', 'currentBDptr', 'baseBDptr', 'chanDesc', 'MC0PTR 指向它', '由脚本解释，不是硬件格式'], 't20s'],
+        [680, 'BD 第一字', ['Command[31:24]', 'L[21] 最后一块', 'R[20] 出错', 'I[19] 完成中断', 'C[18] 连续 / W[17] 环回', 'D[16] 所有权'], 't20s'],
+        [1280, 'BD 后两字', ['Count[15:0]：长度', '通道 0：PM 按半字、DM 按字', '其他脚本一般按字节', 'Buffer Address：主机地址', 'Extended：第二地址或参数', 'D=1 表示 SDMA 拥有'], 't20s']);
+  prose('D 位是唯一的同步原语：主机放好数据把 D 置 1，SDMA 处理完把 D 清 0，谁都不能碰对方那一半', [
+    '环回缓冲区怎么写：BD1、BD2 的 C 置 1（连续），BD3 的 W 置 1 且 C 清 0，同时在 BD3 上置 I；这样三轮之后脚本回卷并给主机一次中断。',
+    '如果最后一个 BD 同时置 C 与 W，脚本会立刻去开第一个 BD，而那个 BD 的 D 可能还是 0，于是报错 —— 手册专门警告过这个组合。',
+    'L 位是“流结束”标志：IPC 场景下发送方把目的 BD 的 L 置 1，接收方看到就知道不用再往后处理；本板主要用在 AP 与 SDMA 之间传递结束事件。',
+    'R 位是错误标志，某些脚本会把命令字段改写成错误码，所以出错时先看 Command 是不是变成了奇怪的数值，再看 R。',
+    'Count 的单位随脚本而变：通道 0 下载程序时按 16 位半字计，下载数据时按 32 位字计；其他脚本通常按字节 —— 差 2 倍或 4 倍时先查这里。',
+    '判据：传输结束后读 BD 的 D 应为 0、Count 应被脚本更新为实际搬运量、R 应为 0；三者任一不符就往下查脚本命令。']);
+}
+
+function drawCmd() {
+  txt(scene, 56, 146, '通道 0 是管理通道：它的 BD 命令只有六种，作用是把代码、数据、上下文搬进或搬出 SDMA 内部 RAM', 't24w');
+  three([80, '六个命令', ['0x01 C0_SET_DM：写数据 RAM', '0x02 C0_GET_DM：读数据 RAM', '0x04 C0_SET_PM：写程序 RAM', '0x06 C0_GET_PM：读程序 RAM', '0x07|CHN C0_SETCTX：装上下文', '0x03|CHN C0_GETCTX：存上下文'], 't20s'],
+        [680, '地址怎么给', ['SET 类：Buffer 是主机源', 'Extended 是 SDMA 目的', 'GET 类：Buffer 是主机目的', 'Extended 是 SDMA 源', 'SETCTX 的 Extended 不用填', '通道号藏在命令高 5 位'], 't20s'],
+        [1280, '计数单位', ['SET_PM：半字数', 'SET_DM：32 位字数', 'SETCTX：上下文字数', 'GET_PM：半字数', 'GET_DM：32 位字数', '写错单位就只搬一半'], 't20s']);
+  prose('为什么要有 SETCTX：通道号在命令字段里，脚本自己算出 0x0800 + 24×通道 的目的地址，主机不必知道内部布局', [
+    '命令值 0x07 是“置上下文”的基型，高 5 位填通道号：0x0F 表示通道 1，0xFF 表示通道 31；0x03 是“取上下文”，同样编码。',
+    '如果用 SET_DM 手工装上下文，就必须自己在 Extended 里写出正确目的地址；这就是手册建议优先用 SETCTX 的原因 —— 少一处算错的机会。',
+    '一段典型的启动 BD 链：先三个 SETCTX 装三个通道的上下文，再三个 SET_PM 装三段脚本，最后一个 BD 置 I、清 C，让主机收到一次中断。',
+    '程序 RAM 与数据 RAM 是同一块物理 RAM 的两种视角：PM 按 16 位编址（脚本指令），DM 按 32 位编址（上下文与数据）；地址不能混用。',
+    '通道 0 自己也需要一个上下文，而且必须在静态模式下被 SAVE 阶段初始化一次；这就是 CONFIG[CSM] 第一次必须写 0 的原因。',
+    '判据：下载完成后可用 GET_PM 把脚本回读到主机内存逐字比对，或用 GETCTX 回读上下文看 PC 是否指向预期的脚本入口。']);
+}
+
+function drawCtx() {
+  txt(scene, 56, 146, '上下文就是“这个通道的寄存器快照”：8 个通用寄存器加 PC、RPC、SPC、EPC 与几个标志位', 't24w');
+  three([80, '布局', ['CONTEXT_BASE = 0x0800', '每通道 24 或 32 字', '地址 = 0x0800 + 24×i', 'offset0：SF/RPC/T/PC', 'offset1：LM/EPC/DF/SPC', 'offset2–9：GR0–GR7'], 't20s'],
+        [680, 'PC 与半字', ['PC 是 14 位', '指令 16 位、存储器 32 位', 'PC 最低位选高低半字', '0 选高半字（大端视角）', '跳转指令写 RPC', 'loop 写 SPC 与 EPC'], 't20s'],
+        [1280, '切换代价', ['动态切换约 5 拍', '只存改过的寄存器', '静态切换 26 拍', '全存全取但确定性好', 'yield：让给更高优先级', 'yieldge：让给同级或更高']]);
+  prose('上下文大小是可配的：24 字还是 32 字取决于是否启用扩展，算错步长会让相邻通道的上下文互相踩踏', [
+    '信号的错误位有两位：SF（源访问出错，LD/LDF 更新）与 DF（目的访问出错，ST/STF 更新）；它们一旦置位，正在跑的硬件循环会立刻退出。',
+    '循环结束时读 T 位判断是否“正常跑完”：正常情况 GReg0 减到 0 置 T，异常退出则 T 保持原值 —— 这就是脚本判断搬运是否被中断的标准手法。',
+    'LM 两位记录循环状态（是否在环内、PC 是否停在最后一拍）；恢复时靠它决定下一条指令取 PC 还是 EPC，掉一位就会从循环中间重新开始。',
+    '动态模式下只保存“被改过的寄存器”，所以脚本改动越少切换越快；静态模式全存全取，适合通道 0 这种初始化路径。',
+    '抢占规则：yield 只让给严格更高优先级，yieldge 连同级也让 —— 音频这类等不了几拍的通道会主动用后者，把时隙让给同级的显示通道。',
+    '判据：用 GETCTX 回读某个通道的 offset0，PC 应落在该通道脚本的入口；若 PC 为 0 说明上下文根本没装进去（SETCTX 的通道号写错了）。']);
+}
+
+function drawBoot() {
+  txt(scene, 56, 146, '启动是一条严格顺序：先映射事件与优先级，再配时钟比，再建 CCB/BD，最后才置 HSTART', 't24w');
+  three([80, '七步顺序', ['① 复位，RAM 内容随机', '② 写 CHNENBL 映射事件', '③ 写 CHNPRI 给非 0 优先级', '④ CONFIG：ACR + CSM=0', '⑤ 在主机内存建 CCB/BD', '⑥ 写 MC0PTR 指向 CCB'], 't20s'],
+        [680, '开跑与收尾', ['⑦ HOSTOVR/EVTOVR 放开', '⑧ HSTART bit0 置 HE[0]', '⑨ 等 INTR[0] 置位表示 done', '⑩ 置 SDMA_LOCK 防改写', '之后才允许外设发事件', '先开后放会随机乱跑']],
+        [1280, '判据与故障', ['EVTERR 非 0 → 事件溢出', 'PSW 看当前通道号', 'EVT_MIRROR 看事件线路', 'ONCE_STAT 应 0xE000', 'CHN0ADDR 应 0x050', '全 0 的 CHNENBL 会挂住']]);
+  prose('最典型的失败是“什么都没发生”：CHNENBL 全 0 时 SDMA 静默停在启动通道上等，既不报错也没有波形', [
+    '手册明确说复位后程序 RAM、上下文 RAM、数据 RAM、CHNENBL 的内容都不可预测 —— 所以“先写映射、后放事件”不是建议而是硬要求。',
+    'HSTART 只置 bit0 是标准做法：只让通道 0 开跑，其余通道等 channel 0 把上下文装好之后再靠事件或 HE 触发。',
+    '等 INTR[0] 用轮询或中断都行；若一直等不到，先读 PSW 看当前通道是不是 0，再看 BD 链的 D 位是否确实置 1、CCB 的 currentBDptr 是否指向第一块。',
+    'LOCK 置上之后连自己都改不了 CHN0ADDR 了，调试期可以先不置；量产镜像里必须在启动流程末尾置位，否则任何能访问该地址的代码都能换掉 SDMA 的启动脚本。',
+    '和低功耗的握手也要走这条通路：进入 WAIT 前用脚本把 DMA 排空、退出时靠 SDMA 的完成中断唤醒，硬件握手位在 CCM 侧，不在 SDMA 寄存器里。',
+    '判据三条同时成立才算跑通：EVTERR=0、目标 BD 的 D 被清 0、对应通道 INTR 位置 1；缺一条就沿 BD 链倒查到底是哪一步没落地。']);
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawCore();
+  else if (s === 1) drawSelect();
+  else if (s === 2) drawEvents();
+  else if (s === 3) drawMap();
+  else if (s === 4) drawBD();
+  else if (s === 5) drawCmd();
+  else if (s === 6) drawCtx();
+  else drawBoot();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () { state.step = INIT.step; draw(); });
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>

@@ -1,0 +1,173 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0 };
+var state = { step: INIT.step };
+
+var STEPS = [
+  { h: '一条链串四个 TAP', hint: 'SJC 当主控',
+    note: 'JTAG 只有五根脚，却要够到 A7、SDMA、DAP 与 ETM —— 靠菊花链把多个 TAP 串成一条。' },
+  { h: 'MOD 决定拓扑', hint: '复位时采样一次',
+    note: 'MOD=0 全串起来（调试快），MOD=1 只留 SJC（纯 1149.1 边界扫描）。' },
+  { h: '引脚与速度上限', hint: 'TCK ≤ 核心/8',
+    note: '五根脚都在 ALT0，带上拉；TCK 上限是被访问核时钟的八分之一，不是芯片主频。' },
+  { h: '五位指令寄存器', hint: '00000 就是 IDCODE',
+    note: 'IR 只有 5 位，复位值 0b00000 等价 IDCODE；边界扫描、调试、安全各有指令。' },
+  { h: 'ExtraDebug 寄存器', hint: '不是内存映射',
+    note: 'SJC 的寄存器只能用 JTAG 经 DR 索引访问，地址 0–7；DCR 管调试请求，SSR 报安全状态。' },
+  { h: '三种安全模式', hint: '熔丝定生死',
+    note: '无调试 / 挑战应答 / 全开；eFUSE 烧断不可逆，量产前必须想清楚。' },
+  { h: '板上的现实', hint: 'JTAG 脚被 SAI2 占了',
+    note: '本板音频用 SAI2，正好压在 JTAG 五脚上 —— 调试与音频只能二选一。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+function three(a, b, c) {
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(a[0], 214, a[1]); for (var i = 0; i < a[2].length; i++) txt(scene, a[0], 252 + i * 36, a[2][i], a[3] || 't20w');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(b[0], 214, b[1]); for (var j = 0; j < b[2].length; j++) txt(scene, b[0], 252 + j * 36, b[2][j], b[3] || 't20w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(c[0], 214, c[1]); for (var k = 0; k < c[2].length; k++) txt(scene, c[0], 252 + k * 36, c[2][k], c[3] || 't20w');
+}
+function prose(title, lines) {
+  wide(456, 330);
+  txt(scene, 80, 490, title, 't24');
+  for (var i = 0; i < lines.length; i++) txt(scene, 80, 522 + i * 34, lines[i], 't20w');
+}
+
+function drawChain() {
+  txt(scene, 56, 146, 'JTAG 只有五根脚，却要够到四个 TAP：靠一条 TDI→TDO 的链，加上 SJC 这个“链主”来切分', 't24w');
+  three([80, '四个 TAP', ['SJC：5 位 IR，链主', 'SDMA：4 位 IR', 'DAP_A7：4 位 IR', 'DAP_M4：4 位 IR', '每个 TAP 有自己的指令寄存器', '链上数据依次穿过所有 IR'], 't20s'],
+        [680, '谁做主', ['SJC 是 master TAP', '边界扫描链由 SJC 控制', 'SJC 进 TLR 时复位全部 TAP', 'TSB 负责把链接到哪个 TAP', 'sdma_bypass 位可跳过 SDMA', '切 bypass 要多给一拍 TMS=0'], 't20s'],
+        [1280, '链长的代价', ['IR 越长，切指令越慢', 'DR 移位要穿过整条链', '旁路未用 TAP 能省时间', 'BYPASS 只占 1 位', '但 TAP 本身仍在链上', '所以才有 MOD=1 单 TAP 模式']]);
+  prose('菊花链的本质是“移位寄存器串起来”：你发的每一位都要穿过前面所有 TAP 的旁路位才能到达目标', [
+    'SJC 的 IR 是 5 位，SDMA 与两个 DAP 各 4 位；全链打开时，要切一个指令得先算清“目标 TAP 在链上的位置”，否则指令会落到别人手里。',
+    'TAP Selection Block 干三件事：把多个 TAP 接到一条链、声明 SJC 为链主、并在 SJC 进 Test-Logic-Reset 时把全部 TAP 一起复位。',
+    '“切 SDMA bypass”之后要多给一拍 TMS=0：因为旁路路径上多了一个 D 触发器，状态机需要一拍把数据推过去；少这一拍就是“怎么都不通”。',
+    'TCK 频率不是随便给的：上限是被访问核时钟的八分之一，链里若有低功耗停时钟的核，整条链都得跟着降速。',
+    '板上调试最常遇到的现象是“能读到 IDCODE 但 halt 不了核”：这说明 SJC TAP 通了，但 DAP 的 IR 没被正确选中（链位置算错了）。',
+    '判据：写完 IR 后回读捕获值（Capture-IR 固定为 0b00001），再读 IDCODE 拿到 32 位非全 0 值，链才算接对。']);
+}
+
+function drawMod() {
+  txt(scene, 56, 146, 'MOD 脚只在 TRST 复位那一刻被采样一次：决定是把四个 TAP 串起来，还是只留 SJC 一个', 't24w');
+  three([80, 'MOD=0（默认）', ['全链：SJC+SDMA+DAP_A7+DAP_M4', '适合高速软件调试', '适合产线烧写与量产', '也是板子默认接法', 'OpenOCD 按多 TAP 配置', '链上顺序要照图 47-2 排'], 't20s'],
+        [680, 'MOD=1', ['只连 SJC 一个 TAP', '真正的 IEEE 1149.1 合规', '主要给边界扫描与 ICT 用', '不经过任何核的 TAP', '适合板级连通性测试', '也用于无需调试的量产板'], 't20s'],
+        [1280, '改不了的时刻', ['采样点在 TRST 复位', '上电后改 MOD 无效', '要改必须重新走 POR/TRST', 'JTAG_MOD 无复用，专用脚', '内部有上拉决定默认', '悬空就是默认全链']]);
+  prose('两个模式不是“功能多少”，而是“物理上链里有谁”：MOD=1 时 SDMA 与 DAP 根本不在移位路径上', [
+    '默认（MOD 取反、逻辑 0）把 SJC、SDMA、DAP_A7、DAP_M4 全部串进 TDI-TDO，这是日常调试与量产烧写的形态。',
+    'MOD 置位（逻辑 1）只剩 SJC：此时边界扫描寄存器直接由 SJC 控制，指令集退化为标准 1149.1，板级测试仪最爱这个模式。',
+    '注意采样时机是 TRST 复位（以及 POR 复位）那一瞬：运行中拉 MOD 不会有任何效果，必须重新复位 TAP 链。',
+    '板上如果 MOD 悬空，靠内部上拉得到默认全链；想让板子强制进单 TAP 模式，得在 MOD 上放一个下拉或跳线。',
+    '两个模式共用同一组五根脚，所以“调试口还能不能扫边界”完全取决于这个脚，而不是软件配置。',
+    '判据：MOD=1 时读到的 IDCODE 仍应是芯片 ID，但此时任何“halt 核”的尝试都会失败 —— 这正是模式生效的证据。']);
+}
+
+function drawPins() {
+  txt(scene, 56, 146, '五根脚全在 ALT0，并带上拉；第六根 MOD 专用；第七根 DE_B 复用 UART2_CTS_B 的 ALT7', 't24w');
+  three([80, '五根标准脚', ['JTAG_TCK：测试时钟，ALT0', 'JTAG_TDI：数据入，ALT0', 'JTAG_TDO：数据出，ALT0', 'JTAG_TMS：状态机，ALT0', 'JTAG_TRST_B：异步复位，ALT0', 'TCK/TMS/TDI/TRST 内部上拉'], 't20s'],
+        [680, '两根特殊脚', ['JTAG_MOD：模式选择，专用', 'JTAG_DE_B：调试请求/应答', 'DE_B 在 UART2_CTS_B ALT7', 'DE_B 带上拉，注意方向', '开 DE 功能要先设 DCR 位', '否则只是普通 GPIO'], 't20s'],
+        [1280, '频率约束', ['TCK ≤ 被访问核时钟 / 8', '链里有 SDMA 就按 SDMA 算', '核进低功耗停钟则整链降速', 'CE 总线另有 25 MHz 上限', 'TDO 在下降沿变化', 'TDI/TMS 在上升沿采样']]);
+  prose('TDO 为什么在下降沿变化：这样接收端在下一个上升沿采样时，数据已经稳定了半个周期，边扫边跑才不会误采', [
+    '手册明确写了 TCK、TDI、TMS、TRST 都带内部上拉：板子上不加外部上拉也能工作，但长排线仍建议加，避免边沿被反射拉出毛刺。',
+    'TDO 是三态的，只在 Shift-IR 与 Shift-DR 两个状态被驱动；其余时间高阻，所以多器件共用 TDO 时不会打架。',
+    'DE_B 是“向核发调试请求、并回收应答”的那根线，默认只是 UART2_CTS_B；要用它必须先置 DCR 的 DE_TO_ARM 或 DE_TO_SDMA。',
+    '把 DCR[3] DEBUG_OBS 置 1 会让 DE_B 被无条件拉低（因为内部 system_debug 恒为高），调试时误置这一位会让外部调试器以为一直有请求。',
+    '时钟比例这条最坑：很多人按 24 MHz 主频除以几去算 TCK，其实约束是“被访问核的时钟/8”，SDMA 在 66 MHz 时就只能给到 8 MHz 出头。',
+    '判据：示波器看 TCK 是否干净、TMS 在上升沿是否稳定、TDO 是否只在移位窗口内有驱动；三者都对才排得上“协议问题”。']);
+}
+
+function drawIR() {
+  txt(scene, 56, 146, '五位指令寄存器：复位值是 00000（等价 IDCODE），Capture-IR 固定捕获 00001，这是判断链是否活着的锚点', 't24w');
+  three([80, '标准指令', ['00000 IDCODE（复位值）', '00001 SAMPLE/PRELOAD', '00010 EXTEST', '00011 HI-Z', '11111 BYPASS', '01000 EXTEST_PULSE'], 't20s'],
+        [680, '调试与扩展', ['00100 ENABLE_ExtraDebug', '00101 ENTER_DEBUG（受安全控制）', '00111 TAP select', '01100 Security Output challenge', '01101 Security Enter response', '01001 EXTEST_TRAIN'], 't20s'],
+        [1280, '两个锚点值', ['Capture-IR 捕获 0b00001', '读 IDCODE 得芯片 ID', 'IDCODE 低 11 位是厂商码', '厂商码 NXP/Freescale = 0x00E', '回读不是这个值 = 链错', '复位后 IR 必为 IDCODE']]);
+  prose('“读得到 IDCODE”是 JTAG 的第一个门槛：它证明 TCK/TMS/TDI/TDO 四根线与链拓扑都对了', [
+    'IR 只有 5 位，所以一条链上所有 TAP 的 IR 会拼成一条长移位寄存器；发指令时要把“前面 TAP 的 BYPASS 码”一起塞进去。',
+    'EXTEST 会把输出脚从系统逻辑手里抢过来，用于板级连通测试；在正常运行的板子上误发 EXTEST 会让外设瞬间失控，所以调试脚本要避免误入。',
+    'HI-Z 让所有输出变高阻，EXTEST_PULSE/TRAIN 是 1149.6 的交流测试指令，给带 AC 耦合的差分链路用。',
+    'ENABLE_ExtraDebug（00100）是访问 SJC 私有寄存器的钥匙：不进这个指令，后面的 DR 访问都到不了 DCR/SSR 这些寄存器。',
+    'ENTER_DEBUG（00101）受安全模式约束：模式 #1 下它无效，模式 #2 下要先通过挑战应答，只有模式 #3 才随便用。',
+    '判据：进 TLR 后读 DR 应得 IDCODE；再发 Capture-IR 应捕获 0b00001；两个都对，链的物理层与状态机就都没问题。']);
+}
+
+function drawRegs() {
+  txt(scene, 56, 146, 'SJC 的寄存器不在内存空间里：手册给的 0h–7h 是 DR 索引，必须先进 ENABLE_ExtraDebug 才能访问', 't24w');
+  three([80, '七个 DR 索引', ['0：GPUSR1 核与 PLL 状态', '1：GPUSR2', '2：GPUSR3', '3：GPSSR 受保护状态', '4：DCR 调试控制，复位 0x1F9E0000', '5：SSR 安全状态'], 't20s'],
+        [680, 'DCR 位域', ['[0] DE_TO_ARM', '[1] DE_TO_SDMA', '[3] DEBUG_OBS：无条件拉 DE_B', '[5] DIRECT_SDMA_REQ_EN', '[6] DIRECT_ARM_REQ_EN', '[31:7] 保留'], 't20s'],
+        [1280, 'SSR 位域', ['[14] BOOTIND：内部启动取反', '[12:11] RSSTAT 应答状态', '[10:9] SJM 安全模式', '[8] FT 熔丝类型', '[5] EBG / [4] EBF', '[3] SWE / [2] SWF / [1] KTA / [0] KTF'], 't20s']);
+  prose('SSR 是整个安全章节的“仪表盘”：SJM 告诉你芯片处在哪种安全模式，RSSTAT 告诉你应答验过没有', [
+    'DR 索引 7 是 GPCCR（通用时钟控制，复位 0x0C00_05A0），索引 6 保留；手册的“地址 0/1/2…”只是索引，不是总线地址。',
+    'RSSTAT 四态很好用：00 没输入应答、01 输入了但没验证、10 输入了且错误、11 正确 —— 排“为什么调试器连不上”时先读这两位。',
+    'SJM 的编码要记清：00 无调试（最严）、01 安全 JTAG（挑战应答）、11 JTAG 全开；10 是保留值，读到它说明熔丝组合异常。',
+    'KTF 与 KTA 一起看：KTF 是熔丝是否烧了“杀 trace”，KTA 是当前 trace 是否真被掐断；两者不等说明条件还没满足（比如还没进安全模式）。',
+    'DCR 的复位值 0x1F9E_0000 里高半段那一串 1 是保留位的复位值，写的时候只动低 7 位，别整字覆盖。',
+    '判据：进 ExtraDebug 后读索引 5 得 SSR，其中 SJM 应与实际熔丝状态一致；若读回全 0 或全 1，多半是 DR 索引或指令发错了。']);
+}
+
+function drawSec() {
+  txt(scene, 56, 146, '三种安全模式由 eFUSE 决定，烧断不可逆：这是整颗芯片最不可回退的一个决定', 't24w');
+  three([80, 'Mode #1 无调试', ['最高安全等级', '只留边界扫描 / MBIST / PLL BIST', 'PLL bypass 仍可用', '电源模式等状态位可读', '调试、trace 全部封死', '量产安全产品首选'], 't20s'],
+        [680, 'Mode #2 安全 JTAG', ['挑战应答认证', 'Output challenge 指令取挑战码', 'Enter response 指令送应答', 'Update-DR 时比对', '每颗片有固定挑战-应答对', '退回返修时用'], 't20s'],
+        [1280, 'Mode #3 全开 + 软件门', ['JTAG 全部功能可用', 'HAB_JDE 位可软件开 JTAG', 'JDE 的 LOCK 位锁到下次 POR', 'JTAG_HEO 熔丝可永久禁软件开', 'Kill Trace 熔丝掐 ETM', 'SJC disable 熔丝连 IDCODE 都封']]);
+  prose('安全模式的真实分界：能不能“让外部人拿到核的控制权”，而不是“能不能做边界扫描”', [
+    'Mode #1 下边界扫描仍可用，是因为它只碰引脚不碰核 —— 板级连通性测试与产线 ICT 靠它，不构成“入侵”。',
+    'Mode #2 是给返修留的后门：挑战码从 TDO 读出，应答码从 TDI 送入，比对在 Update-DR 那一刻完成；固定应答对在制造时就定好，之后不变。',
+    'Mode #3 等于不设防，只适合开发板；正式产品如果留这个模式，等于把调试口当后门敞开。',
+    'HAB_JDE 是“软件开口子”：置 1 后即使处在 Mode #2 也能直接开 JTAG，代价是安全性依赖软件；JDE 的 LOCK 位一置就锁到下次 POR，平台初始化应在交权前锁死它。',
+    'Kill Trace 更细：熔丝烧了并且 SJC 的 ipt_secur_block 成立时（比如 Mode #2 且没有正确应答、TRST 有效、POR 未发生过），ETM 输出直接被掐断，连引脚也救不回来。',
+    '再往上还有“SJC disable 熔丝”：连 IDCODE 与边界扫描都封掉，此时 JTAG 口对外就是一块死铁，只剩电源与功能脚。']);
+}
+
+function drawBoard() {
+  txt(scene, 56, 146, '本板最要紧的一条：SAI2 的六根音频信号正好复用 JTAG 的五根脚，调试与音频只能二选一', 't24w');
+  three([80, '冲突从哪来', ['SAI2_MCLK = JTAG_TMS ALT2', 'SAI2_BCLK = JTAG_TDI ALT2', 'SAI2_SYNC = JTAG_TDO ALT2', 'SAI2_TXD = JTAG_TRST ALT2', 'SAI2_RXD = JTAG_TCK ALT2', '切到 ALT2 JTAG 立即失效'], 't20s'],
+        [680, '不冲突的做法', ['调试阶段保持 ALT0', '音频功能最后再切 ALT2', '或改用 SAI1（CSI 脚）', '或改用 SAI3（LCD 脚）', '量产板干脆不引出 JTAG', '靠串口 + USB 恢复'], 't20w'],
+        [1280, '上电与复位', ['POR 时内部 TRST 被拉低', 'TAP 因此进 TLR', 'TMS 悬空/接高则停在 TLR', 'TRST 脚可异步复位 TAP', '复位脚带上拉，默认不复位', '调试器要先拉 TRST 再发指令']]);
+  prose('这也是“为什么这块板子更适合串口调试”：省下 JTAG 五根脚，就能让 codec 全功能工作', [
+    '第 45 章已经核实过：板上音频 codec 那组网名就是 SAI2_RXD / SAI2_MCLK / SAI2_BCLK / SAI2_SYNC / SAI2_TXD，正好一一对应 JTAG 的五个焊盘。',
+    '所以“我要同时听声音又要在核上打断点”在这块板上做不到；要么把 codec 挪到 SAI1/SAI3，要么接受只能看串口日志。',
+    '上电瞬间 POR 会内部拉低 TRST，把 TAP 强制进 Test-Logic-Reset；之后 TMS 若悬空或接高，TAP 就再也出不来 —— 这正是“调试口看似没反应”的常见原因。',
+    '调试器连接流程应是：拉低 TRST → 释放 → 发 TLR → 读 IDCODE；跳过 TRST 那一步，链上残留状态会让第一次读 IDCODE 失败。',
+    '若要保留调试又要音频，现实方案是留 0 欧电阻跳线：量产出货焊到 SAI2，返修时吹掉改回 JTAG；比改板便宜得多。',
+    '判据：ALT0 下读 IDCODE 正常且能 halt 核；切到 ALT2 后 IDCODE 读不到、但 codec 有声音 —— 两者互斥成立，说明复用配置写对了。']);
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawChain();
+  else if (s === 1) drawMod();
+  else if (s === 2) drawPins();
+  else if (s === 3) drawIR();
+  else if (s === 4) drawRegs();
+  else if (s === 5) drawSec();
+  else drawBoard();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () { state.step = INIT.step; draw(); });
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>
