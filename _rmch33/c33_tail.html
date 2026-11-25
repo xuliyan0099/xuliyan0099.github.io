@@ -1,0 +1,337 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0, lane: 0 };
+var state = { step: INIT.step, lane: INIT.lane };
+
+var STEPS = [
+  { h: 'KPP 是什么', hint: '8×8 矩阵 · 四寄存器 · 两个时钟',
+    note: '64 个键只用 16 根线，代价是必须扫描；消抖、唤醒都在硬件里做，软件只管扫和译码。' },
+  { h: '寄存器与焊盘', hint: '0x020B_8000 · COL0 与 ROW2 同脚',
+    note: '四个 16 位寄存器间隔 2 字节；16 个焊盘全在 ENET1/2 与 NAND 上，且有一个被列和行共用。' },
+  { h: '矩阵怎么接', hint: '列开漏 · 行上拉 · ghost 二极管',
+    note: '列只能开漏输出，行必须上拉输入，按键把行列短接；三键成矩形会长出 ghost 键，靠二极管截断。' },
+  { h: '扫描与消抖', hint: '硬件同步 122 µs · 软件 3–4 遍',
+    note: '一次扫描 = 逐列拉 0 读行；硬件滤短毛刺，软件连续几遍一致才算按下，两层时间常数要对齐。' },
+  { h: '四个寄存器', hint: 'KPCR · KPSR · KDDR · KPDR',
+    note: '真正要背的只有 KPSR 低 4 位：两个 w1c 标志、一个置链、一个清链，顺序错了就丢事件。' },
+  { h: '初始化与扫描', hint: '七步初始化 · 十步一遍 · 低功耗唤醒',
+    note: '待机 = 列全 0 + 行输入上拉 + 32k 在跑；唤醒后先切扫描才知道按的是谁。' },
+  { h: '判据与故障', hint: '电气读数 → 逻辑读数 → 时钟',
+    note: '先量电平确认线通，再看 KPKD 确认逻辑活；全 0 多半是上拉没配，别当成"全按下了"。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+
+function drawTop() {
+  txt(scene, 56, 146, 'KPP 是 16 位键盘矩阵控制器：8×8、开漏列、上拉行、硬件消抖', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '它能做什么');
+  txt(scene, 80, 252, '8×8 矩阵，最多 64 个键', 't20w');
+  txt(scene, 80, 288, '16 根线空闲时可当 GPIO', 't20w');
+  txt(scene, 80, 324, '硬件消抖：4 级同步链', 't20w');
+  txt(scene, 80, 360, '长按/连击：清链再触发', 't20w');
+  txt(scene, 80, 396, '待机时仍检测按键', 't20w');
+  txt(scene, 80, 432, '中断可直接唤醒 CPU', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '两个时钟');
+  txt(scene, 680, 252, 'ipg_clk：寄存器访问', 't20w');
+  txt(scene, 680, 288, 'ipg_clk_32k：消抖与同步', 't20w');
+  txt(scene, 680, 324, '32k 必须常开，最低功耗也在跑', 't20w');
+  txt(scene, 680, 360, '关掉 32k 就不再产生中断', 't20w');
+  txt(scene, 680, 396, '16 根脚全在 ENET1/2 与 NAND', 't20w');
+  txt(scene, 680, 432, '复用前先看板子占没占', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '两种接法');
+  txt(scene, 1280, 252, '2-point：行列交叉短接', 't20w');
+  txt(scene, 1280, 288, 'N 列 + M 行支持 N×M 键', 't20w');
+  txt(scene, 1280, 324, '3-point：两脚接线、一脚接地', 't20w');
+  txt(scene, 1280, 360, '读数据寄存器即可，免扫描', 't20w');
+  txt(scene, 1280, 396, '代价是每键至少占一根行线', 't20w');
+  txt(scene, 1280, 432, '单开关挂空闲行线到地也行', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, 'KPP 的价值不是省 IO，而是把「扫描 + 消抖 + 唤醒」做进硬件', 't24');
+  txt(scene, 80, 522, '64 个键只占 16 根线，代价是软件必须扫描：逐列拉低、读行电平，才能知道按下的是哪一个。', 't20w');
+  txt(scene, 80, 556, '消抖不靠软件延时：行输入经 4 级 32k 触发器同步，短于 3 个 32k 周期（约 92 µs）的毛刺直接被滤掉。', 't20w');
+  txt(scene, 80, 590, '待机时把列全写 0、行保持输入上拉，任何键按下都会拉低某行，硬件立刻给出中断，CPU 可以睡到那一刻。', 't20w');
+  txt(scene, 80, 624, '它也不是通用 IO 扩展器：列只能开漏输出（防两键同按形成电源到地的直通），行只能输入带上拉。', 't20w');
+  txt(scene, 80, 658, '一句话：KPP = 矩阵扫描器 + 硬件消抖 + 唤醒源，寄存器只有四个，难点全在时序和矩阵接法上。', 't20w');
+}
+
+function drawMap() {
+  txt(scene, 56, 146, '四个 16 位寄存器，基址 0x020B_8000，偏移间隔 2 字节', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '寄存器地图');
+  txt(scene, 80, 252, 'KPCR @+0x0 复位 0x0000', 't20s');
+  txt(scene, 80, 288, 'KPSR @+0x2 复位 0x0400', 't20s');
+  txt(scene, 80, 324, 'KDDR @+0x4 复位 0x0000', 't20s');
+  txt(scene, 80, 360, 'KPDR @+0x6 不受复位影响', 't20s');
+  txt(scene, 80, 396, '16 位宽，可按字节/半字访问', 't20w');
+  txt(scene, 80, 432, '高 8 位 = 列，低 8 位 = 行', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '列脚从哪来');
+  txt(scene, 680, 252, 'COL0 ENET1_RX_DATA1 ALT6', 't20s');
+  txt(scene, 680, 288, 'COL1 ENET1_TX_DATA0 ALT6', 't20s');
+  txt(scene, 680, 324, 'COL2 ENET1_TX_EN ALT6', 't20s');
+  txt(scene, 680, 360, 'COL3 ENET1_RX_ER ALT6', 't20s');
+  txt(scene, 680, 396, 'COL0–2 还可选 NAND 的 ALT3', 't20w');
+  txt(scene, 680, 432, 'COL4–7 全在 ENET2 ALT6', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '行脚从哪来');
+  txt(scene, 1280, 252, 'ROW0 ENET1_RX_DATA0 ALT6', 't20s');
+  txt(scene, 1280, 288, 'ROW1 ENET1_RX_EN ALT6', 't20s');
+  txt(scene, 1280, 324, 'ROW2 ENET1_RX_DATA1 ALT6', 't20s');
+  txt(scene, 1280, 360, 'ROW3 ENET1_TX_CLK ALT6', 't20s');
+  txt(scene, 1280, 396, 'ROW0–2 还可选 NAND ALT3', 't20w');
+  txt(scene, 1280, 432, 'ROW4–7 全在 ENET2 ALT6', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '这张表有个坑：COL0 和 ROW2 是同一个焊盘 ENET1_RX_DATA1', 't24');
+  txt(scene, 80, 522, 'RM 的复用表里 KPP_COL0 与 KPP_ROW2 都指向 ENET1_RX_DATA1（ALT6）。一个焊盘不可能同时当列又当行，', 't20w');
+  txt(scene, 80, 556, '所以 8×8 全用在这颗芯片上做不到：要么 8 列 × 7 行、要么 7 列 × 8 行，最多 56 键，别照着 8×8 画 PCB。', 't20w');
+  txt(scene, 80, 590, '第二个约束是这些脚全压在 ENET1/ENET2 与 NAND 上：板子只要用了网口或 NAND Flash，KPP 的可用脚就少一半。', 't20w');
+  txt(scene, 80, 624, 'ALPHA 与 MINI 都没有独立键盘座，原因就在这里 —— 脚被网口、NAND、LCD 分完了，KPP 在这两块板上更像"备胎"。', 't20w');
+  txt(scene, 80, 658, '选脚顺序：先在原理图上查这 16 个网络实际接到哪、被谁占用，再定矩阵尺寸；寄存器永远好改，PCB 改不了。', 't20w');
+}
+
+function drawMatrix() {
+  txt(scene, 56, 146, '矩阵怎么接：列开漏输出、行上拉输入，按键只做一件事 —— 把行列短接', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '电气约定');
+  txt(scene, 80, 252, '列：KDDR 对应位写 1 → 输出', 't20w');
+  txt(scene, 80, 288, '列：KPCR 的 KCO 写 1 → 开漏', 't20w');
+  txt(scene, 80, 324, '行：KDDR 对应位写 0 → 输入', 't20w');
+  txt(scene, 80, 360, '行：靠内部上拉，KDDR=0 时自动开', 't20w');
+  txt(scene, 80, 396, '行：IOMUX 的 PKE/PUS 也要配', 't20w');
+  txt(scene, 80, 432, '两侧都配齐，线才是确定电平', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '为什么必须开漏');
+  txt(scene, 680, 252, '两键同按可能形成行列环路', 't20w');
+  txt(scene, 680, 288, '推挽输出会电源直连地', 't20w');
+  txt(scene, 680, 324, '开漏只能拉低，不会对顶', 't20w');
+  txt(scene, 680, 360, '扫描前先切推挽把列拉高', 't20w');
+  txt(scene, 680, 396, '快速给矩阵电容充电', 't20w');
+  txt(scene, 680, 432, '再切开漏，列间间隔才能短', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, 'Ghost key');
+  txt(scene, 1280, 252, '三键成矩形会串出第四个键', 't20w');
+  txt(scene, 1280, 288, '现象：多报一个没按的键', 't20w');
+  txt(scene, 1280, 324, '解法一：每键串一只二极管', 't20w');
+  txt(scene, 1280, 360, '解法二：软件做矩形/边界校验', 't20w');
+  txt(scene, 1280, 396, '解法三：限制同时按键的个数', 't20w');
+  txt(scene, 1280, 432, '要 n-key rollover 只能上二极管', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '三种接法的取舍：2-point 矩阵、带二极管的矩阵、3-point 按键', 't24');
+  txt(scene, 80, 522, '2-point 最省：行列交叉直接短接，N 列 × M 行支持 N×M 个键，但三键以上可能出 ghost —— 这是矩阵本身的限制。', 't20w');
+  txt(scene, 80, 556, '加二极管后成为单向矩阵：电流只能从行流向列，ghost 那条绕行路径被二极管截断，代价是每键一只管子、只能单向扫描。', 't20w');
+  txt(scene, 80, 590, '3-point 接法：两个触点接两根键盘线、第三个触点接地，按下即把线拉低，直接读 KPDR 就知道是哪个键，完全不用扫描。', 't20w');
+  txt(scene, 80, 624, '3-point 的代价是每个键至少占一根行线，按键数上限就是 8 —— 适合方向键加几个功能键的小键盘，不适合全键盘。', 't20w');
+  txt(scene, 80, 658, '独立的单个开关也能直接挂到空闲行线到地：硬件自己检测闭合，不用轮询，等于把行线当成"带上拉和唤醒的按键输入"。', 't20w');
+}
+
+function drawScan() {
+  txt(scene, 56, 146, '扫描是一个软件循环：列拉 0 逐格走，读行、比对，连续 3–4 遍一致才算数', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '初始化七步');
+  txt(scene, 80, 252, '① KPCR 置 KRE，使能用到的行', 't20w');
+  txt(scene, 80, 288, '② KPDR 列数据全写 0', 't20w');
+  txt(scene, 80, 324, '③ KPCR 置 KCO，列开漏', 't20w');
+  txt(scene, 80, 360, '④ KDDR：列出、行入', 't20w');
+  txt(scene, 80, 396, '⑤ 清 KPKD，清同步链', 't20w');
+  txt(scene, 80, 432, '⑥ 开 KDIE，关 KRIE（防误报松开）', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '一遍扫描');
+  txt(scene, 680, 252, '① 关按下/松开中断', 't20w');
+  txt(scene, 680, 288, '② 列全写 1，准备拉高', 't20w');
+  txt(scene, 680, 324, '③ 切推挽，快充矩阵电容', 't20w');
+  txt(scene, 680, 360, '④ 切回开漏，防直通', 't20w');
+  txt(scene, 680, 396, '⑤ 目标列写 0，其余写 1', 't20w');
+  txt(scene, 680, 432, '⑥ 读 KRD 存表，逐列重复', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '时间预算');
+  txt(scene, 1280, 252, '32k 一个周期 ≈ 30.5 µs', 't20w');
+  txt(scene, 1280, 288, '4 级同步 ≈ 122 µs 才认键', 't20w');
+  txt(scene, 1280, 324, '噪声短于 3 周期被滤（≈92 µs）', 't20w');
+  txt(scene, 1280, 360, '整遍 = 列数 × 单列间隔', 't20w');
+  txt(scene, 1280, 396, '4 列 × 500 µs = 2 ms 一遍', 't20w');
+  txt(scene, 1280, 432, '3 遍 ≈ 6 ms，手感不觉得迟', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '消抖在硬件、去抖在软件：两层时间常数必须对齐，否则不是漏键就是黏键', 't24');
+  txt(scene, 80, 522, '硬件层：4 级同步器用 32k，电平要连续稳定约 4 个周期（122 µs）才被 KPKD 认到，更短的毛刺进不了状态位。', 't20w');
+  txt(scene, 80, 556, '软件层：一次扫描只反映"此刻"，机械键弹跳持续 1–10 ms，所以必须连续 3–4 遍读到同一组闭合才认定为按下。', 't20w');
+  txt(scene, 80, 590, '于是最小可靠节拍 ≈ max(122 µs, 弹跳时间 ÷ 比较次数)。4 列每列 500 µs 时整遍 2 ms，3 遍 6 ms，手感刚好。', 't20w');
+  txt(scene, 80, 624, '间隔太大会漏掉"快速点一下"（短于 6 ms 的按键）；太小则白烧 CPU，可以用 GPT 定时器每 500 µs 触发一次单列扫描。', 't20w');
+  txt(scene, 80, 658, '扫描中列一定是开漏：推挽输出时若两键成环，两个输出会互相灌电流；开漏最坏只是拉低变弱，不会烧片。', 't20w');
+}
+
+function drawReg() {
+  txt(scene, 56, 146, '四个寄存器里真正要背的只有 KPSR 的低 4 位，其余都是方向和数据的搬运', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'KPCR @+0x0');
+  txt(scene, 80, 252, 'bit15:8  KCO：列开漏使能', 't20s');
+  txt(scene, 80, 288, 'bit7:0   KRE：行参与中断', 't20s');
+  txt(scene, 80, 324, 'KCO=1 开漏，KCO=0 推挽', 't20w');
+  txt(scene, 80, 360, 'KRE 复位全 0：所有行都没使能', 't20w');
+  txt(scene, 80, 396, '行是否使能与引脚方向无关', 't20w');
+  txt(scene, 80, 432, '列当输入时 KCO 不起作用', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, 'KPSR @+0x2');
+  txt(scene, 680, 252, 'bit9  KRIE：松开中断使能', 't20s');
+  txt(scene, 680, 288, 'bit8  KDIE：按下中断使能', 't20s');
+  txt(scene, 680, 324, 'bit3  KRSS：写 1 置松开同步链', 't20s');
+  txt(scene, 680, 360, 'bit2  KDSC：写 1 清按下同步链', 't20s');
+  txt(scene, 680, 396, 'bit1  KPKR：w1c，全松开', 't20s');
+  txt(scene, 680, 432, 'bit0  KPKD：w1c，有键按下', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, 'KDDR / KPDR');
+  txt(scene, 1280, 252, 'KDDR：1=输出，0=输入', 't20w');
+  txt(scene, 1280, 288, '行作输入时内部上拉自动开', 't20w');
+  txt(scene, 1280, 324, '但 IOMUX 的上拉还要另配', 't20w');
+  txt(scene, 1280, 360, 'KPDR 高 8 位列，低 8 位行', 't20w');
+  txt(scene, 1280, 396, '写：进锁存器并驱动输出脚', 't20w');
+  txt(scene, 1280, 432, '读：输入位返回引脚真实电平', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '两个自清位是整个驱动的关键：KRSS 置链、KDSC 清链，配合 w1c 才不丢事件', 't24');
+  txt(scene, 80, 522, 'KPKD 是"有键按下"的锁存位，写 1 清除。若只清标志、不重设同步链，同一个按住的键会反复触发 —— 这正好拿来做长按/连击。', 't20w');
+  txt(scene, 80, 556, '松开同理：KPKR 写 1 清除，再写 KRSS 把松开链重新置高；否则下一次松开时链状态不对，中断可能来不及产生。', 't20w');
+  txt(scene, 80, 590, '顺序有讲究：扫描完先写 KRSS 再写 KDSC（RM 的扫描流程就是这么给的），保证"下一次按下"从干净状态开始检测。', 't20w');
+  txt(scene, 80, 624, '复位值 0x0400 别硬按位解释：它表示上电即"全部松开"，且 KDIE/KRIE 都是 0 —— 上电不会来中断，中断必须软件亲手打开。', 't20w');
+  txt(scene, 80, 658, '常见误判：读到 KPKD=1 就以为键还按着，其实可能是扫描时自己把列拉低造成的；判"有没有键"要看扫描后列全回 0 时的读数。', 't20w');
+}
+
+function drawCode() {
+  txt(scene, 56, 146, '初始化与扫描写成函数：七步初始化、一遍扫描十步，全是 16 位读写', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '初始化伪码');
+  txt(scene, 80, 252, 'KPCR = rows 掩码（用几行开几行）', 't20s');
+  txt(scene, 80, 288, 'KPDR = 0x0000（列先写 0）', 't20s');
+  txt(scene, 80, 324, 'KPCR |= cols 掩码（列开漏）', 't20s');
+  txt(scene, 80, 360, 'KDDR = 0xFF00（列出、行入）', 't20s');
+  txt(scene, 80, 396, 'KPSR = KDSC|KPKR|KRSS 清初态', 't20s');
+  txt(scene, 80, 432, 'KPSR |= KDIE 开按下中断', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '扫描一遍');
+  txt(scene, 680, 252, 'KPSR &= ~(KDIE|KRIE) 先关中断', 't20s');
+  txt(scene, 680, 288, 'KPDR |= 0xFF00 列全 1', 't20s');
+  txt(scene, 680, 324, '切推挽，延时 1–2 µs 充电', 't20w');
+  txt(scene, 680, 360, '切回开漏（写 KCO 掩码）', 't20w');
+  txt(scene, 680, 396, 'for c: KPDR &= ~(1<<(8+c))', 't20s');
+  txt(scene, 680, 432, 'row = KPDR & 0xFF 存表', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '与 Linux 驱动同构');
+  txt(scene, 1280, 252, 'imx_keypad.c 走同一套寄存器', 't20w');
+  txt(scene, 1280, 288, '定时器周期性驱动扫描', 't20w');
+  txt(scene, 1280, 324, '计数器做软件去抖（几遍一致）', 't20w');
+  txt(scene, 1280, 360, 'input 子系统上报键码', 't20w');
+  txt(scene, 1280, 396, '设备树 keypad 节点给行列数', 't20w');
+  txt(scene, 1280, 432, 'pinctrl 里配 16 个焊盘', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '低功耗唤醒：列全写 0、行保持输入上拉、32k 在跑，然后就可以让 CPU 睡下去', 't24');
+  txt(scene, 80, 522, '待机态不是"关掉 KPP"：KPCR 的 KRE 要保持使能、KPSR 的 KDIE 要开着、32k 时钟必须还在跑，三者缺一个就唤不醒。', 't20w');
+  txt(scene, 80, 556, '列全写 0 的作用是给矩阵一个确定的低电平：任何键按下都把对应行从"上拉高"拉成"低"，同步链立刻翻转。', 't20w');
+  txt(scene, 80, 590, '唤醒后第一件事不是读键值而是切扫描：列全置 1（先推挽充电）、再逐列拉低读行，否则只知道"有人按了"，不知道按的是谁。', 't20w');
+  txt(scene, 80, 624, '若用 3-point 或单开关挂行线，唤醒后直接读 KPDR 就行，不必扫描 —— 小键盘省 CPU 的最优路径。', 't20w');
+  txt(scene, 80, 658, '中断里只清标志、记时间、发信号量；扫描放到线程或定时器做，否则 122 µs 同步延迟加长中断会把后续按键吞掉。', 't20w');
+}
+
+function drawVerify() {
+  txt(scene, 56, 146, '判据很硬：KPCR 的 KRE、KPDR 的行值、KPSR 的两个 flag，三个读数就能定位', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '上电自检三读');
+  txt(scene, 80, 252, '① KPCR：KRE 是否按需置位', 't20w');
+  txt(scene, 80, 288, '② KDDR：应为 0xFF00', 't20s');
+  txt(scene, 80, 324, '③ KPDR：行全 1、列全 0', 't20w');
+  txt(scene, 80, 360, '行读到 0 → 上拉没开或短路', 't20w');
+  txt(scene, 80, 396, '列读到 1 → 方向或开漏配错', 't20w');
+  txt(scene, 80, 432, 'KPSR：KPKD=0、KPKR=1', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '四个故障判据');
+  txt(scene, 680, 252, '行恒 0：IOMUX 上拉没配', 't20w');
+  txt(scene, 680, 288, '按键盘值不变：列没拉低', 't20w');
+  txt(scene, 680, 324, '有值无中断：KRE 或 KDIE 漏开', 't20w');
+  txt(scene, 680, 360, '中断连发：同步链没收干净', 't20w');
+  txt(scene, 680, 396, '按一键报多键：ghost，缺二极管', 't20w');
+  txt(scene, 680, 432, '全键无反应：CCGR 门控没开', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '时钟与复用');
+  txt(scene, 1280, 252, 'CCGR 开 KPP 的 ipg 门控', 't20w');
+  txt(scene, 1280, 288, '32k 参考时钟必须在跑', 't20w');
+  txt(scene, 1280, 324, '16 脚按表配 ALT6 或 ALT3', 't20w');
+  txt(scene, 1280, 360, '行的 PAD：PKE=1、PUS 上拉档', 't20w');
+  txt(scene, 1280, 396, '列的 PAD：别配成强推挽下拉', 't20w');
+  txt(scene, 1280, 432, '复用冲突先解，再谈功能', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '先确认"线是通的"，再确认"逻辑是对的"：两步看的是完全不同的读数', 't24');
+  txt(scene, 80, 522, '线通不通看电气读数：未按键时 8 行全 1（上拉把线拉高）；把某列拉低后，该列上的键所在行变 0 —— 这是纯欧姆定律，与寄存器逻辑无关。', 't20w');
+  txt(scene, 80, 556, '逻辑对不对看 flag：KPKD 从 0 变 1 说明检测通路（同步链 + KRE 使能）是活的；电平确实变了而它不动，就查 KRE 和 32k。', 't20w');
+  txt(scene, 80, 590, '常见"假成功"：KPDR 读到全 0 就以为"所有键都按着"，其实是行上拉没配、线浮空被读成 0 —— 先量电压，再信寄存器。', 't20w');
+  txt(scene, 80, 624, '排查顺序固定：IOMUX（ALT + 上拉）→ KPCR（KRE/KCO）→ KDDR（方向）→ KPDR（数据）→ KPSR（flag）→ CCGR（时钟）。', 't20w');
+  txt(scene, 80, 658, '这块外设只有四个寄存器、二十页手册，却要求把开漏、上拉、同步、去抖四件事同时在脑子里对齐 —— 最适合练读手册加量信号。', 't20w');
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) drawMap();
+  else if (s === 2) drawMatrix();
+  else if (s === 3) drawScan();
+  else if (s === 4) drawReg();
+  else if (s === 5) drawCode();
+  else drawVerify();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () {
+  state.step = INIT.step; state.lane = INIT.lane; draw();
+});
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+function drawPmu() {
+  txt(scene, 56, 148, 'PMU 把两三路输入变成全芯片的轨；六个稳压器里，只有 LDO_ARM / LDO_SOC 是可编程的', 't24w');
+
+  var RAILS = [
+    ['VDD_ARM_IN', '0.9–1.275 V · ARM 域'],
+    ['VDD_SOC_IN', '1.15–1.3 V · SOC 域'],
+    ['VDD_HIGH_IN', '2.8–3.3 V · 模拟与 IO'],
+    ['VDD_SNVS_IN', '2.4–3.6 V · 常开域'],
+    ['VBUS 5 V', 'USB 供电 · OTG1/OTG2']
+  ];
+  RAILS.forEach(function (r, i) {
+    var y = 180 + i * 88;
+    box(56, y, 268, 72, 'var(--page)', 'var(--line)', 2);
+    txt(scene, 76, y + 30, r[0], 't24');
+    txt(scene, 76, y + 60, r[1], 't20w');
+  });
+
+  var LDOS = [
+    ['LDO_ARM', '→ VDD_ARM_CAP', '0.9–1.275 V，25 mV 一步', '可旁路 / 门控 / 稳压'],
+    ['LDO_SOC', '→ VDD_SOC_CAP', '供 SOC 域，不含 SNVS', '同样三模式，欠压进中断'],
+    ['LDO_1P1', '→ NVCC_PLL', '2.8–3.3 → 1.1 V', 'PLL、USB PHY、24M OSC'],
+    ['LDO_2P5', '→ VDD_HIGH_CAP', '2.8–3.3 → 2.5 V', '弱稳压 2.525 V / 40 Ω'],
+    ['USB LDO', '→ VDD_USB_CAP', '5 V → 3.0 V，带限流', '双 VBUS 自动选择'],
+    ['SNVS LDO', '→ VDD_SNVS_CAP', 'SNVS_IN → SNVS_CAP', 'VHIGH 在时可给纽扣充电']
+  ];
+  LDOS.forEach(function (l, i) {
+    var col = i % 3, row = Math.floor(i / 3);
+    var x = 348 + col * 512, y = 180 + row * 142;
+    box(x, y, 496, 126, 'var(--page)', i < 2 ? 'var(--observe-line)' : 'var(--line)', i < 2 ? 4 : 2);
+    txt(scene, x + 20, y + 34, l[0], 't28');
+    txt(scene, x + 20, y + 64, l[1], 't20w');
+    txt(scene, x + 20, y + 94, l[2], 't20w');
+    txt(scene, x + 20, y + 118, l[3], 't20w');
+  });
+
+  box(56, 470, 704, 316, 'var(--surface)', 'var(--guide)');
+  head(80, 510, '三种稳压模式');
+  txt(scene, 80, 552, '内部旁路：FET 全开，模拟部分关，只剩 IR 压降', 't20w');
+  txt(scene, 80, 586, '电源门控：FET 全关，输出落到漏电平衡点', 't20w');
+  txt(scene, 80, 620, '模拟稳压：按目标电压闭环，25 mV 一步', 't20w');
+  txt(scene, 80, 654, '旁路 → 稳压切换 <100 µs，别卡在切换瞬间改频', 't20w');
+  txt(scene, 80, 690, '欠压 brownout 会直接产生中断，先存现场再降级', 't20w');
+  txt(scene, 80, 726, '寄存器在 0x020C8000 起的 PMU 段，偏移见第 19 章', 't20w');
+  txt(scene, 80, 762, '别把「数字 LDO」当成数字电源：这里指负载是数字电路', 't20w');
+
+  box(784, 470, 552, 316, 'var(--surface)', 'var(--guide)');
+  head(808, 510, '五条省电手段');
+  txt(scene, 808, 552, 'DVFS：频率档与电压档成对改', 't20w');
+  txt(scene, 808, 586, 'SLR：CCR[RBC_EN] 与 REG_BYP_COUNT', 't20w');
+  txt(scene, 808, 620, 'TEMPMON 超温报警 → 降频降压', 't20w');
+  txt(scene, 808, 654, 'MMDC：1024 周期无访问即自刷新', 't20w');
+  txt(scene, 808, 688, 'DDR3 低频切 DLL-off，收窄驱动与端接', 't20w');
+  txt(scene, 808, 722, 'IO：关无用的上下拉、最小驱动、能 CMOS 就 CMOS', 't20w');
+  txt(scene, 808, 758, '改 DDR 驱动必须在非 DDR 代码里跑', 't20w');
+
+  box(1360, 470, 508, 316, 'var(--surface)', 'var(--alert-line)', 4);
+  head(1384, 510, 'DVFS 的账');
+  txt(scene, 1384, 552, 'P ∝ C·V²·f', 't20w');
+  txt(scene, 1384, 586, '528 → 396 MHz 只降 25% 频率', 't20w');
+  txt(scene, 1384, 620, '电压 1.275 → 1.15', 't20w');
+  txt(scene, 1384, 654, '两头一起省，功耗约降 35%', 't20w');
+  txt(scene, 1384, 690, '只降频不降压 ≈ 白降', 't20w');
+  txt(scene, 1384, 726, '漏电只跟电压、温度有关', 't20w');
+  txt(scene, 1384, 762, '所以 STOP 里关钟收益很小', 't20w');
+}
+

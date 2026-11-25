@@ -1,0 +1,335 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0 };
+var state = { step: INIT.step };
+
+var STEPS = [
+  { h: '八路 16 位 PWM', hint: '4×16 FIFO · 12 位预分频',
+    note: 'PWM1–4 在 0x0208 段、PWM5–8 在 0x020F 段；每路六个寄存器。' },
+  { h: '周期怎么算', hint: 'f = clk / ((P+1)(PR+1))',
+    note: '计数器 0 数到 PR+1 就归零，所以一圈是 PR+1 个时钟，字段值比实际少一。' },
+  { h: '占空比与极性', hint: '翻转置位、比较清零',
+    note: '默认在归零时输出高、比较匹配时拉低；POUTC 可以整体反相或断开输出。' },
+  { h: 'FIFO 与 REPEAT', hint: '4 深 · 水印 · 重复 1/2/4/8',
+    note: '写 PWMSAR 就是入队，每个周期取一个；写满第 4 个会置 FWE 并挡住启动。' },
+  { h: '使能六步', hint: 'PWMCR[0] 最后置 1',
+    note: '顺序错在「FIFO 写满」和「状态位没清」，两种都会让 PWM 起不来。' },
+  { h: '时钟源与低功耗', hint: 'CLKSRC · STOPEN',
+    note: '四种时钟选择，00 是关；低功耗/调试模式下是否继续跑，各有一位。' },
+  { h: '背光实践与判据', hint: '20 kHz 以上 · MOS 驱动',
+    note: '调光频率太低会看到闪烁、听到啸叫；算例与测法在最后一页。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+
+function drawTop() {
+  txt(scene, 56, 146, 'PWM 就是一个「可编程方波发生器」：16 位计数器加 4 深 FIFO，八路各管一个引脚', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '八路的地址');
+  txt(scene, 80, 252, 'PWM1 0x0208_0000', 't20s');
+  txt(scene, 80, 288, 'PWM2 0x0208_4000', 't20s');
+  txt(scene, 80, 324, 'PWM3 0x0208_8000', 't20s');
+  txt(scene, 80, 360, 'PWM4 0x0208_C000', 't20s');
+  txt(scene, 80, 396, 'PWM5–8 在 0x020F_* 段', 't20s');
+  txt(scene, 80, 432, '每路占 0x4000 空间', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '六个寄存器');
+  txt(scene, 680, 252, 'PWMCR +0x00：控制', 't20s');
+  txt(scene, 680, 288, 'PWMSR +0x04：状态（w1c）', 't20s');
+  txt(scene, 680, 324, 'PWMIR +0x08：中断使能', 't20s');
+  txt(scene, 680, 360, 'PWMSAR +0x0C：占空比', 't20s');
+  txt(scene, 680, 396, 'PWMPR +0x10：周期', 't20s');
+  txt(scene, 680, 432, 'PWMCNR +0x14：当前计数（只读）', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '复位值有含义');
+  txt(scene, 1280, 252, 'PWMCR 复位 0：默认关闭', 't20s');
+  txt(scene, 1280, 288, 'PWMSR 复位 0x8：FIFO 空', 't20s');
+  txt(scene, 1280, 324, 'PWMIR 复位 0：不使能中断', 't20s');
+  txt(scene, 1280, 360, 'PWMSAR 复位 0：占空比 0', 't20s');
+  txt(scene, 1280, 396, 'PWMPR 复位 0xFFFE', 't20s');
+  txt(scene, 1280, 432, 'PWMCNR 复位 0：计数从 0 起', 't20s');
+
+  wide(456, 330);
+  txt(scene, 80, 490, 'PWM 是「不需要 CPU 干预」的外设：配好周期与占空比，它自己一直数下去', 't24');
+  txt(scene, 80, 522, '它的价值在于便宜：一个定时器就能做呼吸灯、蜂鸣器、背光调光、舵机、加热控制，不必占用定时器中断。代价是精度与灵活性 — 换频率就要重算两个寄存器。', 't20w');
+  txt(scene, 80, 556, 'FIFO 的存在是为了「无扰调占空比」：要改变亮度，就写一个新 sample 进队列，它会在下一个周期边界生效，而不是立刻把当前周期劈断。', 't20w');
+  txt(scene, 80, 590, '八路里 PWM1–4 与 PWM5–8 分处两个地址段，但编程模型完全相同 —— 差异在时钟根与引脚复用，接线前要看 IOMUXC。', 't20w');
+  txt(scene, 80, 624, '常见的复用冲突：PWM1/PWM2 落在 GPIO1_IO08/09 上，同脚还有 SPDIF、CSI_VSYNC/HSYNC；PWM3/PWM4 落在 NAND 的 CLE/WP 附近。抢脚前先看板子实际焊了什么。', 't20w');
+  txt(scene, 80, 658, '一句话：PWM 的难点不在寄存器，而在「算对频率、配足 FIFO、选对引脚」这三件事。', 't20w');
+}
+
+function drawPeriod() {
+  txt(scene, 56, 146, '一圈 = (PRESCALER+1) × (PERIOD+1) 个输入时钟，两个字段都比实际值少一', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '计数过程');
+  txt(scene, 80, 252, '计数器从 0x0000 起', 't20w');
+  txt(scene, 80, 288, '每个预分频时钟加一', 't20w');
+  txt(scene, 80, 324, '数到 PERIOD+1 就归零', 't20w');
+  txt(scene, 80, 360, 'PR=0 时数到 1 就归零', 't20w');
+  txt(scene, 80, 396, 'PR=0xFFFE 时数到 0xFFFF 归零', 't20w');
+  txt(scene, 80, 432, '所以一圈 = PERIOD+1 个刻度', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '两个公式');
+  txt(scene, 680, 252, 'f = clk / ((P+1)(PR+1))', 't20s');
+  txt(scene, 680, 288, 'P = PRESCALER[15:4]', 't20w');
+  txt(scene, 680, 324, 'PR = PERIOD[15:0]', 't20w');
+  txt(scene, 680, 360, 'P 是 12 位：0 到 4095', 't20w');
+  txt(scene, 680, 396, 'PR 是 16 位：0 到 65535', 't20w');
+  txt(scene, 680, 432, '最低 ≈ clk / 268M', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '算一个 20 kHz');
+  txt(scene, 1280, 252, 'ipg_clk = 66 MHz', 't20w');
+  txt(scene, 1280, 288, '66M / 20k = 3300', 't20w');
+  txt(scene, 1280, 324, '取 P=0（不分频）', 't20w');
+  txt(scene, 1280, 360, 'PR+1 = 3300 → PR = 3299', 't20w');
+  txt(scene, 1280, 396, 'PR = 0x0CE3', 't20s');
+  txt(scene, 1280, 432, '误差 0（66000/3300 整除）', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '为什么两个字段都要「减一」：因为计数包含 0，N 个刻度对应 N+1 个状态', 't24');
+  txt(scene, 80, 522, 'PRESCALER 的 0 表示「除以 1」、0xFFF 表示「除以 4096」，也是同一个「值+1」关系。这种编码在定时器类外设里几乎是惯例，与 GPT/EPIT 的「分频值」写法要区分开。', 't20w');
+  txt(scene, 80, 556, '分辨率与频率是矛盾的：时钟固定时，频率越低、一圈里的刻度越多、占空比能调得越细。20 kHz 只有 3300 级，1% 的亮度变化正好是 33 个刻度，够用。', 't20w');
+  txt(scene, 80, 590, '反过来，若要 1 MHz 输出（比如某些红外载波），一圈只有 66 个刻度，占空比只能以 1/66 为步进 —— 这时要么接受粗调，要么换更高的源时钟。', 't20w');
+  txt(scene, 80, 624, '注意「输入时钟」是 CLKSRC 选中的那一个，不是固定 ipg_clk。换时钟源后必须用自己的频率重算，直接沿用旧值是最常见的错误。', 't20w');
+  txt(scene, 80, 658, '判据：用示波器量输出周期，和 1/f 对比；或用 PWMCNR 在两个周期边界各读一次，差值应等于 PR+1（预分频后的刻度数）。', 't20w');
+}
+
+function drawDuty() {
+  txt(scene, 56, 146, '占空比由「比较值」决定：归零时输出置位，计数等于 sample 时清零 —— 或按 POUTC 整体反相', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '默认极性');
+  txt(scene, 80, 252, '周期起点：输出 = 1', 't20w');
+  txt(scene, 80, 288, '计数到 SAR 时：输出 = 0', 't20w');
+  txt(scene, 80, 324, '保持低到本周期结束', 't20w');
+  txt(scene, 80, 360, '高电平宽度 = SAR 个刻度', 't20w');
+  txt(scene, 80, 396, '占空比 = SAR / (PR+1)', 't20s');
+  txt(scene, 80, 432, 'SAR 越小，高电平越窄', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, 'POUTC 三种');
+  txt(scene, 680, 252, '00 归零置位、比较清零', 't20s');
+  txt(scene, 680, 288, '01 归零清零、比较置位', 't20s');
+  txt(scene, 680, 324, '10 输出断开', 't20s');
+  txt(scene, 680, 360, '11 输出断开', 't20s');
+  txt(scene, 680, 396, '反相 = 占空比变 1−d', 't20w');
+  txt(scene, 680, 432, '断开用于「不影响引脚」', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '算 50% 与 10%');
+  txt(scene, 1280, 252, 'PR+1 = 3300（20 kHz）', 't20w');
+  txt(scene, 1280, 288, '50% → SAR = 1650 = 0x064E', 't20s');
+  txt(scene, 1280, 324, '10% → SAR = 330 = 0x014A', 't20s');
+  txt(scene, 1280, 360, '1% → SAR = 33', 't20w');
+  txt(scene, 1280, 396, 'SAR = 0 输出常高（不翻低）', 't20w');
+  txt(scene, 1280, 432, 'SAR > PR 输出常低', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '「占空比 = SAR/(PR+1)」这个分母是整个周期的刻度数，不是 PERIOD 字段值', 't24');
+  txt(scene, 80, 522, '用 PERIOD 当分母会让占空比整体偏小约 1/3300（20 kHz 下 0.03%），肉眼看不出来；但在 100 kHz 以上的高频、且要精确 50% 时，这个误差会让上下管直通时间不对称。', 't20w');
+  txt(scene, 80, 556, '两个边界要记住：SAR=0 时比较永不发生，输出恒高（不是恒低）；SAR 大于 PR 时输出在周期开始就被拉低，恒低。做「完全关断背光」要用 0 占空比对应的那种边界，别写错方向。', 't20w');
+  txt(scene, 80, 590, 'POUTC 的 10/11 是「断开输出」而非「输出低」：引脚交给别的功能或高阻，这在多路共用同一引脚网络时有用，但也会让外部上拉把电平拉高。', 't20w');
+  txt(scene, 80, 624, '调光实践：亮度与占空比不是线性关系（人眼对亮度是对数感知），所以 1%–100% 的占空比映射要做 gamma 曲线，否则低亮度段会「一跳就亮」。', 't20w');
+  txt(scene, 80, 658, '判据：示波器量高电平时间，应等于 SAR × (P+1) / clk；若正好差一个刻度，是计数起点理解错了（归零那一拍也算 0 刻度）。', 't20w');
+}
+
+function drawFifo() {
+  txt(scene, 56, 146, 'FIFO 是四个 16 位槽：每次写 PWMSAR 入队，每个周期出队一个 —— 让占空比按周期平滑变化', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '四个槽的行为');
+  txt(scene, 80, 252, '写 PWMSAR → 入队', 't20w');
+  txt(scene, 80, 288, 'FIFO 满时再写 → FWE', 't20w');
+  txt(scene, 80, 324, 'FWE 时数据不写入', 't20w');
+  txt(scene, 80, 360, '每个周期取一个 sample', 't20w');
+  txt(scene, 80, 396, 'FIFOAV 读当前有几个', 't20w');
+  txt(scene, 80, 432, '可随时写、只能使能后读', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '水印与中断');
+  txt(scene, 680, 252, 'FWM[27:26] 设水位', 't20s');
+  txt(scene, 680, 288, '00：剩 ≤3 个就报空', 't20w');
+  txt(scene, 680, 324, '11：剩 ≤0 个才报空', 't20w');
+  txt(scene, 680, 360, '空 → FE 置位 + 中断', 't20w');
+  txt(scene, 680, 396, '配合 REPEAT 可做渐变', 't20w');
+  txt(scene, 680, 432, '中断里补写 sample', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, 'REPEAT 的用法');
+  txt(scene, 1280, 252, 'REPEAT[2:1] 00：用 1 次', 't20s');
+  txt(scene, 1280, 288, '01：用 2 次', 't20s');
+  txt(scene, 1280, 324, '10：用 4 次', 't20s');
+  txt(scene, 1280, 360, '11：用 8 次', 't20s');
+  txt(scene, 1280, 396, '相当于「降采样」输出', 't20w');
+  txt(scene, 1280, 432, '呼吸灯可省一半中断', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, 'FIFO 让「改占空比」变成无扰操作：新值在下一个周期边界生效，不会劈断当前波形', 't24');
+  txt(scene, 80, 522, '如果直接改 PWMSR 里的当前值（很多实现这么干），会在周期中间跳变，输出出现一个「半个宽脉冲」—— 对 LED 无所谓，对舵机、电机就是一次抖动。', 't20w');
+  txt(scene, 80, 556, 'FWE 是启动杀手：使能后写满第 4 个槽会置 FWE，这个错误位会阻止 PWM 启动（手册明确说了）。所以使能前最多写 3 个 sample，并且要读 PWMSR 清掉所有状态位。', 't20w');
+  txt(scene, 80, 590, 'FWM 的设计意图：留出「提前量」。剩 3 个槽就报空，软件有 3 个周期的时间补数据，FIFO 不会真空 —— 这就是用中断做连续波形而不掉帧的关键。', 't20w');
+  txt(scene, 80, 624, 'REPEAT 用在「输出频率低于采样率」的场景：比如用 8 kHz 的 sample 流做 1 kHz 的亮度渐变，每个值重复 8 次，中断频率降到 1 kHz。', 't20w');
+  txt(scene, 80, 658, '判据：读 PWMCNR 与 FIFOAV，在稳定运行时应看到 FIFOAV 在 0–1 之间摆动，而不是长期 4（长期 4 说明没在消费，PWM 没真跑）。', 't20w');
+}
+
+function drawEnable() {
+  txt(scene, 56, 146, '使能是六步：先配控制、再装 FIFO、清状态、写周期，最后才置 EN —— 顺序不能省', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '六步');
+  txt(scene, 80, 252, '① PWMCR 配置，EN 保持 0', 't20w');
+  txt(scene, 80, 288, '② PWMIR 使能所需中断', 't20w');
+  txt(scene, 80, 324, '③ 写 1–3 个初始 sample', 't20w');
+  txt(scene, 80, 360, '④ 清 FWE/CMP/ROV', 't20w');
+  txt(scene, 80, 396, '⑤ 写 PWMPR 周期', 't20w');
+  txt(scene, 80, 432, '⑥ PWMCR[0]=1 使能', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '两个陷阱');
+  txt(scene, 680, 252, '写第 4 个 sample → FWE', 't20w');
+  txt(scene, 680, 288, 'FWE 会阻止 PWM 启动', 't20w');
+  txt(scene, 680, 324, '状态位不清 → 首个中断就误报', 't20w');
+  txt(scene, 680, 360, 'EN=0 时改 CLKSRC 才安全', 't20w');
+  txt(scene, 680, 396, 'SWR 会清 FIFO 但保留四位', 't20w');
+  txt(scene, 680, 432, '这四位不受 SWR 影响', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '关闭与重启');
+  txt(scene, 1280, 252, '清 EN 即可停', 't20w');
+  txt(scene, 1280, 288, 'FIFO 残值保留到下次使能', 't20w');
+  txt(scene, 1280, 324, '要清空就置 SWR 或硬复位', 't20w');
+  txt(scene, 1280, 360, 'SWR 自清，等它回 0', 't20w');
+  txt(scene, 1280, 396, 'SWR 保留 DBGEN 等四位', 't20w');
+  txt(scene, 1280, 432, '停/启可保留配置', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '「最后一步才使能」不是洁癖：EN=0 时计数器被复位，你配什么都不会立刻跑，正好安全', 't24');
+  txt(scene, 80, 522, '这也解释了为什么 CLKSRC 只能在 EN=0 时改：时钟源一换，预分频与计数器的节拍全变，运行中切换会产生不可预期的半个周期。', 't20w');
+  txt(scene, 80, 556, 'SWR 的例外清单很实用：软件复位会把所有寄存器打回复位值，但 DBGEN/STOPEN/DOZEN/WAITEN 四位保留 —— 因为这四位是「调试/低功耗策略」，不属于波形配置。', 't20w');
+  txt(scene, 80, 590, '「停/启保留配置」是常态用法：背光要熄灭，清 EN 就行；再点亮时置 EN，周期与占空比都还在，FIFO 里的残值也会接着播 —— 这可能不是你想要的，所以熄灭前通常先清空。', 't20w');
+  txt(scene, 80, 624, '顺序反例：先置 EN 再写 PWMPR，会出现一个「用旧周期跑半圈」的脉冲；对背光只是一闪，对电机就是一次冲击电流。', 't20w');
+  txt(scene, 80, 658, '判据：使能后读 PWMCNR 应看到 0 到 PR 循环变化；若恒为 0，说明 EN 没置、或 CLKSRC=00（时钟关）、或 FWE 挡住了启动。', 't20w');
+}
+
+function drawClock() {
+  txt(scene, 56, 146, '时钟源有四选一，其中一个是「关」；低功耗与调试各有独立开关，默认全关', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'CLKSRC[17:16]');
+  txt(scene, 80, 252, '00：时钟关闭', 't20s');
+  txt(scene, 80, 288, '01：ipg_clk（常规）', 't20s');
+  txt(scene, 80, 324, '10：ipg_clk_highfreq', 't20s');
+  txt(scene, 80, 360, '11：ipg_clk_32k', 't20s');
+  txt(scene, 80, 396, '复位后为 00（无时钟）', 't20w');
+  txt(scene, 80, 432, '只在 EN=0 时改', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '四个模式使能');
+  txt(scene, 680, 252, 'WAITEN[23]：等待模式继续跑', 't20s');
+  txt(scene, 680, 288, 'STOPEN[25]：停止模式继续跑', 't20s');
+  txt(scene, 680, 324, 'DOZEN[24]：休眠模式继续跑', 't20s');
+  txt(scene, 680, 360, 'DBGEN[22]：调试模式继续跑', 't20s');
+  txt(scene, 680, 396, '默认全 0：模式一进就停', 't20w');
+  txt(scene, 680, 432, 'SWR 不影响这四位', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '为什么有 32k 源');
+  txt(scene, 1280, 252, '低功耗时 ipg_clk 会关', 't20w');
+  txt(scene, 1280, 288, '32k 与 highfreq 仍在', 't20w');
+  txt(scene, 1280, 324, '可做「睡着也在闪」的指示', 't20w');
+  txt(scene, 1280, 360, '32k 下最高频率很低', 't20w');
+  txt(scene, 1280, 396, '一圈最少 1 个 32k 时钟', 't20w');
+  txt(scene, 1280, 432, '= 30.5 µs → 最高约 32 kHz', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, 'CLKSRC 复位是 00（关）：这是「宁可不动」的安全默认值，也解释了「配完不亮」的第一嫌疑人', 't24');
+  txt(scene, 80, 522, '很多人只写了 PRESCALER 与 PERIOD 就置 EN，忘了 CLKSRC 还是 0。计数器没有节拍，PWMCNR 恒为 0，输出保持初始电平 —— 看起来像「PWM 坏了」。', 't20w');
+  txt(scene, 80, 556, 'STOPEN 与 WAITEN 的取舍：待机时要维持背光亮度，就必须开 STOPEN 且时钟源不能是 ipg_clk（它在 stop 时被门控）。正确组合是「highfreq 或 32k + STOPEN=1」。', 't20w');
+  txt(scene, 80, 590, 'DBGEN 用于调试：不开的话，一进调试器停核，PWM 就停，电机/背光状态随之变化，很难复现问题。做电机调试时通常置 1。', 't20w');
+  txt(scene, 80, 624, '32k 源的频率上限约 32 kHz（一圈至少一个时钟），做背光偏低频、肉眼可见闪烁；它的正确用途是「低频、极低功耗的闪烁指示」。', 't20w');
+  txt(scene, 80, 658, '判据：读回 PWMCR 确认 CLKSRC≠00、EN=1；再量引脚有无波形。有波形但频率不对，就回头查 CLKSRC 选的是哪个根时钟。', 't20w');
+}
+
+function drawBacklight() {
+  txt(scene, 56, 146, '背光是 PWM 最常见的用途：算对频率、经 MOS 驱动、用 gamma 曲线调光', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '频率怎么选');
+  txt(scene, 80, 252, '低于 200 Hz：肉眼闪', 't20w');
+  txt(scene, 80, 288, '200–1 kHz：部分人能察觉', 't20w');
+  txt(scene, 80, 324, '20 kHz 以上：听不到啸叫', 't20w');
+  txt(scene, 80, 360, '背光常用 20–30 kHz', 't20w');
+  txt(scene, 80, 396, '要避开升压的开关频率', 't20w');
+  txt(scene, 80, 432, '否则会产生拍频条纹', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '驱动级');
+  txt(scene, 680, 252, 'PWM 脚不能直推背光', 't20w');
+  txt(scene, 680, 288, '经 MOS/三极管做开关', 't20w');
+  txt(scene, 680, 324, '板上网络名 BLT_PWM', 't20w');
+  txt(scene, 680, 360, '进背光升压的调光脚', 't20w');
+  txt(scene, 680, 396, '极性要和 POUTC 对齐', 't20w');
+  txt(scene, 680, 432, '否则「0% 最亮」', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '算例：20 kHz / 30%');
+  txt(scene, 1280, 252, 'clk 66 MHz，P=0', 't20w');
+  txt(scene, 1280, 288, 'PR = 3299 = 0x0CE3', 't20s');
+  txt(scene, 1280, 324, 'PR+1 = 3300 刻度', 't20w');
+  txt(scene, 1280, 360, '30% → SAR = 990', 't20w');
+  txt(scene, 1280, 396, 'SAR = 0x03DE', 't20s');
+  txt(scene, 1280, 432, '一格 = 0.03% 亮度', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '背光调光的两个真实约束：人眼非线性、以及升压电路的调光方式（PWM 还是模拟）', 't24');
+  txt(scene, 80, 522, '多数背光升压芯片的调光脚接受 PWM，内部再滤波成直流；这要求 PWM 频率落在它的规格内（常见 10–50 kHz），太低会看到条纹、太高会被内部滤波削弱。', 't20w');
+  txt(scene, 80, 556, '亮度映射要按 gamma：占空比 30% 对应的视觉亮度大约只有 10%。所以驱动层通常把 0–255 的亮度值先做 gamma 表，再换算成 SAR —— 直接线性映射会让低亮度段「一跳就亮」。', 't20w');
+  txt(scene, 80, 590, '极性是最容易翻车的点：如果背光升压是「低电平有效」，那么 POUTC=00（默认高有效）会让「占空比 0%」变成最亮。上板先量一次，别照抄别人的值。', 't20w');
+  txt(scene, 80, 624, '还有一层：PWM 输出与 LCD 的 VSYNC 无关，所以调光不会引起画面撕裂；但若 PWM 频率与帧率成整数比，可能出现「整屏亮度按帧波动」的摩尔纹。', 't20w');
+  txt(scene, 80, 658, '判据三条：示波器量到 20 kHz 方波、占空比随亮度命令单调变化、全黑时背光电流接近 0。三条缺一条，先查极性再查驱动级。', 't20w');
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) drawPeriod();
+  else if (s === 2) drawDuty();
+  else if (s === 3) drawFifo();
+  else if (s === 4) drawEnable();
+  else if (s === 5) drawClock();
+  else drawBacklight();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () { state.step = INIT.step; draw(); });
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>

@@ -1,0 +1,292 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0 };
+var state = { step: INIT.step };
+
+var STEPS = [
+  { h: '128 KB 片上内存', hint: 'AXI 从口 · 64 位',
+    note: '没有自己的寄存器：容量固定、时序靠 GPR3、安全靠 GPR10。' },
+  { h: '四个 bank 交错', hint: '地址低 2 位选 bank',
+    note: '64 位对齐交错，读与写落到不同 bank 就能同拍进行。' },
+  { h: '仲裁规则', hint: '读优先 · 按事务轮转',
+    note: '同一 bank 读写冲突时先给读；轮转按 AXI 事务算，一个 burst 跑完才换手。' },
+  { h: '四个时序旋钮', hint: 'GPR3[24:21]',
+    note: '读等待 +1 拍、三条流水线各 +1 拍；高频不稳就开，低频可以全关。' },
+  { h: '放在哪、干什么', hint: '0x0090_0000 + 128 KB',
+    note: '启动 ROM 的栈、DMA 缓冲、异常向量重定位，都爱用它，因为它是确定延迟。' },
+  { h: '一致性与判据', hint: 'TrustZone · cache',
+    note: 'DMA 与 CPU 共用一块 OCRAM 时必须处理 cache；判据是「长时间读写不误码」。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+
+function drawTop() {
+  txt(scene, 56, 146, 'OCRAM 是「确定延迟的小内存」：128 KB、单 AXI 从口、64 位宽，读写各走一条通路', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '基本参数');
+  txt(scene, 80, 252, '容量 128 KB（固定）', 't20w');
+  txt(scene, 80, 288, '挂在 64 位系统 AXI 上', 't20w');
+  txt(scene, 80, 324, '只有一个 AXI 端口', 't20w');
+  txt(scene, 80, 360, '地址范围 0x0090_0000 起', 't20w');
+  txt(scene, 80, 396, '读、写由两个独立模块处理', 't20w');
+  txt(scene, 80, 432, '块内没有任何可编程寄存器', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '四个 bank');
+  txt(scene, 680, 252, '地址低 2 位选 bank', 't20w');
+  txt(scene, 680, 288, '每 bank 32 KB', 't20w');
+  txt(scene, 680, 324, '64 位对齐交错', 't20w');
+  txt(scene, 680, 360, 'bank0: 0x…00 起的 8 字节', 't20w');
+  txt(scene, 680, 396, 'bank1: 0x…08 起的 8 字节', 't20w');
+  txt(scene, 680, 432, '每个 bank 独立仲裁器', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '它能给你什么');
+  txt(scene, 1280, 252, '没有 DDR 校准与刷新开销', 't20w');
+  txt(scene, 1280, 288, '延迟确定，适合实时与启动', 't20w');
+  txt(scene, 1280, 324, '开 MMU 后要映射成 normal 内存', 't20w');
+  txt(scene, 1280, 360, '不受 DDR 掉压影响', 't20w');
+  txt(scene, 1280, 396, '代价：只有 128 KB，且和 L2 抢空间', 't20w');
+  txt(scene, 1280, 432, '不能当主存跑 Linux', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '为什么要有它：DDR 再好也有校准、刷新、行列切换的不确定性，OCRAM 的延迟是固定的', 't24');
+  txt(scene, 80, 522, '启动 ROM 在上电时就把栈放在 OCRAM 里 —— 那时 DDR 还没初始化，唯一能用的 RAM 就是它。这也是「串口能打印、但一进 DDR 初始化就挂」这类故障的诊断线索。', 't20w');
+  txt(scene, 80, 556, '它接在 64 位 AXI 上，一次传输 8 字节；bank 交错的意义在于「让读和写同时占用不同 bank」，所以理论上读写可以并行，而不是共享一条通路。', 't20w');
+  txt(scene, 80, 624, 'i.MX6ULL 还有一条特殊路径：L2 cache 可以被当作 OCRAM 用，此时时序旋钮换成 GPR3 的另外三位。这是「把 cache 改成 TCM」的经典做法。', 't20w');
+  txt(scene, 80, 658, '注意它不是 TCM：没有指令/数据分离的总线，仍然走 AXI 与系统总线仲裁；真要「零等待」，得靠 L2-as-OCRAM 那种紧耦合配置。', 't20w');
+}
+
+function drawBank() {
+  txt(scene, 56, 146, '地址最低两位决定落在哪个 bank：这就是「交错」的全部含义', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '映射关系');
+  txt(scene, 80, 252, '总容量 128 KB', 't20w');
+  txt(scene, 80, 288, '4 个 bank，每个 32 KB', 't20w');
+  txt(scene, 80, 324, '粒度 = 64 位 = 8 字节', 't20w');
+  txt(scene, 80, 360, 'bank = (地址 >> 3) & 3', 't20s');
+  txt(scene, 80, 396, '即每 32 字节转一圈', 't20w');
+  txt(scene, 80, 432, '连续访问天然分散到四 bank', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '并行条件');
+  txt(scene, 680, 252, '读 bank0 + 写 bank1 = 同拍', 't20w');
+  txt(scene, 680, 288, '读 bank0 + 写 bank0 = 排队', 't20w');
+  txt(scene, 680, 324, '同 bank 两读：仍要串行', 't20w');
+  txt(scene, 680, 360, '仲裁器每 bank 一个', 't20w');
+  txt(scene, 680, 396, 'RX 与 TX 用不同 bank 可提速', 't20w');
+  txt(scene, 680, 432, 'DMA 双向缓冲常按此设计', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '实测办法');
+  txt(scene, 1280, 252, '同 bank 读写：带宽折半', 't20w');
+  txt(scene, 1280, 288, '跨 bank 读写：接近翻倍', 't20w');
+  txt(scene, 1280, 324, '用两个指针差 8 字节验证', 't20w');
+  txt(scene, 1280, 360, '差 0 字节 = 同 bank', 't20w');
+  txt(scene, 1280, 396, '差 32 字节 = 回到同 bank', 't20w');
+  txt(scene, 1280, 432, '差 8 的奇数倍 = 不同 bank', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '交错是带宽设计，不是容量设计：它让「连续地址」自动分布在四个 bank 上', 't24');
+  txt(scene, 80, 522, '如果两个缓冲区的起始地址相差 32 字节的整数倍，它们就落在同一个 bank，读写会互相排队 —— 这是「双缓冲 DMA 提速不明显」的常见原因。', 't20w');
+  txt(scene, 80, 556, '正确的做法：让读写缓冲的起始地址相差 8 字节（或 8 的奇数倍），这样读 bank n 写 bank n+1，物理上可以同拍。', 't20w');
+  txt(scene, 80, 590, '但注意「同拍」只在 bank 级成立：真正的瓶颈还在 AXI 端口本身（一个端口，一读一写仍要复用地址通道）。bank 交错消掉的是「存储单元级」的冲突。', 't20w');
+  txt(scene, 80, 624, '32 KB 一个 bank 也意味着：单次 burst 跨 bank 越多越快，跨完一圈后又会回到同 bank —— 大块拷贝的带宽是波动的，不是恒定值。', 't20w');
+  txt(scene, 80, 658, '判据：用 8 字节步进的写、8 字节步进的读，测到两次读之间没有等待；换 32 字节步进，应该能观察到周期性变慢。', 't20w');
+}
+
+function drawArb() {
+  txt(scene, 56, 146, '四条仲裁规则，核心只有两句：读优先、按「整个事务」轮转而不是按每拍', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '四条规则');
+  txt(scene, 80, 252, '只有一方请求 → 直接给', 't20w');
+  txt(scene, 80, 288, '读写同时来 → 先给读', 't20w');
+  txt(scene, 80, 324, '刚完成读 → 下次写优先', 't20w');
+  txt(scene, 80, 360, '刚完成写 → 下次读优先', 't20w');
+  txt(scene, 80, 396, '本质：round-robin 轮转', 't20w');
+  txt(scene, 80, 432, '但只在「事务」粒度上轮转', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '事务粒度意味着');
+  txt(scene, 680, 252, '一次 burst 拿到就独占', 't20w');
+  txt(scene, 680, 288, '中途不会被打断', 't20w');
+  txt(scene, 680, 324, '16 拍的读 burst 会连着跑完', 't20w');
+  txt(scene, 680, 360, '另一方的写要等它整段结束', 't20w');
+  txt(scene, 680, 396, '好处：地址连续，效率高', 't20w');
+  txt(scene, 680, 432, '坏处：长 burst 带来抖动', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '对实时性的影响');
+  txt(scene, 1280, 252, 'AXI 突发最长 16 拍', 't20w');
+  txt(scene, 1280, 288, '16 × 8 B = 128 B 一段', 't20w');
+  txt(scene, 1280, 324, '对端最多等一整段', 't20w');
+  txt(scene, 1280, 360, '高优先级请求不能插队', 't20w');
+  txt(scene, 1280, 396, '所以要控制 burst 长度', 't20w');
+  txt(scene, 1280, 432, '实时数据用短 burst', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '「读优先」是为了不让读饿死：读是阻塞式的（CPU 等数据），写可以缓冲', 't24');
+  txt(scene, 80, 522, '写请求来自 CPU 的写缓冲或 DMA，硬件里有一层缓冲可以吸收；读请求一旦发出，发起方就在等，所以优先给读能降低平均延迟。这是所有内存控制器的通用策略。', 't20w');
+  txt(scene, 80, 556, '轮转的意义：刚完成读之后马上让写优先，等于「读一次、写一次」交替，双方都不会被饿死；但如果一直有读请求涌来，这个规则保证写至少能拿到一半。', 't20w');
+  txt(scene, 80, 590, '按事务而非按拍轮转的好处是效率：切换 bank/方向都有开销，一个 burst 一次切换最省。代价是长 burst 会让对手等更久 —— 这在音频、CAN 这类周期性任务里要算清楚。', 't20w');
+  txt(scene, 80, 624, '实践：把 OCRAM 上的大块拷贝拆成 8 拍或 4 拍的 burst，抖动下降明显；而纯吞吐场景（比如摄像头帧缓存）用满 16 拍更划算。', 't20w');
+  txt(scene, 80, 658, '判据：用 GPIO 翻转 + 示波器测「写请求到写完成」的延迟分布，如果出现固定周期的尖峰，多半是读 burst 独占造成的。', 't20w');
+}
+
+function drawTuning() {
+  txt(scene, 56, 146, '四个旋钮都在 IOMUXC_GPR3：一个读等待、三条流水线，每个都只花 1 拍', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '四个位');
+  txt(scene, 80, 252, 'GPR3[21] 读数据等待', 't20s');
+  txt(scene, 80, 288, '1 → 每次读 2 拍', 't20w');
+  txt(scene, 80, 324, 'GPR3[22] 读地址流水', 't20s');
+  txt(scene, 80, 360, '1 → 地址延 1 拍再送', 't20w');
+  txt(scene, 80, 396, 'GPR3[23] 写数据流水', 't20s');
+  txt(scene, 80, 432, '1 → 写数据延 1 拍', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '第四个与 L2');
+  txt(scene, 680, 252, 'GPR3[24] 写地址流水', 't20s');
+  txt(scene, 680, 288, '1 → 写地址延 1 拍', 't20w');
+  txt(scene, 680, 324, 'L2 当 OCRAM 时换一组：', 't20w');
+  txt(scene, 680, 360, 'GPR3[1] 读地址流水', 't20s');
+  txt(scene, 680, 396, 'GPR3[2] 写数据流水', 't20s');
+  txt(scene, 680, 432, 'GPR3[3] 写地址流水', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '代价换算');
+  txt(scene, 1280, 252, '全关：读 1 拍出数据', 't20w');
+  txt(scene, 1280, 288, '读等待开：读变 2 拍', 't20w');
+  txt(scene, 1280, 324, '流水开：整个 burst +1 拍', 't20w');
+  txt(scene, 1280, 360, '注意是「每个事务」不是「每拍」', 't20w');
+  txt(scene, 1280, 396, '16 拍 burst：+1 / 16 ≈ 6%', 't20w');
+  txt(scene, 1280, 432, '1 拍 burst：直接翻倍', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '「读等待」和「流水」不是一回事：一个是数据晚一拍出来，一个是地址/数据晚一拍进去', 't24');
+  txt(scene, 80, 522, '读等待解决的是「存储单元读得慢」：高频时单元输出到不了下一拍，就多给一拍。代价是每一次读（每个 beat）都 +1 拍，对短读非常贵。', 't20w');
+  txt(scene, 80, 556, '三条流水线解决的是「建立时间」：地址或数据在时钟沿前不稳定，就把它们打一拍再送进去。代价是每个 AXI 事务 +1 拍，与 beat 数无关。', 't20w');
+  txt(scene, 80, 590, '这就是为什么手册说「at most 1 more clock cycle for each AXI transaction」：流水是事务级的，读等待是访问级的。做性能预算时必须分开算。', 't20w');
+  txt(scene, 80, 624, '经验取值：528 MHz 下 OCRAM 通常要开读等待 + 读地址流水；400 MHz 以下可以全关。开了不影响功能，只影响带宽，所以「先开稳、再逐位关掉试」。', 't20w');
+  txt(scene, 80, 658, '判据：全关跑 memtester 风格的随机读写，出现偶发错值就是不稳定；逐位打开直到稳定，再记录下这组值作为该频率的固定配置。', 't20w');
+}
+
+function drawUse() {
+  txt(scene, 56, 146, 'OCRAM 最常见的四个去处：启动栈、异常向量、DMA 缓冲、紧耦合代码段', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '启动阶段');
+  txt(scene, 80, 252, 'ROM 先用它做栈', 't20w');
+  txt(scene, 80, 288, 'DDR 未初始化时唯一 RAM', 't20w');
+  txt(scene, 80, 324, 'U-Boot 的 early stack', 't20w');
+  txt(scene, 80, 360, 'SPL 阶段常用前 64 KB', 't20w');
+  txt(scene, 80, 396, '掉电即失，不能存持久数据', 't20w');
+  txt(scene, 80, 432, '复位后内容不确定', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '运行阶段');
+  txt(scene, 680, 252, '异常向量表重定位', 't20w');
+  txt(scene, 680, 288, 'DMA 描述符链', 't20w');
+  txt(scene, 680, 324, '小缓冲池（网络包、音频帧）', 't20w');
+  txt(scene, 680, 360, '中断处理栈', 't20w');
+  txt(scene, 680, 396, '需要「确定性延迟」的代码', 't20w');
+  txt(scene, 680, 432, '不能放需要大容量的东西', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '和 cache 的关系');
+  txt(scene, 1280, 252, 'OCRAM 默认是可 cache 的正常内存', 't20w');
+  txt(scene, 1280, 288, 'CPU 写进 cache 不等于写进 OCRAM', 't20w');
+  txt(scene, 1280, 324, 'DMA 读到的是旧值', 't20w');
+  txt(scene, 1280, 360, '三种解法：清 cache、置 non-cache、用一致性端口', 't20w');
+  txt(scene, 1280, 396, 'GPR10 还有 TrustZone 属性', 't20w');
+  txt(scene, 1280, 432, '非安全世界访问会被挡', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, 'DMA + cache 是这个模块最容易出错的地方，而且错得「看起来像硬件坏了」', 't24');
+  txt(scene, 80, 522, '典型现象：CPU 写完缓冲、启动 DMA、DMA 读到的却是旧数据。原因不是 DMA 坏了，而是数据还在 L1/L2 里没落到 OCRAM。', 't20w');
+  txt(scene, 80, 556, '三种解法的取舍：clean/invalidate 每次都要花几百拍；把整块标成 non-cacheable 会损失 CPU 访问速度；一致性端口只在部分总线上有。多数驱动选自「写前 clean、读后 invalidate」。', 't20w');
+  txt(scene, 80, 590, '0x0090_0000 起的 128 KB 是物理地址。跑 Linux 时这段通常被保留（reserved）给驱动用，用 ioremap 或 dma_alloc_coherent 拿到；直接 malloc 拿不到它。', 't20w');
+  txt(scene, 80, 624, 'GPR10 是 TrustZone 的 OCRAM 安全属性：置了安全位，非安全世界读这段会 abort。做 OP-TEE 时要在这里划分「安全 OCRAM」，否则两个世界互相踩。', 't20w');
+  txt(scene, 80, 658, '判据：写一段图案 → clean cache → 用 DMA 读回比对；再反向 invalidate 后 CPU 读。两步都对，才算这套缓冲「真能用」。', 't20w');
+}
+
+function drawCheck() {
+  txt(scene, 56, 146, '验证一个片上内存不需要复杂仪器：地址线走通、bank 并行、高频误码，三件事就够', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '三步验证');
+  txt(scene, 80, 252, '① 全容量写读比对', 't20w');
+  txt(scene, 80, 288, '用 0x55/0xAA 交替图案', 't20w');
+  txt(scene, 80, 324, '② 地址线测试', 't20w');
+  txt(scene, 80, 360, '每 4 KB 写唯一值', 't20w');
+  txt(scene, 80, 396, '扫一遍看有无别名', 't20w');
+  txt(scene, 80, 432, '③ bank 并行测试', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '失败现象对照');
+  txt(scene, 680, 252, '固定地址错 → 地址线/别名', 't20w');
+  txt(scene, 680, 288, '随机位错 → 时序旋钮不够', 't20w');
+  txt(scene, 680, 324, '写后立刻读错 → 写流水没开', 't20w');
+  txt(scene, 680, 360, '读稳定但 DMA 错 → cache', 't20w');
+  txt(scene, 680, 396, '一访问就 abort → TrustZone', 't20w');
+  txt(scene, 680, 432, '整段读 0 → 时钟门控', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '真正的判据');
+  txt(scene, 1280, 252, '温度上来仍不错', 't20w');
+  txt(scene, 1280, 288, '满负载 + DMA 同时跑', 't20w');
+  txt(scene, 1280, 324, '跑 1 小时不出现单比特错', 't20w');
+  txt(scene, 1280, 360, '多核/多主并发访问', 't20w');
+  txt(scene, 1280, 396, '掉电重启后内容不确定是对的', 't20w');
+  txt(scene, 1280, 432, '别指望它做持久存储', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '片上 RAM 出问题几乎都是配置问题，不是器件问题 —— 所以验证的重点是「配置组合」', 't24');
+  txt(scene, 80, 522, '地址别名测试的做法：往 addr 写 addr 的低 16 位，全部写完后整片读回来比对；只要有「两个地址读到同一个值」，就是地址译码或 bank 选错。', 't20w');
+  txt(scene, 80, 556, '时序组合只有 16 种（四个位），穷举很快：每种组合跑一轮随机读写，记录是否出现单比特翻转，就能选出该频率下的稳定组合。', 't20w');
+  txt(scene, 80, 590, '注意 OCRAM 不会自愈：没有 ECC。一个比特翻转就是真错值，不像 DDR 有 ECC 可以纠正（i.MX6ULL 的 DDR 也没 ECC）。所以它的可靠性完全靠「不改频率、不改时序」。', 't20w');
+  txt(scene, 80, 624, '如果系统里同时有 DVFS，降频后要重算这四个位：低频可以关掉换带宽，高频必须打开换稳定 —— 这也是为什么 U-Boot 初始化时把它写死，而不是运行时动态调。', 't20w');
+  txt(scene, 80, 658, '一句话：OCRAM 的「稳」是靠保守配置换来的；想要快，就得接受在边界上跑，并且用长时间压测守住它。', 't20w');
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) drawBank();
+  else if (s === 2) drawArb();
+  else if (s === 3) drawTuning();
+  else if (s === 4) drawUse();
+  else drawCheck();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () { state.step = INIT.step; draw(); });
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>

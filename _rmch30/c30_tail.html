@@ -1,0 +1,295 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0, lane: 0 };
+var state = { step: INIT.step, lane: INIT.lane };
+
+var STEPS = [
+  { h: '加法器与捕获', hint: '32 位向上计数 · 2 捕获 · 3 比较',
+    note: 'GPT 是向上计数的通用定时器：两个输入捕获记下「事件发生的那一刻」，三个输出比较在「数到某个值」时翻转引脚。它和 EPIT 的减法器正好互补。' },
+  { h: '六种时钟源', hint: 'ipg · perclk · 24M · 32k · 外部',
+    note: 'CLKSRC 六选一，再过 12 位预分频（÷1–4096）。换时钟源必须先 EN=0，否则计数器会用半新半旧的时钟跑出无法解释的值。' },
+  { h: '十个寄存器', hint: '0x0209_8000 与 0x020E_8000',
+    note: '两个 GPT 各 10 个 32 位寄存器，偏移从 0x00 到 0x24。ICR1/ICR2/CNT 只读，写它们会产生总线异常，不是「写了没反应」。' },
+  { h: 'CR 的十四个位', hint: 'OM · IM · FO · FRR · ENMOD',
+    note: 'CR 一个寄存器装下了所有模式：三个比较输出模式、两个捕获边沿、三个强制比较、时钟源、四种低功耗使能、重启/自由运行、使能。' },
+  { h: '捕获、比较与中断', hint: 'IF/OF/ROV · w1c · 累积线',
+    note: '捕获会把 CNT 锁进 ICR 并置 IF；比较会置 OF 并按 OM 动引脚；计数到 0xFFFFFFFF 置 ROV。六个状态位都写 1 清零，另有一根无掩码的累积中断线。' },
+  { h: '初始化的十步', hint: '先关再配 · 最后开 EN',
+    note: '手册给了换时钟源的十步顺序：关 EN、关中断、断输出、断捕获、改 CLKSRC、软复位、清状态、ENMOD=1、开 EN、开中断。顺序错了会带出脏状态。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+
+function drawRole() {
+  txt(scene, 56, 146, 'GPT 是「数到某值就动一下、有人来就记一下」的加法计数器，和 EPIT 的减法器正好互补', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '它有什么');
+  txt(scene, 80, 252, '一个 32 位向上计数器', 't20w');
+  txt(scene, 80, 288, '两路输入捕获，各带边沿选择', 't20w');
+  txt(scene, 80, 324, '三路输出比较，各带输出模式', 't20w');
+  txt(scene, 80, 360, '12 位预分频，÷1 到 ÷4096', 't20w');
+  txt(scene, 80, 396, '溢出、捕获、比较都能中断', 't20w');
+  txt(scene, 80, 432, '可配在 STOP/WAIT/DEBUG 里继续跑', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '和 EPIT 的区别');
+  txt(scene, 680, 252, 'EPIT：减法，到 0 重装，适合定周期', 't20w');
+  txt(scene, 680, 288, 'GPT：加法，到 OCR 比较，适合测时', 't20w');
+  txt(scene, 680, 324, 'EPIT 有 4 种输出动作，GPT 有 4 种', 't20w');
+  txt(scene, 680, 360, '只有 GPT 能捕获外部边沿', 't20w');
+  txt(scene, 680, 396, '只有 GPT 能三路比较同时用', 't20w');
+  txt(scene, 680, 432, 'EPIT 复位值 LR=0xFFFF_FFFF，GPT 是 0', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '两种计数模式');
+  txt(scene, 1280, 252, 'Restart：比较 1 命中即回 0', 't20w');
+  txt(scene, 1280, 288, 'Free-Run：一直数到 0xFFFFFFFF', 't20w');
+  txt(scene, 1280, 324, 'Restart 只跟比较通道 1 挂钩', 't20w');
+  txt(scene, 1280, 360, '写 OCR1 会立刻把计数器清零', 't20w');
+  txt(scene, 1280, 396, '比较 2/3 命中也绝不清零', 't20w');
+  txt(scene, 1280, 432, '溢出标志 ROV 两种模式都会置', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '选型口诀：要「固定节拍」用 EPIT，要「测量外部事件」用 GPT', 't24');
+  txt(scene, 80, 522, 'EPIT 的 LR/CMPR 结构天生适合产生周期性中断或 PWM，改周期只要写一个寄存器，硬件自己重装。', 't20w');
+  txt(scene, 80, 556, 'GPT 的价值在捕获：外部信号一来，硬件把当前 CNT 拷进 ICR1 并置标志，软件事后做差就能算出脉宽、周期、频率，精度只受时钟和中断延迟影响。', 't20w');
+  txt(scene, 80, 590, '三个比较通道可以做成三路相位不同的方波输出，OM=1xx 还能发一个输入时钟宽的低脉冲，用来做单次触发很方便。', 't20w');
+  txt(scene, 80, 624, '注意 GPT 只有加法：要测「两个事件之间的时间」，做法是读两次 ICR 相减，并处理一次溢出（差值取模 2^32 即可，无符号减法天然正确）。', 't20w');
+  txt(scene, 80, 658, '低功耗场景它是关键：CLKSRC 可以选 32k，STOPEN/WAITEN 置 1 后主电源域停了它还在数，可以当深睡里的粗计时器。', 't20w');
+}
+
+function drawClocks() {
+  txt(scene, 56, 146, '六选一、再分频：所有时间计算都从「输入时钟 × (PRESCALER+1)」这一步开始', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'CLKSRC 编码');
+  txt(scene, 80, 252, '000  无时钟（默认，计数器不动）', 't20s');
+  txt(scene, 80, 288, '001  ipg_clk（外设时钟）', 't20s');
+  txt(scene, 80, 324, '010  ipg_clk_highfreq（perclk）', 't20s');
+  txt(scene, 80, 360, '011  GPT_CLK（外部引脚）', 't20s');
+  txt(scene, 80, 396, '100  ipg_clk_32k（低功耗）', 't20s');
+  txt(scene, 80, 432, '101  ipg_clk_24M（晶振）', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '两级分频');
+  txt(scene, 680, 252, 'PRESCALER[11:0]：÷1–÷4096', 't20s');
+  txt(scene, 680, 288, 'PRESCALER24M[15:12]：÷1–÷16', 't20s');
+  txt(scene, 680, 324, '24M 先过自己的小分频再进选择器', 't20w');
+  txt(scene, 680, 360, '改 PRESCALER 立即生效，计数器重启一拍', 't20w');
+  txt(scene, 680, 396, '外部时钟必须小于 ipg 的 1/4', 't20w');
+  txt(scene, 680, 432, '外部时钟在低功耗里不可用（ipg 没了）', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '三个算例');
+  txt(scene, 1280, 252, 'ipg=66 MHz，÷66 → 1 µs 一拍', 't20s');
+  txt(scene, 1280, 288, 'PRESCALER=65，最大计时 4295 s', 't20s');
+  txt(scene, 1280, 324, '32k，÷1 → 30.5 µs 一拍', 't20s');
+  txt(scene, 1280, 360, '32k，÷4096 → 125 ms 一拍', 't20s');
+  txt(scene, 1280, 396, '24M，÷24 → 1 µs 一拍', 't20s');
+  txt(scene, 1280, 432, '24M ÷16 后再 ÷1 → 0.667 µs', 't20s');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '换时钟源必须先关 EN：这是手册反复强调的一条', 't24');
+  txt(scene, 80, 522, 'CLKSRC 在计数器运行中改变，预分频器会收到两个不同频率的边沿，计数节奏乱掉，读到的时间差没有任何意义。', 't20w');
+  txt(scene, 80, 556, 'PRESCALER 反而允许随时改，手册说「立即影响输出时钟频率」，代价是预分频计数被重置，当前这一拍会丢。', 't20w');
+  txt(scene, 80, 590, '要 1 µs 分辨率又不想记 66 MHz 这种怪数，优先用 24M 晶振：PRESCALER24M=0、PRESCALER=23，正好 1 µs，且不受总线频率调节影响。', 't20w');
+  txt(scene, 80, 624, '32k 源适合「秒级」：一拍 30.5 µs，32 位计数器能数 36 小时才溢出；要更长就靠软件在 ROV 中断里加高位。', 't20w');
+  txt(scene, 80, 658, '外部时钟那条限制别忽略：< ipg/4 是为了让模块内的两级同步器能稳定采样，超了会丢边沿，表现为计数偏少。', 't20w');
+}
+
+function drawRegs() {
+  txt(scene, 56, 146, '两个 GPT 各 10 个寄存器，偏移完全一致，只有基址差 0x50000', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'GPT1 · 0x0209_8000');
+  txt(scene, 80, 252, '+0x00 CR    控制   复位 0', 't20s');
+  txt(scene, 80, 288, '+0x04 PR    预分频 复位 0', 't20s');
+  txt(scene, 80, 324, '+0x08 SR    状态   w1c', 't20s');
+  txt(scene, 80, 360, '+0x0C IR    中断使能', 't20s');
+  txt(scene, 80, 396, '+0x10/14/18 OCR1/2/3  0xFFFF_FFFF', 't20s');
+  txt(scene, 80, 432, 'GIC SPI 55（dtsi 的 timer@2098000）', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, 'GPT2 · 0x020E_8000');
+  txt(scene, 680, 252, '同偏移，同复位值', 't20w');
+  txt(scene, 680, 288, '+0x1C ICR1  只读', 't20s');
+  txt(scene, 680, 324, '+0x20 ICR2  只读', 't20s');
+  txt(scene, 680, 360, '+0x24 CNT   只读', 't20s');
+  txt(scene, 680, 396, '写这三个 → 总线异常', 't20w');
+  txt(scene, 680, 432, 'GIC SPI 109（timer@20e8000）', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '访问约束');
+  txt(scene, 1280, 252, '写 CR / OCR1 各多 1 个等待周期', 't20w');
+  txt(scene, 1280, 288, '其余读写 0 等待周期', 't20w');
+  txt(scene, 1280, 324, '地址 ≥ base+0x028 属未实现空间', 't20w');
+  txt(scene, 1280, 360, 'resp_sel 低时访问会总线异常', 't20w');
+  txt(scene, 1280, 396, 'resp_sel 高时静默丢弃', 't20w');
+  txt(scene, 1280, 432, '只读寄存器写操作一律异常', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, 'OCR 复位 0xFFFF_FFFF 不是随便定的：它让「还没配比较值」时不误触发', 't24');
+  txt(scene, 80, 522, '计数器是加法，复位从 0 开始数；OCR 全是 1，意味着要数满 2^32 才可能相等，实际上等于「比较功能暂时关闭」。', 't20w');
+  txt(scene, 80, 556, '一旦你写了 OCR1，Restart 模式下计数器立刻清零 —— 所以初始化时「先写 OCR 再开 EN」和「开 EN 后再写 OCR」是两种完全不同的行为。', 't20w');
+  txt(scene, 80, 590, 'ICR1/ICR2/CNT 只读，写它们会触发总线异常（abort）。调试时看到莫名的 abort，先查有没有把这些地址当普通寄存器写。', 't20w');
+  txt(scene, 80, 624, 'CR 与 OCR1 的写多一个等待周期，意味着在 GPIO 翻转 + 写 CR 的紧循环里，翻转频率会被这个等待周期吃掉一部分。', 't20w');
+  txt(scene, 80, 658, '两个 GPT 的基址差 0x50000，不是 0x4000：别按 GPIO/EPIT 的步长去推，一定回手册查表。', 't20w');
+}
+
+function drawCr() {
+  txt(scene, 56, 146, '一个 CR 装下了所有模式：高 16 位管比较与捕获，低 16 位管时钟、低功耗与使能', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '高位：比较与捕获');
+  txt(scene, 80, 252, 'bit31/30/29  FO3/FO2/FO1 强制比较', 't20s');
+  txt(scene, 80, 288, 'bit28:26 OM3 / 25:23 OM2 / 22:20 OM1', 't20s');
+  txt(scene, 80, 324, 'bit19:18 IM2 / 17:16 IM1', 't20s');
+  txt(scene, 80, 360, 'OM：000 断开 001 翻转 010 清 011 置', 't20w');
+  txt(scene, 80, 396, 'OM=1xx：先置 1，命中发一个时钟宽低脉冲', 't20w');
+  txt(scene, 80, 432, 'IM：00 关 01 上升 10 下降 11 双边沿', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '低位：时钟与使能');
+  txt(scene, 680, 252, 'bit15 SWR 软复位（自清）', 't20s');
+  txt(scene, 680, 288, 'bit10 EN_24M 开 24M 输入', 't20s');
+  txt(scene, 680, 324, 'bit9  FRR 0 重启 / 1 自由运行', 't20s');
+  txt(scene, 680, 360, 'bit8:6 CLKSRC 时钟源', 't20s');
+  txt(scene, 680, 396, 'bit5/4/3/2 STOPEN/DOZEEN/WAITEN/DBGEN', 't20s');
+  txt(scene, 680, 432, 'bit1 ENMOD 重开时是否清零；bit0 EN', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '三个容易忽略的点');
+  txt(scene, 1280, 252, 'SWR 不复位 EN/ENMOD/STOPEN/WAITEN/DBGEN', 't20w');
+  txt(scene, 1280, 288, '也不复位 EN_24M 与 CLKSRC', 't20w');
+  txt(scene, 1280, 324, 'FO 位写 1 自清、永远读回 0', 't20w');
+  txt(scene, 1280, 360, '强制比较不置 OF、不产生中断', 't20w');
+  txt(scene, 1280, 396, 'ENMOD=0 时关 EN 再开，从冻结值继续', 't20w');
+  txt(scene, 1280, 432, '低功耗退出后一律从冻结值继续', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, 'Restart 与 Free-Run 的差别只在「比较 1 命中的那一刻」', 't24');
+  txt(scene, 80, 522, 'FRR=0：OCR1 命中后计数器回 0，周期固定为 OCR1+1 个计数时钟 —— 这就是最典型的「定时中断」用法。', 't20w');
+  txt(scene, 80, 556, 'FRR=1：命中后继续往上数，直到 0xFFFFFFFF 溢出回 0，周期是 2^32 个时钟；适合做「绝对时间戳」，中断只在溢出时来一次。', 't20w');
+  txt(scene, 80, 590, 'Restart 模式下写 OCR1 会清计数器，这是硬件帮你避免「新比较值比当前值小 → 永远等不到」的补救措施，但也会打乱你正在测的时间。', 't20w');
+  txt(scene, 80, 624, '强制比较 FO 是调试利器：不用等计数到值，写一下就能立刻看到引脚动作与极性，用来验证 OM 配置和外部电路最省事。', 't20w');
+  txt(scene, 80, 658, 'ENMOD 决定「关掉再开」是清零还是接着数。做长时间测量时置 0，避免每次重开都丢掉已经累计的时间；做固定周期时置 1 更干净。', 't20w');
+}
+
+function drawEvents() {
+  txt(scene, 56, 146, '捕获锁存 CNT、比较动引脚、溢出置 ROV：六个状态位全写 1 清零', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '捕获通道');
+  txt(scene, 80, 252, '边沿到来 → CNT 拷进 ICRn', 't20w');
+  txt(scene, 80, 288, '同时置 SR 的 IFn', 't20w');
+  txt(scene, 80, 324, 'ICR 可随时读，读不影响值', 't20w');
+  txt(scene, 80, 360, '两次跳变至少隔 1 个计数时钟才保证捕获', 't20w');
+  txt(scene, 80, 396, '锁存有最多 1 个时钟的不确定度', 't20w');
+  txt(scene, 80, 432, 'IF 未清也会被新捕获覆盖旧值', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '比较通道');
+  txt(scene, 680, 252, 'CNT == OCRn → 置 OFn', 't20w');
+  txt(scene, 680, 288, '按 OMn 去翻转/清/置/发脉冲', 't20w');
+  txt(scene, 680, 324, 'OFn 可单独开中断（IR 的 OFnIE）', 't20w');
+  txt(scene, 680, 360, '三路共用同一个 CNT', 't20w');
+  txt(scene, 680, 396, '改 OCR 只影响下一次比较', 't20w');
+  txt(scene, 680, 432, 'FO 强制比较不置 OF、不进中断', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '状态与中断');
+  txt(scene, 1280, 252, 'SR：bit5 ROV / 4 IF2 / 3 IF1', 't20s');
+  txt(scene, 1280, 288, 'SR：bit2 OF3 / 1 OF2 / 0 OF1', 't20s');
+  txt(scene, 1280, 324, 'IR：同位，ROVIE/IFnIE/OFnIE', 't20s');
+  txt(scene, 1280, 360, '全部 w1c，写 0 无效', 't20w');
+  txt(scene, 1280, 396, '另有一根累积中断线，无掩码', 't20w');
+  txt(scene, 1280, 432, '中断在低功耗里也能产生（时钟可用时）', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '用捕获测周期与占空比：两次上升沿之差是周期，高电平宽度就是占空比', 't24');
+  txt(scene, 80, 522, '做法：IM1=01（只捕上升沿），第一次中断记 t1，第二次记 t2，周期 = t2 − t1（无符号减法自动处理溢出）；想测高电平再开另一路捕下降沿。', 't20w');
+  txt(scene, 80, 556, '精度上限是计数时钟加中断延迟：66 MHz 下 1 拍 15 ns，但中断响应可能在几十 µs，所以要在 ISR 里尽快读 ICR，或直接用 ICR 值做差而不是记录「进中断的时刻」。', 't20w');
+  txt(scene, 80, 590, 'ICR 是「事件瞬间的 CNT」，这正是它比软件读 CNT 强的地方：软件读 CNT 会被中断延迟污染，硬件锁存不会。', 't20w');
+  txt(scene, 80, 624, '比较通道做 PWM 有个硬限制：OM 只能翻转/清/置，没有「按占空比自动重装」的机制，所以多路 PWM 还是用 PWM 外设（eFlexPWM）。', 't20w');
+  txt(scene, 80, 658, '清标志的顺序建议：先读 SR 判断来源，再写 1 清对应位，最后处理数据。一次写清全部位会丢掉「到底是谁触发」的信息。', 't20w');
+}
+
+function drawInit() {
+  txt(scene, 56, 146, '初始化就一条铁律：所有配置都在 EN=0 时做完，最后一步才开 EN', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '手册的十步');
+  txt(scene, 80, 252, '① EN=0 ② 清 IR ③ OM 全 0', 't20s');
+  txt(scene, 80, 288, '④ IM 全 0 ⑤ 改 CLKSRC', 't20s');
+  txt(scene, 80, 324, '⑥ SWR=1 ⑦ 写 1 清 SR', 't20s');
+  txt(scene, 80, 360, '⑧ ENMOD=1 ⑨ EN=1 ⑩ 开 IR', 't20s');
+  txt(scene, 80, 396, '顺序的意义：先断开输出与捕获', 't20w');
+  txt(scene, 80, 432, '再软复位，避免残留标志误触发', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '定时中断配法');
+  txt(scene, 680, 252, 'FRR=0（Restart）', 't20w');
+  txt(scene, 680, 288, 'PRESCALER 定 1 µs 一拍', 't20w');
+  txt(scene, 680, 324, 'OCR1 = 周期 − 1', 't20w');
+  txt(scene, 680, 360, 'IR 的 OF1IE=1', 't20w');
+  txt(scene, 680, 396, 'ISR 里写 1 清 OF1', 't20w');
+  txt(scene, 680, 432, '测抖动：翻转 GPIO 用示波器看周期', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '板级与判据');
+  txt(scene, 1280, 252, 'GPT1_COMPARE1/2/3 = GPIO1_IO01/02/03', 't20w');
+  txt(scene, 1280, 288, '都在 ALT1，与 UART1/2 的 ALT4 复用', 't20w');
+  txt(scene, 1280, 324, 'GPT2 全组在 JTAG 与 SD1 脚上', 't20w');
+  txt(scene, 1280, 360, 'JTAG 一开，GPT2 的脚就抢不到', 't20w');
+  txt(scene, 1280, 396, '读 CNT 应稳定递增，改 PR 立即变速', 't20w');
+  txt(scene, 1280, 432, '写只读寄存器应触发 abort（可作自检）', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '第一层判「计数在不在跑」，第二层判「时间准不准」，第三层判「事件抓没抓到」', 't24');
+  txt(scene, 80, 522, '计数层：EN=1 后连读两次 CNT，差值应等于两次读取间隔的时钟数；若一直不变，查 CLKSRC 是否为 000（默认就是无时钟）。', 't20w');
+  txt(scene, 80, 556, '精度层：用 24M 源 + PRESCALER=23 得到 1 µs 一拍，再用示波器量比较输出的周期，误差应在一个时钟内；偏大偏小就是预分频算错了。', 't20w');
+  txt(scene, 80, 590, '事件层：把 GPT1_CAPTURE1 接到一个已知方波，读两次 ICR1 相减，应该等于方波周期 × 每拍时间；差一倍就是边沿选成了双边沿。', 't20w');
+  txt(scene, 80, 624, '测量常用公式：频率 = 计数时钟 / 两次捕获之差；占空比 = 高电平捕获差 / 周期捕获差 × 100%。', 't20w');
+  txt(scene, 80, 658, '最后一条排错经验：读到的 CNT 每次都是 0，八成是 EN=0 或 CLKSRC=000；读数在跳但周期不对，先算 PRESCALER 再怀疑晶振。', 't20w');
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawRole();
+  else if (s === 1) drawClocks();
+  else if (s === 2) drawRegs();
+  else if (s === 3) drawCr();
+  else if (s === 4) drawEvents();
+  else drawInit();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () {
+  state.step = INIT.step; state.lane = INIT.lane; draw();
+});
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>

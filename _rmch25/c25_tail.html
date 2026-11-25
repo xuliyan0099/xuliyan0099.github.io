@@ -1,0 +1,313 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0, lane: 0 };
+var state = { step: INIT.step, lane: INIT.lane };
+
+var STEPS = [
+  { h: '六个发四个收', hint: 'TX0–5 · RX0–3 · 共享脚',
+    note: 'ESAI 是全双工串行音频口：六路发送、四路接收，其中四根数据脚是收/发复用的。三种模式：普通、网络（TDM）、按需。' },
+  { h: '十二根信号线', hint: 'SCKT · FST · HCKT',
+    note: '三组时钟（位时钟、帧同步、高频主时钟）× 收发各一套，加六根数据。主从由 TCKD/TFSD/THCKD 三个方向位决定，谁输出谁输入。' },
+  { h: '时钟怎么分', hint: 'TPM · TFP · TPSR · TDC',
+    note: 'FSys 先过固定 ÷8（TPSR 可旁路），再过 ÷(TPM+1)、÷(TFP+1)，得到位时钟；帧率由 TDC+1 个槽 × 槽长决定。' },
+  { h: '帧格式七个位', hint: 'TFSL · TFSR · TWA · PADC',
+    note: '帧同步是位宽还是字宽、相对数据早一拍还是对齐、数据靠左还是靠右、补零还是重复末位 —— 全靠 TCR/TCCR 里这七位。' },
+  { h: '128 字 FIFO', hint: 'TFCR · RFCR · 水位',
+    note: '发送 FIFO 128 字由六个发送器共享，接收 FIFO 128 字由四个接收器共享。水位到了才报中断/DMA，否则每个字都打断 CPU。' },
+  { h: '板上没器件', hint: 'CSI 复用 · 只能量时钟',
+    note: 'ESAI 的十二根脚全部落在 CSI/EIM 复用组，ALPHA 板给了摄像头 FPC，MINI 板整组未引。音频在本板走 SAI1，ESAI 只做寄存器与时钟实测。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+
+function drawRole() {
+  txt(scene, 56, 146, 'ESAI 是给音频与 DSP 用的全双工串口：可以当 I2S 主机，也能做 TDM 多槽从机', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '能力');
+  txt(scene, 80, 252, '六路发送 TX0–TX5', 't20w');
+  txt(scene, 80, 288, '四路接收 RX0–RX3', 't20w');
+  txt(scene, 80, 324, 'TX2_RX3、TX3_RX2、TX4_RX1、TX5_RX0 复用', 't20w');
+  txt(scene, 80, 360, 'TX0/TX1 只做发送，不复用', 't20w');
+  txt(scene, 80, 396, '字长 8/12/16/20/24 位', 't20w');
+  txt(scene, 80, 432, 'I2S、左对齐、右对齐、AC97', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '三种模式');
+  txt(scene, 680, 252, '普通：一帧一个字，接单个 codec', 't20w');
+  txt(scene, 680, 288, '网络：2–32 个时隙，TDM 多通道', 't20w');
+  txt(scene, 680, 324, '按需：TDC=0，有数据才发帧', 't20w');
+  txt(scene, 680, 360, '同步/异步由 SAICR[SYN] 选', 't20w');
+  txt(scene, 680, 396, '异步：收/发各用自己的时钟', 't20w');
+  txt(scene, 680, 432, '同步：收发共用发送侧时钟', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '缓冲与开销');
+  txt(scene, 1280, 252, '发送 FIFO 128 字，六个发送器共享', 't20w');
+  txt(scene, 1280, 288, '接收 FIFO 128 字，四个接收器共享', 't20w');
+  txt(scene, 1280, 324, '水位到了才报中断或拉 DMA', 't20w');
+  txt(scene, 1280, 360, '时隙掩码 TSMA/TSMB、RSMA/RSMB', 't20w');
+  txt(scene, 1280, 396, '掩码让 CPU 只处理关心的槽', 't20w');
+  txt(scene, 1280, 432, '没有硬件重采样、没有混音', 't20w');
+
+  wide(456, 330);
+  head(80, 494, '和 SAI 的区别：ESAI 是老派「多路独立收发」，SAI 是新派「I2S 专用」');
+  txt(scene, 80, 522, 'ESAI 出身自 56xxx DSP 的 ESSI/SAI，特点是「六发四收 + 时隙掩码 + 每路独立移位寄存器」，天生适合 TDM 与多 codec。', 't20w');
+  txt(scene, 80, 556, 'SAI 只有两路（一收一发），但支持 I2S/TDM/PDM，时钟树更简洁，现代 codec 基本都挂 SAI。', 't20w');
+  txt(scene, 80, 590, '6ULL 两个都有：SAI1/SAI2 走板载 codec，ESAI1 在这两块板上没有器件 —— 这是理解本章的前提。', 't20w');
+  txt(scene, 80, 624, '「六发」不是六根独立立体声：所有发送器共用同一套时钟与帧同步，只是各自占不同的时隙或不同的数据脚。', 't20w');
+  txt(scene, 80, 658, '「四收」同理：四路接收共享 SCKR/FSR，各取一根 SDI，或在网络模式下各取不同时隙。', 't20w');
+  txt(scene, 80, 692, '按需模式很特别：不产生周期帧同步，只有 FIFO 里有数据时才发一个帧 —— 适合「偶尔送一段控制字」的场合。', 't20w');
+  txt(scene, 80, 726, '普通模式接单个 codec 最省事：一帧一个左声道 + 一个右声道（两个发送器，两个时隙）。', 't20w');
+  txt(scene, 80, 760, '记住三条主线：引脚复用（收发共享）、时钟链（÷8→÷TPM→÷TFP）、帧结构（槽数×槽长）。', 't20w');
+}
+
+function drawPins() {
+  txt(scene, 56, 146, '十二根脚分三组：位时钟、帧同步、高频主时钟，收发各一套，加六根数据', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '接收侧');
+  txt(scene, 80, 252, 'PC0 SCKR：接收位时钟', 't20s');
+  txt(scene, 80, 288, 'PC1 FSR：接收帧同步', 't20s');
+  txt(scene, 80, 324, 'PC2 HCKR：接收高频主时钟', 't20s');
+  txt(scene, 80, 360, 'PC6 TX5_RX0：数据 0（与 TX5 共用）', 't20s');
+  txt(scene, 80, 396, 'PC7 TX4_RX1：数据 1', 't20s');
+  txt(scene, 80, 432, 'PC8 TX3_RX2 / PC9 TX2_RX3：数据 2、3', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '发送侧');
+  txt(scene, 680, 252, 'PC3 SCKT：发送位时钟', 't20s');
+  txt(scene, 680, 288, 'PC4 FST：发送帧同步', 't20s');
+  txt(scene, 680, 324, 'PC5 HCKT：发送高频主时钟', 't20s');
+  txt(scene, 680, 360, 'PC10 TX1、PC11 TX0：独立发送脚', 't20s');
+  txt(scene, 680, 396, '六个发送器都靠 SCKT/FST 定时', 't20w');
+  txt(scene, 680, 432, '主模式下由 ESAI 输出这三根时钟', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '主从由三个方向位定');
+  txt(scene, 1280, 252, 'TCCR[TCKD]：SCKT 输出还是输入', 't20w');
+  txt(scene, 1280, 288, 'TCCR[TFSD]：FST 输出还是输入', 't20w');
+  txt(scene, 1280, 324, 'TCCR[THCKD]：HCKT 输出还是输入', 't20w');
+  txt(scene, 1280, 360, '接收侧对应 RCKD/RFSD/RHCKD', 't20w');
+  txt(scene, 1280, 396, 'SYN=1 时接收侧三根变成 IO 标志', 't20w');
+  txt(scene, 1280, 432, 'HS 与 OF0–OF2 就是这时用的', 't20w');
+
+  wide(456, 330);
+  head(80, 494, '接线的最简形态：三根时钟 + 两根数据就能出声');
+  txt(scene, 80, 522, '接一颗 I2S codec：ESAI 当主机输出 SCKT（位时钟）、FST（左右声道指示）、HCKT（codec 的 MCLK），数据走 TX0。', 't20w');
+  txt(scene, 80, 556, 'codec 回采的数据走 RX0（PC6，与 TX5 共用）；如果同时要录和放，就要占两根数据脚，注意 TX5 与 RX0 不能同时开。', 't20w');
+  txt(scene, 80, 590, 'HCKT 就是 codec 的 MCLK：一般是采样率的 256 倍（48 kHz → 12.288 MHz），由 FSys 分频或外部晶振提供。', 't20w');
+  txt(scene, 80, 624, 'SCKT 是 BCLK：48 kHz 立体声 16 位 → 每帧 32 位 → 1.536 MHz，正好是 MCLK 的 1/8。', 't20w');
+  txt(scene, 80, 658, 'FST 是 LRCK：频率等于采样率 48 kHz，占空比对 I2S 是 50%，对左对齐格式可能是一个字长的高电平。', 't20w');
+  txt(scene, 80, 692, 'EXTAL 那一路是给「板上已有高频时钟」的场合：外部 12.288 MHz 直接进 HCKT，省掉内部分频的抖动。', 't20w');
+  txt(scene, 80, 726, 'ETI/ETO/ERI/ERO 四个位就是 EXTAL 的四个方向开关：能进 HCKT、能从 HCKT 出、能进 HCKR、能从 HCKR 出。', 't20w');
+  txt(scene, 80, 760, '注意：EXTAL 是 esai_clk_root（CCM 里配），不是随便一根 GPIO 时钟，配置前先看第 18 章时钟树。', 't20w');
+}
+
+function drawClock() {
+  txt(scene, 56, 146, '位时钟链只有三级除法：÷8（可旁路）→ ÷(TPM+1) → ÷(TFP+1)，帧率再按槽数分', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '分频链');
+  txt(scene, 80, 252, '源：FSys = ipg_clk_esai（CCM esai_clk_root）', 't20w');
+  txt(scene, 80, 288, '第一级 TPSR：0 启用 ÷8，1 旁路', 't20w');
+  txt(scene, 80, 324, '第二级 TPM[7:0]：÷1 … ÷256', 't20w');
+  txt(scene, 80, 360, '第三级 TFP[3:0]：÷1 … ÷16', 't20w');
+  txt(scene, 80, 396, '输出 SCKT，同时供内部移位寄存器', 't20w');
+  txt(scene, 80, 432, '上限 FSys/6，下限 FSys/65536', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '帧率');
+  txt(scene, 680, 252, 'TDC[4:0]：每帧字数 − 1（网络模式）', 't20w');
+  txt(scene, 680, 288, 'TDC=0 且网络模式 → 按需模式', 't20w');
+  txt(scene, 680, 324, '每帧位数 = 槽数 × 槽长', 't20w');
+  txt(scene, 680, 360, '帧率 = 位时钟 ÷ 每帧位数', 't20w');
+  txt(scene, 680, 396, '普通模式 TDC 决定字传输间隔', 't20w');
+  txt(scene, 680, 432, 'TFSL=1（位宽帧同步）时 TDC=0 可连续传', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '陷阱');
+  txt(scene, 1280, 252, 'TPSR=1 且 TPM=0 会同步出错', 't20w');
+  txt(scene, 1280, 288, '手册明确禁止这组组合', 't20w');
+  txt(scene, 1280, 324, '内部时钟当源时（TCKD=1）尤其危险', 't20w');
+  txt(scene, 1280, 360, '改分频要先把 TE/RE 关掉', 't20w');
+  txt(scene, 1280, 396, '运行中改 TPM，本周期的位宽会变', 't20w');
+  txt(scene, 1280, 432, '帧同步与位时钟必须同源，否则错位', 't20w');
+
+  wide(456, 330);
+  head(80, 494, '48 kHz 立体声 16 位的一个完整算例');
+  txt(scene, 80, 522, '目标：MCLK = 12.288 MHz（256×48k）、BCLK = 1.536 MHz、LRCK = 48 kHz、每帧 2 槽 16 位。', 't20w');
+  txt(scene, 80, 556, '设 FSys = 12.288 MHz：第一级 ÷8 得 1.536 MHz（TPSR=0），TPM=0（÷1）、TFP=0（÷1）→ SCKT 正好 1.536 MHz。', 't20w');
+  txt(scene, 80, 590, '每帧位数 = 2 槽 × 16 位 = 32 位 → 帧率 = 1.536 MHz / 32 = 48 kHz，正好等于 LRCK。', 't20w');
+  txt(scene, 80, 624, '若 FSys 只有 66 MHz（ipg），就得靠 TPM/TFP 凑：66M/1.536M = 42.97，除不尽 —— 这时必须用音频 PLL 或外部晶振。', 't20w');
+  txt(scene, 80, 658, '这就是音频为什么单独要一颗 PLL：48k 与 44.1k 两族采样率，用整数除法几乎无法同时凑准。', 't20w');
+  txt(scene, 80, 692, '44.1 kHz 要 MCLK 11.2896 MHz、BCLK 1.4112 MHz；两颗晶振（12.288M / 11.2896M）就是为了两只脚都踩准。', 't20w');
+  txt(scene, 80, 726, '槽长选错的表现：声音速度正常但声道错位（左右对调或半帧偏移），因为帧里位数算错了。', 't20w');
+  txt(scene, 80, 760, '判据：示波器量 SCKT 与 FST，FST 周期应严格等于 1/48k = 20.833 µs；差一点就是分频没凑准。', 't20w');
+}
+
+function drawFrame() {
+  txt(scene, 56, 146, '帧格式就是七个位的组合：同步宽度、同步时机、极性、边沿、对齐、补零、移位方向', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '同步与极性');
+  txt(scene, 80, 252, 'TFSL：0 字宽同步 / 1 位宽同步', 't20w');
+  txt(scene, 80, 288, 'TFSR：同步对齐首bit还是末bit', 't20w');
+  txt(scene, 80, 324, 'TFSP：正极性（高有效）或负极性', 't20w');
+  txt(scene, 80, 360, 'TCKP：上升沿出、下降沿采（或反）', 't20w');
+  txt(scene, 80, 396, 'TFSR 仅在字宽同步时有效', 't20w');
+  txt(scene, 80, 432, '位宽同步固定提前一位时钟', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '对齐与填充');
+  txt(scene, 680, 252, 'TWA：0 左对齐 / 1 右对齐', 't20w');
+  txt(scene, 680, 288, 'PADC：0 重复末位 / 1 补零', 't20w');
+  txt(scene, 680, 324, '字短于槽时才生效', 't20w');
+  txt(scene, 680, 360, 'TSHFD：0 高位先出 / 1 低位先出', 't20w');
+  txt(scene, 680, 396, 'TSWS[4:0]：槽长与字长选择', 't20w');
+  txt(scene, 680, 432, 'ALC：16 位数据对齐到 bit15', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '常用组合');
+  txt(scene, 1280, 252, 'I2S：TFSL=1、TFSP=0、TCKP=0、TWA=0', 't20w');
+  txt(scene, 1280, 288, '左对齐：TFSL=0、TWA=0、PADC=1', 't20w');
+  txt(scene, 1280, 324, '右对齐：TFSL=0、TWA=1、PADC=1', 't20w');
+  txt(scene, 1280, 360, 'AC97：TSWS=00011、TDC=0x0C', 't20w');
+  txt(scene, 1280, 396, 'AC97 首槽 16 位、后 12 槽 20 位', 't20w');
+  txt(scene, 1280, 432, 'SPDIF：TSHFD=1（低位先出）', 't20w');
+
+  wide(456, 330);
+  head(80, 494, 'I2S 的三个「反常识」：同步早一位、左对齐、低位在左声道');
+  txt(scene, 80, 522, '标准 I2S 的帧同步在数据前一个位时钟就拉高（TFSR 语义上等价提前），所以 LRCK 翻转的那一位不属于任何声道。', 't20w');
+  txt(scene, 80, 556, '数据是左对齐的：MSB 紧跟在 LRCK 变化后的第二个 BCLK 边沿，这就是 TWA=0 + TFSL=1 的物理含义。', 't20w');
+  txt(scene, 80, 590, '「低位在左声道」是 Philips 的老约定（LRCK 低 = 左声道），和「先左后右」不是一回事，配错会左右颠倒。', 't20w');
+  txt(scene, 80, 624, 'PADC 决定填充：字长 16 位、槽长 32 位时，剩下的 16 位补零还是重复末位，直接影响 codec 是否认为「数据有效」。', 't20w');
+  txt(scene, 80, 658, '如果 codec 要 24 位而只给了 16 位，采「重复末位」会让低 8 位变成噪声样的抖动，听起来像底噪升高。', 't20w');
+  txt(scene, 80, 692, 'TSWS 表里槽长与字长是分开选的：可以 32 位槽装 16 位字，也可以 32 位槽装 24 位字，后者剩 8 位填充。', 't20w');
+  txt(scene, 80, 726, 'ALC 是给「16 位分数数据」用的：置 1 后所有字左对齐到 bit15，这时不能用 20/24 位字长，否则结果不可预测。', 't20w');
+  txt(scene, 80, 760, '调试口诀：先量 LRCK 与第一个数据位的关系，再看它是「同步当拍」还是「早一位」，这一步定 I2S 还是左对齐。', 't20w');
+}
+
+function drawFifo() {
+  txt(scene, 56, 146, 'FIFO 是这章真正的工程价值：128 字共享、按水位报事件，把 CPU 从「每个字都中断」里救出来', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '发送 FIFO（TFCR）');
+  txt(scene, 80, 252, 'bit0 TFE：FIFO 使能', 't20w');
+  txt(scene, 80, 288, 'bit1 TFR：复位 FIFO 指针', 't20w');
+  txt(scene, 80, 324, '[7:2] TE5–TE0：哪些发送器用 FIFO', 't20w');
+  txt(scene, 80, 360, '[15:8] TFWM：空槽水位', 't20w');
+  txt(scene, 80, 396, 'bit19 TIEN：使能后自动预装', 't20w');
+  txt(scene, 80, 432, 'bit21 TFIN：空标志中断使能', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '接收 FIFO（RFCR）');
+  txt(scene, 680, 252, '同类结构：RFE/RFR/RE3–RE0', 't20w');
+  txt(scene, 680, 288, '[15:8] RFWM：已存字数水位', 't20w');
+  txt(scene, 680, 324, 'RFIN：满标志中断使能', 't20w');
+  txt(scene, 680, 360, 'RAENB：槽对齐使能（反相）', 't20w');
+  txt(scene, 680, 396, 'RWA[2:0]：接收字对齐', 't20w');
+  txt(scene, 680, 432, 'RFSR/RFSR 状态在 +0x1C', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '状态与中断');
+  txt(scene, 1280, 252, 'ESR[8] TFE：空槽 ≥ 水位', 't20w');
+  txt(scene, 1280, 288, 'ESR[9] RFF：已存 ≥ 水位', 't20w');
+  txt(scene, 1280, 324, 'ESR[10] TINIT：预装未完成', 't20w');
+  txt(scene, 1280, 360, 'TDE/RDE：数据异常（欠载/溢出）', 't20w');
+  txt(scene, 1280, 396, 'TLS/RLS：帧末槽事件', 't20w');
+  txt(scene, 1280, 432, '读 ESR 会清 TLS/RLS 这类「最高优先级」位', 't20w');
+
+  wide(456, 330);
+  head(80, 494, '共享 FIFO 的关键规则：写入顺序必须按时隙交错');
+  txt(scene, 80, 522, '手册写得很直白：多个发送器同时启用时，数据要「从低号到高号交错写」——0 号、2 号、3 号、再 0 号，如此循环。', 't20w');
+  txt(scene, 80, 556, '写错顺序不会报错，只会让声道错乱：本该给右声道的数据进了左声道，听感是「左右互换且电平不对」。', 't20w');
+  txt(scene, 80, 590, '接收侧同理：读 ERDR 也按低号到高号交错返回；只启用 RX0 与 RX2 时，读出来的就是 0、2、0、2。', 't20w');
+  txt(scene, 80, 624, 'FIFO 满时继续写，数据被丢弃而不是覆盖旧数据 —— 这解释了「偶发丢字」为什么听不出爆音、只是节奏错位。', 't20w');
+  txt(scene, 80, 658, '水位是省 CPU 的核心：TFWM=16 意味着「空出 16 个槽才中断一次」，一次中断能补 16 个字。', 't20w');
+  txt(scene, 80, 692, '水位设太深会迟滞：FIFO 只剩 16 字时才补，遇到系统卡顿就容易欠载；设 1/2（64 字）比较稳。', 't20w');
+  txt(scene, 80, 726, 'TIEN 建议置 1：使能 FIFO 后硬件自动把第一个字装进各移位寄存器，省掉手工预装，还能靠 TINIT 判断是否装完。', 't20w');
+  txt(scene, 80, 760, 'TINIT 清零之前不要置 TE 位：手册明确要求先等初始化完成，否则第一帧会发错字。', 't20w');
+}
+
+function drawBoard() {
+  txt(scene, 56, 146, '本板 ESAI 没有负载：十二根脚全在 CSI/EIM 组，能测的只有寄存器与时钟输出', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '引脚落点（核心板球位）');
+  txt(scene, 80, 252, 'TX0 = D1、TX1 = F3', 't20s');
+  txt(scene, 80, 288, 'TX2_RX3 = E5、TX3_RX2 = F5', 't20s');
+  txt(scene, 80, 324, 'TX4_RX1 = F2、TX5_RX0 = D2', 't20s');
+  txt(scene, 80, 360, 'TX_CLK = D3、TX_FS = D4', 't20s');
+  txt(scene, 80, 396, 'RX_CLK = E1、RX_FS = E2', 't20s');
+  txt(scene, 80, 432, 'TX_HF_CLK = E4、RX_HF_CLK = E3', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '这些球还兼什么');
+  txt(scene, 680, 252, '全部是 CSI_DATA00–07 与 EIM_AD00–07', 't20w');
+  txt(scene, 680, 288, 'ALPHA 板这组接到摄像头 FPC', 't20w');
+  txt(scene, 680, 324, 'EIM 排针也复用同一批球', 't20w');
+  txt(scene, 680, 360, 'MINI 板 GPIO4 整组未引排针', 't20w');
+  txt(scene, 680, 396, '切到 ESAI 就要放弃摄像头', 't20w');
+  txt(scene, 680, 432, '板上没有音频 codec 接 ESAI', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '寄存器级实测五步');
+  txt(scene, 1280, 252, '① 置 ECR[ESAIEN]=1', 't20w');
+  txt(scene, 1280, 288, '② 置 ECR[ERST]=1 再清 0', 't20w');
+  txt(scene, 1280, 324, '③ 写 TCR/RCR：TPR=RPR=1 个人复位', 't20w');
+  txt(scene, 1280, 360, '④ 配 TCCR 分频，TCKD=1 让 SCKT 输出', 't20w');
+  txt(scene, 1280, 396, '⑤ 量 SCKT/FST 频率与理论值比对', 't20w');
+  txt(scene, 1280, 432, '全过说明时钟链与引脚都通了', 't20w');
+
+  wide(456, 330);
+  head(80, 494, '为什么这块板只能「量时钟」，不能「听声音」');
+  txt(scene, 80, 522, 'ESAI 的数据脚与位时钟脚都落在 CSI_DATA00–07（E4/E3/E2/E1、D4/D3/D2/D1）与相邻球上。', 't20w');
+  txt(scene, 80, 556, 'ALPHA 板把这些球引给了摄像头接口（OV5640 的 DVP 并口），MINI 板这部分干脆没引到 2.54 排针。', 't20w');
+  txt(scene, 80, 590, '所以要让 ESAI 输出 SCKT，必须先把对应球切到 ALT 功能，代价是摄像头彻底不可用 —— 这是硬件级的二选一。', 't20w');
+  txt(scene, 80, 624, '板载音频走的是 SAI1 + codec（I2S），和 ESAI 是两条独立通路；想听声音应该调 SAI，不是 ESAI。', 't20w');
+  txt(scene, 80, 658, '能做的实测：开 ESAIEN、做一次软复位、配 TCCR 让 SCKT 输出，然后用示波器量频率与帧率是否等于公式。', 't20w');
+  txt(scene, 80, 692, '特别注意 TPSR=1 且 TPM=0 是手册明令禁止的组合：内部时钟作源时会同步失败，表现为 SCKT 完全不动。', 't20w');
+  txt(scene, 80, 726, 'Linux 侧：内核有 fsl-esai 驱动（ASoC），DT 里要写 esai 节点 + codec 子节点；本板没有 codec，绑定会失败。', 't20w');
+  txt(scene, 80, 760, '下一步 RM26 是 FLEXCAN（1245–1324 页，80 页，read）：本板带 CAN 收发器，是第一个能真正总线上跑的章节。', 't20w');
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawRole();
+  else if (s === 1) drawPins();
+  else if (s === 2) drawClock();
+  else if (s === 3) drawFrame();
+  else if (s === 4) drawFifo();
+  else drawBoard();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () {
+  state.step = INIT.step; state.lane = INIT.lane; draw();
+});
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>

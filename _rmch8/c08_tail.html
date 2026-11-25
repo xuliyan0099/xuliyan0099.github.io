@@ -1,0 +1,289 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var DEVS = [
+  ['NOR / OneNAND（EIM）', '0x1000', '整个镜像', '0000：BOOT_CFG1[3]=0 选 NOR，=1 选 OneNAND', [
+    'EIM 空间直接取指，可 XIP',
+    'OneNAND 只搬 1 KB，等 500 µs',
+    'BOOT_CFG2[7:6] 定 16 位复用',
+    '坑：0x100 当 0x1000 必失败'
+  ]],
+  ['QSPI 串行 NOR', '0x1000', '整个镜像', '0001：接口固定 QSPI1，不经过 EIM', [
+    '先读 0x400 处 512 B 配置',
+    '再按它把 QSPI 配成 Quad',
+    'Quad Enable 必须提前烧好',
+    '坑：不写 512 B 只能单线慢读'
+  ]],
+  ['SD / MMC / eMMC', '0x400', '4 KB', '010x(SD) / 011x(MMC)，端口看 0x450[12:11]', [
+    '先读 4 KB 校验 IVT 再搬',
+    '上限 32 MB（ADMA 描述符）',
+    'eMMC 由 Ext_CSD[179] 选分区',
+    '坑：IVT 放 0x1000 卡起不来'
+  ]],
+  ['SPI EEPROM（ECSPI）', '0x400', '4 KB', '0011：片选号由 BOOT_CFG4[5:4] 指定', [
+    'ECSPI 作主机，32 B 突发',
+    '3 字节地址，18 MHz',
+    '先取 4 KB 判 0xD1 再搬',
+    '坑：片选错读回全 0xFF'
+  ]],
+  ['Raw NAND', '无（FCB）', 'FCB 指向', '1xxx：页大小、块页数、ECC 另配', [
+    '先找 FCB（0x20424346）',
+    '再找 DBBT（0x44424254）',
+    'BCH 40 位 ECC 照 FCB 配',
+    '坑：时序错一位读出随机数'
+  ]]
+];
+
+var INIT = { step: 0, dev: 2 };
+var state = { step: INIT.step, dev: INIT.dev };
+
+var STEPS = [
+  { h: '两根引脚定去向', hint: 'BOOT_MODE[1:0] 决定四种结局',
+    note: 'POR 之后，硬件把核的取指地址强制指到片内 ROM（0x0000_0000）。ROM 的第一件事不是初始化外设，而是采样 BOOT_MODE[1:0]，再叠加 eFUSE 与 GPIO：四种组合分别是「按熔丝启动」「串行下载」「内部启动」「保留」。同一颗芯片既能跑量产固件、也能当空白板救砖，区别就在这四位状态；采样结果随后落进 SRC_SBMR1/2，是事后唯一能查的证据。' },
+  { h: '七段路，段段可断', hint: '任一段失败都落回串行下载',
+    note: '内部启动不是「读 flash 然后跳」一句话：采样 → 选设备 → 读首块 → 认 IVT → 跑 DCD → HAB 验签 → 跳 entry，七件事严格按序。任何一段失败——读不到、头不是 0xD1、DDR 参数错、签名不对——控制权都交回串行下载器。所以「串口一声不响、USB 却能枚举成 HID」几乎总是这条链在前半段断了，而不是芯片坏了。' },
+  { h: 'IVT / Boot Data / DCD', hint: '32 B + 12 B + 上限 1768 B',
+    note: '程序镜像不是裸二进制：开头（位置随介质而定，SD 卡在 0x400、NOR 在 0x1000）必须是 IVT——8 个 32 位字，头 4 字节 0xD1 / 0x0020 / 0x40。IVT 用五个指针把 entry、DCD、Boot Data、CSF 串起来；Boot Data 再说「搬到哪、多长、是不是插件」。DCD 是一串大端命令，0xCC 写寄存器、0xCF 校验，且只允许碰 ROM 白名单里的地址——地址越界不报错，只是不生效。' },
+  { h: '点每行看偏移与坑', hint: '偏移错一位就读不到 0xD1',
+    note: '同一份 IVT 放在不同介质上的位置完全不同：SD 卡 0x400、NOR 0x1000、OneNAND 0x100、SPI EEPROM 0x400，NAND 则没有固定位置（靠第一块里的 FCB 指路）。偏移错一位，ROM 读到的就不是 0xD1，现象是「完全无输出」，跟硬件坏了的表象一模一样。右边四条是每类介质各自的专属坑，做板子时逐条对照。' },
+  { h: '拨码·寄存器·卡内容', hint: '三处对照，切开电路与配置',
+    note: 'MINI 板用 8 位拨码 D1–D8 去覆写 BOOT_CFG1 的八个位，BOOT_MODE0/1 留在核心板上固定不动。验证顺序是：先读 SRC_SBMR1/2，看 ROM 到底采样到什么；再把卡或镜像的头 16 字节 dump 出来看是否 0xD1；最后才看串口日志。三处对不上，问题一定出在配置侧，不必拆板子量电。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function arrow(x1, y1, x2, y2) {
+  svgEl(scene, 'line', { x1: x1, y1: y1, x2: x2, y2: y2, stroke: 'var(--text-2)', 'stroke-width': 4 });
+  var a = Math.atan2(y2 - y1, x2 - x1), L = 18, W = 9;
+  svgEl(scene, 'path', {
+    d: 'M' + x2 + ' ' + y2 + ' L' + (x2 - L * Math.cos(a) + W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) - W * Math.cos(a)) +
+      ' L' + (x2 - L * Math.cos(a) - W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) + W * Math.cos(a)) + ' Z',
+    fill: 'var(--text-2)', stroke: 'none'
+  });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+
+function drawModes() {
+  txt(scene, 56, 148, '复位把 PC 指到 0x0000_0000；ROM 先看两根引脚，再决定去哪', 't24w');
+
+  box(56, 176, 400, 196, 'var(--page)', 'var(--line)');
+  txt(scene, 80, 218, '上电 / 复位', 't28');
+  txt(scene, 80, 258, 'POR 拉住核，PC = 0', 't24w');
+  txt(scene, 80, 294, 'ROM 在片内，不在 flash', 't24w');
+  txt(scene, 80, 330, '此时 DDR 还没初始化', 't24w');
+
+  arrow(460, 274, 516, 274);
+  box(520, 176, 380, 196, 'var(--surface)', 'var(--observe-line)', 5);
+  txt(scene, 544, 218, 'BOOT_MODE[1:0]', 't28');
+  txt(scene, 544, 258, '两根引脚，复位时采样', 't24w');
+  txt(scene, 544, 294, '再叠加 eFUSE 与 GPIO', 't24w');
+  txt(scene, 544, 330, '结果落进 SRC_SBMR1/2', 't24w');
+
+  var MODES = [
+    ['00', 'Boot From Fuses', '只认熔丝；BT_FUSE_SEL=0 直落串行下载'],
+    ['01', 'Serial Downloader', 'USB OTG1 + UART1/2，WDOG 默认 64 s'],
+    ['10', 'Internal Boot', '按熔丝/GPIO 选设备，正常读镜像'],
+    ['11', 'Reserved', '保留，量产靠 DIR_BT_DIS 关掉']
+  ];
+  arrow(710, 374, 710, 418);
+  MODES.forEach(function (m, i) {
+    var y = 424 + i * 82, on = i === 2;
+    box(96, y, 1700, 66, on ? 'var(--page)' : 'var(--surface)', on ? 'var(--observe-line)' : 'var(--line)', on ? 4 : 2);
+    txt(scene, 120, y + 44, m[0], 'tnum');
+    txt(scene, 200, y + 44, m[1], 't28');
+    txt(scene, 620, y + 44, m[2], 't24w');
+  });
+
+  txt(scene, 96, 784, '要点：00 与 10 都读 flash，区别只是「只信熔丝」还是「允许 GPIO 覆写」；01 不读任何介质，是救砖通道。', 't24w');
+}
+
+function drawFlow() {
+  txt(scene, 56, 148, '内部启动的七段：任一段失败，控制权交给串行下载器', 't24w');
+  var STAGE = [
+    ['采样 SBMR', 'BOOT_MODE + eFUSE/GPIO', '存入 SRC_SBMR1/2'],
+    ['选设备', 'BOOT_CFG1[7:4] 定介质', '6 类介质 5 种编码'],
+    ['读首块', 'SD 4 KB / NOR 全长', '先进 OCRAM'],
+    ['认 IVT', '头 4 字节 D1 00 20 40', '不对就换设备'],
+    ['跑 DCD', '0xCC 写寄存器', '给 DDR 与时钟上电'],
+    ['HAB 验签', 'SEC_CONFIG 三档', '失败直接落 SDP'],
+    ['跳 entry', 'IVT 第 2 个字', '交给 U-Boot / SPL']
+  ];
+  STAGE.forEach(function (s, i) {
+    var col = i % 4, row = Math.floor(i / 4);
+    var x = 56 + col * 462, y = 178 + row * 186;
+    box(x, y, 430, 168, 'var(--page)', 'var(--line)', 2);
+    txt(scene, x + 24, y + 44, s[0], 'bd-heading');
+    txt(scene, x + 24, y + 90, s[1], 't24w');
+    txt(scene, x + 24, y + 126, s[2], 't24w');
+    txt(scene, x + 24, y + 158, '第 ' + (i + 1) + ' 段', 't24w');
+    if (col < 3 && i < 6) arrow(x + 434, y + 84, x + 456, y + 84);
+  });
+  box(56, 552, 430, 192, 'var(--surface)', 'var(--alert-line)', 4);
+  txt(scene, 80, 594, '失败兜底', 'bd-heading');
+  txt(scene, 80, 640, '一旦失败 → 串行下载', 't24w');
+  txt(scene, 80, 680, 'USB HID 或 UART 等包', 't24w');
+  txt(scene, 80, 720, 'WDOG 不开则永久等', 't24w');
+
+  box(488, 552, 1380, 192, 'var(--surface)', 'var(--guide)');
+  head(512, 594, 'ROM 阶段已经做完的事');
+  txt(scene, 512, 640, '时钟：ARM 396 MHz、PLL2 528 MHz，AHB 132 MHz、IPG 66 MHz', 't24w');
+  txt(scene, 512, 680, '关掉一批外设时钟，只留启动设备、UART1/2、USB、USDHC 这些必需的', 't24w');
+  txt(scene, 512, 720, 'ROM 异常向量复制到 OCRAM；验签期间临时开 MMU / D-cache', 't24w');
+}
+
+function drawImage() {
+  txt(scene, 56, 148, '一份可启动镜像：IVT（32 B）+ Boot Data（12 B）+ DCD（≤1768 B）+ 代码', 't24w');
+
+  box(56, 172, 844, 388, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 212, 'IVT：8 个 32 位字，全大端');
+  var IVT = [
+    ['+0x00', 'header', '0xD1 / len 0x0020 / ver 0x40'],
+    ['+0x04', 'entry', '第一条指令的地址'],
+    ['+0x08', 'reserved1', '必须写 0'],
+    ['+0x0C', 'dcd', 'DCD 地址，可填 0'],
+    ['+0x10', 'boot data', 'Boot Data 地址'],
+    ['+0x14', 'self', 'IVT 自己的地址'],
+    ['+0x18', 'csf', 'HAB 命令序列，可填 0'],
+    ['+0x1C', 'reserved2', '必须写 0']
+  ];
+  IVT.forEach(function (r, i) {
+    var y = 246 + i * 37;
+    txt(scene, 80, y, r[0], 'tnum');
+    txt(scene, 172, y, r[1], 't28');
+    txt(scene, 330, y, r[2], 't24w');
+  });
+  txt(scene, 80, 538, '上限：IVT 32 B · DCD ≤1768 B · SD 镜像 ≤32 MB', 't24w');
+
+  box(920, 172, 948, 168, 'var(--page)', 'var(--line)');
+  head(944, 212, 'Boot Data：3 个 32 位字');
+  txt(scene, 944, 250, 'start    镜像最终运行地址', 't24w');
+  txt(scene, 944, 288, 'length   镜像字节数', 't24w');
+  txt(scene, 944, 326, 'plugin   0 普通 / 1 插件', 't24w');
+
+  box(920, 360, 948, 200, 'var(--page)', 'var(--line)');
+  head(944, 404, 'DCD：头 + 一串命令');
+  txt(scene, 944, 440, '头：0xD2 | len | ver 0x41', 'tnum');
+  txt(scene, 944, 474, '0xCC 写：tag+len+param+addr+val', 'tnum');
+  txt(scene, 944, 508, '0xCF 校验：读地址比掩码', 'tnum');
+  txt(scene, 944, 540, 'mask=1 时 set=1 置位、0 清位；mask=0 直接写值', 't24w');
+
+  box(56, 592, 1812, 190, 'var(--surface)', 'var(--guide)');
+  head(80, 632, 'DCD 只许碰这些区（Table 8-31，节选）');
+  txt(scene, 80, 672, 'IOMUXC 0x020E0000–3FFF   IOMUXC GPR 0x020E4000–7FFF   CCM 0x020C4000–7FFF', 'tnum');
+  txt(scene, 80, 706, 'ANADIG 0x020C8000–8FFF   MMDC 0x021B0000–3FFF   EIM 0x021B8000–BFFF', 'tnum');
+  txt(scene, 80, 740, 'OCRAM 0x00907000–0x00917FF0   DDR 0x10000000 起', 'tnum');
+  txt(scene, 80, 774, '白名单外写进去不报错，只是不生效——最阴的一种静默失败。', 't24w');
+}
+
+function drawDevs() {
+  txt(scene, 56, 148, '同一份 IVT，位置随介质而变；偏移错一位 = 读不到 0xD1', 't24w');
+  DEVS.forEach(function (d, i) {
+    var y = 172 + i * 82, on = i === state.dev;
+    var g = svgEl(scene, 'g', {}, '');
+    g.style.cursor = 'pointer';
+    svgEl(g, 'rect', { x: 56, y: y, width: 1060, height: 70, rx: 12, fill: on ? 'var(--surface)' : 'var(--page)', stroke: on ? 'var(--observe-line)' : 'var(--line)', 'stroke-width': on ? 5 : 2 });
+    txt(g, 80, y + 44, d[0], on ? 'bd-heading' : 't28');
+    txt(g, 540, y + 44, '偏移 ' + d[1], 't24w');
+    txt(g, 780, y + 44, '首块 ' + d[2], 't24w');
+    g.addEventListener('click', function () { state.dev = i; draw(); });
+  });
+
+  box(1140, 172, 728, 380, 'var(--page)', 'var(--line)');
+  head(1164, 212, DEVS[state.dev][0]);
+  txt(scene, 1164, 252, '选设备：' + DEVS[state.dev][3], 't24w');
+  DEVS[state.dev][4].forEach(function (l, i) {
+    svgEl(scene, 'rect', { x: 1164, y: 282 + i * 60, width: 6, height: 34, fill: 'var(--cat-3-line)' });
+    txt(scene, 1184, 310 + i * 60, l, 't24w');
+  });
+
+  box(56, 592, 1812, 190, 'var(--surface)', 'var(--guide)');
+  head(80, 632, '三个「看起来像硬件坏了」的配置错');
+  txt(scene, 80, 674, '① SD 卡把 IVT 放 0x1000（照抄 NOR 习惯）→ 读回全 0，认不到 D1', 't24w');
+  txt(scene, 80, 710, '② eMMC 端口选到 USDHC1（0x450[12:11] 错）→ 去读 TF 槽，卡不在就落 SDP', 't24w');
+  txt(scene, 80, 746, '③ NAND 的 FCB 时序抄错一位 → 读出随机数，DBBT 找不到，判为无镜像', 't24w');
+}
+
+function drawBoard() {
+  txt(scene, 56, 148, 'MINI 板：8 位拨码改 BOOT_CFG1；验证靠 SBMR 寄存器 + 卡头 16 字节 + 串口', 't24w');
+
+  box(56, 172, 584, 400, 'var(--page)', 'var(--line)');
+  head(80, 212, '① 拨码 D1–D8');
+  txt(scene, 80, 252, 'D1–D8 → BOOT_CFG1 的八个位', 't24w');
+  txt(scene, 80, 294, 'BOOT_DATA7 借用 LCD_DATA6', 't24w');
+  txt(scene, 80, 336, 'BOOT_MODE0/1 在核心板上', 't24w');
+  txt(scene, 80, 378, '拨码 1/0 就是熔丝位 1/0', 't24w');
+  txt(scene, 80, 420, '改完必须断电重启', 't24w');
+  txt(scene, 80, 462, 'R45–R50 是这些位的上下拉', 't24w');
+  txt(scene, 80, 504, 'eMMC 挂 SD2，TF 卡挂 SD1', 't24w');
+  txt(scene, 80, 546, '「拨到 MMC」还要端口选对', 't24w');
+
+  box(660, 172, 584, 400, 'var(--surface)', 'var(--guide)');
+  head(684, 212, '② 读 SBMR 看采样值');
+  txt(scene, 684, 252, 'SRC_SBMR1 0x020D8004', 'tnum');
+  txt(scene, 684, 294, 'SRC_SBMR2 0x020D800C', 'tnum');
+  txt(scene, 684, 336, 'BOOT_MODE 在 [25:24]', 't24w');
+  txt(scene, 684, 378, 'BT_FUSE_SEL 在 [6]', 't24w');
+  txt(scene, 684, 420, 'U-Boot：md 0x020D8004 1', 'tnum');
+  txt(scene, 684, 462, '对不上 → 拨码或上下拉', 't24w');
+  txt(scene, 684, 504, '对得上不起 → 镜像或设备', 't24w');
+  txt(scene, 684, 546, '这一步把电路与配置切开', 't24w');
+
+  box(1264, 172, 604, 400, 'var(--page)', 'var(--line)');
+  head(1288, 212, '③ 镜像头 16 字节');
+  txt(scene, 1288, 252, 'SD/eMMC 偏移 0x400', 't24w');
+  txt(scene, 1288, 294, 'NOR 偏移 0x1000', 't24w');
+  txt(scene, 1288, 336, '前 4 字节 D1 00 20 40', 'tnum');
+  txt(scene, 1288, 378, 'dd bs=1 skip=1024 count=16', 'tnum');
+  txt(scene, 1288, 420, '  | xxd   看清 16 字节', 'tnum');
+  txt(scene, 1288, 462, 'Windows 用 HxD 开物理盘', 't24w');
+  txt(scene, 1288, 504, 'IVT 的 self 必须指回自己', 't24w');
+  txt(scene, 1288, 546, '否则 ROM 与 HAB 都不认', 't24w');
+
+  box(56, 596, 1812, 190, 'var(--surface)', 'var(--alert-line)', 4);
+  head(80, 636, '现象 → 先查哪一处');
+  var DIAG = [
+    ['串口一字没有，USB 也认不到', 'BOOT_MODE 采样错 / 拨码未生效'],
+    ['USB 枚举成 HID，串口无输出', '已落 SDP：设备或 IVT 失败'],
+    ['打印停在 DDR 初始化之前', 'DCD 没跑或 MMDC 参数错'],
+    ['打印到一半发乱码', 'UART 时钟/波特率，不关启动']
+  ];
+  DIAG.forEach(function (r, i) {
+    var y = 672 + i * 36;
+    txt(scene, 80, y, '· ' + r[0], 't24w');
+    txt(scene, 920, y, '→ ' + r[1], 't24w');
+  });
+}
+
+function draw() {
+  var s = STEPS[state.step];
+  $('hint').textContent = s.hint;
+  $('note').textContent = s.note;
+  scene.textContent = '';
+  if (state.step === 0) drawModes();
+  else if (state.step === 1) drawFlow();
+  else if (state.step === 2) drawImage();
+  else if (state.step === 3) drawDevs();
+  else drawBoard();
+}
+
+var step = stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+void step;
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () {
+  state.step = INIT.step; state.dev = INIT.dev; draw();
+});
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>

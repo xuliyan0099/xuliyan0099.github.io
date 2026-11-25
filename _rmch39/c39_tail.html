@@ -1,0 +1,335 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0 };
+var state = { step: INIT.step };
+
+var STEPS = [
+  { h: '七个 LDO', hint: '外部只剩两路供电',
+    note: 'ARM、SOC、1P1、2P5、USB、SNVS：片内把大部分电压都自己造了。' },
+  { h: '数字 LDO：ARM/SOC', hint: 'TARG 编码 · 25 mV 一步',
+    note: '0 是断电、1 是 0.725 V、31 是「全通」；复位 0x12 算出 1.15 V。' },
+  { h: '1P1 与 2P5', hint: '0x110 / 0x130 · 弱稳压器',
+    note: '给模拟与 PLL 用；低功耗切换必须先关主稳压再开弱稳压，中间靠电容顶住。' },
+  { h: 'USB LDO 3P0', hint: '0x120 · 2.625–3.4 V',
+    note: '两路 VBUS 自动选源；插上先自保限流，再由软件转全稳压。' },
+  { h: '寄存器地图', hint: '0x020C_8000',
+    note: '每个稳压器四套地址（本体/SET/CLR/TOG），MISC2 藏在 0x170。' },
+  { h: '斜坡与欠压', hint: 'RAMP_RATE · BO_OFFSET',
+    note: '抬压必须一步一步走，25 mV 一档；欠压检测是「已掉到目标以下多少」。' },
+  { h: 'SNVS 与判据', hint: 'SNVS_IN → SNVS_CAP',
+    note: '主电断了也要活的 1.2 V 域；用万用表量 CAP 脚是上板第一步。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+
+function drawTop() {
+  txt(scene, 56, 146, 'PMU 的核心是「把电源树做进芯片」：七路 LDO 造出绝大多数供电，板上只剩两路输入', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '七路 LDO');
+  txt(scene, 80, 252, 'LDO_ARM：核电压', 't20w');
+  txt(scene, 80, 288, 'LDO_SOC：内部逻辑', 't20w');
+  txt(scene, 80, 324, 'LDO_1P1：模拟与 PLL', 't20w');
+  txt(scene, 80, 360, 'LDO_2P5：模拟 2.5 V', 't20w');
+  txt(scene, 80, 396, 'LDO_USB：3.0 V', 't20w');
+  txt(scene, 80, 432, 'LDO_SNVS：常电域', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '板上还剩什么');
+  txt(scene, 680, 252, '不算纽扣电池与 VBUS', 't20w');
+  txt(scene, 680, 288, '外部输入只剩两路', 't20w');
+  txt(scene, 680, 324, '一路高压 3.3 V 级', 't20w');
+  txt(scene, 680, 360, '一路给 DDR 的 1.2–1.5 V', 't20w');
+  txt(scene, 680, 396, 'DDR 电源随颗粒类型变', 't20w');
+  txt(scene, 680, 432, 'I/O 电压段可另配', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '为什么重要');
+  txt(scene, 1280, 252, '省掉外部 PMIC 的多数通道', 't20w');
+  txt(scene, 1280, 288, '但电压由内部 FET 线性调整', 't20w');
+  txt(scene, 1280, 324, '压差 × 电流 = 发热', 't20w');
+  txt(scene, 1280, 360, '大电流场景效率不如 DCDC', 't20w');
+  txt(scene, 1280, 396, '所以 ARM 常外部供、内部做旁路', 't20w');
+  txt(scene, 1280, 432, '旁路（bypass）就是这条路', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '内部 LDO 不是「更高级的电源」，是「更省 BOM 的电源」：代价是效率与散热', 't24');
+  txt(scene, 80, 522, '线性稳压把多余电压变成热：输入 3.3 V、输出 1.1 V、电流 1 A，就有 2.2 W 落在芯片里。i.MX6ULL 这种级别的核电流，靠片内 LDO 长期供电是不现实的。', 't20w');
+  txt(scene, 80, 556, '所以正点原子这类板子用外部 DCDC 供 1.375 V 给 ARM/SOC，再把 LDO_ARM/LDO_SOC 设成 bypass（TARG=0x1F，FET 全通不调压）—— 内部只当开关用。', 't20w');
+  txt(scene, 80, 590, '反过来，1P1/2P5 这类小电流模拟电源就非常适合片内做：电流几十毫安，压差小，省掉外部两路 LDO 和滤波，PCB 面积收益明显。', 't20w');
+  txt(scene, 80, 624, 'SNVS 域独立得很彻底：它有自己的输入 SNVS_IN、自己的输出 SNVS_CAP、自己的 32 kHz 晶振，主电全断时靠纽扣电池维持 RTC 与 tamper。', 't20w');
+  txt(scene, 80, 658, '一句话：读这一章要带着「哪一路该旁路、哪一路该内部调」的判断，否则会照着复位值抄出一块发烫的板子。', 't20w');
+}
+
+function drawDigital() {
+  txt(scene, 56, 146, '数字 LDO 的 TARG 是一张查表：0 断电、1 起 0.725 V、每加一档 +25 mV、31 是全通', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '三种模式');
+  txt(scene, 80, 252, 'Power Gate：TARG=0', 't20w');
+  txt(scene, 80, 288, 'FET 全关，模拟部分断电', 't20w');
+  txt(scene, 80, 324, '输出落到漏电平衡点', 't20w');
+  txt(scene, 80, 360, 'Analog Regulation：1–30', 't20w');
+  txt(scene, 80, 396, '闭环调到目标电压', 't20w');
+  txt(scene, 80, 432, 'Bypass：TARG=31，FET 全通', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, 'TARG 编码');
+  txt(scene, 680, 252, '00000：断电', 't20s');
+  txt(scene, 680, 288, '00001：0.725 V', 't20s');
+  txt(scene, 680, 324, '00010：0.750 V', 't20s');
+  txt(scene, 680, 360, '10000：1.100 V（0x10）', 't20s');
+  txt(scene, 680, 396, '11110：1.450 V（0x1E）', 't20s');
+  txt(scene, 680, 432, '11111：全通不调压', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '复位值解出来');
+  txt(scene, 1280, 252, 'REG_CORE 复位 0048_2012', 't20s');
+  txt(scene, 1280, 288, 'REG2_TARG = bits[22:18] = 0x12', 't20s');
+  txt(scene, 1280, 324, 'REG0_TARG = bits[4:0] = 0x12', 't20s');
+  txt(scene, 1280, 360, '1.15 V = 0.725 + 17 × 0.025', 't20w');
+  txt(scene, 1280, 396, '两个域复位都是 1.15 V', 't20w');
+  txt(scene, 1280, 432, 'REG1 位段保留未用', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '「0x1F 全通」是理解这块的关键：它把稳压 FET 打开，电压完全由外部输入决定', 't24');
+  txt(scene, 80, 522, '这就是 bypass 模式。板级用外部 DCDC 供核电压时，把 TARG 写 0x1F，内部 LDO 就不再调压，只当一个开关 —— 既省了内部功耗，也不引入额外压差。', 't20w');
+  txt(scene, 80, 556, 'TARG=0 的 power gate 则是真正断电：FET 关断、模拟电路也断电，输出只剩漏电决定的残压。这是 STOP 模式里「关掉一个域」的硬件手段。', 't20w');
+  txt(scene, 80, 590, '手册专门警告：这张表能写到超过工艺极限的电压，会永久损坏芯片；也能写到低到「连状态都保持不住」。所以改 TARG 必须查数据手册的 Operating Ranges，不能只看寄存器能写多大。', 't20w');
+  txt(scene, 80, 624, 'DVFS 的落点就在这里：调频的同时改 REG0_TARG（ARM）与 REG2_TARG（SOC），两者要按数据手册的「频率-电压」表配对，不能只调一个。', 't20w');
+  txt(scene, 80, 658, '判据：写完读回 REG_CORE，确认目标档位；再用万用表量 VDD_ARM_CAP，应等于 0.725 + (TARG−1)×0.025（旁路时应等于外部输入）。', 't20w');
+}
+
+function drawAnalog() {
+  txt(scene, 56, 146, '1P1 与 2P5 是给模拟电路与 PLL 的：范围窄、电流小，还各带一个「弱稳压器」备胎', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'LDO_1P1');
+  txt(scene, 80, 252, '给模拟单元的数字部分', 't20w');
+  txt(scene, 80, 288, '0.8–1.4 V，25 mV 一步', 't20w');
+  txt(scene, 80, 324, 'REG_1P1 +0x110 复位 1073', 't20s');
+  txt(scene, 80, 360, 'ENABLE_ILIMIT：限流', 't20s');
+  txt(scene, 80, 396, 'ENABLE_PULLDOWN：下拉', 't20s');
+  txt(scene, 80, 432, '带可编程欠压检测', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, 'LDO_2P5');
+  txt(scene, 680, 252, '2.0–2.75 V，25 mV 一步', 't20w');
+  txt(scene, 680, 288, 'REG_2P5 +0x130 复位 1073', 't20s');
+  txt(scene, 680, 324, '同样有限流与下拉', 't20w');
+  txt(scene, 680, 360, '带欠压检测', 't20w');
+  txt(scene, 680, 396, '外部只需低 ESR 去耦', 't20w');
+  txt(scene, 680, 432, '电容值按应用定', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '弱稳压器三步');
+  txt(scene, 1280, 252, '① 先把负载降到维持态', 't20w');
+  txt(scene, 1280, 288, '② 清 ENABLE_LINREG 关主稳压', 't20s');
+  txt(scene, 1280, 324, '③ 置 ENABLE_WEAK_LINREG', 't20s');
+  txt(scene, 1280, 360, '中间靠外部电容顶住', 't20w');
+  txt(scene, 1280, 396, '③ 必须在电容放完前完成', 't20w');
+  txt(scene, 1280, 432, '恢复时反序执行', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '弱稳压器的输出不可编程：它跟着输入和负载走，只保证「别掉到 0」', 't24');
+  txt(scene, 80, 522, '设计意图：低功耗模式下主稳压与带隙基准都关了，但 PLL、模拟单元仍需一点点电压维持状态，于是加一条自偏置的弱通路。它不精确，也不需要精确。', 't20w');
+  txt(scene, 80, 556, '三步顺序不能乱：先关主稳压再开弱稳压，中间那段时间完全靠外部去耦电容供电。电容选小了、或者第③步拖太久，电压就会跌穿，模拟单元复位。', 't20w');
+  txt(scene, 80, 590, '这也是「低功耗模式唤醒后 PLL 锁不上」的常见根因：不是 PLL 坏了，是 1P1 在切换时掉下去过，导致带隙基准需要重新建立。', 't20w');
+  txt(scene, 80, 624, 'ENABLE_PULLDOWN 用于「确定关断」：打开后输出被主动拉到地，避免浮空引起漏电或误判。不需要时保持关闭，否则会白白耗电。', 't20w');
+  txt(scene, 80, 658, '判据：正常模式量 VDD_HIGH_CAP 应在设定值 ±3%；进入低功耗后应先看到一个小跌落再稳定，若直接掉到 0.3 V 以下，就是切换时序或电容有问题。', 't20w');
+}
+
+function drawUSB() {
+  txt(scene, 56, 146, 'USB LDO 是唯一「输入是 5 V」的一路：它带双 VBUS 选择、in-rush 限流与自保启动', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '基本规格');
+  txt(scene, 80, 252, '输入：USB_OTG1/2_VBUS', 't20w');
+  txt(scene, 80, 288, '典型 5 V', 't20w');
+  txt(scene, 80, 324, '输出：标称 3.0 V', 't20w');
+  txt(scene, 80, 360, '可调 2.625–3.4 V', 't20w');
+  txt(scene, 80, 396, '25 mV 一步', 't20w');
+  txt(scene, 80, 432, 'REG_3P0 +0x120 复位 0F74', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '双 VBUS 与自保');
+  txt(scene, 680, 252, '内置 power mux', 't20w');
+  txt(scene, 680, 288, '两路都在：软件选一路', 't20w');
+  txt(scene, 680, 324, '只有一路：自动选它', 't20w');
+  txt(scene, 680, 360, '插上 VBUS 先低频自保', 't20w');
+  txt(scene, 680, 396, '防止输出过压', 't20w');
+  txt(scene, 680, 432, '软件再切到全稳压', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, 'in-rush 与拔出');
+  txt(scene, 1280, 252, '插上瞬间电容是短路', 't20w');
+  txt(scene, 1280, 288, '限流保护输入与连接器', 't20w');
+  txt(scene, 1280, 324, '要满足 USB 的 in-rush 指标', 't20w');
+  txt(scene, 1280, 360, '全稳压 = 使能 + 关限流', 't20w');
+  txt(scene, 1280, 396, '拔出后寄存器回复位态', 't20w');
+  txt(scene, 1280, 432, '外部去耦最小 4.7 µF', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '这一路的存在意义：USB PHY 要 3.0 V，而板子上通常只有 3.3 V 与 5 V', 't24');
+  txt(scene, 80, 522, '从 5 V 线性降到 3.0 V，压差 2 V；如果 USB 口带 500 mA 负载，就是 1 W 的热 —— 所以这颗 LDO 只在 host 模式下对外供电，device 模式下电流很小。', 't20w');
+  txt(scene, 80, 556, '「插上先自保」是硬件行为，不受软件控制：芯片检测到 VBUS 上升就进入低功耗限流状态，输出不会立刻到 3.0 V。软件要主动使能并关掉 in-rush 限流才算真正工作。', 't20w');
+  txt(scene, 80, 590, '如果软件一直不开，USB 会表现为「枚举不了/反复重连」—— 因为 PHY 的 3.0 V 一直没稳。这是「USB 不识别」里最容易被忽略的一条，不是走线问题。', 't20w');
+  txt(scene, 80, 624, '双 VBUS 的取舍：OTG1 与 OTG2 同时插着时，由寄存器选一路；如果两路电压差很多（一个 5 V 一个 4.5 V），mux 会倾向高的一路，软件要读状态而不是假设。', 't20w');
+  txt(scene, 80, 658, '判据：插上 VBUS 后量 VDD_USB_CAP，应稳定在设定值；若在 2 V 左右徘徊，说明还在自保状态，去查 REG_3P0 的使能与限流位。', 't20w');
+}
+
+function drawMap() {
+  txt(scene, 56, 146, 'PMU 的寄存器排布很规整：每个稳压器占 4 个地址（本体/SET/CLR/TOG）', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '稳压器组');
+  txt(scene, 80, 252, 'REG_1P1 +0x110 复位 1073', 't20s');
+  txt(scene, 80, 288, 'REG_3P0 +0x120 复位 0F74', 't20s');
+  txt(scene, 80, 324, 'REG_2P5 +0x130 复位 1073', 't20s');
+  txt(scene, 80, 360, 'REG_CORE +0x140 复位 482012', 't20s');
+  txt(scene, 80, 396, '每个都有 +4 / +8 / +C 三套', 't20w');
+  txt(scene, 80, 432, '写 SET 只置位、CLR 只清零', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '杂项组');
+  txt(scene, 680, 252, 'MISC0 +0x150 复位 0400_0000', 't20s');
+  txt(scene, 680, 288, 'MISC1 +0x160', 't20s');
+  txt(scene, 680, 324, 'MISC2 +0x170（与 CCM 共享）', 't20s');
+  txt(scene, 680, 360, 'LOWPWR_CTRL +0x270', 't20s');
+  txt(scene, 680, 396, '复位 0000_4009', 't20w');
+  txt(scene, 680, 432, '基址 0x020C_8000', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, 'MISC0 里有什么');
+  txt(scene, 1280, 252, 'XTAL_24M_PWD：24M 停振', 't20s');
+  txt(scene, 1280, 288, 'RTC_XTAL_SOURCE：32k 源', 't20s');
+  txt(scene, 1280, 324, 'OSC_XTALOK / EN', 't20s');
+  txt(scene, 1280, 360, 'CLKGATE_DELAY / CTRL', 't20s');
+  txt(scene, 1280, 396, 'VID_PLL_PREDIV', 't20s');
+  txt(scene, 1280, 432, '第 60 章讲晶振要用到它', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, 'SET/CLR/TOG 在这里比在 OCOTP 更实用：电源位必须单bit操作，读-改-写会误动别的稳压器', 't24');
+  txt(scene, 80, 522, '典型场景：只想打开 1P1 的限流，就写 REG_1P1_SET 的 ENABLE_ILIMIT 位；如果用普通写，读回来的值里可能包含刚刚变化的欠压状态位，写回去就把状态清掉了。', 't20w');
+  txt(scene, 80, 556, 'MISC2 被 CCM 共享这件事要注意：它同时管稳压器的斜坡步进时间与 brownout，还参与 CCM 的一些模拟配置。两个驱动都改它就会互相踩，设备树里通常只由一个模块初始化。', 't20w');
+  txt(scene, 80, 590, 'LOWPWR_CTRL 在 0x270，不在 0x100 段：它是「低功耗模式下的全局开关」，管旁路、管弱稳压器选择、管 STOP 时的电源行为。复位 0x4009 说明默认已经开了几项。', 't20w');
+  txt(scene, 80, 624, '看复位值也能读出设计意图：1P1/2P5 复位 0x1073 表示默认已使能并调到某个档；3P0 复位 0x0F74 表示默认未使能（USB 还没插）。这些默认值就是「上电即可用」的基线。', 't20w');
+  txt(scene, 80, 658, '核对：用 devmem 读 0x020C_8110/0x020C_8140，和复位值对比，就知道有没有被 bootloader 改过。', 't20w');
+}
+
+function drawRamp() {
+  txt(scene, 56, 146, '抬压不能一步到位：内部按 25 mV 一档爬坡，速率由 RAMP_RATE 与 STEP_TIME 决定', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '斜坡的两个旋钮');
+  txt(scene, 80, 252, 'REG_CORE[28:27] RAMP_RATE', 't20s');
+  txt(scene, 80, 288, '00 快 / 01 中快', 't20w');
+  txt(scene, 80, 324, '10 中慢 / 11 慢', 't20w');
+  txt(scene, 80, 360, 'MISC2 的 REGx_STEP_TIME', 't20s');
+  txt(scene, 80, 396, '每档停留时间', 't20w');
+  txt(scene, 80, 432, '两者一起决定斜率', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '为什么要慢');
+  txt(scene, 680, 252, '跳变会让输出电容猛充电', 't20w');
+  txt(scene, 680, 288, '浪涌电流受输入能力限制', 't20w');
+  txt(scene, 680, 324, '超限就把输入拉塌', 't20w');
+  txt(scene, 680, 360, '同一路输入上的其他稳压器受害', 't20w');
+  txt(scene, 680, 396, '上电时由限流器控制', 't20w');
+  txt(scene, 680, 432, 'DVFS 时要软件控制', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '欠压（brownout）');
+  txt(scene, 1280, 252, 'ENABLE_BO 使能检测', 't20s');
+  txt(scene, 1280, 288, 'BO_OFFSET 设门限偏移', 't20s');
+  txt(scene, 1280, 324, '相对「目标电压」而不是绝对', 't20w');
+  txt(scene, 1280, 360, 'BO_STATUS 读当前是否欠压', 't20s');
+  txt(scene, 1280, 396, '触发时给核一个中断', 't20w');
+  txt(scene, 1280, 432, '用来提前降频/降负载', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '电压「跳」比电压「高」更危险：高只是超规格，跳会拉垮整条输入轨', 't24');
+  txt(scene, 80, 522, '物理原因：输出电容上的电压不能突变，抬高目标电压等于给电容充电，电流 = C·dV/dt。跳变越快，浪涌越大，超过输入源能力就把输入拉低 —— 而输入是共用的。', 't20w');
+  txt(scene, 80, 556, '所以手册要求「限制输出电压的变化率」，并且硬件已经做了：把目标电压按 25 mV 一档、逐档抬，每档停留一段时间。软件要做的只是别把 RAMP_RATE 设到最快。', 't20w');
+  txt(scene, 80, 590, '降压方向不需要这么小心：目标一降，输出靠负载放电，自然慢；手册也明说「降压速率由负载决定」。所以 DVFS 里升压慢、降压快是合理的。', 't20w');
+  txt(scene, 80, 624, 'brownout 的「偏移」设计很实用：门限跟着目标电压走，不用每次调压都重算绝对门限。比如目标 1.15 V、偏移 100 mV，则 1.05 V 触发。', 't20w');
+  txt(scene, 80, 658, '判据：用示波器 AC 耦合看 VDD_ARM_CAP，在 DVFS 升档时应看到阶梯状爬坡而不是阶跃；若看到明显的下冲，就是 RAMP_RATE 太快或输入源太弱。', 't20w');
+}
+
+function drawSNVS() {
+  txt(scene, 56, 146, 'SNVS LDO 是「永不掉电」的那一路：输入 SNVS_IN、输出 SNVS_CAP，主电全断也维持', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'SNVS 域');
+  txt(scene, 80, 252, '输入：VDD_SNVS_IN', 't20w');
+  txt(scene, 80, 288, '输出：VDD_SNVS_CAP', 't20w');
+  txt(scene, 80, 324, '供 RTC、tamper、常电寄存器', 't20w');
+  txt(scene, 80, 360, '可用纽扣电池续命', 't20w');
+  txt(scene, 80, 396, '不掉电就不丢时间', 't20w');
+  txt(scene, 80, 432, '典型 3.0 V 输入', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '上板必量');
+  txt(scene, 680, 252, '量 SNVS_CAP 电压', 't20w');
+  txt(scene, 680, 288, '应为 1.2 V 级', 't20w');
+  txt(scene, 680, 324, '量 32k 晶振是否起振', 't20w');
+  txt(scene, 680, 360, '量 VBAT 二极管方向', 't20w');
+  txt(scene, 680, 396, '主电断了 CAP 仍在', 't20w');
+  txt(scene, 680, 432, '否则 RTC 每次开机归零', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '常见故障');
+  txt(scene, 1280, 252, '时间每次开机都归零', 't20w');
+  txt(scene, 1280, 288, '先查 VBAT 与 SNVS_CAP', 't20w');
+  txt(scene, 1280, 324, '不是先查 RTC 驱动', 't20w');
+  txt(scene, 1280, 360, 'SNVS 域写不进去', 't20w');
+  txt(scene, 1280, 396, '可能被 tamper 锁住', 't20w');
+  txt(scene, 1280, 432, '或 GPR 安全位挡住', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, 'SNVS 是「电源域」不是「稳压器」：它包含 LDO、RTC、tamper、常电寄存器一整套', 't24');
+  txt(scene, 80, 522, '它存在的理由很实际：整机断电后仍要保留时间、保留「是否被拆过」的证据、保留密钥。所以这一域必须由独立电源供电，通常是一颗纽扣电池经二极管并联到主 3.3 V。', 't20w');
+  txt(scene, 80, 556, '二极管的方向决定行为：主电在时由主电供、电池不放电；主电断时电池顶上。接反了就变成「电池给主电供电」，几天就耗光，表现为「换电池也没用」。', 't20w');
+  txt(scene, 80, 590, 'SNVS_CAP 是 LDO 输出，需要外部电容。这个脚电压不对，整个常电域都不工作：RTC 不走、tamper 记录不到、唤醒源失效。万用表量它是排查「时间归零」的第一步。', 't20w');
+  txt(scene, 80, 624, '第 48 章会展开：SNVS_LP 管 RTC/闹钟/tamper，SNVS_HP 管安全存储与主域接口。这一章只负责「把电造出来」。', 't20w');
+  txt(scene, 80, 658, '一句话：整板电源树里，只有这一路是「永远在线」的 —— 所以它最不该被省掉去耦电容。', 't20w');
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) drawDigital();
+  else if (s === 2) drawAnalog();
+  else if (s === 3) drawUSB();
+  else if (s === 4) drawMap();
+  else if (s === 5) drawRamp();
+  else drawSNVS();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () { state.step = INIT.step; draw(); });
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>

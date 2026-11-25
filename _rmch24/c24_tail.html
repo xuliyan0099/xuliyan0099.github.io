@@ -1,0 +1,313 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0, lane: 0 };
+var state = { step: INIT.step, lane: INIT.lane };
+
+var STEPS = [
+  { h: '一个减法器', hint: 'LR → CMPR → OCIF',
+    note: 'EPIT 的全部硬件就是一个 32 位减法器：从 LR 往下减，减到 CMPR 就置 OCIF、发中断；减到 0 再决定是回 LR 还是回 FFFFFFFF。' },
+  { h: '时钟三条路', hint: 'ipg · perclk · 32k',
+    note: 'CLKSRC 三选一：ipg_clk（外设时钟，正常模式用）、ipg_clk_highfreq（perclk，低功耗仍在）、ipg_clk_32k（32 kHz 晶振）。换源必须先关 EN。' },
+  { h: '五个寄存器', hint: 'CR · SR · LR · CMPR · CNR',
+    note: 'EPIT1 在 0x020D_0000，EPIT2 在 0x020D_4000，各五个 32 位寄存器。CR 里塞了时钟源、分频、模式和使能，SR 只有一位 OCIF。' },
+  { h: '周期怎么算', hint: 'PRE × (LR − CMPR)',
+    note: '中断周期 = (PRESCALAR+1) × (LR − CMPR) / f_clk。66 MHz 要 1 ms 就凑 66000 个计数，分频与重装值怎么拆是本章唯一的算术。' },
+  { h: '四种用法', hint: '节拍 · 延时 · 方波 · 唤醒',
+    note: '周期中断做系统节拍，单次延时用一次性装值，OM 翻转输出方波（占空比固定 50%），32 kHz + STOPEN 做低功耗唤醒源。' },
+  { h: '板上怎么验', hint: 'CNR · OCIF · 中断计数',
+    note: '本板 EPIT 输出脚被 UART3 占着，用不了。实测靠三件事：读 CNR 看它递减、写 CMPR 看 OCIF 置位、中断里点灯或加计数。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+
+function drawRole() {
+  txt(scene, 56, 146, 'EPIT 是「设定后不管」的定时器：一个 32 位减法器，减到比较值就报一次', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '数据通路');
+  txt(scene, 80, 252, 'Load Register（32 位）→ 计数器', 't20w');
+  txt(scene, 80, 288, 'Counter 每个时钟减 1', 't20w');
+  txt(scene, 80, 324, '减到 Compare 值 → 置 OCIF', 't20w');
+  txt(scene, 80, 360, '减到 0 → 按 RLD 决定回哪', 't20w');
+  txt(scene, 80, 396, '中间夹一个 12 位预分频（1–4096）', 't20w');
+  txt(scene, 80, 432, '比较器输出还能驱动 EPITn_OUT 引脚', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '两种模式');
+  txt(scene, 680, 252, 'RLD=1：set-and-forget', 't20w');
+  txt(scene, 680, 288, '减到 0 自动从 LR 重装', 't20w');
+  txt(scene, 680, 324, '周期中断就用它，写一次跑到底', 't20w');
+  txt(scene, 680, 360, 'RLD=0：free-running', 't20w');
+  txt(scene, 680, 396, '减到 0 回 0xFFFF_FFFF 继续减', 't20w');
+  txt(scene, 680, 432, '不重装，适合量超长间隔', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '三个卖点');
+  txt(scene, 1280, 252, '不用 CPU 参与：开 EN 就开始数', 't20w');
+  txt(scene, 1280, 288, '32 位够长：66 MHz 也能数 65 秒', 't20w');
+  txt(scene, 1280, 324, '低功耗可用：perclk 与 32k 不停', 't20w');
+  txt(scene, 1280, 360, '可当场改值：LR 随时写，IOVW 立即生效', 't20w');
+  txt(scene, 1280, 396, '输出脚可翻转：能直接给外部芯片打节拍', 't20w');
+  txt(scene, 1280, 432, '代价：只有一个比较点，做不了多路', 't20w');
+
+  wide(456, 330);
+  head(80, 494, '把 EPIT 想成「倒计时炸弹」，导线只有四根');
+  txt(scene, 80, 522, '装弹值放 LR，引爆线是 CMPR：计数器每来一个分频后的时钟就减 1，减到 CMPR 的那一刻，OCIF 置 1。', 't20w');
+  txt(scene, 80, 556, 'OCIF 置位不等于中断：还要 OCIEN=1 且 NVIC/GIC 那边没屏蔽，中断才会真的进 CPU。', 't20w');
+  txt(scene, 80, 590, '减到 0 之后怎么办由 RLD 决定：置 1 就重新装弹（周期定时），清 0 就回到 FFFFFFFF（自由跑）。', 't20w');
+  txt(scene, 80, 624, '想让「每次重装都中断」，set-and-forget 下把 CMPR 设成等于 LR；自由跑下把 CMPR 设成 FFFFFFFF。', 't20w');
+  txt(scene, 80, 658, '想让「中途某个点中断」，CMPR 就是那个剩余计数值：CMPR 越大越早触发，越小越晚触发。', 't20w');
+  txt(scene, 80, 692, '预分频只是把输入时钟先除一下，不改变计数器位宽：分频 4096 后，32 位能数到 4096×2^32 个源时钟。', 't20w');
+  txt(scene, 80, 726, '和 GPT 的区别：GPT 有捕获、比较、PWM 多路，EPIT 只有一路比较；所以 EPIT 便宜、够快、专门做节拍。', 't20w');
+  txt(scene, 80, 760, '一句话记住：EPIT = 装弹（LR）+ 扳机（CMPR）+ 循环开关（RLD）+ 分频（PRESCALAR）。', 't20w');
+}
+
+function drawClk() {
+  txt(scene, 56, 146, 'CLKSRC 三选一：正常模式用 ipg，低功耗靠 perclk 或 32k 撑住，换源要先关 EN', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '三个时钟源');
+  txt(scene, 80, 252, '01 ipg_clk：外设时钟，6ULL 常为 66 MHz', 't20w');
+  txt(scene, 80, 288, '10 ipg_clk_highfreq：perclk', 't20w');
+  txt(scene, 80, 324, 'perclk 由 PLL3/PFD 或 ipg 派生', 't20w');
+  txt(scene, 80, 360, '11 ipg_clk_32k：外部 32 kHz 晶振', 't20s');
+  txt(scene, 80, 396, '00 关时钟：计数器彻底停', 't20w');
+  txt(scene, 80, 432, '正常模式 CCM 会把源同步到 ahb_clk', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '低功耗与调试');
+  txt(scene, 680, 252, 'STOPEN=1：stop 模式下继续数', 't20w');
+  txt(scene, 680, 288, 'WAITEN=1：wait 模式下继续数', 't20w');
+  txt(scene, 680, 324, '前提是所选时钟在低功耗仍存在', 't20w');
+  txt(scene, 680, 360, 'ipg 在低功耗会被关 → 只能用 32k/perclk', 't20w');
+  txt(scene, 680, 396, 'DBGEN=0：调试断点时计数器冻结', 't20w');
+  txt(scene, 680, 432, '退出调试后从冻结值继续', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '换源八步（手册原文顺序）');
+  txt(scene, 1280, 252, '① EN=0 关定时器', 't20w');
+  txt(scene, 1280, 288, '② OM=00 断输出 ③ 关中断', 't20w');
+  txt(scene, 1280, 324, '④ 写 CLKSRC 选新源', 't20w');
+  txt(scene, 1280, 360, '⑤ 写 1 清 SR 的 OCIF', 't20w');
+  txt(scene, 1280, 396, '⑥ ENMOD=1 让计数回到确定值', 't20w');
+  txt(scene, 1280, 432, '⑦ EN=1 启动 ⑧ 开中断', 't20w');
+
+  wide(456, 330);
+  head(80, 494, '低功耗为什么必须换源：ipg 会被 CCM 关掉');
+  txt(scene, 80, 522, '正常模式下 ipg_clk 一路供到 EPIT 的预分频，够用也够准；但进 stop 模式，CCM 会把大部分外设时钟关掉。', 't20w');
+  txt(scene, 80, 556, 'perclk 与 32 kHz 晶振这两路是特意留着的：手册写「低功耗时切到未同步版本」，所以它们能继续喂计数器。', 't20w');
+  txt(scene, 80, 590, '32k 的精度靠外部晶振（通常 ±20 ppm），做 RTC 级的分钟级唤醒够用；做毫秒级节拍就太粗（一格 30.5 µs）。', 't20w');
+  txt(scene, 80, 624, 'perclk 在 6ULL 上常配到 66 MHz 或更低，用它做低功耗唤醒比 32k 精细得多，代价是功耗略高。', 't20w');
+  txt(scene, 80, 658, '换源必须在 EN=0 时做：计数器正在跑的时候改 CLKSRC，分频器与计数器会拿到半个周期的毛刺，第一个间隔就不准。', 't20w');
+  txt(scene, 80, 692, 'ENMOD 是「复位到确定态」的开关：置 1 再开 EN，计数器从 LR 重新装弹、预分频归零，不会带着上次的余数。', 't20w');
+  txt(scene, 80, 726, '从低功耗回来有个例外：手册明确说不管 ENMOD 怎么设，都从冻结值继续 —— 因为冻结是「暂停」不是「复位」。', 't20w');
+  txt(scene, 80, 760, '调试断点时如果 DBGEN=0，计数器会停住；这会让「用 EPIT 测代码耗时」在断点下失效，注意别被误导。', 't20w');
+}
+
+function drawReg() {
+  txt(scene, 56, 146, '五个寄存器看懂四个位域就够：CLKSRC/PRESCALAR/RLD/OCIEN/EN，其余是低功耗与复位开关', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '地址与复位值');
+  txt(scene, 80, 252, 'EPIT1 基址 0x020D_0000', 't20s');
+  txt(scene, 80, 288, 'EPIT2 基址 0x020D_4000', 't20s');
+  txt(scene, 80, 324, '+0x00 CR 复位 0x0000_0000', 't20s');
+  txt(scene, 80, 360, '+0x04 SR 复位 0x0000_0000', 't20s');
+  txt(scene, 80, 396, '+0x08 LR 复位 0xFFFF_FFFF', 't20s');
+  txt(scene, 80, 432, '+0x0C CMPR 复位 0，+0x10 CNR 复位 FFFFFFFF', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, 'CR 位域（上）');
+  txt(scene, 680, 252, '[25:24] CLKSRC：00 关 / 01 ipg / 10 perclk / 11 32k', 't20w');
+  txt(scene, 680, 288, '[23:22] OM：00 断开 / 01 翻转 / 10 清 0 / 11 置 1', 't20w');
+  txt(scene, 680, 324, 'bit21 STOPEN、bit19 WAITEN', 't20w');
+  txt(scene, 680, 360, 'bit18 DBGEN：调试时是否继续数', 't20w');
+  txt(scene, 680, 396, 'bit17 IOVW：写 LR 是否立即覆盖计数', 't20w');
+  txt(scene, 680, 432, 'bit16 SWR：软件复位，自清', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, 'CR 位域（下）');
+  txt(scene, 1280, 252, '[15:4] PRESCALAR：÷(n+1)，0→1、0xFFF→4096', 't20w');
+  txt(scene, 1280, 288, 'bit3 RLD：1 重装 / 0 自由跑', 't20w');
+  txt(scene, 1280, 324, 'bit2 OCIEN：比较中断使能', 't20w');
+  txt(scene, 1280, 360, 'bit1 ENMOD：重开时是否复位计数', 't20w');
+  txt(scene, 1280, 396, 'bit0 EN：总开关', 't20w');
+  txt(scene, 1280, 432, 'SR 只有 bit0 OCIF，写 1 清零', 't20w');
+
+  wide(456, 330);
+  head(80, 494, '写 CR 与写 LR 各要一个等待周期，别在中断里连写');
+  txt(scene, 80, 522, '手册专门提了一句：对 CR 与 LR 的写会插入一个 wait state，其余寄存器是 0 等待 —— 因为这两个值要同步到计数时钟域。', 't20w');
+  txt(scene, 80, 556, '所以「中断里改周期」的正确做法是：只改 LR（或 CMPR），让新值在下一个重装周期生效，不要关 EN 再开。', 't20w');
+  txt(scene, 80, 590, 'CNR 是只读的：往它写会产生总线传输错误（transfer error），不是静默忽略 —— 调试时看到 bus fault 先查这里。', 't20w');
+  txt(scene, 80, 624, 'IOVW 是唯一的例外通道：置 1 后写 LR，会同时把计数器的值也改成该值，等于「立即重新装弹」。', 't20w');
+  txt(scene, 80, 658, 'IOVW 生效与 RLD 无关：即使自由跑模式，也能用 IOVW 强行把计数器拽到指定值。', 't20w');
+  txt(scene, 80, 692, 'SWR 自清：写 1 后硬件复位整个模块，但 EN/ENMOD/STOPEN/WAITEN/DBGEN 五个位不受影响，复位完还是原来的状态。', 't20w');
+  txt(scene, 80, 726, 'SR 是 w1c：写 1 清 OCIF，写 0 无效。中断服务程序末尾必须清，否则出去立刻又进来。', 't20w');
+  txt(scene, 80, 760, '初始化的安全顺序：先写 LR/CMPR/PRESCALAR/CLKSRC，最后一步写 EN —— EN 一置位，计数器立刻按新配置跑。', 't20w');
+}
+
+function drawMath() {
+  txt(scene, 56, 146, '周期公式只有一条：T = (PRE+1) × (LR − CMPR) / f_clk；难的是把 66000 拆成两个整数', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '公式与边界');
+  txt(scene, 80, 252, 'T = (PRESCALAR+1)×(LR−CMPR)/f', 't20s');
+  txt(scene, 80, 288, 'CMPR=0 时最常用：T=(PRE+1)×LR/f', 't20w');
+  txt(scene, 80, 324, 'CMPR=LR：每次重装立刻触发', 't20w');
+  txt(scene, 80, 360, '自由跑 CMPR=FFFFFFFF：每 2^32 次', 't20w');
+  txt(scene, 80, 396, '66 MHz 不 +分频：最长 65.04 s', 't20w');
+  txt(scene, 80, 432, '32 kHz + ÷4096：最长约 17 年', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '三个算例');
+  txt(scene, 680, 252, '① 66 MHz 要 1 ms：66000 计数', 't20w');
+  txt(scene, 680, 288, '拆成 PRE=65（÷66）+ LR=1000', 't20w');
+  txt(scene, 680, 324, '或 PRE=0 + LR=66000（精度更好）', 't20w');
+  txt(scene, 680, 360, '② 32.768 kHz 要 1 s：32768 计数', 't20w');
+  txt(scene, 680, 396, 'PRE=0 + LR=32768 正好 1 s', 't20w');
+  txt(scene, 680, 432, '③ 66 MHz 要 10 ms：LR=660000', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '误差从哪来');
+  txt(scene, 1280, 252, '取整：66000/66 恰好整除，不偏', 't20w');
+  txt(scene, 1280, 288, '不整除时每周期都有小数残差', 't20w');
+  txt(scene, 1280, 324, '修复：把 PRE 取小，让 LR 保留更多有效位', 't20w');
+  txt(scene, 1280, 360, '晶振精度：32k ±20 ppm ≈ 每天 1.7 s', 't20w');
+  txt(scene, 1280, 396, '中断延迟：进 ISR 再清 OCIF 有几十周期抖动', 't20w');
+  txt(scene, 1280, 432, '硬实时别靠软件补，用输出脚直接打', 't20w');
+
+  wide(456, 330);
+  head(80, 494, '为什么「分频取小」更准：残差被计数器放大');
+  txt(scene, 80, 522, '拿 66 MHz 生成 1 ms：66000 个源时钟。方案 A 用 ÷66 + 1000，方案 B 用 ÷1 + 66000，两者理论都对。', 't20w');
+  txt(scene, 80, 556, '差别在量化：如果目标不是整除（比如 1 kHz 下要 1.001 ms），÷66 会把每格 15.15 ns 的误差累积 1000 次。', 't20w');
+  txt(scene, 80, 590, '换到 32 kHz 就更明显：一格 30.5 µs，要 10 ms 只能数 327 或 328 格，天生带 0.3% 的台阶。', 't20w');
+  txt(scene, 80, 624, '所以做长周期定时（秒级）要用 32k（省电、准到晶振级），做短周期（毫秒级）要用 ipg 不分频或小分频。', 't20w');
+  txt(scene, 80, 658, '「自由跑 + CMPR 固定」还有另一个用途：把 CNR 当时间戳读。上电清零后，CNR 就是开机以来的源时钟计数。', 't20w');
+  txt(scene, 80, 692, '用它测代码耗时：进函数读 CNR、出函数读 CNR，差值 × 时钟周期就是耗时 —— 但记得 DBGEN=1，否则断点会骗你。', 't20w');
+  txt(scene, 80, 726, '溢出边界要算：LR 必须 ≥ CMPR+1，否则计数器永远减不到 CMPR，中断一次都不来（最常见的不亮灯原因）。', 't20w');
+  txt(scene, 80, 760, '还有一个坑：改了 f_clk（PLL 重配）而没改 LR/PRE，周期会按比例漂 —— 时钟树一动，所有定时都要重算。', 't20w');
+}
+
+function drawUse() {
+  txt(scene, 56, 146, '四种用法各有对应的位组合：周期节拍、单次延时、输出方波、低功耗唤醒', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '周期中断（节拍）');
+  txt(scene, 80, 252, 'RLD=1、CMPR=0、OCIEN=1', 't20w');
+  txt(scene, 80, 288, 'LR=周期计数、EN=1 跑到底', 't20w');
+  txt(scene, 80, 324, 'ISR 里只清 OCIF，不改配置', 't20w');
+  txt(scene, 80, 360, '适合 systick 替代、软件定时器基准', 't20w');
+  txt(scene, 80, 396, '要改周期：只写 LR，下轮生效', 't20w');
+  txt(scene, 80, 432, '注意重装瞬间不重同步预分频', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '单次延时');
+  txt(scene, 680, 252, 'RLD=0 或 RLD=1 都行', 't20w');
+  txt(scene, 680, 288, '开 EN → 等 OCIF → 关 EN', 't20w');
+  txt(scene, 680, 324, 'CMPR 设成目标剩余值', 't20w');
+  txt(scene, 680, 360, '要重来先 SWR 或 IOVW 重装', 't20w');
+  txt(scene, 680, 396, '精度比软件循环高一个数量级', 't20w');
+  txt(scene, 680, 432, '别在 ISR 里死等，用状态机', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '输出方波 / 唤醒');
+  txt(scene, 1280, 252, 'OM=01 翻转：每个比较事件翻一次', 't20w');
+  txt(scene, 1280, 288, '频率 = f/(2×(PRE+1)×(LR−CMPR))', 't20w');
+  txt(scene, 1280, 324, '占空比固定 50%，做不了调光', 't20w');
+  txt(scene, 1280, 360, 'OM=10/11 可清 0/置 1，配状态机用', 't20w');
+  txt(scene, 1280, 396, '低功耗唤醒：32k + STOPEN=1', 't20w');
+  txt(scene, 1280, 432, '唤醒后要重算已过时间，别直接当 tick', 't20w');
+
+  wide(456, 330);
+  head(80, 494, '一个必踩的陷阱：重开 EN 时 CMPR 等于旧的 CNR，会立刻误触发');
+  txt(scene, 80, 522, '场景：你把 EN 关掉、改了 LR、再打开，结果第一个中断在几微秒内就来了，周期完全不对。', 't20w');
+  txt(scene, 80, 556, '原因：关 EN 时计数器冻结在某值 X，CMPR 还停在 X（或恰好等于 X），一开 EN 比较器立刻命中。', 't20w');
+  txt(scene, 80, 590, '手册给三个解法：把 CMPR 设成「上次 CNR + 1」；或用 IOVW 写 LR 把计数器直接拽到 LR；或多做一次关/开并清 OCIF。', 't20w');
+  txt(scene, 80, 624, '最稳的是第一种：初始化时先读一次 CNR，再写 CMPR = 该值 + 1，然后才写 LR 与 EN。', 't20w');
+  txt(scene, 80, 658, '第二个陷阱：中断里不清 OCIF。表现是「进了一次中断就再也不出来」，因为标志一直挂着。', 't20w');
+  txt(scene, 80, 692, '第三个陷阱：把 EPIT 当中断源却没配 GIC。EPIT1 是 SPI 56、EPIT2 是 SPI 57，要在 GIC 里使能并设优先级。', 't20w');
+  txt(scene, 80, 726, '第四个：用 EPIT 做 PWM。它只有一路比较、占空比恒 50%，要调光请用 PWM 外设（PWM1–8 或 GPT 的比较输出）。', 't20w');
+  txt(scene, 80, 760, '第五个：低功耗下还用 ipg。进 stop 前没换到 32k/perclk，回来发现「少睡了一段时间」，时间全乱。', 't20w');
+}
+
+function drawBoard() {
+  txt(scene, 56, 146, '本板 EPIT 的两个输出脚被 UART3 占着，能测的是计数器、标志和中断', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '引脚现实');
+  txt(scene, 80, 252, 'EPIT1_OUT 落在 UART3_RX_DATA 球（C5）', 't20w');
+  txt(scene, 80, 288, 'EPIT2_OUT 落在 UART3_CTS_B 球（B5）', 't20w');
+  txt(scene, 80, 324, '两者都是 ALT8 功能', 't20w');
+  txt(scene, 80, 360, 'ALPHA 板这组球接 UART3 的 TTL 排针', 't20w');
+  txt(scene, 80, 396, 'MINI 板 GPIO4 整组未引到排针', 't20w');
+  txt(scene, 80, 432, '要用输出脚就得放弃 UART3 的 RX/CTS', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '寄存器级实测五步');
+  txt(scene, 680, 252, '① 写 LR=0x0000_FFFF、CMPR=0', 't20s');
+  txt(scene, 680, 288, '② 写 CR：CLKSRC=01、PRE=0、EN=1', 't20w');
+  txt(scene, 680, 324, '③ 连读 CNR 三次，应递减', 't20w');
+  txt(scene, 680, 360, '④ 读 SR，应看到 OCIF=1', 't20w');
+  txt(scene, 680, 396, '⑤ 写 SR=1 清，再读回 0', 't20w');
+  txt(scene, 680, 432, '全过说明减法器与总线都活着', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '再加中断与计数');
+  txt(scene, 1280, 252, 'OCIEN=1 → 中断进 ISR 加 1', 't20w');
+  txt(scene, 1280, 288, 'ISR 里翻转一个 GPIO 点灯', 't20w');
+  txt(scene, 1280, 324, '用逻辑分析仪量翻转周期', 't20w');
+  txt(scene, 1280, 360, '与公式算出的 T 比对', 't20w');
+  txt(scene, 1280, 396, '差 2 倍 → PRE 算错；差 66 倍 → CLKSRC 选错', 't20w');
+  txt(scene, 1280, 432, 'Linux 下看 /proc/interrupts 是否涨', 't20w');
+
+  wide(456, 330);
+  head(80, 494, '为什么本板不推荐去动 EPIT 输出脚');
+  txt(scene, 80, 522, 'ALPHA 板的 UART3 是四线 TTL 排针（TX/RX/RTS/CTS），正好占着 EPIT1_OUT 与 EPIT2_OUT 的两个球。', 't20w');
+  txt(scene, 80, 556, '把这两个球切到 ALT8，UART3 就只剩 TX/RTS：串口调试立刻坏掉，而且这种「坏」不容易第一时间联想到 EPIT。', 't20w');
+  txt(scene, 80, 590, 'MINI 板更彻底：这组球属于 GPIO4/NAND/EIM 复用组，整组没引到 2.54 排针，输出脚物理上摸不到。', 't20w');
+  txt(scene, 80, 624, '所以本章的实测方案是「内部闭环」：中断里翻 GPIO，用示波器/逻辑分析仪量 GPIO 的方波，反推 EPIT 周期。', 't20w');
+  txt(scene, 80, 658, '量到的周期若比理论值大一点点（几十 µs），那是中断响应延迟 + 清标志开销，不是定时器不准。', 't20w');
+  txt(scene, 80, 692, '要测「纯硬件精度」，就把 OM 配成翻转输出到球上量 —— 但那要改板；或者用 GPT 的比较输出（本板 GPT1 有引出）。', 't20w');
+  txt(scene, 80, 726, 'Linux 侧：EPIT 常被内核拿去做 clock event 或唤醒源；自己写驱动占 EPIT 前，先看 DT 里是否已 assigned。', 't20w');
+  txt(scene, 80, 760, '下一步 RM25 是 ESAI 音频接口（1179–1244 页，66 页，opt）：本板没有音频 codec，只做结构与寄存器解读。', 't20w');
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawRole();
+  else if (s === 1) drawClk();
+  else if (s === 2) drawReg();
+  else if (s === 3) drawMath();
+  else if (s === 4) drawUse();
+  else drawBoard();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () {
+  state.step = INIT.step; state.lane = INIT.lane; draw();
+});
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>

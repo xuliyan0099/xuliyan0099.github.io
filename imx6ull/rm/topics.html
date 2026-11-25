@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>七条主线：跨章专题阅读路径 | i.MX6ULL 学习手册</title>
+<meta name="description" content="把 60 章按真实工程链路重新排成七条主线：启动、时钟电源、DMA、显示、存储、串口音频、安全调试。每条主线给出顺序、每章为什么在这一步、以及只读三章的缩写版。">
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../assets/mobile.css">
+<style>
+.path-note{display:grid;gap:8px;margin:16px 0 6px}
+.mini{margin:14px 0 0;padding:14px 16px;border:1px solid rgba(95,241,239,.28);border-radius:12px;background:rgba(95,241,239,.05)}
+.mini b{color:#7ee7ff;font-size:12.5px;letter-spacing:.04em}
+.mini p{margin:6px 0 0;font-size:13px;color:#b9c6dc}
+.mini code{color:#cfe0ff}
+.path-h{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 6px}
+.path-h .cnt{font:500 11.5px/1 ui-monospace,Consolas,monospace;color:#8fa3c4;margin-left:auto}
+table tr td:first-child{white-space:nowrap;width:92px}
+table tr td:first-child a{color:#7ee7ff;text-decoration:none;font:600 12px/1.6 ui-monospace,Consolas,monospace}
+table tr td:first-child a:hover{text-decoration:underline}
+table tr td:nth-child(2){width:36%}
+@media (max-width:720px){table tr td:nth-child(2){width:auto}}
+</style>
+</head><body>
+<input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
+<header id="topbar">
+  <div class="brand"><span class="dot"></span>i.MX6ULL 学习手册 <small>比特 → 电路 → CPU → 内核 → 板子</small></div>
+  <div class="spacer"></div>
+  <label for="navChk" class="nav-btn" aria-label="目录">☰ 目录</label>
+  <a class="home" href="../index.html"><span class="lg">⌂ 学习站入口</span><span class="sm">⌂ 学习站</span></a>
+  <a class="home" href="../../index.html"><span class="lg">⌂ 个人知识库</span><span class="sm">⌂ 知识库</span></a>
+</header>
+<label for="navChk" class="nav-mask" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside id="sidebar">
+    <div class="vol-h">专题阅读路径</div>
+    <ol>
+      <li><a href="#howto"><span class="no">00</span><span>怎么用这七条线<span class="sub">不是目录，是施工顺序</span></span></a></li>
+      <li><a href="#p1"><span class="no">一</span><span>从冷启动到 shell<span class="sub">8 章 · 上电到第一行日志</span></span></a></li>
+      <li><a href="#p2"><span class="no">二</span><span>时钟、电源与复位<span class="sub">8 章 · 让芯片跑起来并睡下去</span></span></a></li>
+      <li><a href="#p3"><span class="no">三</span><span>DMA 与数据搬运<span class="sub">6 章 · 别让 CPU 搬字节</span></span></a></li>
+      <li><a href="#p4"><span class="no">四</span><span>显示与图形<span class="sub">6 章 · 从帧缓冲到合成</span></span></a></li>
+      <li><a href="#p5"><span class="no">五</span><span>存储与外设总线<span class="sub">6 章 · DDR、NOR、SD、NAND</span></span></a></li>
+      <li><a href="#p6"><span class="no">六</span><span>串口、总线与音频<span class="sub">8 章 · 芯片怎么和外面说话</span></span></a></li>
+      <li><a href="#p7"><span class="no">七</span><span>安全与调试<span class="sub">7 章 · 谁能进来，怎么拦住</span></span></a></li>
+      <li><a href="#pick"><span class="no">✦</span><span>只读三章<span class="sub">每主线的最短路径</span></span></a></li>
+    </ol>
+    <div class="vol-nav"><a href="index.html">← 60 章逐章解读</a><a href="../manual/index.html">手册研读 →</a></div>
+  </aside>
+
+  <main class="doc book">
+    <div class="ch-meta"><span class="lv">芯片手册 · 专题重组</span><span class="sep">/</span>60 章已全部上线<span class="sep">/</span>七条主线</div>
+    <h1>七条主线：把 60 章按工程链路重排</h1>
+    <p class="lede">按章号读，读到第 20 章就忘了第 3 章。真正写代码时也不是这个顺序：要启动，就从晶振一路查到 NOR 的 LUT；调不通串口，先怀疑引脚复用，再怀疑门控。这七条线是把 60 章按<b>「上板时事情发生的顺序」</b>重新串一遍，每条线给顺序、给理由、给最短三章。每一章都能点进去看四到七步的交互讲解。</p>
+
+    <h2 id="howto"><span class="n">00</span>怎么用这七条线</h2>
+    <div class="goals">
+      <h4>三条使用规矩</h4>
+      <ol>
+        <li><b>先读首章，再按表走</b>——每条线的第一章都是总览，先把「这一段在整颗芯片里占什么位置」建立起来，后面的章才有落点。</li>
+        <li><b>不必读完</b>——表里写了「为什么在这一步」，如果你手上没有这块硬件（比如没接 NAND），整行跳过，不影响后面。</li>
+        <li><b>卡住时反向查</b>——现象定位用目录页的「按问题查」表；这条线用来回答「接下来该配什么」。</li>
+      </ol>
+    </div>
+    <div class="box tip">
+      <h5>一条线读完大概多久</h5>
+      <p>每章四到七步，逐步点，平均 6–10 分钟。一条主线 6–8 章，约一小时；七条线全部过一遍是 6–8 小时，相当于把整本手册走一遍，但顺序是你能记住的那个顺序。</p>
+    </div>
+
+    <div class="path-h" id="p1"><h2 style="margin:0"><span class="n">一</span>从冷启动到 shell</h2><span class="cnt">8 章 · 上电到第一行日志</span></div>
+    <p class="pl">这条线回答一个问题：手指按下复位键之后，到串口打出第一行字，中间经过了谁。它同时也是排障顺序——板子不亮，就按这条线从上往下查。</p>
+    <div class="tblw"><table>
+      <thead><tr><th>章</th><th>为什么在这一步</th><th>落地到</th></tr></thead>
+      <tbody>
+        <tr><td><a href="c08.html">RM08 启动流程</a></td><td>Boot ROM 是第一段代码，它怎么找镜像、怎么验 IVT 与 DCD</td><td>IVT / Boot Data / DCD 三块结构</td></tr>
+        <tr><td><a href="c05.html">RM05 熔丝表</a></td><td>从哪个介质启动、几位宽，全由 BOOT_CFG 决定</td><td>BOOT_CFG1–4 与 BT_FUSE_SEL</td></tr>
+        <tr><td><a href="c51.html">RM51 复位控制器</a></td><td>先分清是 POR 还是看门狗复位，否则会查错方向</td><td>SRSR 复位源、SBMR 锁存启动配置</td></tr>
+        <tr><td><a href="c60.html">RM60 晶振</a></td><td>24 MHz 不起来，后面所有 PLL 都是空谈</td><td>主振与 32.768 kHz RTC 晶振</td></tr>
+        <tr><td><a href="c02.html">RM02 内存映射</a></td><td>解释为什么 0x0 是 ROM、0x6000_0000 是外部 NOR</td><td>片内 ROM 与各外设基址</td></tr>
+        <tr><td><a href="c43.html">RM43 ROM 补丁</a></td><td>复位向量可以被补丁改写，这是外部启动的一环</td><td>0x0 处换成跳转，16 个比较器</td></tr>
+        <tr><td><a href="c42.html">RM42 QuadSPI</a></td><td>最常见的启动介质，读镜像靠 LUT 里那条 0xEB 序列</td><td>LUT 读序列与 0x6000_0000 窗口</td></tr>
+        <tr><td><a href="c58.html">RM58 uSDHC</a></td><td>SD 卡与 eMMC 走另一条启动路径，量产更常见</td><td>命令/ADMA、卡识别与分区</td></tr>
+      </tbody>
+    </table></div>
+    <div class="mini"><b>只读三章</b><p><a href="c08.html">RM08</a> → <a href="c05.html">RM05</a> → <a href="c51.html">RM51</a>：能把「为什么这块板从 NOR 起、为什么复位后日志在 UART1」讲清楚，就够用了。</p></div>
+
+    <div class="path-h" id="p2"><h2 style="margin:0"><span class="n">二</span>时钟、电源与复位</h2><span class="cnt">8 章 · 让芯片跑起来并睡下去</span></div>
+    <p class="pl">这条线是所有外设的前置：任何外设不工作，第一步都该问「它的门控开了吗、根时钟选对了吗」。做完再谈低功耗。</p>
+    <div class="tblw"><table>
+      <thead><tr><th>章</th><th>为什么在这一步</th><th>落地到</th></tr></thead>
+      <tbody>
+        <tr><td><a href="c10.html">RM10 时钟电源总览</a></td><td>先看清 PLL 树与电源域的骨架，再进细节</td><td>PLL 链、域划分、DVFS 概念</td></tr>
+        <tr><td><a href="c18.html">RM18 CCM</a></td><td>门控与根时钟的实际开关都在这</td><td>CCGR、PLL 配置、时钟根选择</td></tr>
+        <tr><td><a href="c27.html">RM27 GPC</a></td><td>WFI 之后芯片去哪儿，由它决定</td><td>电源域状态机与低功耗模式</td></tr>
+        <tr><td><a href="c39.html">RM39 PMU</a></td><td>提频必须先提压，LDO 的步进在这里</td><td>片上 LDO 与调压寄存器</td></tr>
+        <tr><td><a href="c51.html">RM51 复位控制器</a></td><td>warm reset 要等 DDR 确认，等不到就降级</td><td>SCR / SRSR / SBMR</td></tr>
+        <tr><td><a href="c48.html">RM48 SNVS</a></td><td>主电断掉以后，谁还活着、谁记得时间</td><td>RTC、单调计数、GPR 保持域</td></tr>
+        <tr><td><a href="c52.html">RM52 温度监控</a></td><td>高温降频是硬保护，不看它会被动撞墙</td><td>三档阈值与温度换算</td></tr>
+        <tr><td><a href="c59.html">RM59 看门狗</a></td><td>最后一道保险，也是「莫名重启」的常见元凶</td><td>喂狗窗口与复位因果</td></tr>
+      </tbody>
+    </table></div>
+    <div class="mini"><b>只读三章</b><p><a href="c18.html">RM18</a> → <a href="c27.html">RM27</a> → <a href="c51.html">RM51</a>：会开门控、会让芯片睡着、分得清是谁把它叫醒。</p></div>
+
+    <div class="path-h" id="p3"><h2 style="margin:0"><span class="n">三</span>DMA 与数据搬运</h2><span class="cnt">6 章 · 别让 CPU 搬字节</span></div>
+    <p class="pl">摄像头、音频、NAND、网络都在等数据自动流动。这条线讲清「谁触发、谁搬、搬到哪、搬完怎么通知」这四件事。</p>
+    <div class="tblw"><table>
+      <thead><tr><th>章</th><th>为什么在这一步</th><th>落地到</th></tr></thead>
+      <tbody>
+        <tr><td><a href="c03.html">RM03 中断号与事件号</a></td><td>DMA 不是轮询，它靠事件号被外设叫醒</td><td>外设事件号表与中断号表</td></tr>
+        <tr><td><a href="c46.html">RM46 SDMA</a></td><td>32 个虚拟通道共用一套脚本内核，通用搬运都走它</td><td>CHNENBL / CHNPRI、CCB 与 BD</td></tr>
+        <tr><td><a href="c38.html">RM38 OCRAM</a></td><td>脚本、描述符、小缓冲放哪儿，直接影响搬得动搬不动</td><td>片上 RAM 的地址与访问宽度</td></tr>
+        <tr><td><a href="c15.html">RM15 APBH 与专用 DMA</td><td>NAND 与墨水屏有专用通道，不走 SDMA</td><td>APBH 桥与 BCH 的挂接</td></tr>
+        <tr><td><a href="c17.html">RM17 NAND ECC</a></td><td>ECC 引擎靠 DMA 喂页数据，配错就全是错码</td><td>BCH 参数与页级校验</td></tr>
+        <tr><td><a href="c14.html">RM14 AIPSTZ</a></td><td>某个主控能不能看见某个外设，由权限挡着</td><td>主控权限与访问越界的表现</td></tr>
+      </tbody>
+    </table></div>
+    <div class="mini"><b>只读三章</b><p><a href="c46.html">RM46</a> → <a href="c03.html">RM03</a> → <a href="c38.html">RM38</a>：会开通道、会找事件号、知道缓冲该放哪块 RAM。</p></div>
+
+    <div class="path-h" id="p4"><h2 style="margin:0"><span class="n">四</span>显示与图形</h2><span class="cnt">6 章 · 从帧缓冲到合成</span></div>
+    <p class="pl">一条 RGB 屏点亮的完整链路：引脚 → 时钟 → 控制器 → 合成加速 → 采集 → 特殊屏。花屏和偏移九成出在前两章。</p>
+    <div class="tblw"><table>
+      <thead><tr><th>章</th><th>为什么在这一步</th><th>落地到</th></tr></thead>
+      <tbody>
+        <tr><td><a href="c32.html">RM32 引脚复用</a></td><td>24 位数据线加四根同步信号，复用组选错就是全黑</td><td>LCD 引脚 ALT 模式与电气设置</td></tr>
+        <tr><td><a href="c18.html">RM18 CCM</a></td><td>像素时钟来自哪条 PLL，除出来是不是正好 33.3 MHz</td><td>LCDIF 根时钟与分频</td></tr>
+        <tr><td><a href="c34.html">RM34 eLCDIF</a></td><td>时序参数、帧地址、双缓冲都在这</td><td>CTRL、VDCTRL、帧缓冲指针</td></tr>
+        <tr><td><a href="c41.html">RM41 PXP</a></td><td>要叠加、缩放、旋转时，别让 CPU 去拷像素</td><td>PS/AS 合成、缩放倒数、两级旋转</td></tr>
+        <tr><td><a href="c19.html">RM19 CSI</a></td><td>摄像头数据先落地成帧，再交给 PXP 处理</td><td>CSI 接收与打包格式</td></tr>
+        <tr><td><a href="c23.html">RM23 EPDC</a></td><td>墨水屏刷新逻辑完全不同，要靠波形表</td><td>EPDC 时序与 WFE 波形</td></tr>
+      </tbody>
+    </table></div>
+    <div class="mini"><b>只读三章</b><p><a href="c34.html">RM34</a> → <a href="c41.html">RM41</a> → <a href="c32.html">RM32</a>：能把一块 800×480 的屏点亮，并叠一层图标上去。</p></div>
+
+    <div class="path-h" id="p5"><h2 style="margin:0"><span class="n">五</span>存储与外设总线</h2><span class="cnt">6 章 · DDR、NOR、SD、NAND</span></div>
+    <p class="pl">四种存储四种性格：DDR 要校准、NOR 要 LUT、SD 要命令、NAND 要 ECC。这条线讲清各自的初始化门槛。</p>
+    <div class="tblw"><table>
+      <thead><tr><th>章</th><th>为什么在这一步</th><th>落地到</th></tr></thead>
+      <tbody>
+        <tr><td><a href="c02.html">RM02 内存映射</a></td><td>先知道每种存储在地址空间里占哪一段</td><td>窗口与基址</td></tr>
+        <tr><td><a href="c35.html">RM35 MMDC 与校准</a></td><td>DDR 不稳多半是校准没做完，不是频率太高</td><td>初始化序列、读写校准、模式寄存器</td></tr>
+        <tr><td><a href="c42.html">RM42 QuadSPI</a></td><td>NOR 的读命令与时序差异全在 LUT 里填</td><td>LUT 序列、AHB 窗口、四个缓冲</td></tr>
+        <tr><td><a href="c58.html">RM58 uSDHC</a></td><td>SD 与 eMMC 靠命令交互，ADMA 才是高速关键</td><td>命令寄存器、ADMA 描述符</td></tr>
+        <tr><td><a href="c29.html">RM29 GPMI</a> + <a href="c17.html">RM17</a></td><td>NAND 的时序与 ECC 必须成对配，单独调不通</td><td>GPMI 时序、BCH 校验</td></tr>
+        <tr><td><a href="c49.html">RM49 SPBA</a></td><td>多个主控抢外设时，谁有权限、谁被挡</td><td>PRR 寄存器与轮转仲裁</td></tr>
+      </tbody>
+    </table></div>
+    <div class="mini"><b>只读三章</b><p><a href="c35.html">RM35</a> → <a href="c42.html">RM42</a> → <a href="c58.html">RM58</a>：把板上的 DDR、NOR、SD 三条路都跑到能读写。</p></div>
+
+    <div class="path-h" id="p6"><h2 style="margin:0"><span class="n">六</span>串口、总线与音频</h2><span class="cnt">8 章 · 芯片怎么和外面说话</span></div>
+    <p class="pl">从上电调试用的 UART，到板上传感器走的 I2C，再到音频这条独立链路。共同点是：引脚、时钟、协议三样缺一不可。</p>
+    <div class="tblw"><table>
+      <thead><tr><th>章</th><th>为什么在这一步</th><th>落地到</th></tr></thead>
+      <tbody>
+        <tr><td><a href="c55.html">RM55 UART</a></td><td>八路基址、波特率公式、FIFO 水位，调试第一工具</td><td>UBIR/UBMR、USR1/2、上电顺序</td></tr>
+        <tr><td><a href="c31.html">RM31 I2C</a></td><td>传感器与 PMIC 都挂在这，仲裁与时钟拉伸是难点</td><td>I2CR/I2SR、START 与 ACK</td></tr>
+        <tr><td><a href="c20.html">RM20 ECSPI</a></td><td>屏幕、Flash、ADC 常见，四路片选要靠软件管</td><td>CONREG、FIFO、片选控制</td></tr>
+        <tr><td><a href="c26.html">RM26 FLEXCAN</a></td><td>车载场景必读，位时序与 Bus-Off 恢复</td><td>邮箱、位时序、错误状态机</td></tr>
+        <tr><td><a href="c45.html">RM45 SAI</a></td><td>I2S 音频主路径，两级分频决定采样率</td><td>TCR1–5、FIFO 与帧同步</td></tr>
+        <tr><td><a href="c50.html">RM50 S/PDIF</a></td><td>光纤与同轴输出，block 结构与 DPLL 锁定时钟</td><td>子帧格式、SIS 与 STC</td></tr>
+        <tr><td><a href="c16.html">RM16 ASRC</a></td><td>两路采样率不一致时，靠它做异步转换</td><td>转换比设置与 FIFO</td></tr>
+        <tr><td><a href="c36.html">RM36 MQS</a></td><td>没有 DAC 时，用 PWM 直接推喇叭的最小方案</td><td>四页内容：分频与占空比</td></tr>
+      </tbody>
+    </table></div>
+    <div class="mini"><b>只读三章</b><p><a href="c55.html">RM55</a> → <a href="c31.html">RM31</a> → <a href="c20.html">RM20</a>：串口能打日志、I2C 能读到传感器 ID、SPI 能读回 Flash 的 JEDEC。</p></div>
+
+    <div class="path-h" id="p7"><h2 style="margin:0"><span class="n">七</span>安全与调试</h2><span class="cnt">7 章 · 谁能进来，怎么拦住</span></div>
+    <p class="pl">这条线两头都硬：一头是熔丝，烧了就不可逆；一头是 JTAG，配错就连不上。做量产或做安全启动时按顺序读。</p>
+    <div class="tblw"><table>
+      <thead><tr><th>章</th><th>为什么在这一步</th><th>落地到</th></tr></thead>
+      <tbody>
+        <tr><td><a href="c11.html">RM11 安全总览</a></td><td>先建立信任链：谁验谁、密钥在哪</td><td>HAB 流程与安全启动阶段</td></tr>
+        <tr><td><a href="c05.html">RM05 熔丝表</a></td><td>SEC_CONFIG 与 JTAG 禁用位一旦烧写就回不去</td><td>熔丝位定义与影响</td></tr>
+        <tr><td><a href="c37.html">RM37 OCOTP</a></td><td>熔丝控制器的影子寄存器与烧写时序</td><td>影子寄存器、写保护、烧写步骤</td></tr>
+        <tr><td><a href="c47.html">RM47 SJC</a></td><td>JTAG 拓扑与三档安全模式，连不上先看这里</td><td>MOD 引脚、指令表、挑战应答</td></tr>
+        <tr><td><a href="c07.html">RM07 调试架构</a></td><td>DAP、CTI、ETM 谁接谁，决定能不能断点</td><td>调试组件拓扑</td></tr>
+        <tr><td><a href="c54.html">RM54 TZASC</a></td><td>把 DDR 分区保护起来，越界访问直接拦</td><td>区域配置与违规中断</td></tr>
+        <tr><td><a href="c48.html">RM48 SNVS</a></td><td>单调计数防回滚，掉电也要记得</td><td>LP 单调计数器与 tamper</td></tr>
+      </tbody>
+    </table></div>
+    <div class="mini"><b>只读三章</b><p><a href="c11.html">RM11</a> → <a href="c47.html">RM47</a> → <a href="c37.html">RM37</a>：知道安全启动卡在哪一步、JTAG 为什么连不上、熔丝怎么烧。</p></div>
+
+    <h2 id="pick"><span class="n">✦</span>七条线的最短路径</h2>
+    <p>如果只有两个小时，按这个顺序读九章：先建立「芯片怎么起来」，再建立「外设怎么被打开」，最后是「数据怎么动」。</p>
+    <div class="tblw"><table>
+      <thead><tr><th>序</th><th>章</th><th>拿到什么</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><a href="c08.html">RM08 启动流程</a></td><td>上电到跳进你的代码，中间每一步都可解释</td></tr>
+        <tr><td>2</td><td><a href="c02.html">RM02 内存映射</a></td><td>看任何一个地址都知道它属于谁</td></tr>
+        <tr><td>3</td><td><a href="c18.html">RM18 CCM</a></td><td>能把任意外设的门控和根时钟配出来</td></tr>
+        <tr><td>4</td><td><a href="c32.html">RM32 引脚复用</a></td><td>任何一根脚都能找到它的 ALT 与电气设置</td></tr>
+        <tr><td>5</td><td><a href="c55.html">RM55 UART</a></td><td>第一个能观测的输出通道</td></tr>
+        <tr><td>6</td><td><a href="c46.html">RM46 SDMA</a></td><td>大块数据不再靠 CPU 一位一位搬</td></tr>
+        <tr><td>7</td><td><a href="c35.html">RM35 MMDC</a></td><td>DDR 能跑起来，跑 Linux 才有前提</td></tr>
+        <tr><td>8</td><td><a href="c34.html">RM34 eLCDIF</a></td><td>第一个能观测的图形输出</td></tr>
+        <tr><td>9</td><td><a href="c51.html">RM51 复位控制器</a></td><td>板子出问题时，知道是谁按了重启</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="ch-nav">
+      <a href="index.html"><span>目录</span><b>← 60 章逐章解读（全部已上线）</b></a>
+      <a class="nx" href="../manual/index.html"><span>前置</span><b>手册研读 8 篇 · 怎么读一本手册 →</b></a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

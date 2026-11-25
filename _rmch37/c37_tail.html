@@ -1,0 +1,335 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0 };
+var state = { step: INIT.step };
+
+var STEPS = [
+  { h: '一次性熔丝', hint: '512×8 OTP · 64 字影子',
+    note: '烧断就是 1，烧错不能改；所以软件只读影子，写熔丝要过两道锁。' },
+  { h: '寄存器地图', hint: '0x021B_C000 · 4 套 CTRL',
+    note: '控制区在 0x000 段，影子寄存器从 0x400 起，bank 步长 0x80、word 步长 0x10。' },
+  { h: '八个 bank 装什么', hint: 'LOCK · CFG · OTPMK · SRK',
+    note: 'bank0 是锁位与配置，bank2 主密钥，bank3 公钥哈希，bank4 MAC，bank6 ROM 补丁。' },
+  { h: '怎么读', hint: '影子直读 · 0xBADABADA',
+    note: '平时读影子寄存器就够；被读锁的区域返回固定魔数，并置 ERROR 卡住后续访问。' },
+  { h: '怎么烧', hint: '0x3E77 · 掩码 · 10 µs/bit',
+    note: '每写一次都要重新解锁；控制器只烧 1，已烧过的位不会重烧；写完等 2 µs 收尾。' },
+  { h: '时序与 CRC', hint: 'TIMING/TIMING2 · CRC32',
+    note: '时序按 ipg_clk 折算；CRC 用来验收「读锁区域」拷贝是否完好。' },
+  { h: '锁与判据', hint: 'LOCK 只读 · SRK_REVOKE',
+    note: '锁位写下去永久生效；判据是「锁后再写是否被拒」而不是「值对不对」。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+
+function drawTop() {
+  txt(scene, 56, 146, 'OCOTP 是「只烧一次的 ROM」：物理上是 512×8 熔丝阵列，软件看到的是 64 个 32 位影子寄存器', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '物理与逻辑');
+  txt(scene, 80, 252, '阵列 512 × 8 bit', 't20w');
+  txt(scene, 80, 288, '分成 64 个 32 位字', 't20w');
+  txt(scene, 80, 324, '每个字都有影子寄存器', 't20w');
+  txt(scene, 80, 360, '上电时自动搬进影子', 't20w');
+  txt(scene, 80, 396, '软件平时只读影子', 't20w');
+  txt(scene, 80, 432, '写熔丝是另一条路径', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '为什么叫一次性');
+  txt(scene, 680, 252, '烧断 = 逻辑 1', 't20w');
+  txt(scene, 680, 288, '不能反向烧回 0', 't20w');
+  txt(scene, 680, 324, '只能 0 → 1 单向', 't20w');
+  txt(scene, 680, 360, '烧错只能换芯片', 't20w');
+  txt(scene, 680, 396, '所以有 LOCK 机制', 't20w');
+  txt(scene, 680, 432, '防止 rogue 代码乱写', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '四条总线');
+  txt(scene, 1280, 252, 'HWV_FUSE：给硬件的熔丝值', 't20w');
+  txt(scene, 1280, 288, 'HWV_REG：SCS 构成的「软熔丝」', 't20w');
+  txt(scene, 1280, 324, 'STICKY_REG：粘滞位', 't20w');
+  txt(scene, 1280, 360, 'OTPMK 直送 CAAM，不进总线', 't20w');
+  txt(scene, 1280, 396, '密钥区读锁后连影子都读不到', 't20w');
+  txt(scene, 1280, 432, '这是「防提取」的第一道墙', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '影子寄存器是「缓存」不是「副本」：改了影子不等于改了熔丝，断电就恢复', 't24');
+  txt(scene, 80, 522, '上电复位时控制器逐字读熔丝、填影子，期间 BUSY=1；软件起来时影子已经可用，所以设备树里读 MAC、读 boot 配置都只是普通寄存器读。', 't20w');
+  txt(scene, 80, 556, '影子寄存器在锁位未置时是「可写」的 —— 这不是笔误，是设计：允许在开发阶段用软件覆盖熔丝值做实验，不用真的烧。锁位置 1 后这条覆盖路径关闭。', 't20w');
+  txt(scene, 80, 590, '这也解释了一个常见现象：U-Boot 里改 MAC 只是写影子，重启就没了；真正固化的 MAC 在 bank4 word2/3，一辈子只能烧一次。', 't20w');
+  txt(scene, 80, 624, '密钥（OTPMK/SRK）走的是专用通路：它们既不在总线可见的地址上，也不允许被 CPU 读回，只有 CAAM 能用。想读出来做备份是不可能的。', 't20w');
+  txt(scene, 80, 658, '一句话：OCOTP = 熔丝阵列 + 影子缓存 + 四道保护（读锁、写锁、覆盖锁、CRC）。', 't20w');
+}
+
+function drawMap() {
+  txt(scene, 56, 146, '控制区在 0x021B_C000 的低段，影子寄存器从 +0x400 起：bank 步长 0x80、word 步长 0x10', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '控制区');
+  txt(scene, 80, 252, 'CTRL +0x00（SET/CLR/TOG 另三套）', 't20s');
+  txt(scene, 80, 288, 'TIMING +0x10：烧写时序', 't20s');
+  txt(scene, 80, 324, 'DATA +0x20：写数据入口', 't20s');
+  txt(scene, 80, 360, 'READ_CTRL +0x30：发起读', 't20s');
+  txt(scene, 80, 396, 'READ_FUSE_DATA +0x40：读结果', 't20s');
+  txt(scene, 80, 432, 'SW_STICKY +0x50 / SCS +0x60', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '辅助区');
+  txt(scene, 680, 252, 'CRC_ADDR +0x70', 't20s');
+  txt(scene, 680, 288, 'CRC_VALUE +0x80', 't20s');
+  txt(scene, 680, 324, 'VERSION +0x90 复位 0300_0000', 't20s');
+  txt(scene, 680, 360, 'TIMING2 +0x100 复位 01C1_0042', 't20s');
+  txt(scene, 680, 396, '注意 SCS 也有 SET/CLR/TOG', 't20w');
+  txt(scene, 680, 432, '四个地址块写同一组位', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '影子区');
+  txt(scene, 1280, 252, '0x400 = Bank0 Word0', 't20s');
+  txt(scene, 1280, 288, '0x480 = Bank1 Word0', 't20s');
+  txt(scene, 1280, 324, '0x500 = Bank2 Word0', 't20s');
+  txt(scene, 1280, 360, '0x800 = Bank6（0x700 段空）', 't20s');
+  txt(scene, 1280, 396, '0x8F0 = Bank7 Word7', 't20s');
+  txt(scene, 1280, 432, '64 字 = 8 bank × 8 word', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, 'SET / CLR / TOG 是同一个寄存器的三个「门」：写位不覆盖别的位，这是防并发的关键', 't24');
+  txt(scene, 80, 522, 'CTRL 占了 0x00–0x0C 四个地址：+0 普通读写、+4 只置位、+8 只清零、+C 翻转。SCS 同理（+0x60–0x6C）。所以手册写「4d × i」不是 4 个独立寄存器。', 't20w');
+  txt(scene, 80, 556, '为什么需要这个：ERROR 位只能「写 1 清」（写 0 无效），如果用普通读写去清，读-改-写会把同时出现的 BUSY 一起清掉。用 CLR 地址就只清你指定的位。', 't20w');
+  txt(scene, 80, 590, '影子区里 0x400 是 LOCK，只读 —— 它是「锁位自己的影子」，反映当前哪些区域已被锁。想判断某区域是否可写，读它对应的位而不是去试写。', 't20w');
+  txt(scene, 80, 624, 'bank 之间的空洞（0x700–0x7FF）是给 ROM patch 预留的地址空间：bank6 落在 0x800，跳过去正好 0x80 对齐，不要以为漏了一段。', 't20w');
+  txt(scene, 80, 658, '核对：读 VERSION 得 0x0300_0000 说明 IP 存在且版本对；读 TIMING2 得 0x01C1_0042 说明复位值没被改过。两者都对再去烧写。', 't20w');
+}
+
+function drawBank() {
+  txt(scene, 56, 146, '八个 bank 各有分工：锁位、出厂配置、主密钥、公钥哈希、MAC、通用区、ROM 补丁', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'Bank0 / Bank1');
+  txt(scene, 80, 252, '0x400 LOCK（只读锁位镜像）', 't20s');
+  txt(scene, 80, 288, '0x410–0x470 CFG0–CFG6', 't20s');
+  txt(scene, 80, 324, '出厂配置：启动方式、频率', 't20w');
+  txt(scene, 80, 360, '0x480–0x4C0 MEM0–MEM4', 't20s');
+  txt(scene, 80, 396, '含 BOOT_CFG 相关位', 't20w');
+  txt(scene, 80, 432, '锁位是 LOCK_BOOT_CFG[1]', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, 'Bank2 / Bank3');
+  txt(scene, 680, 252, '0x500–0x570 OTPMK0–7', 't20s');
+  txt(scene, 680, 288, '256 位主密钥，只给 CAAM', 't20w');
+  txt(scene, 680, 324, 'CPU 永远读不到明文', 't20w');
+  txt(scene, 680, 360, '0x580–0x5F0 SRK0–7', 't20s');
+  txt(scene, 680, 396, '公钥哈希，验签用', 't20w');
+  txt(scene, 680, 432, '烧了它才能安全启动', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, 'Bank4–7');
+  txt(scene, 1280, 252, '0x600 SJC_RESP0–1：JTAG 响应', 't20s');
+  txt(scene, 1280, 288, '0x620 MAC0 / 0x630 MAC1', 't20s');
+  txt(scene, 1280, 324, '0x650 CRC Key、0x660 GP1', 't20s');
+  txt(scene, 1280, 360, '0x680 SW_GP0–4、SRK_REVOKE', 't20s');
+  txt(scene, 1280, 396, '0x800–0x870 ROM_PATCH0–7', 't20s');
+  txt(scene, 1280, 432, '0x880–0x8F0 GP3/GP4', 't20s');
+
+  wide(456, 330);
+  txt(scene, 80, 490, 'MAC 是「一块板一个」的东西：同一批镜像烧同一个 MAC，局域网里就会撞车', 't24');
+  txt(scene, 80, 522, 'MAC0/MAC1 在 bank4 word2/word3，各 32 位：MAC0 低 24 位是 OUI，MAC1 高 8 位是最低位字节 + 序号。烧 MAC 时才需要动熔丝，其他配置通常靠设备树。', 't20w');
+  txt(scene, 80, 556, 'CFG0–CFG6 与 MEM0–MEM4 是出厂信息（晶圆坐标、频率等级、温度等级），量产板子上这些值已经烧好，软件只读不写；试图改写会被锁位挡回去。', 't20w');
+  txt(scene, 80, 590, 'SRK_REVOKE 是「撤销公钥」的位：置位后对应那把 SRK 永久失效，用来在密钥泄露时阻断旧镜像 —— 这是不可逆操作，比烧错 MAC 严重得多。', 't20w');
+  txt(scene, 80, 624, 'ROM_PATCH0–7 与第 43 章 ROMC 是配套的：启动 ROM 从这些熔丝里取补丁地址与替换指令，芯片勘误就靠它们在上电时打补丁。', 't20w');
+  txt(scene, 80, 658, 'FIELD_RETURN 与 MISC_CONF 是产线/返修信息：返修标记、测试模式残留。读它们能判断「这颗芯片是不是工程样片」，比看丝印可靠。', 't20w');
+}
+
+function drawRead() {
+  txt(scene, 56, 146, '读有两条路：读影子（常用）与读熔丝（诊断）；被读锁的区域会返回魔数 0xBADABADA', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '读影子三步');
+  txt(scene, 80, 252, '① 等 BUSY=0、ERROR=0', 't20w');
+  txt(scene, 80, 288, '② 读目标影子地址', 't20w');
+  txt(scene, 80, 324, '③ 密钥区返回 0xBADABADA', 't20w');
+  txt(scene, 80, 360, '重载影子：置 RELOAD_SHADOWS', 't20w');
+  txt(scene, 80, 396, '等 BUSY 与 RELOAD 自动清', 't20w');
+  txt(scene, 80, 432, '全部字逐字重读一遍', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '读熔丝四步');
+  txt(scene, 680, 252, '① BUSY/ERROR 必须清零', 't20w');
+  txt(scene, 680, 288, '② ADDR 写目标字地址（0–3F）', 't20w');
+  txt(scene, 680, 324, '③ READ_CTRL[READ_FUSE]=1', 't20w');
+  txt(scene, 680, 360, '④ 等 BUSY 清，读 READ_FUSE_DATA', 't20w');
+  txt(scene, 680, 396, '这条路径绕过影子缓存', 't20w');
+  txt(scene, 680, 432, '用于确认「影子与熔丝是否一致」', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, 'ERROR 会在这几种情况置位');
+  txt(scene, 1280, 252, '重载影子期间写影子', 't20w');
+  txt(scene, 1280, 288, '写已锁的影子寄存器', 't20w');
+  txt(scene, 1280, 324, '读已读锁的影子寄存器', 't20w');
+  txt(scene, 1280, 360, '烧已烧过的熔丝字', 't20w');
+  txt(scene, 1280, 396, '读已读锁的熔丝字', 't20w');
+  txt(scene, 1280, 432, '清法：向 CLR 地址写 1', 't20s');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '0xBADABADA 不是错误码，是「拒绝回答」：它同时置 ERROR，逼你先处理再继续', 't24');
+  txt(scene, 80, 522, '设计意图很清楚：密钥区一旦读锁，读操作不能静默返回 0（那会被误认为「没烧」），必须留下痕迹。软件看到这个魔数就知道「这里有东西但你不能看」。', 't20w');
+  txt(scene, 80, 556, 'ERROR 置位后所有 OTP 访问都被挡住，必须先清；清的唯一方式是写 CLR 地址的对应位（普通写 0 无效）。这也是为什么 CTRL 要提供四个别名地址。', 't20w');
+  txt(scene, 80, 590, 'RELOAD_SHADOWS 是量产调试的常用手段：刚烧完一个 word，不必重启，置一次重载就能在影子里看到新值 —— 但烧完要等 2 µs 后置位更稳。', 't20w');
+  txt(scene, 80, 624, '重载会把 LOCK 影子一起刷新，所以「重载前能写、重载后写不了」是正常现象：说明你刚烧的锁位生效了，不是 bug。', 't20w');
+  txt(scene, 80, 658, '判据：烧写后做「重载 → 读影子 → 读熔丝 → 两者相等」四步；只做前两步，可能读到的是还没生效的旧缓存。', 't20w');
+}
+
+function drawWrite() {
+  txt(scene, 56, 146, '烧写是五步仪式：配时序 → 清状态 → 写 ADDR 与解锁码 → 写 DATA → 等 BUSY 再等 2 µs', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '五步');
+  txt(scene, 80, 252, '① TIMING/TIMING2 按 ipg_clk 配', 't20w');
+  txt(scene, 80, 288, '② 等 BUSY=0、ERROR=0', 't20w');
+  txt(scene, 80, 324, '③ ADDR + WR_UNLOCK=0x3E77', 't20w');
+  txt(scene, 80, 360, '④ 写 DATA（触发烧写）', 't20w');
+  txt(scene, 80, 396, '⑤ BUSY 清后等 2 µs 收尾', 't20w');
+  txt(scene, 80, 432, '每次写都要重新解锁', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '掩码机制');
+  txt(scene, 680, 252, '烧前先读熔丝原值', 't20w');
+  txt(scene, 680, 288, '原值按位掩掉 DATA 的 0', 't20w');
+  txt(scene, 680, 324, '只有 1 才会烧断', 't20w');
+  txt(scene, 680, 360, '已烧过的位不会被重烧', 't20w');
+  txt(scene, 680, 396, '所以「补烧」是安全的', 't20w');
+  txt(scene, 680, 432, '但无法把 1 改回 0', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '时间成本');
+  txt(scene, 1280, 252, '每个 1 位约 10 µs', 't20w');
+  txt(scene, 1280, 288, '烧 16 位 = 160 µs', 't20w');
+  txt(scene, 1280, 324, '整个字 32 位 ≈ 320 µs', 't20w');
+  txt(scene, 1280, 360, '这期间 DATA 向右移出', 't20w');
+  txt(scene, 1280, 396, 'DATA 不能中途改', 't20w');
+  txt(scene, 1280, 432, '写完 2 µs 内不能做任何 OTP 操作', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '0x3E77 是防呆不是加密：它只防「野指针写到 DATA」，挡不住有意烧写的人', 't24');
+  txt(scene, 80, 522, '解锁码必须在每次写 DATA 前重新写入 CTRL[31:16]：写操作一开始硬件就把它清掉，下一次写必须再写一遍。把「解锁 + 地址 + 数据」放在一条连续代码里最稳。', 't20w');
+  txt(scene, 80, 556, '掩码机制的意思：控制器先把目标字读出来，和你给的 DATA 做「按位与」，只有原值为 0 而你要写 1 的位才真正去烧。所以同一地址重复烧同一份数据是幂等的。', 't20w');
+  txt(scene, 80, 590, '写延迟按「置 1 的位数」线性叠加：写 0x0000_0001 只要 10 µs，写 0xFFFF_FFFF 要 320 µs。量产烧写时把数据打包少置 1 会快一点 —— 但语义不能为了快而改。', 't20w');
+  txt(scene, 80, 624, '写后 2 µs 的 postamble 是电气要求：烧写电压要泄放稳定，否则紧接着的读可能读到错误值、甚至让下一次烧写的电荷量不准。手册用 HW_DIGCTL_MICROSECONDS 做延时。', 't20w');
+  txt(scene, 80, 658, '判据：烧完读回影子与熔丝一致、CRC 校验通过、且「再烧一次同值」不置 ERROR（幂等）；三条都过才算烧写成功。', 't20w');
+}
+
+function drawTiming() {
+  txt(scene, 56, 146, '时序寄存器的单位是 ipg_clk 周期：换主频就要重算，否则烧写脉冲宽度不对', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'TIMING 字段');
+  txt(scene, 80, 252, 'STROBE_PROG[11:0]：烧写脉冲', 't20s');
+  txt(scene, 80, 288, 'RELAX[15:12]：附加延时', 't20s');
+  txt(scene, 80, 324, 'STROBE_READ[21:16]：读脉冲', 't20s');
+  txt(scene, 80, 360, 'WAIT[27:22]：读写间隔', 't20s');
+  txt(scene, 80, 396, 'TIMING2 +0x100 复位 01C1_0042', 't20s');
+  txt(scene, 80, 432, 'RELAX_PROG / RELAX_READ 在 TIMING2', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '两个公式');
+  txt(scene, 680, 252, 'Tpgm = ((SP+1) − 2×(RP+1))/f', 't20s');
+  txt(scene, 680, 288, 'Trd = ((SR+1) − 2×(RR+1))/f', 't20s');
+  txt(scene, 680, 324, 'SP=STROBE_PROG，RP=RELAX_PROG', 't20w');
+  txt(scene, 680, 360, '以实现 10 µs / 读脉冲宽度', 't20w');
+  txt(scene, 680, 396, 'f = ipg_clk 频率', 't20w');
+  txt(scene, 680, 432, 'ipg 66 MHz 时 SP ≈ 660', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, 'CRC 三件套');
+  txt(scene, 1280, 252, 'CRC_ADDR：起始/结束字地址', 't20s');
+  txt(scene, 1280, 288, 'CRC_VALUE：算出的 CRC32', 't20s');
+  txt(scene, 1280, 324, 'CTRL[11] CRC_TEST 启动', 't20s');
+  txt(scene, 1280, 360, 'CTRL[12] CRC_FAIL 不等即错', 't20s');
+  txt(scene, 1280, 396, '比对对象：CRC Key 熔丝字', 't20w');
+  txt(scene, 1280, 432, '用途：验收读锁区域的完整性', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '「时序按主频重算」是这一章唯一真正需要动手算的东西，算错表现是「烧不进去」或「烧进去后读回不稳」', 't24');
+  txt(scene, 80, 522, '公式里的「减 2×RELAX」是因为脉冲由两段 RELAX 包住：实际有效宽度 = 总计数减去两头的松弛时间。直接把 10 µs 除以周期当 STROBE_PROG 会偏长，脉冲过宽会伤熔丝。', 't20w');
+  txt(scene, 80, 556, '算例：ipg_clk = 66 MHz（周期 15.15 ns），要 10 µs 的 Tpgm，取 RELAX_PROG=3，则 (SP+1) = 660 + 2×4 = 668，SP = 667 ≈ 0x29B。', 't20w');
+  txt(scene, 80, 590, '读脉冲 Trd 通常 2 µs 左右：同上折算，SR+1 ≈ 132 + 2×(RR+1)。读比写短，是因为读不需要熔丝导通。', 't20w');
+  txt(scene, 80, 624, 'CRC 不是给数据完整性用的通用校验，而是「读锁区域」的验收手段：密钥读不出来，就用 CRC32 证明它没被改过。CRC_ADDR 里写起始与结束字地址，硬件按区间算。', 't20w');
+  txt(scene, 80, 658, '判据：CRC_TEST 置位后 BUSY 走完，CRC_FAIL=0 才算通过；如果为 1，先怀疑「区间写错」而不是「熔丝坏了」。', 't20w');
+}
+
+function drawLock() {
+  txt(scene, 56, 146, '锁是这个模块的灵魂：LOCK 寄存器只读、锁位单向、SRK_REVOKE 不可撤销', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '锁的层次');
+  txt(scene, 80, 252, 'LOCK 0x400 只读镜像', 't20s');
+  txt(scene, 80, 288, '每个区域有写锁位', 't20w');
+  txt(scene, 80, 324, '密钥区另有读锁位', 't20w');
+  txt(scene, 80, 360, 'SRK 撤销位（revoke）', 't20w');
+  txt(scene, 80, 396, 'BOOT_CFG 锁位', 't20w');
+  txt(scene, 80, 432, 'FIELD_RETURN 锁位', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '锁后行为');
+  txt(scene, 680, 252, '写影子 → 拒绝 + ERROR', 't20w');
+  txt(scene, 680, 288, '读密钥影子 → 0xBADABADA', 't20w');
+  txt(scene, 680, 324, '烧熔丝 → 拒绝 + ERROR', 't20w');
+  txt(scene, 680, 360, '但影子仍可读（非密钥区）', 't20w');
+  txt(scene, 680, 396, '锁位本身清不掉', 't20w');
+  txt(scene, 680, 432, '只能整片擦除？不存在', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '量产顺序');
+  txt(scene, 1280, 252, '① 先烧 MAC 与 GP', 't20w');
+  txt(scene, 1280, 288, '② 验证 OK 再烧密钥', 't20w');
+  txt(scene, 1280, 324, '③ 密钥区烧完立刻加读锁', 't20w');
+  txt(scene, 1280, 360, '④ 最后锁 BOOT_CFG', 't20w');
+  txt(scene, 1280, 396, '顺序反了：锁完就没法改', 't20w');
+  txt(scene, 1280, 432, '产线脚本要能断点续烧', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '锁位的判据只有一个：锁之后再试写一次，看它是否被拒 —— 值对不对是另一回事', 't24');
+  txt(scene, 80, 522, '判断「某区域是否已锁」不要靠记，读 LOCK 影子（0x400）对应位；这个寄存器永远只读，反映的是熔丝里的真实状态，不会被软件覆盖。', 't20w');
+  txt(scene, 80, 556, '读锁比写锁更狠：写锁只是不能改，读锁是连影子都不让你读。密钥区一旦读锁，连「长度是 256 位」这种信息都拿不到，只能靠 CRC 间接验收。', 't20w');
+  txt(scene, 80, 590, 'SRK_REVOKE 的用途：安全启动的信任根是「熔丝里的公钥哈希」。密钥泄露时，把 revoke 位置 1，旧镜像的签名就永久失效 —— 这是唯一能在现场止损的手段。', 't20w');
+  txt(scene, 80, 624, '产线最常见的翻车：先锁 LOCK，再想补烧 MAC，全片报废。所以量产脚本一定把「锁」放到最后一步，并且每颗芯片烧完立刻校验 MAC 与 boot 配置。', 't20w');
+  txt(scene, 80, 658, '一句话：把 OTP 当「不可回滚的配置存储器」对待 —— 每一次写之前先问「这值确定吗」，因为没有第二次机会。', 't20w');
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) drawMap();
+  else if (s === 2) drawBank();
+  else if (s === 3) drawRead();
+  else if (s === 4) drawWrite();
+  else if (s === 5) drawTiming();
+  else drawLock();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () { state.step = INIT.step; draw(); });
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>

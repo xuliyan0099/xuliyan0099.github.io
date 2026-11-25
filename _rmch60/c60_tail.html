@@ -1,0 +1,334 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0 };
+var state = { step: INIT.step };
+
+var STEPS = [
+  { h: '两个晶振', hint: '24 MHz / 32.768 kHz',
+    note: '一个给 PLL 与全系统当基准，一个只给 SNVS 与 RTC 计时；两者供电域都不同。' },
+  { h: '24M 起振电路', hint: '反相器 + 负载电容',
+    note: '片内只有一个带偏置的反相放大器，能不能起振一半看晶振参数、一半看两颗电容。' },
+  { h: 'MISC0 逐位', hint: '0x020C_8150',
+    note: '掉电、稳定检测、偏置电流、RTC 时钟来源全挤在这一个寄存器里。' },
+  { h: '32.768k 与兜底', hint: '内部环振自动接管',
+    note: 'RTC 晶振不起振时芯片不会停摆，但计时会跑偏；生产系统必须用外部晶振。' },
+  { h: '低功耗控制', hint: '0x020C_8270',
+    note: '上电延迟、稳定状态、XTAL 与 RC 二选一，都在 LOWPWR_CTRL 里。' },
+  { h: 'RC 自校准', hint: 'COUNT_RC_TRG = 750',
+    note: '片上 24 MHz RC 用 32 kHz 当尺子自我校正；精度够跑，不够做 USB 与以太网。' },
+  { h: '实测与故障判据', hint: '引脚输出 + 电容反推',
+    note: '芯片能把 24M 与 32K 直接输出到引脚，这是唯一不用猜的验证手段。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+
+function drawTop() {
+  txt(scene, 56, 146, '一颗芯片上两个晶振：24 MHz 决定系统跑多快，32.768 kHz 决定时间准不准', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '24 MHz：系统基准');
+  txt(scene, 80, 252, '引脚 XTALI / XTALO，无复用', 't20s');
+  txt(scene, 80, 288, '喂给 PLL1 与所有派生时钟', 't20w');
+  txt(scene, 80, 324, 'USB、以太网 RMII 都依赖它', 't20w');
+  txt(scene, 80, 360, '掉电由 CCM 控制', 't20w');
+  txt(scene, 80, 396, '内部还有一个 24 MHz RC 可顶替', 't20w');
+  txt(scene, 80, 432, 'RC 精度差，不能做高速接口', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '32.768 kHz：RTC 专用');
+  txt(scene, 680, 252, '引脚 RTC_XTALI / RTC_XTALO', 't20s');
+  txt(scene, 680, 288, '挂在 SNVS 供电域，主电源掉了还在跑', 't20w');
+  txt(scene, 680, 324, '分频 15 次正好 1 Hz', 't20w');
+  txt(scene, 680, 360, '32768 = 2 的 15 次方', 't20w');
+  txt(scene, 680, 396, '不起振时内部环振自动接管', 't20w');
+  txt(scene, 680, 432, '接管后计时会慢慢跑偏', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '为什么用 32.768 kHz');
+  txt(scene, 1280, 252, '32768 = 2^15，纯二进制分频', 't20w');
+  txt(scene, 1280, 288, '分频链不需要小数校正', 't20w');
+  txt(scene, 1280, 324, '功耗可以做到 1 µA 级', 't20w');
+  txt(scene, 1280, 360, '音叉晶振，CL 常为 6–12 pF', 't20w');
+  txt(scene, 1280, 396, '负载电容小，更容易被漏电带偏', 't20w');
+  txt(scene, 1280, 432, 'PCB 上要洗得很干净', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '两个晶振的差别不只在频率：一个是「性能基准」，一个是「时间基准」，精度要求方向不同', 't24');
+  txt(scene, 80, 522, '24 MHz 影响的是「跑得对不对」：PLL 以它为参考倍频出 396/528 MHz，USB 要 480 MHz 的精确 48 MHz，以太网 RMII 要 50 MHz 且抖动要小。它偏 1%，USB 就可能枚举失败。', 't20w');
+  txt(scene, 80, 556, '32.768 kHz 影响的是「时间走得准不准」：它的误差直接累加成秒/天的漂移。晶振本身的精度（常见 ±20 ppm）决定了每月几十秒的偏差，温度与负载电容偏差还会再叠加。', 't20w');
+  txt(scene, 80, 590, '精度数量级差得远：普通晶振 ±10–30 ppm，片上 RC 振荡器常在 ±1% 量级 —— 差两个数量级，所以 RC 只能应急，不能做产品级时基。', 't20w');
+  txt(scene, 80, 624, '两个模块共用一个寄存器区（XTALOSC24M，基址 0x020C_8000），但 32 kHz 的「兜底」逻辑、稳定检测与 RTC 时钟来源选择都放在 24M 的 MISC0 里，容易看漏。', 't20w');
+  txt(scene, 80, 658, '一句话：24M 求「频率与抖动」，32.768k 求「长期稳定与低功耗」，两套判据别混用。', 't20w');
+}
+
+function draw24m() {
+  txt(scene, 56, 146, '片内只有一个带偏置的反相放大器，晶振网络要自己补：两颗负载电容 + 可能的串联电阻', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '片内有什么');
+  txt(scene, 80, 252, '反相放大器（XTALI 进、XTALO 出）', 't20w');
+  txt(scene, 80, 288, '内部偏置电阻 Rbias', 't20w');
+  txt(scene, 80, 324, '可编程偏置电流 OSC_I', 't20w');
+  txt(scene, 80, 360, '起振检测（OSC_XTALOK）', 't20w');
+  txt(scene, 80, 396, '没有负载电容，也没有反馈电阻', 't20w');
+  txt(scene, 80, 432, '这两样必须板子上给', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '板子上要什么');
+  txt(scene, 680, 252, '晶振：标称 24 MHz，CL 要小', 't20w');
+  txt(scene, 680, 288, '两颗负载电容 C1、C2 到地', 't20w');
+  txt(scene, 680, 324, 'C1、C2 串联即 CL', 't20w');
+  txt(scene, 680, 360, '必要时串一颗限流电阻', 't20w');
+  txt(scene, 680, 396, '走线短、远离高频与电源', 't20w');
+  txt(scene, 680, 432, '下方铺地要完整、不要割裂', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '电容怎么定');
+  txt(scene, 1280, 252, 'CL = C1 × C2 / (C1 + C2) + Cstray', 't20s');
+  txt(scene, 1280, 288, '两电容相等时：CL ≈ C/2 + Cstray', 't20w');
+  txt(scene, 1280, 324, '反推：C ≈ 2 × (CL − Cstray)', 't20s');
+  txt(scene, 1280, 360, 'Cstray 常按 2–5 pF 估', 't20w');
+  txt(scene, 1280, 396, 'CL=10 pF、Cstray=3 pF → C≈14 pF', 't20w');
+  txt(scene, 1280, 432, '晶振手册给的 CL 才是准绳', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '起振的物理条件只有一个：环路增益足够，且相位在 24 MHz 处正好 360 度', 't24');
+  txt(scene, 80, 522, '反相放大器给 180 度，晶振在串联谐振附近再给 180 度，环路才成立。负载电容决定晶振工作在「略低于串联谐振」的点上 —— 电容变大，频率变低。', 't20w');
+  txt(scene, 80, 556, '所以电容不能随手取：取值偏大，起振更容易但频率偏低、驱动电流变大；取值偏小，频率偏高且可能起不来。USB 与以太网对 24 MHz 的精度要求通常在 ±50 ppm 以内。', 't20w');
+  txt(scene, 80, 590, '驱动能力也要看：晶振的 ESR 与驱动电平（DL）要与放大器匹配。ESR 太大的晶振在低温或低压下起不来；驱动电平超规格会加速晶振老化，表现为「用两年后频率漂了」。', 't20w');
+  txt(scene, 80, 624, '启动顺序的时间账：偏置电流先给满（OSC_I=00），振荡建立通常几十到几百微秒；MISC0 的 CLKGATE_DELAY 默认 1 ms，就是留给它「先响起来再把时钟放给数字逻辑」。', 't20w');
+  txt(scene, 80, 658, '判据：上电后读 MISC0 的 OSC_XTALOK（需先置 OSC_XTALOK_EN），为 1 才算稳定；再用示波器在输出引脚量频率，两者一致才算真起振。', 't20w');
+}
+
+function drawMisc0() {
+  txt(scene, 56, 146, 'MISC0 一个寄存器管四件事：24M 掉电、稳定检测、偏置电流、RTC 时钟来源', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '地址与别名');
+  txt(scene, 80, 252, '基址 0x020C_8000，偏移 0x150', 't20s');
+  txt(scene, 80, 288, 'MISC0 = 0x020C_8150', 't20s');
+  txt(scene, 80, 324, 'SET/CLR/TOG 依次 +4/+8/+C', 't20s');
+  txt(scene, 80, 360, '复位值 0x0400_0000', 't20s');
+  txt(scene, 80, 396, '写在 CLR 里就是「清位」', 't20w');
+  txt(scene, 80, 432, '不用读改写，天然抗并发', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '振荡相关位');
+  txt(scene, 680, 252, '[30] XTAL_24M_PWD 掉电', 't20s');
+  txt(scene, 680, 288, '[16] OSC_XTALOK_EN 开检测', 't20s');
+  txt(scene, 680, 324, '[15] OSC_XTALOK 稳定状态', 't20s');
+  txt(scene, 680, 360, '[14:13] OSC_I 偏置电流', 't20s');
+  txt(scene, 680, 396, '[28:26] CLKGATE_DELAY 放钟延迟', 't20s');
+  txt(scene, 680, 432, '[29] RTC_XTAL_SOURCE 时钟来源', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '复位值怎么读');
+  txt(scene, 1280, 252, '0x0400_0000 只有 bit26 为 1', 't20s');
+  txt(scene, 1280, 288, '即 CLKGATE_DELAY = 001', 't20s');
+  txt(scene, 1280, 324, '也就是默认 1.0 ms 放钟延迟', 't20w');
+  txt(scene, 1280, 360, 'XTAL_24M_PWD 复位为 0：上电即供电', 't20w');
+  txt(scene, 1280, 396, 'OSC_XTALOK_EN 复位为 0：默认不检测', 't20w');
+  txt(scene, 1280, 432, '所以「稳定位不亮」常是没开检测', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '三个最容易被误读的位：OSC_XTALOK 不是「上电就 1」，OSC_I 不是「越大越稳」，RTC_XTAL_SOURCE 是只读状态', 't24');
+  txt(scene, 80, 522, 'OSC_XTALOK 需要先置 OSC_XTALOK_EN 才会工作，且手册说明「频率判对」可能早于波形完全展开 —— 也就是说它偏乐观，不能当作「已经非常稳」的证据。', 't20w');
+  txt(scene, 80, 556, 'OSC_I 是「偏置电流」四档：00 标称、01 降 12.5%、10 降 25%、11 降 37.5%。做法是先用 00 起振，稳定后逐档往下降，降到不影响起振与抖动的最小档，省的是毫安级电流。', 't20w');
+  txt(scene, 80, 590, '关键警告：进入 XTALOSC24 会掉电的低功耗模式之前，必须把 OSC_I 恢复成 00。否则下次唤醒时偏置不够，晶振起不来，表现为「睡下去就醒不过来」。', 't20w');
+  txt(scene, 80, 624, 'RTC_XTAL_SOURCE 是只读的：0 表示当前用内部环振、1 表示用外部 RTC 晶振。它和 LOWPWR_CTRL 的选择位配合，构成「检测到外部振荡就自动切过去」的机制。', 't20w');
+  txt(scene, 80, 658, '判据：读 MISC0 时先看 bit30 是否为 0（没掉电）、再看 bit16 是否为 1（检测开着）、最后看 bit15（是否稳定）；三位顺序错了，结论都不可信。', 't20w');
+}
+
+function draw32k() {
+  txt(scene, 56, 146, 'RTC 晶振是全芯片最娇气的一路：µA 级驱动、pF 级负载，一点漏电就能把它带偏', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '片内结构');
+  txt(scene, 80, 252, '振荡放大器 + Rbias', 't20w');
+  txt(scene, 80, 288, '独立的检测放大器（差分）', 't20w');
+  txt(scene, 80, 324, '内部环振（约 32 kHz）', 't20w');
+  txt(scene, 80, 360, '自动选择开关（检测到就切外部）', 't20w');
+  txt(scene, 80, 396, '三者在 RTC_XTALI/O 两个球上汇合', 't20w');
+  txt(scene, 80, 432, '供电来自 SNVS，主域掉电不影响', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '三种外部时钟注入');
+  txt(scene, 680, 252, '① 单端驱动 XTALO，XTALI 悬空并加电容', 't20w');
+  txt(scene, 680, 288, '② 单端驱动 XTALI，XTALO 悬空', 't20w');
+  txt(scene, 680, 324, '③ 差分同时驱动两端', 't20w');
+  txt(scene, 680, 360, '手册建议用第 ② 种', 't20w');
+  txt(scene, 680, 396, '外部源按 1.1 V 域电平给', 't20w');
+  txt(scene, 680, 432, '幅度不够会被检测放大器忽略', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '内部环振的定位');
+  txt(scene, 1280, 252, '掉时钟时自动接管，系统不停摆', 't20w');
+  txt(scene, 1280, 288, '精度远不如晶振，不能长期计时', 't20w');
+  txt(scene, 1280, 324, '价值：快速启动 + 防拆机', 't20w');
+  txt(scene, 1280, 360, '手册要求生产系统必须用外部源', 't20w');
+  txt(scene, 1280, 396, '否则时间会明显漂移', 't20w');
+  txt(scene, 1280, 432, '判据：读 RTC_XTAL_SOURCE 是否为 1', 't20s');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '这颗晶振的敌人不是频率选错，而是漏电与污染：它工作在 µA 级，任何并联电阻都会抽走偏置', 't24');
+  txt(scene, 80, 522, '晶振的等效模型是「串联 RLC 加并联 C0」。C0 与外部杂散电容、PCB 漏电、助焊剂残留在两端形成并联通路，把放大器的偏置点拉走 —— 表现就是「不起振」或「起振后停振」。', 't20w');
+  txt(scene, 80, 556, '所以 32 kHz 电路对工艺极其敏感：板子必须洗净、不能有助焊剂残留；外壳与走线不能沾潮；两侧电容要按晶振 CL 取（常见 6–12 pF 对应 12–25 pF 级别），不能照抄 24 MHz 的取值。', 't20w');
+  txt(scene, 80, 590, '32.768 kHz 转 1 Hz 是纯二进制：32768 = 2^15，分频 15 次即得秒脉冲。这就是为什么选这个「怪频率」—— 分频链不需要小数补偿，功耗与面积都最省。', 't20w');
+  txt(scene, 80, 624, '精度账：晶振 ±20 ppm 意味着一天 86400 × 20 × 10^-6 ≈ 1.7 秒，一个月约 52 秒。要更准只能在软件里做温补，或改用 TCXO —— 靠换电容调频率只能微调几个 ppm。', 't20w');
+  txt(scene, 80, 658, '判据：量 RTC_XTALO 应有 32.768 kHz、幅度约 1 V 级的正弦；若看到明显方波或频率跳变，先怀疑板子漏电，再怀疑晶振 CL 选错。', 't20w');
+}
+
+function drawLowpwr() {
+  txt(scene, 56, 146, 'LOWPWR_CTRL 管两件事：24M 什么时候算「上电完成」，以及 24M 用晶振还是用 RC', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '地址与复位值');
+  txt(scene, 80, 252, '0x020C_8270', 't20s');
+  txt(scene, 80, 288, 'SET/CLR/TOG 依次 +4/+8/+C', 't20s');
+  txt(scene, 80, 324, '复位值 0x0000_4009', 't20s');
+  txt(scene, 80, 360, 'bit14 = 1 → 上电延迟 0.5 ms', 't20w');
+  txt(scene, 80, 396, 'bit3 = 1 → RC_OSC_PROG = 100b', 't20w');
+  txt(scene, 80, 432, 'bit0 = 1 → RC 振荡器复位即开', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '关键位');
+  txt(scene, 680, 252, '[16] PWRUP_STAT 稳定状态（只读）', 't20s');
+  txt(scene, 680, 288, '[15:14] PWRUP_DELAY 上电延迟', 't20s');
+  txt(scene, 680, 324, '00/01/10/11 = 0.25/0.5/1/2 ms', 't20s');
+  txt(scene, 680, 360, '[4] OSC_SEL：0 晶振、1 RC', 't20s');
+  txt(scene, 680, 396, '[3:1] RC_OSC_PROG 粗调', 't20s');
+  txt(scene, 680, 432, '[0] RC_OSC_EN 使能', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '复位态的真相');
+  txt(scene, 1280, 252, '复位后 RC 振荡器已经在跑', 't20w');
+  txt(scene, 1280, 288, '但 OSC_SEL = 0 仍选晶振', 't20w');
+  txt(scene, 1280, 324, '也就是「备着不用」', 't20w');
+  txt(scene, 1280, 360, '切换只需改 OSC_SEL 一位', 't20w');
+  txt(scene, 1280, 396, '切之前要确认 RC 已经稳', 't20w');
+  txt(scene, 1280, 432, '否则全系统时钟瞬间抖动', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '这两个延迟不是「保险参数」，而是「起振时间的预算」：给少了，时钟会在振荡还没建立时被放出去', 't24');
+  txt(scene, 80, 522, 'PWRUP_DELAY 管「上电后等多久算稳定」，默认 0.5 ms；MISC0 的 CLKGATE_DELAY 管「认定稳定后再等多久才放钟」，默认 1.0 ms。两级串联构成起振预算。', 't20w');
+  txt(scene, 80, 556, '预算怎么定：建立时间与 ESR、CL、驱动电流相关，常见 24 MHz 晶振在 100–500 µs；低温低压会更慢。量产板要在最低温、最低压下量真实建立时间，再留 2 倍余量。', 't20w');
+  txt(scene, 80, 590, 'PWRUP_STAT 是硬件给的结论：1 表示已稳定可用。软件上电流程应「先等这一位，再切 PLL」，而不是「延时固定毫秒后盲切」。前者对温度与批次都稳，后者只在实验室常温成立。', 't20w');
+  txt(scene, 80, 624, '切 RC 的代价：RC 精度差，PLL 倍频后偏差同比放大，USB 的 480 MHz 与 RMII 的 50 MHz 都会出界，表现为「USB 不识别」或「丢包」。只适合降频待机。', 't20w');
+  txt(scene, 80, 658, '判据：切 OSC_SEL 前后各读一次 PWRUP_STAT 与 MISC0 的 OSC_XTALOK；切换后立刻量输出引脚频率，确认不是「切过去但没时钟」。', 't20w');
+}
+
+function drawRc() {
+  txt(scene, 56, 146, '片上 24 MHz RC 靠「32 kHz 当尺子」自我校正：一个 32k 周期里数够 750 个 RC 周期，就算 24 MHz', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '三个配置寄存器');
+  txt(scene, 80, 252, 'OSC_CONFIG0 +0x2A0 控制', 't20s');
+  txt(scene, 80, 288, 'OSC_CONFIG1 +0x2B0 计数', 't20s');
+  txt(scene, 80, 324, 'OSC_CONFIG2 +0x2C0 1 MHz 输出', 't20s');
+  txt(scene, 80, 396, '各带 SET/CLR/TOG 别名', 't20s');
+  txt(scene, 80, 432, '复位 0x1020 / 0x02EE / 0x0102E2', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, 'CONFIG0 的旋钮');
+  txt(scene, 680, 252, '[11:4] RC_OSC_PROG 调谐值', 't20s');
+  txt(scene, 680, 288, '[31:24] 当前生效值（只读）', 't20s');
+  txt(scene, 680, 324, '[15:12] HYST_PLUS 上 hyster', 't20s');
+  txt(scene, 680, 360, '[19:16] HYST_MINUS 下 hyster', 't20s');
+  txt(scene, 680, 396, '[0] START 启停校正', 't20s');
+  txt(scene, 680, 432, '[2] BYPASS 用寄存器值硬压', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '数够多少才算对');
+  txt(scene, 1280, 252, 'CONFIG1 [11:0] COUNT_RC_TRG', 't20s');
+  txt(scene, 1280, 288, '复位值 0x2EE = 750', 't20s');
+  txt(scene, 1280, 324, '750 个 RC 周期 = 1 个 32 kHz 周期', 't20w');
+  txt(scene, 1280, 360, '即 750 × 32 kHz = 24 MHz', 't20w');
+  txt(scene, 1280, 396, '参考若是 32.768 kHz 应改 733', 't20w');
+  txt(scene, 1280, 432, 'CONFIG2 再把 1 MHz 导出来用', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '自校准是一个闭环：数多了就把调谐值往下压，数少了往上加，直到落在 HYST 窗口里', 't24');
+  txt(scene, 80, 522, '每个 32 kHz 周期里数 RC 周期数，与 COUNT_RC_TRG 比；超出 HYST 窗口就把 RC_OSC_PROG 加减一步。ENABLE=1 允许改，BYPASS=1 只听寄存器值。', 't20w');
+  txt(scene, 80, 556, 'HYST 窗口的意义是「防抖」：窗口太窄，调谐值会来回跳，输出频率抖动；窗口太宽，校正精度差。手册给的 ±1 级窗口对应的是可接受的稳态误差，一般不用动。', 't20w');
+  txt(scene, 80, 590, '精度上限来自参考：尺子本身是 32 kHz。如果 RTC 用的是内部环振（精度 ±1% 级），那么校正出来的 24 MHz 也只到 ±1% 级 —— 闭环只能消除 RC 自身的漂移，消不掉参考的偏差。', 't20w');
+  txt(scene, 80, 624, 'CONFIG2 另有一条路：把校正后的 RC 分频到 1 MHz 输出（ENABLE_1M）供低功耗外设；CLK_1M_ERR_FL 置位表示一个 32 kHz 周期里没数够，说明目标设高了。', 't20w');
+  txt(scene, 80, 658, '判据：读 CONFIG0[31:24] 看算法把调谐值收到多少并是否稳定；强制 BYPASS 后用示波器量 RC_CLK 输出，偏差应在 ±1% 内，否则说明参考源本身不准。', 't20w');
+}
+
+function drawCheck() {
+  txt(scene, 56, 146, '验证晶振不靠猜：芯片本身就能把 24 MHz、25 MHz、32 kHz 直接送到引脚上', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '量测引脚');
+  txt(scene, 80, 252, '32K 出脚：ENET1_RX_EN ALT2', 't20s');
+  txt(scene, 80, 288, '或 GPIO1_IO03 ALT3 / JTAG_TCK ALT6', 't20s');
+  txt(scene, 80, 324, '24M 出脚：ENET1_TX_DATA0 ALT2', 't20s');
+  txt(scene, 80, 360, '或 GPIO1_IO04 ALT3 / JTAG_TRST ALT6', 't20s');
+  txt(scene, 80, 396, '25M 出脚：ENET2_RX_EN ALT8', 't20s');
+  txt(scene, 80, 432, '先配 IOMUXC 的 ALT，才有波形', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '故障三连');
+  txt(scene, 680, 252, '不起振：先查焊接、CL、ESR', 't20w');
+  txt(scene, 680, 288, '起振但偏：查负载电容与杂散', 't20w');
+  txt(scene, 680, 324, '起来又停：查漏电与污染', 't20w');
+  txt(scene, 680, 360, '低温不起：偏置电流或 ESR 不够', 't20w');
+  txt(scene, 680, 396, '睡后不醒：OSC_I 没恢复 00', 't20w');
+  txt(scene, 680, 432, 'RTC 走偏：内部环振在顶班', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '判据清单');
+  txt(scene, 1280, 252, 'OSC_XTALOK_EN = 1 且 OK = 1', 't20s');
+  txt(scene, 1280, 288, 'PWRUP_STAT = 1', 't20s');
+  txt(scene, 1280, 324, 'RTC_XTAL_SOURCE = 1', 't20s');
+  txt(scene, 1280, 360, '量测频率偏差在 ±50 ppm 内', 't20w');
+  txt(scene, 1280, 396, 'USB 能枚举、网络不丢包', 't20w');
+  txt(scene, 1280, 432, '高低温各跑一遍才算过', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '最容易漏的一步：OSC_XTALOK 默认是关的，不置 EN 就永远读到 0，很容易被误判成「晶振没起振」', 't24');
+  txt(scene, 80, 522, '正确顺序：① 确认 MISC0[30]=0（没掉电）② 置 OSC_XTALOK_EN ③ 等 OSC_XTALOK=1 ④ 读 LOWPWR_CTRL[16]。四步都过，才继续去切 PLL。', 't20w');
+  txt(scene, 80, 556, '电容取值的实操：先按晶振手册的 CL 用公式反推两颗电容，装板后量频率；偏低就把电容减小一点，偏高就加大一点，每次只动 1–2 pF，因为频率对电容的敏感度很高。', 't20w');
+  txt(scene, 80, 590, 'USB 与以太网是最好的「系统级判据」：它们对 24 MHz 的精度与抖动极敏感。晶振偏几百 ppm 时，示波器上可能看不出，但 USB 枚举失败、RMII 丢包会立刻暴露。', 't20w');
+  txt(scene, 80, 624, '32 kHz 的长期判据只能靠时间：让 RTC 跑 24 小时，与 NTP 对时算偏差，再换算成 ppm。这比任何一次示波器测量都更能反映「负载电容与温度的真实影响」。', 't20w');
+  txt(scene, 80, 658, '一句话总结：24M 用「引脚波形 + USB/网络」验，32.768k 用「RTC_XTAL_SOURCE + 24 小时漂移」验，两套都过才算板子稳。', 't20w');
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) draw24m();
+  else if (s === 2) drawMisc0();
+  else if (s === 3) draw32k();
+  else if (s === 4) drawLowpwr();
+  else if (s === 5) drawRc();
+  else drawCheck();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () { state.step = INIT.step; draw(); });
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>

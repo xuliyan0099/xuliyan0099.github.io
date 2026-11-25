@@ -1,0 +1,11 @@
+const fs = require('fs'), vm = require('vm');
+const c = { window: {} };
+vm.createContext(c);
+vm.runInContext(fs.readFileSync('D:/Workspace/MainPage/imx6ull/rm/rm-data.js', 'utf8'), c);
+const R = c.window.RM;
+let all = [];
+for (const k of Object.keys(R.parts)) all = all.concat(R.parts[k].chapters || []);
+console.log('total', all.length, 'ready', all.filter(x => x.ready).length);
+for (const x of all) if ([15, 16, 17, 18].includes(x.n)) console.log(x.n, x.ready, (x.pts || []).length, x.zh);
+const bad = all.filter(x => x.ready && !x.n);
+console.log('ready-without-n', bad.length);

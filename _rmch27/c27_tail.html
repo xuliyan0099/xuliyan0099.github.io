@@ -1,0 +1,297 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0, lane: 0 };
+var state = { step: INIT.step, lane: INIT.lane };
+
+var STEPS = [
+  { h: '低功耗的总开关', hint: '0x020D_C000 · 128 个唤醒源',
+    note: 'GPC 是 General Power Controller：它不管时钟、不管复位，只管「断电与唤醒」这一件事。WAIT/STOP 时哪个域掉电、哪个中断能把 CPU 叫醒，都由它决定。' },
+  { h: '进 STOP 再出来', hint: 'pdn_req → 隔离 → 断电 → 唤醒 → 复位',
+    note: '进入 STOP 是 CCM 发请求、GPC 按顺序隔离再断电；退出是任一未屏蔽中断触发上电，再由 SRC 复位被断电的域。整条链路每一步都能用寄存器计时。' },
+  { h: '寄存器全景', hint: 'GPC 0x000–0x024 · PGC 0x220 起',
+    note: 'GPC 本体只有 10 个寄存器：控制、调试时钟选择、4 个中断掩码、4 个中断状态。真正控制断电的是 PGC 子块，MEGA 域在 0x220，CPU 域在 0x2A0。' },
+  { h: 'CNTR 的请求位', hint: 'L2_PGE · GPCIRQM · MEGA/DISPLAY',
+    note: 'GPC_CNTR 复位值 0x0052_0000：bit22 L2_PGE=1 表示 L2 随 CPU 一起掉电、上电后硬件自动失效；bit20 恒为 1；bit17 VADC 模拟电默认关。请求位写 1 自清。' },
+  { h: '四个计数值', hint: 'SW · SW2ISO · ISO · ISO2SW',
+    note: 'SW/ISO 数 IPG 时钟，SW2ISO/ISO2SW 决定隔离保持多久。CPU 域的下电那两个数还按 32k 时钟数，而且硅版本 1.1 有 64 倍快档（SW[5]=1）。' },
+  { h: '谁能叫醒你', hint: 'IMR1–4 · ISR1–4 · 板级实测',
+    note: 'IMR 写 1 是屏蔽，写 0 才允许唤醒；ISR 只读反映当前挂起状态。配错一位，最典型的现场是「按了键没反应」或者「睡着了立刻被自己的中断叫醒」。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+
+function drawRole() {
+  txt(scene, 56, 146, 'GPC 只回答两个问题：进低功耗时谁断电，出事时谁能把 CPU 叫醒', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '它管的四件事');
+  txt(scene, 80, 252, '① 选唤醒源：IMR1–4 逐位放行', 't20w');
+  txt(scene, 80, 288, '② 全局闸门：CNTR 的 GPCIRQM', 't20w');
+  txt(scene, 80, 324, '③ 断电顺序：四个计数值定节奏', 't20w');
+  txt(scene, 80, 360, '④ 结果回报：SR 的 PSR 位', 't20w');
+  txt(scene, 80, 396, 'CPU 域电源门控（PGC CPU）', 't20w');
+  txt(scene, 80, 432, 'MEGA/显示域门控（PGC MEGA）', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '它不管的事');
+  txt(scene, 680, 252, '不产生时钟：那是 CCM 的活', 't20w');
+  txt(scene, 680, 288, '不放复位：断电域上电后交 SRC', 't20w');
+  txt(scene, 680, 324, '不保存现场：CPU 寄存器由 ARM', 't20w');
+  txt(scene, 680, 360, 'dormant 程序先存到 RAM', 't20w');
+  txt(scene, 680, 396, '不管 SNVS 关机态：ONOFF 键走 SNVS', 't20w');
+  txt(scene, 680, 432, 'GPC 只管 WAIT/STOP 内的唤醒', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '地址与规模');
+  txt(scene, 1280, 252, '基址 0x020D_C000，窗口 0x4000', 't20s');
+  txt(scene, 1280, 288, 'GPC 本体寄存器在 +0x000–0x024', 't20s');
+  txt(scene, 1280, 324, 'PGC MEGA 子块 +0x220–0x22C', 't20s');
+  txt(scene, 1280, 360, 'PGC CPU 子块 +0x2A0–0x2AC', 't20s');
+  txt(scene, 1280, 396, '中断源 128 个（irq 32–159）', 't20w');
+  txt(scene, 1280, 432, 'linux 里是 gpc@20dc000，SPI 89', 't20s');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '先分清三个角色：GPC 发号、CCM 供时钟、SRC 收尾复位', 't24');
+  txt(scene, 80, 522, '断电请求从 CCM 发出（pdn_req），GPC 收到后按 PGC 里配的节拍逐级拉隔离、切电源；上电则相反。', 't20w');
+  txt(scene, 80, 556, '被断电的域再上电时状态已经丢了，必须复位一次才能用 —— 这一次复位由 SRC 完成，GPC 只负责把上电请求递过去。', 't20w');
+  txt(scene, 80, 590, '所以调低功耗问题要按三段查：先看 GPC 有没有收到请求（SR 的 PSR），再看 CCM 时钟有没有停，最后看 SRC 有没有放复位。', 't20w');
+  txt(scene, 80, 624, 'i.MX6ULL 里能被门控的只有 CPU 域和 MEGA（显示）域；外设时钟的门控不在 GPC，在 CCM 的 CCGR。', 't20w');
+  txt(scene, 80, 658, '记住一句话：GPC 决定「谁断电、谁能唤醒」，但断电之后能不能活过来，要看 CCM 和 SRC 配不配合。', 't20w');
+}
+
+function drawStates() {
+  txt(scene, 56, 146, '一次 STOP 的完整往返：进去靠隔离断电，出来靠中断加复位', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '进入（断电）');
+  txt(scene, 80, 252, '① CCM 发 pdn_req', 't20w');
+  txt(scene, 80, 288, '② ARM dormant 存现场到 RAM', 't20w');
+  txt(scene, 80, 324, '③ 等 ISO 个时钟 → 拉隔离', 't20w');
+  txt(scene, 80, 360, '④ 等 ISO2SW 个时钟 → 切电源', 't20w');
+  txt(scene, 80, 396, '⑤ 显示/MEGA 域可单独请求', 't20w');
+  txt(scene, 80, 432, '⑥ 电源控制输出变 1 → PSR 置位', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '退出（上电）');
+  txt(scene, 680, 252, '① 任一未屏蔽中断到来', 't20w');
+  txt(scene, 680, 288, '② GPC 与 CCM 同时收到上电请求', 't20w');
+  txt(scene, 680, 324, '③ 等 SW 个时钟 → 合电源', 't20w');
+  txt(scene, 680, 360, '④ 等 SW2ISO 个时钟 → 撤隔离', 't20w');
+  txt(scene, 680, 396, '⑤ SRC 对该域放一次复位', 't20w');
+  txt(scene, 680, 432, '⑥ 恢复现场，从中断处继续跑', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '三条硬规矩');
+  txt(scene, 1280, 252, 'ISO 与 ISO2SW 都不能写 0', 't20w');
+  txt(scene, 1280, 288, 'SW2ISO 必须大于 LDO 爬升时间', 't20w');
+  txt(scene, 1280, 324, 'MEGA 不许在 CPU 上电时断电', 't20w');
+  txt(scene, 1280, 360, 'PCR 从 pdn_req 到上电完成不许改', 't20w');
+  txt(scene, 1280, 396, 'L2 掉电后上电即被硬件无效化', 't20w');
+  txt(scene, 1280, 432, '写 SR 的 PSR 要用写 1 清零', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '“隔离”和“断电”是两件事，顺序不能反', 't24');
+  txt(scene, 80, 522, '隔离是把目标域的输入输出钳到安全电平，避免断电瞬间漏电、误触发隔壁域。先隔离再切电，上电时先合电再撤隔离。', 't20w');
+  txt(scene, 80, 556, '这四段等待就是为了让电源和隔离有物理上的先后：ISO 是 pdn_req 到拉隔离，ISO2SW 是隔离拉好到切电源；', 't20w');
+  txt(scene, 80, 590, 'SW 是 pup_req 到合电源，SW2ISO 是电源稳了到撤隔离。SW2ISO 要留足 LDO 爬升时间，手册明确要求不能太小。', 't20w');
+  txt(scene, 80, 624, '被断电的一侧再上电时内容全丢，所以 SRC 必须补一次复位；如果你的域里有需要保留的数据，只能放 RAM 并靠 dormant 程序搬。', 't20w');
+  txt(scene, 80, 658, '单一节点最常见的坑：MEGA 在 CPU 还上电时就请求断电，手册写得很直白 —— 不允许，硬件行为不保证。', 't20w');
+  txt(scene, 80, 692, '调试手法：进 STOP 前后各读一次 PSR，1 表示这一轮真的掉过电，0 表示只进了 WAIT 没断电。', 't20w');
+}
+
+function drawRegs() {
+  txt(scene, 56, 146, '十个 GPC 寄存器加六个 PGC 寄存器，复位值就是最好的说明书', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'GPC 本体 0x000 起');
+  txt(scene, 80, 252, '+0x000 CNTR  复位 0x0052_0000', 't20s');
+  txt(scene, 80, 288, '+0x004 PGR   复位 0x0000_0000', 't20s');
+  txt(scene, 80, 324, '+0x008 IMR1  irq[63:32]', 't20s');
+  txt(scene, 80, 360, '+0x00C IMR2  irq[95:64]', 't20s');
+  txt(scene, 80, 396, '+0x010 IMR3  irq[127:96]', 't20s');
+  txt(scene, 80, 432, '+0x014 IMR4  irq[159:128]', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '状态寄存器 0x018 起');
+  txt(scene, 680, 252, '+0x018 ISR1  irq[63:32] 只读', 't20s');
+  txt(scene, 680, 288, '+0x01C ISR2  irq[95:64] 只读', 't20s');
+  txt(scene, 680, 324, '+0x020 ISR3  irq[127:96] 只读', 't20s');
+  txt(scene, 680, 360, '+0x024 ISR4  irq[159:128] 只读', 't20s');
+  txt(scene, 680, 396, 'IMR：1 = 屏蔽，0 = 允许唤醒', 't20w');
+  txt(scene, 680, 432, 'ISR：直接反映该中断当前挂起', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, 'PGC 子块 0x220 / 0x2A0');
+  txt(scene, 1280, 252, '+0x220 MEGA_CTRL  bit0 PCR', 't20s');
+  txt(scene, 1280, 288, '+0x224 MEGA_PUPSCR 0x0F01', 't20s');
+  txt(scene, 1280, 324, '+0x228 MEGA_PDNSCR 0x0101', 't20s');
+  txt(scene, 1280, 360, '+0x22C MEGA_SR    bit0 PSR', 't20s');
+  txt(scene, 1280, 396, '+0x2A0 CPU_CTRL / 0x2A4 PUPSCR', 't20s');
+  txt(scene, 1280, 432, '+0x2A8 PDNSCR / 0x2AC SR', 't20s');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '复位值把三个默认行为直接告诉你了', 't24');
+  txt(scene, 80, 522, 'CNTR = 0x0052_0000：bit22 L2_PGE=1（L2 随 CPU 掉电，上电自动失效），bit20 恒 1（保留位），bit17 VADC_ANALOG_OFF=1（模拟电默认关）。', 't20w');
+  txt(scene, 80, 556, 'PUPSCR = 0x0000_0F01：bit13:8 SW2ISO=0x0F（15），bit5:0 SW=1 —— 上电等 1 拍合电，再等 15 拍撤隔离，方向是对的但要按 LDO 参数改。', 't20w');
+  txt(scene, 80, 590, 'PDNSCR = 0x0000_0101：ISO2SW=1、ISO=1，即下电隔离只各等 1 拍。CPU 域这两个数按 32k 数（约 30.5 µs 一拍），MEGA 域按 IPG 数。', 't20w');
+  txt(scene, 80, 624, '只有 PGC 子块要求 supervisor 模式访问，越权或访问未实现的地址会回 bus transfer error（ips_xfr_err）。', 't20w');
+  txt(scene, 80, 658, 'GPC 本体与 PGC 全部字节可访问，所以 8 位写也能用；但掩码寄存器建议整字读改写，避免把别的唤醒源顺手关掉。', 't20w');
+}
+
+function drawCntr() {
+  txt(scene, 56, 146, 'GPC_CNTR：一个控制寄存器，三个域请求 + 两个 VADC 位 + 一个全局闸门', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '位域');
+  txt(scene, 80, 252, 'bit22 L2_PGE    L2 随核掉电（复位 1）', 't20s');
+  txt(scene, 80, 288, 'bit21 GPCIRQM   1 = 屏蔽全部中断/事件', 't20s');
+  txt(scene, 80, 324, 'bit20 恒 1      保留，只读', 't20s');
+  txt(scene, 80, 360, 'bit18 VADC_EXT_PWD_N  0 = 断电', 't20s');
+  txt(scene, 80, 396, 'bit17 VADC_ANALOG_OFF 1 = 模拟电关', 't20s');
+  txt(scene, 80, 432, 'bit5  DISPLAY_PUP_REQ  自清', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '请求位');
+  txt(scene, 680, 252, 'bit4  DISPLAY_PDN_REQ  自清', 't20s');
+  txt(scene, 680, 288, 'bit3  MEGA_PUP_REQ     自清', 't20s');
+  txt(scene, 680, 324, 'bit2  MEGA_PDN_REQ     自清', 't20s');
+  txt(scene, 680, 360, '写 1 启动一次序列，硬件做完清零', 't20w');
+  txt(scene, 680, 396, '读回 0 不代表没做，要看 SR 的 PSR', 't20w');
+  txt(scene, 680, 432, '软件可直接控显示电源，复位序仍交硬件', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '三个坑');
+  txt(scene, 1280, 252, '① 把 L2_PGE 清 0：L2 常电但上电后', 't20w');
+  txt(scene, 1280, 288, '内容不保证，缓存一致性要自己维护', 't20w');
+  txt(scene, 1280, 324, '② GPCIRQM 置 1 后所有唤醒源失效', 't20w');
+  txt(scene, 1280, 360, '表现为「睡下去再也起不来」', 't20w');
+  txt(scene, 1280, 396, '③ MEGA 在 CPU 上电时断电：禁止', 't20w');
+  txt(scene, 1280, 432, '手册原文 Caution，硬件行为不保证', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '读一遍 CNTR 就知道芯片此刻的默认姿态', 't24');
+  txt(scene, 80, 522, '上电读 CNTR 得到 0x0052_0000：L2 会跟着核一起掉、VADC 模拟电是关的、其余请求位全 0。这个值可以直接当「未被改过的基线」。', 't20w');
+  txt(scene, 80, 556, '要让 L2 在 STOP 期间保电，清 bit22；代价是漏电变大。要让 L2 掉电又不想上电后被无效化，没有这种选项 —— 硬件就是这么设计的。', 't20w');
+  txt(scene, 80, 590, 'GPCIRQM 是总闸：置 1 后 IMR 怎么配都没用。调试「进 STOP 醒不来」时，第一件事就是确认这一位是不是被谁置上了。', 't20w');
+  txt(scene, 80, 624, 'DISPLAY/MEGA 的请求位是给显示子系统单独开关用的，做完自清。注意 MEGA 域断电的前提是 CPU 也断，顺序反了就是上面那个 Caution。', 't20w');
+  txt(scene, 80, 658, 'VADC 两位一般不用动：默认关模拟电最省，要用 ADC 时再按驱动打开，否则读出来全是垃圾值。', 't20w');
+}
+
+function drawTiming() {
+  txt(scene, 56, 146, '四个计数值把「先隔离、再断电、先合电、再撤隔离」变成可算的时间', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '上电两个数');
+  txt(scene, 80, 252, 'SW[5:0]：pup_req 到合电源', 't20w');
+  txt(scene, 80, 288, 'SW2ISO[13:8]：合电到撤隔离', 't20w');
+  txt(scene, 80, 324, '单位 IPG 时钟，两者都不能写 0', 't20w');
+  txt(scene, 80, 360, '复位 SW=1、SW2ISO=15', 't20w');
+  txt(scene, 80, 396, 'SW2ISO 必须大于 LDO 爬升时间', 't20w');
+  txt(scene, 80, 432, 'SW[5]=1 时改按 64 倍算（rev1.1）', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '下电两个数');
+  txt(scene, 680, 252, 'ISO[5:0]：pdn_req 到拉隔离', 't20w');
+  txt(scene, 680, 288, 'ISO2SW[13:8]：隔离到切电源', 't20w');
+  txt(scene, 680, 324, 'MEGA 域按 IPG 数', 't20w');
+  txt(scene, 680, 360, 'CPU 域按 32k 数（慢 2000 倍）', 't20w');
+  txt(scene, 680, 396, '复位 ISO=1、ISO2SW=1', 't20w');
+  txt(scene, 680, 432, '同样不能写 0，否则等于没隔离', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '算例：IPG=66 MHz');
+  txt(scene, 1280, 252, 'SW=15、rev1.0：2048×15=30720 拍', 't20s');
+  txt(scene, 1280, 288, '= 465 µs 才合上电源', 't20s');
+  txt(scene, 1280, 324, 'SW[5]=1（rev1.1）：64×15=960 拍', 't20s');
+  txt(scene, 1280, 360, '= 14.5 µs，适合快唤醒', 't20s');
+  txt(scene, 1280, 396, 'CPU ISO=1 @32k = 30.5 µs', 't20s');
+  txt(scene, 1280, 432, 'CPU ISO2SW=1 @32k = 30.5 µs', 't20s');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '64 倍快档是硅版本 1.1 才有的，别在 1.0 上试', 't24');
+  txt(scene, 80, 522, 'rev1.0 只有一种算法：2048×SW[5:0]。rev1.1 看 SW[5]：为 1 时按 64×SW[4:0]，为 0 时仍按 2048×SW[4:0]。', 't20w');
+  txt(scene, 80, 556, '这就是为什么同一个 SW=0x2F 在两颗芯片上唤醒时间能差 30 倍。硅版本读 USB_ANALOG_DIGPROG 就能确认是 1.0 还是 1.1。', 't20w');
+  txt(scene, 80, 590, 'CPU 域的下电时序用 32k 而不是 IPG，是因为这时候 IPG 很可能已经停了；32k 一直活着，才能数完 ISO 再断电。', 't20w');
+  txt(scene, 80, 624, '联调顺序：先把 SW 拉大（比如 0x3F）确认能稳定上电，再逐步缩小到刚好够；反过来做会得到偶发的不启动，极难复现。', 't20w');
+  txt(scene, 80, 658, '实测量法：在 pup_req 后翻转一个 GPIO，在第一条指令执行时再翻一次，两次之间的宽度就是 SW+SW2ISO+LDO 爬升的总和。', 't20w');
+}
+
+function drawImr() {
+  txt(scene, 56, 146, '配唤醒源只做三件事：清对应的 IMR 位、开外设中断、清掉旧 ISR', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '五步配置');
+  txt(scene, 80, 252, '① 选源：GPIO/UART/SNVS 等', 't20w');
+  txt(scene, 80, 288, '② IMRn 清对应位（0 = 放行）', 't20w');
+  txt(scene, 80, 324, '③ 该外设自己的中断使能要开', 't20w');
+  txt(scene, 80, 360, '④ WFI 进 WAIT 或 STOP', 't20w');
+  txt(scene, 80, 396, '⑤ 醒来读 ISR 定位是谁，再清', 't20w');
+  txt(scene, 80, 432, 'irq 号减 32 得位号：IMR1 管 32–63', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '板级唤醒通道');
+  txt(scene, 680, 252, 'ONOFF 键 → SNVS，100K 上拉 R26', 't20w');
+  txt(scene, 680, 288, 'SNVS 管关机态，GPC 管 WAIT/STOP', 't20w');
+  txt(scene, 680, 324, 'PMIC_STBY_REQ：U9（CCM 侧）', 't20w');
+  txt(scene, 680, 360, 'PMIC_ON_REQ：T9（SNVS 侧）', 't20w');
+  txt(scene, 680, 396, '两板都把这两根线接到 PMIC', 't20w');
+  txt(scene, 680, 432, '没有独立 RTC 中断源，秒级唤醒靠 GPT', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '实测与判据');
+  txt(scene, 1280, 252, '读 CNTR：应为 0x0052_0000', 't20s');
+  txt(scene, 1280, 288, '读 CPU_PUPSCR：0x0000_0F01', 't20s');
+  txt(scene, 1280, 324, '读 MEGA_PUPSCR：0x0000_0F01', 't20s');
+  txt(scene, 1280, 360, '读 MEGA_PDNSCR：0x0000_0101', 't20s');
+  txt(scene, 1280, 396, 'PSR 写 1 清，再进 STOP 看是否再置', 't20w');
+  txt(scene, 1280, 432, 'IMR 清位后 ISR 应能看到挂起', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '「醒不来」和「睡下去立刻醒」是两种完全不同的错', 't24');
+  txt(scene, 80, 522, '醒不来：先查 GPCIRQM 是否被置 1，再查 IMR 对应位是否还是 1，最后查该外设中断有没有真的使能到 GIC。', 't20w');
+  txt(scene, 80, 556, '立刻醒：多半是某个源一直在挂起（比如 UART 的 RX 有残留、GPIO 电平一直是触发态），WFI 刚进去就被自己叫出来。', 't20w');
+  txt(scene, 80, 590, '定位手法：进 STOP 前把 IMR 全屏蔽只留一个源，能稳定睡下去就一个个放开，第一个把它叫醒的就是元凶。', 't20w');
+  txt(scene, 80, 624, 'ISR 是只读的状态镜像，不要指望写它清中断；要清的是外设自己的状态位和 GIC 的挂起位，否则出来还会再进一次。', 't20w');
+  txt(scene, 80, 658, '注意 ONOFF 键走的是 SNVS，从 SNVS 关机态唤醒跟 GPC 的 IMR 一点关系都没有 —— 两套唤醒体系别混在一起查。', 't20w');
+  txt(scene, 80, 692, '最后一条实测判据：进 STOP 前后各读一次 PSR。前后都是 0 说明只进了 WAIT；前 0 后 1 才是真的断了电。', 't20w');
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawRole();
+  else if (s === 1) drawStates();
+  else if (s === 2) drawRegs();
+  else if (s === 3) drawCntr();
+  else if (s === 4) drawTiming();
+  else drawImr();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () {
+  state.step = INIT.step; state.lane = INIT.lane; draw();
+});
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>

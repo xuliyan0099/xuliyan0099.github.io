@@ -1,0 +1,403 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0, lane: 0 };
+var state = { step: INIT.step, lane: INIT.lane };
+
+var STEPS = [
+  { h: '八个子模块', hint: 'MAC · uDMA · FIFO · PTP',
+    note: 'ENET 不是一个寄存器块，而是六个协作单元：MAC 负责帧与 CRC，MII/MDIO 负责和 PHY 说话，uDMA 负责搬描述符与数据，收发各一条 FIFO，PTP 负责 1588 打戳，MIB/RMON 负责计数。' },
+  { h: 'RMII 与 PHY', hint: 'KSZ8081 · 50 MHz · MDIO',
+    note: '本板走 RMII：TXEN + TXD0/1 + RXD0/1 + CRS_DV + RXER 六根线，50 MHz 参考时钟由 PHY 的 REF_CLK 送来；PHY 是 KSZ8081RNB，靠 MDIO/MDC 两根线配置。' },
+  { h: '寄存器地图', hint: '0x0218_8000 · 64 KB',
+    note: 'ENET1 基址 0x0218_8000（6ULL 只有一路；ENET2 0x020B_4000 是 6UL 才有）。EIR 在 +0x04、ECR +0x24、MMFR +0x40、MSCR +0x44、RCR +0x84、TCR +0xC4、描述符环 +0x180/+0x184。' },
+  { h: '三个控制寄存器', hint: 'ETHEREN · RMII · FDEN',
+    note: 'ECR 是总开关（RESET、ETHEREN），RCR 定收侧（MII_MODE 必须为 1、RMII_MODE、MAX_FL=1518、FCE），TCR 定发侧（FDEN 全双工、GTS 优雅停）。三个都配完才允许置 ETHEREN。' },
+  { h: 'MDIO 读 PHY', hint: 'MMFR · MII_SPEED',
+    note: 'MMFR 一次事务写一个字段：ST=01、OP=10 读、PA=PHY 地址、RA=寄存器号、TA=10。MSCR 的 MII_SPEED 把 MDC 压到 2.5 MHz 以下；66 MHz 的 IPG 时钟对应 0xD。' },
+  { h: '描述符与环', hint: '32 字节 · R/T · wrap',
+    note: '收发都是 32 字节描述符：长度、状态、缓冲区指针，外加错误与时间戳字段。RDSR/TDSR 指向环首，描述符之间靠连续地址走，最后一个的 W 位为 1 表示回卷。' },
+  { h: '十步初始化', hint: '复位 → 环 → ETHEREN',
+    note: '顺序错了就不通：先软件复位，再配 MSCR/RCR/TCR 与 MAC 地址，然后建环、写 RDSR/TDSR 并激活 RDAR、使能中断，最后一步才置 ETHEREN。' },
+  { h: '七条判据', hint: '环回 · link · ping',
+    note: '先内部环回验 MAC，再看 BMSR 的 link 位，再自协商，再 DHCP。ping 不通时按「MAC 侧 → PHY 侧 → 线序」三段查，别一上手就怀疑驱动。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+
+function drawRole() {
+  txt(scene, 56, 146, 'ENET 是六个单元协作：MAC 管帧、MDIO 管 PHY、uDMA 管搬运、FIFO 管缓冲、PTP 管打戳', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '数据面');
+  txt(scene, 80, 252, 'MAC：帧边界、CRC、地址过滤', 't20w');
+  txt(scene, 80, 288, 'uDMA：读描述符、搬缓冲区', 't20w');
+  txt(scene, 80, 324, 'TX/RX FIFO：各约 2 KB 级缓冲', 't20w');
+  txt(scene, 80, 360, 'RMON/IEEE 计数器：帧长分布', 't20w');
+  txt(scene, 80, 396, '10/100 Mbps，全/半双工', 't20w');
+  txt(scene, 80, 432, '无内置 PHY：必须外挂', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '控制面');
+  txt(scene, 680, 252, 'MDIO/MDC：读写 PHY 寄存器', 't20w');
+  txt(scene, 680, 288, 'MMFR 一次一帧，MSCR 定频率', 't20w');
+  txt(scene, 680, 324, 'MII 或 RMII：由 RCR 选', 't20w');
+  txt(scene, 680, 360, '1588：PTP 打戳 + 定时器输出', 't20w');
+  txt(scene, 680, 396, '魔术包唤醒（低功耗）', 't20w');
+  txt(scene, 680, 432, '中断 118/119：主中断 + PPS', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '本芯片的边界');
+  txt(scene, 1280, 252, '6ULL 只实例化 ENET1（ENET2 是 6UL）', 't20w');
+  txt(scene, 1280, 288, '两路共用一套寄存器模板（ENETx_）', 't20w');
+  txt(scene, 1280, 324, '基址 0x0218_8000，窗口 0x4000', 't20s');
+  txt(scene, 1280, 360, '速度只到 100 Mbps，没有千兆', 't20w');
+  txt(scene, 1280, 396, '没有硬件校验和卸载，全靠软件', 't20w');
+  txt(scene, 1280, 432, '没有内部 PHY，MDIO 必须外接', 't20w');
+
+  wide(456, 330);
+  head(80, 494, '六个单元的交接点，其实就是两张表和两条 FIFO');
+  txt(scene, 80, 522, '发送：CPU 写 TxBD（R=1、长度、缓冲区地址）→ 置 TDAR → uDMA 读 BD、把数据搬进 TXFIFO → MAC 加前导码与 CRC 后发到 RMII。', 't20w');
+  txt(scene, 80, 556, '接收：MAC 校验目的地址与 CRC → 写入 RXFIFO → uDMA 按 RxBD 把数据搬进内存 → 回写长度与状态位（E、L）→ 置 EIR[RXF]。', 't20w');
+  txt(scene, 80, 590, '两张表：RxBD 环（RDSR 指首）与 TxBD 环（TDSR 指首）。环是软件分配的普通内存，ENET 只认「连续 32 字节 × N 个」这个约定。', 't20w');
+  txt(scene, 80, 624, '两条 FIFO：TXFIFO 的水位决定「提前发」还是「整帧到达再发」（TFWR 的 STR_FWD）；RXFIFO 的水位决定中断与丢包的节奏。', 't20w');
+  txt(scene, 80, 658, 'MAC 地址不是「配一次就完」：PALR/PAUR 存单播地址，IAUR/IALR 存哈希表，GAUR/GALR 存组播哈希；收帧时三处都要过一遍。', 't20w');
+  txt(scene, 80, 692, '1588 是可选项：ECR[EN1588]=1 时描述符变 32 字节增强格式并带回戳字段，=0 时退回 8 字节 legacy FEC 格式。', 't20w');
+  txt(scene, 80, 726, '所以「ENET 驱动」在 Linux 里就是 freescale fec 驱动：它做的全部事情，就是把这两张环和十几个寄存器按顺序摆好。', 't20w');
+  txt(scene, 80, 760, '记住一句话：MAC 不懂内存地址，它只认描述符；描述符摆错，寄存器配得再对也收不到包。', 't20w');
+}
+
+function drawPins() {
+  txt(scene, 56, 146, '本板用 RMII：六根数据线 + 50 MHz 参考时钟 + 两根 MDIO，PHY 是外挂的 KSZ8081', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'RMII 七根线');
+  txt(scene, 80, 252, 'TXEN：发送使能，一帧一个脉冲', 't20w');
+  txt(scene, 80, 288, 'TXD0/TXD1：2 位并行，100M 时 25 MHz', 't20w');
+  txt(scene, 80, 324, 'RXD0/RXD1：接收 2 位并行', 't20w');
+  txt(scene, 80, 360, 'CRS_DV：载波 + 数据有效', 't20w');
+  txt(scene, 80, 396, 'RXER：接收错误（坏帧标记）', 't20w');
+  txt(scene, 80, 432, 'REF_CLK 50 MHz：由 PHY 送给 MAC', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '时钟从哪来');
+  txt(scene, 680, 252, 'PHY 板载 25 MHz 晶振（X1）', 't20w');
+  txt(scene, 680, 288, 'KSZ8081 内部倍频出 50 MHz', 't20w');
+  txt(scene, 680, 324, '走 REF_CLK 进 MAC 的 TX_CLK 脚', 't20w');
+  txt(scene, 680, 360, '所以 MAC 侧不需要另配 50 M 时钟', 't20w');
+  txt(scene, 680, 396, 'CCM 只提供 ipg_clk 与 ahb_clk', 't20w');
+  txt(scene, 680, 432, 'RMII 10 Mbps 时把 RCR[RMII_10T] 置 1', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, 'MDIO 两根线');
+  txt(scene, 1280, 252, 'MDC：时钟，由 MSCR 分频产生', 't20w');
+  txt(scene, 1280, 288, 'MDIO：双向数据，需要上拉', 't20w');
+  txt(scene, 1280, 324, 'MINI 板两根线全板共用（ENET_MDIO）', 't20w');
+  txt(scene, 1280, 360, 'PHY 地址由 LED0/LED1 引脚上电采样', 't20w');
+  txt(scene, 1280, 396, '原理图标注 PHY ADDR:0x01', 't20s');
+  txt(scene, 1280, 432, '地址错了就「读 ID 全是 0xFFFF」', 't20w');
+
+  wide(456, 330);
+  head(80, 494, '为什么这块板的网口「一定能跑起来」而 EIM「一定跑不起来」');
+  txt(scene, 80, 522, '因为 ENET 的引脚是独占的：ENET1_TXEN/TXD0/TXD1/RXD0/RXD1/CRS_DV/RXER/TX_CLK 各自一根球，没有和 NAND、CSI 复用。', 't20w');
+  txt(scene, 80, 556, '而 EIM 的 AD00–AD15 与 CSI/NAND 共用焊盘，CS1/BCLK/WAIT 也被 NAND 拿走 —— 这就是「同样是总线，一个能实测、一个只能读文档」的根本原因。', 't20w');
+  txt(scene, 80, 590, '板级还有两根控制线：ENET1_RST（PHY 复位，接 GPIO）与 ENET1_INT_TREE#（PHY 中断，可选接 GPIO 或悬空轮询）。', 't20w');
+  txt(scene, 80, 624, 'PHY 复位时序：拉低 ≥10 ms 再放开，等 ≥1 ms 才能读寄存器；很多「读 ID 失败」其实是复位没等够。', 't20w');
+  txt(scene, 80, 658, 'RMII 的 50 MHz 参考时钟是「PHY 给 MAC」而不是反过来：KSZ8081 的 REF_CLK 输出脚必须接到 ENET1_TX_CLK，否则 MAC 没有发送节拍。', 't20w');
+  txt(scene, 80, 692, '10 Mbps 与 100 Mbps 的差别只在 RCR[RMII_10T]：置 1 后 MAC 按 10 M 节拍收发，PHY 侧自协商结果必须一致，否则大量 CRC 错。', 't20w');
+  txt(scene, 80, 726, 'MDIO 线上必须有一个上拉（通常 4.7 kΩ 到 3.3 V）；没有上拉时读 PHY 会随机出错，示波器上看是「数据线浮空」。', 't20w');
+  txt(scene, 80, 760, '一句话：RMII 是「少引脚版 MII」，省掉 8 根数据线，代价是 MAC 与 PHY 必须共用同一个 50 MHz 时钟。', 't20w');
+}
+
+function drawRegs() {
+  txt(scene, 56, 146, 'ENET1 基址 0x0218_8000，窗口 0x4000；几十个寄存器里，日常只用其中十二个', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '低偏移段');
+  txt(scene, 80, 252, '+0x004 EIR：中断事件（写 1 清）', 't20s');
+  txt(scene, 80, 288, '+0x008 EIMR：中断掩码', 't20s');
+  txt(scene, 80, 324, '+0x010 RDAR · +0x014 TDAR：激活环', 't20s');
+  txt(scene, 80, 360, '+0x024 ECR：总开关', 't20s');
+  txt(scene, 80, 396, '+0x040 MMFR · +0x044 MSCR：MDIO', 't20s');
+  txt(scene, 80, 432, '+0x064 MIBC：计数器冻结/清', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '收发与地址');
+  txt(scene, 680, 252, '+0x084 RCR：收侧控制', 't20s');
+  txt(scene, 680, 288, '+0x0C4 TCR：发侧控制', 't20s');
+  txt(scene, 680, 324, '+0x0E4 PALR · +0x0E8 PAUR：MAC 地址', 't20s');
+  txt(scene, 680, 360, '+0x118/+0x11C IAUR/IALR：单播哈希', 't20s');
+  txt(scene, 680, 396, '+0x120/+0x124 GAUR/GALR：组播哈希', 't20s');
+  txt(scene, 680, 432, '+0x0EC OPD：PAUSE 时长', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '描述符环与水位');
+  txt(scene, 1280, 252, '+0x180 RDSR：收环首地址（[31:2]）', 't20s');
+  txt(scene, 1280, 288, '+0x184 TDSR：发环首地址（[31:2]）', 't20s');
+  txt(scene, 1280, 324, '+0x188 MRBR：接收缓冲上限', 't20s');
+  txt(scene, 1280, 360, '+0x190–0x19C RSFL/RSEM/RAEM/RAFL', 't20s');
+  txt(scene, 1280, 396, '+0x1A0–0x1A8 TSEM/TAEM/TAFL', 't20s');
+  txt(scene, 1280, 432, '+0x1B0 FTRL：超长帧截断', 't20s');
+
+  wide(456, 330);
+  head(80, 494, '其余四段：计数器、1588、定时器、以及别碰的保留区');
+  txt(scene, 80, 522, '+0x200 起是 RMON 计数器（收发各一套：包数、广播、组播、CRC 错、各长度区间、总字节），+0x248 起是 IEEE 802.3 计数器。', 't20w');
+  txt(scene, 80, 556, '这些是「32 位只读、读后不清」的统计寄存器，掉电前想留证据就趁早读；MIBC 可以一键冻结全部计数器。', 't20w');
+  txt(scene, 80, 590, '+0x400 起是 1588 可调定时器（ATCR/ATVR/ATOFF/ATPER/ATCOR/ATINC），+0x604 起是四路定时比较通道（TCSRn/TCCRn）。', 't20w');
+  txt(scene, 80, 624, '1588 的用法：ATINC 写「每拍加多少纳秒」，ATPER 写周期，TCCRn 写比较值，命中就翻转对应引脚 —— 这就是 PPS 输出的来源。', 't20w');
+  txt(scene, 80, 658, '窗口只有 0x4000：越过 ENET1 的 0x4000 偏移就是别的外设，别「顺手」去读 +0x5000 找寄存器。', 't20w');
+  txt(scene, 80, 692, '6ULL 只有 ENET1；手册里所有 ENETx_ 前缀的寄存器都是同一套模板，读 ENET2 的定义对 ENET1 完全适用。', 't20w');
+  txt(scene, 80, 726, '两个必记的「伪寄存器」：RDAR 与 TDAR。它们不是状态，是「踢一脚」的命令寄存器：写 1 告诉 uDMA「环里有新东西」。', 't20w');
+  txt(scene, 80, 760, '偏移 +0x00 是保留：EIR 从 +0x04 开始，照 Linux fec.h 抄偏移最省事，照「猜」抄最容易差 4 字节。', 't20w');
+}
+
+function drawCtrl() {
+  txt(scene, 56, 146, '三个控制寄存器定生死：ECR 的总开关、RCR 的 RMII 与帧长、TCR 的全双工', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'ECR（+0x24）');
+  txt(scene, 80, 252, 'bit0 RESET：写 1 复位 MAC，自清', 't20w');
+  txt(scene, 80, 288, 'bit1 ETHEREN：收发的总开关', 't20w');
+  txt(scene, 80, 324, 'bit4 EN1588：增强描述符 + 打戳', 't20w');
+  txt(scene, 80, 360, 'bit8 DBSWP：必须写 1（小端）', 't20w');
+  txt(scene, 80, 396, 'bit6 DBGEN：调试冻结', 't20w');
+  txt(scene, 80, 432, 'bit2/3 MAGICEN/SLEEP：魔术包唤醒', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, 'RCR（+0x84）');
+  txt(scene, 680, 252, 'bit2 MII_MODE：必须写 1', 't20w');
+  txt(scene, 680, 288, 'bit8 RMII_MODE：本板写 1', 't20w');
+  txt(scene, 680, 324, 'bit9 RMII_10T：10 Mbps 时写 1', 't20w');
+  txt(scene, 680, 360, '[29:16] MAX_FL：复位 1518', 't20w');
+  txt(scene, 680, 396, 'bit5 FCE：接受 PAUSE 帧', 't20w');
+  txt(scene, 680, 432, 'bit0 LOOP：内部环回自测', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, 'TCR（+0xC4）');
+  txt(scene, 1280, 252, 'bit2 FDEN：全双工（要 1）', 't20w');
+  txt(scene, 1280, 288, 'bit0 GTS：优雅停，发完当前帧就停', 't20w');
+  txt(scene, 1280, 324, 'bit3 TFC_PAUSE：主动发 PAUSE 帧', 't20w');
+  txt(scene, 1280, 360, 'bit4 RFC_PAUSE：收到 PAUSE 的只读状态', 't20w');
+  txt(scene, 1280, 396, 'bit5–7 ADDSEL：发 PAUSE 用哪个源地址', 't20w');
+  txt(scene, 1280, 432, 'FDEN 只能在 ETHEREN=0 时改', 't20w');
+
+  wide(456, 330);
+  head(80, 494, '四条配置纪律，违反任何一条都表现为「完全不通」');
+  txt(scene, 80, 522, '第一，MII_MODE 必须为 1。复位值是 0，忘了写就是「MII 关闭」——PHY 收不到任何东西，链路灯都不亮。', 't20w');
+  txt(scene, 80, 556, '第二，DBSWP 必须写 1。描述符是小端排布，不交换字节序时 CPU 读到的长度与状态位是错位的，现象是「收到的包长度离谱」。', 't20w');
+  txt(scene, 80, 590, '第三，ETHEREN 必须是最后一步。手册明写：其余寄存器全部配完才允许置位；提前置位会让 uDMA 在环还没建好时就去读 BD。', 't20w');
+  txt(scene, 80, 624, '第四，MAX_FL 保持 1518（带 VLAN 用 1522）。改小会把正常帧判成超长（BABR），改大则失去长度过滤。', 't20w');
+  txt(scene, 80, 658, '复位流程：置 ECR[RESET]=1 等它自清 → 清 EIR 全部挂起位 → 再配其余寄存器。复位不清 EIR，老中断会立刻重放。', 't20w');
+  txt(scene, 80, 692, '半双工（FDEN=0）才需要 DRT=1 与碰撞相关配置；接交换机一律全双工，把 FDEN 写 1、DRT 写 0。', 't20w');
+  txt(scene, 80, 726, 'FCE=1 只表示「我会听 PAUSE」；要主动发 PAUSE 得置 TCR[TFC_PAUSE]，两者不是一回事。', 't20w');
+  txt(scene, 80, 760, 'DBSWP 这条坑最隐蔽：它不影响寄存器读写，只影响描述符解析；所以「MDIO 能读、PHY ID 正确、就是不收包」时先查它。', 't20w');
+}
+
+function drawMdio() {
+  txt(scene, 56, 146, 'MDIO 是两根线走的一个 64 位帧：ST、OP、PA、RA、TA、DATA 六段，写 MMFR 就发一帧', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'MMFR 位域');
+  txt(scene, 80, 252, '[31:30] ST = 01（Clause 22 起始）', 't20w');
+  txt(scene, 80, 288, '[29:28] OP = 10 读 / 01 写', 't20w');
+  txt(scene, 80, 324, '[27:23] PA = PHY 地址 0–31', 't20w');
+  txt(scene, 80, 360, '[22:18] RA = 寄存器号 0–31', 't20w');
+  txt(scene, 80, 396, '[17:16] TA = 10（必须）', 't20w');
+  txt(scene, 80, 432, '[15:0] DATA：写入值或读回值', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, 'MDC 频率');
+  txt(scene, 680, 252, 'MDC = IPG 时钟 / ((MII_SPEED+1)×2)', 't20s');
+  txt(scene, 680, 288, '规范上限 2.5 MHz，别超', 't20w');
+  txt(scene, 680, 324, '25 MHz → MII_SPEED=4 → 2.50 MHz', 't20s');
+  txt(scene, 680, 360, '50 MHz → 9 → 2.50 MHz', 't20s');
+  txt(scene, 680, 396, '66 MHz → 0xD → 2.36 MHz', 't20s');
+  txt(scene, 680, 432, 'DIS_PRE=1 可省掉前导码（少 32 位）', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, 'KSZ8081 常用寄存器');
+  txt(scene, 1280, 252, '0x00 BMCR：复位、自协商、环回', 't20s');
+  txt(scene, 1280, 288, '0x01 BMSR：bit2 link、bit5 自协商完成', 't20s');
+  txt(scene, 1280, 324, '0x02/0x03 PHYID1/PHYID2', 't20s');
+  txt(scene, 1280, 360, '0x04 ANAR：能力通告（100M 全双工）', 't20s');
+  txt(scene, 1280, 396, '0x05 ANLPAR：对端通告', 't20s');
+  txt(scene, 1280, 432, '0x1F PHY 控制/状态（厂商私有）', 't20s');
+
+  wide(456, 330);
+  head(80, 494, '五个必须知道的细节');
+  txt(scene, 80, 522, '① MSCR 为 0 时写 MMFR 不会发帧：必须先把 MII_SPEED 写成非零，再写 MMFR；两次写的先后顺序手册允许互换，但「都为 0」一定不通。', 't20w');
+  txt(scene, 80, 556, '② 一帧没发完不要重写 MMFR，会破坏正在发送的帧内容；正确姿势是等 EIR[MII] 置位（或轮询 EIR bit23）再写下一帧。', 't20w');
+  txt(scene, 80, 590, '③ 读 PHY 的流程：写 MMFR（OP=10）→ 等 MII 完成 → 读 MMFR[15:0]。写 PHY 时 OP=01，DATA 就是你写进去的值。', 't20w');
+  txt(scene, 80, 624, '④ 读 ID 判定活着的标准：PHYID1 不是 0xFFFF、也不是 0x0000。KSZ8081 的 ID 高半字是 0x0022，低半字随型号略有差异。', 't20w');
+  txt(scene, 80, 658, '⑤ 自协商流程：写 BMCR=0x3100（自协商 + 重启）→ 等 BMSR bit5 置位 → 读 BMSR bit2 确认 link → 读 ANLPAR 看对端能力。', 't20w');
+  txt(scene, 80, 692, 'PHY 地址不是猜出来的：先把 0x00–0x1F 全扫一遍读 PHYID1，谁是 0x0022 就是它；本板原理图标注 0x01。', 't20w');
+  txt(scene, 80, 726, 'link 位是「latching low」：掉线后读一次会清，连续两次读才能确认当前状态 —— 只看一次的代码会误判。', 't20w');
+  txt(scene, 80, 760, 'MDIO 上没有任何数据时，先量 MDC 有没有波形：MSCR 写 0 是最常见的「MDC 没波形」原因。', 't20w');
+}
+
+function drawBd() {
+  txt(scene, 56, 146, '描述符是 32 字节一块的「作业单」：长度、状态、缓冲区地址，环靠连续内存 + W 位回卷', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'RxBD 关键字段');
+  txt(scene, 80, 252, '+0 长度（MAC 回写）', 't20s');
+  txt(scene, 80, 288, '+2 bit15 E 空 / bit13 W 回卷', 't20s');
+  txt(scene, 80, 324, '+2 bit11 L 帧尾 / bit9 LG 超长', 't20s');
+  txt(scene, 80, 360, '+2 bit7 NO / bit4 OV 溢出', 't20s');
+  txt(scene, 80, 396, '+4/+6 缓冲区地址（低/高半字）', 't20s');
+  txt(scene, 80, 432, '+8/+A 校验和、VLAN、错误位', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, 'TxBD 关键字段');
+  txt(scene, 680, 252, '+0 长度（软件写）', 't20s');
+  txt(scene, 680, 288, '+2 bit15 R 就绪（置 1 才发）', 't20s');
+  txt(scene, 680, 324, '+2 bit10 TC 发送完成（MAC 回写）', 't20s');
+  txt(scene, 680, 360, '+2 bit13 W 回卷、bit11 L 帧尾', 't20s');
+  txt(scene, 680, 396, '+8 UE/EE/FE/LCE/OE/TSE 错误位', 't20s');
+  txt(scene, 680, 432, '+A TS 时间戳 / INT 中断请求', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '环怎么连起来');
+  txt(scene, 1280, 252, 'RDSR/TDSR 存环首地址（[31:2]）', 't20s');
+  txt(scene, 1280, 288, '描述符之间按地址 +32 递增', 't20w');
+  txt(scene, 1280, 324, '最后一块的 W=1 表示下一块回环首', 't20w');
+  txt(scene, 1280, 360, '环数建议 8–64 块，太小易丢帧', 't20w');
+  txt(scene, 1280, 396, '环首建议 64 字节对齐（手册推荐）', 't20w');
+  txt(scene, 1280, 432, 'RDAR/TDAR 写 1 才真正激活', 't20w');
+
+  wide(456, 330);
+  head(80, 494, '四个必须自己守住的约定');
+  txt(scene, 80, 522, '① 描述符必须 4 字节对齐、环首最好 64 字节对齐：不对齐时 uDMA 取到的字段会错位，现象是「偶发丢包 + 长度乱」', 't20w');
+  txt(scene, 80, 556, '② 收帧前把 RxBD 的 E 置 1、W 按环位置设好；MAC 收完一帧会把 E 清 0、写长度、置 L，软件处理完再把 E 置回 1。', 't20w');
+  txt(scene, 80, 590, '③ 发帧：填长度与地址 → 置 R=1 → 置 TDAR[TDAR]=1 → 等 TC=1（或 EIR[TXF]）→ 清 R。R 与 TC 是两套位，别混。', 't20w');
+  txt(scene, 80, 624, '④ 缓冲区要放在 DMA 能访问的内存里，并且注意 cache：Cortex-A7 有 D-Cache，收发缓冲必须做 clean/invalidate，否则 CPU 看到的是旧数据。', 't20w');
+  txt(scene, 80, 658, '增强格式（EN1588=1）32 字节；legacy FEC 格式 8 字节。切 ECR[EN1588] 会改变描述符布局，环里所有块必须同步重建。', 't20w');
+  txt(scene, 80, 692, '一个帧可以跨多个描述符：中间的块 L=0，最后一块 L=1。拼帧逻辑写错，收到的就是半截包。', 't20w');
+  txt(scene, 80, 726, '错误位的用法：UE 下溢、FE FIFO 错、LCE 迟碰撞、TSE 发送错误；收侧 OV 表示 RXFIFO 溢出丢数据。', 't20w');
+  txt(scene, 80, 760, '调试顺序：先看 RDSR/TDSR 是否等于你写的地址，再看 RDAR/TDAR 是否为 1，最后才怀疑 PHY。', 't20w');
+}
+
+function drawInit() {
+  txt(scene, 56, 146, '十步初始化：复位 → MDIO → 控制寄存器 → MAC 地址 → 环 → 中断 → 最后 ETHEREN', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '前十步');
+  txt(scene, 80, 252, '① CCM 开 ipg/ahb 时钟', 't20w');
+  txt(scene, 80, 288, '② IOMUX 配 RMII 八根 + MDIO/MDC', 't20w');
+  txt(scene, 80, 324, '③ 拉低 PHY 复位 ≥10 ms 再放开', 't20w');
+  txt(scene, 80, 360, '④ 置 ECR[RESET]=1，等自清', 't20w');
+  txt(scene, 80, 396, '⑤ 写 MSCR 定 MDC，扫 PHY 地址', 't20w');
+  txt(scene, 80, 432, '⑥ 写 RCR：MII_MODE、RMII_MODE', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '后四步');
+  txt(scene, 680, 252, '⑦ 写 TCR[FDEN]=1、RCR[MAX_FL]=1518', 't20w');
+  txt(scene, 680, 288, '⑧ 写 PALR/PAUR 装 MAC 地址', 't20w');
+  txt(scene, 680, 324, '⑨ 建两个环，写 RDSR/TDSR', 't20w');
+  txt(scene, 680, 360, '⑩ 写 EIMR 开中断 → 置 ETHEREN', 't20w');
+  txt(scene, 680, 396, '最后写 RDAR/TDAR 激活两条环', 't20w');
+  txt(scene, 680, 432, '顺序反了：环没建好就 ETHEREN 会 EBERR', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '中断与状态');
+  txt(scene, 1280, 252, 'EIR bit24 RXB / bit25 RXF：收到帧', 't20w');
+  txt(scene, 1280, 288, 'EIR bit26 TXB / bit27 TXF：发送完成', 't20w');
+  txt(scene, 1280, 324, 'EIR bit23 MII：MDIO 事务完成', 't20w');
+  txt(scene, 1280, 360, 'EIR bit22 EBERR：总线错误（致命）', 't20w');
+  txt(scene, 1280, 396, 'EIR bit20 RL：丢帧（环不够用）', 't20w');
+  txt(scene, 1280, 432, 'EIR 写 1 清，不清会一直重入', 't20w');
+
+  wide(456, 330);
+  head(80, 494, '一次收发的完整时间线（拿来对照示波器与日志）');
+  txt(scene, 80, 522, '收：前导码 → MAC 同步 → 解目的地址 → 命中 PALR → 写 RXFIFO → uDMA 搬入内存 → 回写长度与 L → EIR[RXF]。', 't20w');
+  txt(scene, 80, 556, '发：置 TxBD[R] → 置 TDAR → uDMA 灌 TXFIFO → 到 TFWR 水位 → MAC 加前导与 CRC → TXEN 拉高 → TC=1、EIR[TXF]。', 't20w');
+  txt(scene, 80, 590, 'Linux 侧对应：fec_enet_init → fec_restart → 申请环 → request_irq(118) → napi poll；`ifconfig eth0 up` 背后就是这十步。', 't20w');
+  txt(scene, 80, 624, '裸机自测建议：先把环设成 4 块、缓冲区 1520 字节，收一个包就把长度与首 6 字节打到串口，比对发送端的源 MAC。', 't20w');
+  txt(scene, 80, 658, 'PHY 侧还要配一次：写 BMCR 重启自协商，等 BMSR link=1；否则 MAC 以为链路在，PHY 实际没通，表现为「发得出去、收不到」。', 't20w');
+  txt(scene, 80, 692, 'MAC 地址来源：6ULL 的 OCOTP 里有出厂 MAC（fuse 0x4E0 起），也可以在 DT/环境变量里覆盖；用随机地址时要保证全网唯一。', 't20w');
+  txt(scene, 80, 726, '初始化完先别急着 ping：读一次 RMON 计数器，确认 T_PACKETS 与 R_PACKETS 都在涨，再看 ARP 有没有应答。', 't20w');
+  txt(scene, 80, 760, '把这十步写成表格贴在调试记录里，每次不通就按序号打勾 —— 网口问题 80% 是某一步漏了。', 't20w');
+}
+
+function drawDebug() {
+  txt(scene, 56, 146, '七条判据从内到外：先环回验 MAC，再 link 验 PHY，再 ARP 验协议栈，最后才怀疑驱动', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '内环回');
+  txt(scene, 80, 252, 'RCR[LOOP]=1、RMII_MODE=0', 't20w');
+  txt(scene, 80, 288, 'DRT 必须清 0', 't20w');
+  txt(scene, 80, 324, '发一帧应能自己收到', 't20w');
+  txt(scene, 80, 360, '收到即证明 MAC + uDMA + 环都对', 't20w');
+  txt(scene, 80, 396, '收不到就查环与 DBSWP', 't20w');
+  txt(scene, 80, 432, '这是唯一不依赖 PHY 的自测', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '读 PHY 三连');
+  txt(scene, 680, 252, 'PHYID1 = 0x0022（KSZ8081）', 't20s');
+  txt(scene, 680, 288, 'BMSR bit2 link = 1', 't20w');
+  txt(scene, 680, 324, 'BMSR bit5 自协商完成 = 1', 't20w');
+  txt(scene, 680, 360, 'ANLPAR 看对端 100M/全双工', 't20w');
+  txt(scene, 680, 396, '三者齐了才可能通', 't20w');
+  txt(scene, 680, 432, 'ID 全 F：地址错或 MDC 没波形', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '六个典型故障');
+  txt(scene, 1280, 252, '全无反应：ETHEREN 未置 / MII_MODE=0', 't20w');
+  txt(scene, 1280, 288, '能发不能收：RxBD 的 E 没置 / RDAR=0', 't20w');
+  txt(scene, 1280, 324, '长度离谱：DBSWP 没写 1', 't20w');
+  txt(scene, 1280, 360, '大量 CRC 错：RMII 50 M 时钟没接对', 't20w');
+  txt(scene, 1280, 396, '偶发丢包：环太小 / 缓冲没做 cache 维护', 't20w');
+  txt(scene, 1280, 432, 'ping 不通但 link 亮：ARP 被过滤/地址冲突', 't20w');
+
+  wide(456, 330);
+  head(80, 494, '三段排查法：把「网口不通」拆成三段各自独立验证');
+  txt(scene, 80, 522, '第一段 MAC 侧（不接 PHY 也能测）：内部环回。RCR[LOOP]=1、RMII_MODE=0、DRT=0，发一帧看能不能自己收到 —— 通了说明寄存器、描述符、uDMA 全部正确。', 't20w');
+  txt(scene, 80, 556, '第二段 PHY 侧：读 PHYID 确认芯片在、读 BMSR 确认 link、读 ANLPAR 确认速率双工一致。MAC 配 100M 全双工而 PHY 协商成 10M 半双工，就是「能通但丢包」。', 't20w');
+  txt(scene, 80, 590, '第三段线路侧：网线、交换机口、变压器中心抽头供电；RMII 板子上还要看 50 MHz 时钟的幅度与占空比（用示波器量 TX_CLK）。', 't20w');
+  txt(scene, 80, 624, '工具侧：`ip -s link` 看 RX/TX 错误计数，`ethtool -S eth0` 看 RMON，`cat /sys/class/net/eth0/carrier` 看链路，`ethtool eth0` 看协商结果。', 't20w');
+  txt(scene, 80, 658, 'MAC 地址冲突的典型现象：ARP 有请求没应答、或者应答来自别的机器；查 `ip neigh` 与交换机 MAC 表就能定位。', 't20w');
+  txt(scene, 80, 692, 'cache 问题的典型现象：第一次收包正常、连续收包后数据错乱；Cortex-A7 上必须对收发缓冲做 DMA 一致性处理（非一致性内存或显式维护）。', 't20w');
+  txt(scene, 80, 726, '最后一句：ENET 是本板唯一「能从寄存器一路实测到 ping 通」的高速外设，把这章走通，后面的网络协议栈、LWIP、socket 才有落脚点。', 't20w');
+  txt(scene, 80, 760, '下一步 RM23 是 EPDC 电子纸控制器（1035–1166 页）：一个寄存器多、但没有 PHY 的黑盒。', 't20w');
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawRole();
+  else if (s === 1) drawPins();
+  else if (s === 2) drawRegs();
+  else if (s === 3) drawCtrl();
+  else if (s === 4) drawMdio();
+  else if (s === 5) drawBd();
+  else if (s === 6) drawInit();
+  else drawDebug();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () {
+  state.step = INIT.step; state.lane = INIT.lane; draw();
+});
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>

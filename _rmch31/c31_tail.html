@@ -1,0 +1,337 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0, lane: 0 };
+var state = { step: INIT.step, lane: INIT.lane };
+
+var STEPS = [
+  { h: '两线开漏总线', hint: 'SCL · SDA · 上拉 · 线与',
+    note: 'I2C 只有两根线，靠开漏 + 上拉实现「线与」；谁拉低谁说了算，这就是仲裁与时钟同步的物理基础。' },
+  { h: '四组脚与板子', hint: 'CSI 组 · UART 组 · ENET 组 · LCD 组',
+    note: '四路 I2C 的脚分散在四组复用里，ALT3 最多。板上 I2C1/I2C2 都有对外接口，屏的触摸走 I2C2。' },
+  { h: '五个 16 位寄存器', hint: 'IADR · IFDR · I2CR · I2SR · I2DR',
+    note: '每路 I2C 只有五个寄存器，偏移 0x00/0x04/0x08/0x0C/0x10，全是 16 位，只允许半字访问。' },
+  { h: '分频表：64 个固定值', hint: 'IC[5:0] · 30 到 3840',
+    note: 'IFDR 不是自由分频，而是 64 个离散除数。49.5 MHz 下要 100 kbps 取 480，要 400 kbps 取 128。' },
+  { h: '控制与状态', hint: 'IEN/MSTA/MTX/TXAK · ICF/IBB/IAL/RXAK',
+    note: 'I2CR 六位定行为，I2SR 七位报状态。很多位是「写别的」来清，比如写 I2CR 清 IAAS、写 0 清 IIF。' },
+  { h: '一次完整事务', hint: 'START · 地址 · ACK · 数据 · STOP',
+    note: '主发是最简单的路径：等 IBB=0、置 MSTA/MTX、写地址到 I2DR、逐字节看 RXAK、最后清 MSTA 发 STOP。' },
+  { h: '判据与救总线', hint: '电气 · 协议 · 数据 · 9 个脉冲',
+    note: '先量空闲电平，再看第 9 拍有没有 ACK，最后核对读回的 ID。总线卡死时用 9 个 SCL 脉冲让从机松手。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+
+function drawRole() {
+  txt(scene, 56, 146, 'I2C 的电气本质：两根开漏线 + 两个上拉电阻，任何设备拉低都立刻被所有设备看见', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '总线规则');
+  txt(scene, 80, 252, 'SCL 时钟线，SDA 数据线', 't20w');
+  txt(scene, 80, 288, '输出必须开漏（或开集电极）', 't20w');
+  txt(scene, 80, 324, '高电平靠外部上拉 Rp 提供', 't20w');
+  txt(scene, 80, 360, '线与：有一个拉低，整条线就是低', 't20w');
+  txt(scene, 80, 396, '空闲时两根线都被上拉到高', 't20w');
+  txt(scene, 80, 432, '速率只分标准 100k 与快速 400k', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '多主与仲裁');
+  txt(scene, 680, 252, '多主同时发：时钟低取最长，高取最短', 't20w');
+  txt(scene, 680, 288, '发 1 却被别人拉 0 → 失去仲裁', 't20w');
+  txt(scene, 680, 324, '失去仲裁立即转从接收，不产生 STOP', 't20w');
+  txt(scene, 680, 360, '硬件置 IAL，MSTA 自动清 0', 't20w');
+  txt(scene, 680, 396, '从机可以把 SCL 拉住做握手/降速', 't20w');
+  txt(scene, 680, 432, '这就是时钟拉伸（clock stretching）', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '三个必做前提');
+  txt(scene, 1280, 252, 'IOMUX 选对 ALT 后必须置 SION', 't20w');
+  txt(scene, 1280, 288, 'SION=1 才能把输出值回读到输入', 't20w');
+  txt(scene, 1280, 324, '片内上拉太弱，必须外部上拉', 't20w');
+  txt(scene, 1280, 360, '默认 10K 级，长线用 4.7K 或更小', 't20w');
+  txt(scene, 1280, 396, '复位后默认是「从接收」状态', 't20w');
+  txt(scene, 1280, 432, '不主动置 MSTA 就不会当主机', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '为什么开漏是必须的：两个设备同时驱动一根线，推挽会直接短路', 't24');
+  txt(scene, 80, 522, '开漏只能「拉低」不能「推高」，高电平由电阻提供，所以任何一方拉低都安全；这正是仲裁能工作的物理前提。', 't20w');
+  txt(scene, 80, 556, '仲裁时谁发 1 谁就退出：因为发 1 意味着放弃拉低，而别人拉低把线拽下来了，硬件采样到不一致就判定失败方。', 't20w');
+  txt(scene, 80, 590, '上拉阻值决定上升沿：Rp × 总线电容就是时间常数，阻值太大边沿爬不起来，400 kbps 下常见 2.2K–4.7K。', 't20w');
+  txt(scene, 80, 624, '从机时钟拉伸是合法的：主机拉低后松开，从机继续拉住，主机看到 SCL 还是低就等着 —— 慢速 MCU 靠这个不被冲垮。', 't20w');
+  txt(scene, 80, 658, '别忘 SION：I2C 的 SDA 要双向，没有 SION 时模块读不到自己输出的电平，会误判仲裁丢失。手册专门写了这一句。', 't20w');
+}
+
+function drawBoard() {
+  txt(scene, 56, 146, '四路 I2C 的焊盘分散在四组复用里，ALT3 是它们共同的家', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'I2C1 / I2C2 焊盘');
+  txt(scene, 80, 252, 'I2C1_SCL：CSI_PIXCLK ALT3', 't20s');
+  txt(scene, 80, 288, 'I2C1_SDA：CSI_MCLK  ALT3', 't20s');
+  txt(scene, 80, 324, '也可走 GPIO1_IO02/03（ALT0）', 't20s');
+  txt(scene, 80, 360, '或 UART4_TX/RX（ALT2）', 't20s');
+  txt(scene, 80, 396, 'I2C2_SCL：CSI_HSYNC ALT3', 't20s');
+  txt(scene, 80, 432, 'I2C2_SDA：CSI_VSYNC ALT3', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, 'I2C3 / I2C4 焊盘');
+  txt(scene, 680, 252, 'I2C3：ENET2_RX_DATA0/1 ALT3', 't20s');
+  txt(scene, 680, 288, '或 LCD_DATA00/01 ALT4', 't20s');
+  txt(scene, 680, 324, '或 UART1_TX/RX ALT2', 't20s');
+  txt(scene, 680, 360, 'I2C4：ENET2_RX_EN/TX_DATA0 ALT3', 't20s');
+  txt(scene, 680, 396, '或 LCD_DATA02/03 ALT4', 't20s');
+  txt(scene, 680, 432, '或 UART2_TX/RX ALT2', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '板上的用法');
+  txt(scene, 1280, 252, 'I2C1_SCL/SDA 引到 4 针接口', 't20w');
+  txt(scene, 1280, 288, 'I2C2_SCL/SDA 也引到 4 针接口', 't20w');
+  txt(scene, 1280, 324, '屏接口同组有 CT_RST + I2C2_SDA', 't20w');
+  txt(scene, 1280, 360, '即电容触摸挂在 I2C2 上', 't20w');
+  txt(scene, 1280, 396, '两路都靠外部上拉，板上已有 Rp', 't20w');
+  txt(scene, 1280, 432, '接模块前先确认模块自带上拉', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '同一路 I2C 的 SCL 与 SDA 必须配到同一组 ALT 上吗？不一定，但要成对可用', 't24');
+  txt(scene, 80, 522, '手册列的是「每个信号可用的焊盘」，I2C1_SCL 可选 CSI_PIXCLK(ALT3)、GPIO1_IO02(ALT0)、UART4_TX(ALT2)，SDA 同理，但不要求两者选同一组。', 't20w');
+  txt(scene, 80, 556, '实际选脚的原则是：先看板子把哪两根线拉出来了，再回表里查对应焊盘的 ALT 编号，别反过来先选 ALT 再找脚。', 't20w');
+  txt(scene, 80, 590, '注意 CSI 组的脚同时是 NAND 的 CE2/CE3 候选（ALT2 是 NAND），摄像头、NAND、I2C 会互相抢，配 ALT3 就把摄像头时钟让出去了。', 't20w');
+  txt(scene, 80, 624, '板上已经有上拉电阻，外接模块若也带上拉，并联后阻值变小、上升沿更快但静态电流变大；10K + 10K 变 5K，一般没事，但要算功耗。', 't20w');
+  txt(scene, 80, 658, '两条 4 针接口是「SCL/SDA/VCC/GND」的典型排布，接 OLED、EEPROM、传感器模块最方便，但注意 3.3 V 与 5 V 模块不要混插。', 't20w');
+}
+
+function drawRegs() {
+  txt(scene, 56, 146, '每路 I2C 只有五个寄存器，全是 16 位，偏移从 0x00 到 0x10', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '四路基址');
+  txt(scene, 80, 252, 'I2C1  0x021A_0000', 't20s');
+  txt(scene, 80, 288, 'I2C2  0x021A_4000', 't20s');
+  txt(scene, 80, 324, 'I2C3  0x021A_8000', 't20s');
+  txt(scene, 80, 360, 'I2C4  0x021F_8000', 't20s');
+  txt(scene, 80, 396, '前三个连续，第四个跳到 0x021F', 't20s');
+  txt(scene, 80, 432, '0x0002/6/A/E 是保留地址', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '五个寄存器');
+  txt(scene, 680, 252, '+0x00 IADR  从机地址 复位 0', 't20s');
+  txt(scene, 680, 288, '+0x04 IFDR  分频    复位 0', 't20s');
+  txt(scene, 680, 324, '+0x08 I2CR  控制    复位 0', 't20s');
+  txt(scene, 680, 360, '+0x0C I2SR  状态    复位 0x0081', 't20s');
+  txt(scene, 680, 396, '+0x10 I2DR  数据    复位 0', 't20s');
+  txt(scene, 680, 432, 'I2SR 复位值高字节 0x81：ICF=1、RXAK=1', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '访问规矩');
+  txt(scene, 1280, 252, '这是一个 16 位模块，只做半字访问', 't20w');
+  txt(scene, 1280, 288, '字节访问会产生访问错误', 't20w');
+  txt(scene, 1280, 324, '只支持小端', 't20w');
+  txt(scene, 1280, 360, '访问未实现地址 → 总线错误', 't20w');
+  txt(scene, 1280, 396, '写 IEN=0 会软复位整块（除 IADR/IFDR）', 't20w');
+  txt(scene, 1280, 432, 'IADR 与 IFDR 不被软复位影响', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '状态寄存器复位值 0x0081 是个提醒：此刻「传输完成」且「未收到应答」', 't24');
+  txt(scene, 80, 522, 'ICF=1 表示当前没有字节在传（复位即空闲），RXAK=1 表示还没收到过 ACK。上电读一次 I2SR 得到 0x0081 是正常基线。', 't20w');
+  txt(scene, 80, 556, 'IADR 的地址只有 7 位（bit7:1），bit0 保留为 0：I2C 的从机地址永远是 7 位，第 8 位是读写方向，由总线上的 R/W 位决定而不是寄存器决定。', 't20w');
+  txt(scene, 80, 590, 'IEN 兼具「使能」与「软复位」双重身份：写 0 会让整块内部复位，但 IADR/IFDR 保留 —— 所以改地址或分频不用重新使能。', 't20w');
+  txt(scene, 80, 624, '16 位模块的限制很实际：用 32 位指针访问会得到未对齐错误，用 8 位指针访问会被桥拆成两次半字，读 I2DR 时可能多读一次把数据吃掉。', 't20w');
+  txt(scene, 80, 658, '四路里只有前三个的地址连续，I2C4 在 0x021F_8000；不要用「基址 + n×0x4000」这种公式去算第四路。', 't20w');
+}
+
+function drawIfdr() {
+  txt(scene, 56, 146, 'I2C 的分频不是自由除法，而是一张 64 项的固定表，选最接近的那个', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '公式与来源');
+  txt(scene, 80, 252, 'SCL = PERCLK_ROOT / 分频值', 't20s');
+  txt(scene, 80, 288, 'PERCLK 来自 IPG_CLK_ROOT', 't20w');
+  txt(scene, 80, 324, '默认 PLL2_PFD2=396M → IPG 49.5M', 't20w');
+  txt(scene, 80, 360, '→ PERCLK = 49.5 MHz', 't20w');
+  txt(scene, 80, 396, '快速模式要求模块时钟 ≥12.8 MHz', 't20w');
+  txt(scene, 80, 432, 'IC 传输中不许改，只能在 START 前改', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '表里的常用值');
+  txt(scene, 680, 252, 'IC=0x0B → 128 分频', 't20s');
+  txt(scene, 680, 288, 'IC=0x13 → 480 分频', 't20s');
+  txt(scene, 680, 324, 'IC=0x0F → 240 分频', 't20s');
+  txt(scene, 680, 360, 'IC=0x37 → 512 分频', 't20s');
+  txt(scene, 680, 396, 'IC=0x00 → 30 分频（最快）', 't20s');
+  txt(scene, 680, 432, 'IC=0x3F → 2048 分频（最慢）', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '49.5 MHz 下的算例');
+  txt(scene, 1280, 252, '400k：49.5M/128 = 386.7 kbps', 't20s');
+  txt(scene, 1280, 288, '100k：49.5M/480 = 103.1 kbps', 't20s');
+  txt(scene, 1280, 324, '50k：49.5M/960 = 51.6 kbps', 't20s');
+  txt(scene, 1280, 360, '想精确 100k 只能用 495 分频', 't20s');
+  txt(scene, 1280, 396, '表里没有 495 → 取 480 或 512', 't20w');
+  txt(scene, 1280, 432, '偏快 3% 仍在 I2C 容差内', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '为什么允许偏快不许偏慢：I2C 的时序上限比下限宽松', 't24');
+  txt(scene, 80, 522, '标准模式要求 SCL 不超过 100 kbps，实际做到 103 kbps 已经很接近；再快就得换更大的分频值，宁可慢一点也不要超规格。', 't20w');
+  txt(scene, 80, 556, '如果 CCM 改了 PLL2 或 perclk_podf，这张表的前提就变了：先用公式算出实际 PERCLK，再重新选 IC，别照抄别人的寄存器值。', 't20w');
+  txt(scene, 80, 590, '快速模式 400 kbps 需要模块时钟至少 12.8 MHz；PERCLK 只有 5 MHz 时，最大分频 30 也只能到 166 kbps，怎么调都上不去。', 't20w');
+  txt(scene, 80, 624, '采样也在分频频率上：手册说总线信号按预分频频率采样，所以分频太大时，毛刺与慢边沿更容易被误判成 START/STOP。', 't20w');
+  txt(scene, 80, 658, '实用做法：先用 480 分频把器件 ID 读对，再逐步减小分频值提速，直到读出错，退回一档就是这条线的安全速率。', 't20w');
+}
+
+function drawCtrl() {
+  txt(scene, 56, 146, 'I2CR 六位决定「做什么」，I2SR 七位告诉你「发生了什么」', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'I2CR 控制位');
+  txt(scene, 80, 252, 'bit7 IEN：使能，也是软复位', 't20s');
+  txt(scene, 80, 288, 'bit6 IIEN：中断使能', 't20s');
+  txt(scene, 80, 324, 'bit5 MSTA：1 主 / 0 从，写 1 发 START', 't20s');
+  txt(scene, 80, 360, 'bit4 MTX：1 发 / 0 收', 't20s');
+  txt(scene, 80, 396, 'bit3 TXAK：1 = 不应答（收尾用）', 't20s');
+  txt(scene, 80, 432, 'bit2 RSTA：写 1 发重复 START（读回 0）', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, 'I2SR 状态位');
+  txt(scene, 680, 252, 'bit7 ICF：1 = 本字节传完', 't20s');
+  txt(scene, 680, 288, 'bit6 IAAS：被当作从机呼叫', 't20s');
+  txt(scene, 680, 324, 'bit5 IBB：总线忙', 't20s');
+  txt(scene, 680, 360, 'bit4 IAL：仲裁丢失', 't20s');
+  txt(scene, 680, 396, 'bit2 SRW：从机方向（1 = 主机要读）', 't20s');
+  txt(scene, 680, 432, 'bit1 IIF：中断挂起；bit0 RXAK：1 = 未应答', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '清除方式各不相同');
+  txt(scene, 1280, 252, 'ICF：读或写 I2DR 自动清', 't20w');
+  txt(scene, 1280, 288, 'IIF：向该位写 0 清（不能写 1）', 't20w');
+  txt(scene, 1280, 324, 'IAL：写 0 清', 't20w');
+  txt(scene, 1280, 360, 'IAAS：写 I2CR 即清', 't20w');
+  txt(scene, 1280, 396, 'IBB：START/STOP 硬件置清', 't20w');
+  txt(scene, 1280, 432, 'MSTA 清 0 即产生 STOP', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, 'MSTA 有两个身份：置 1 发 START，清 0 发 STOP —— 这是最容易记反的一处', 't24');
+  txt(scene, 80, 522, '主机模式不是「配置」出来的，而是「动作」出来的：写 MSTA=1 的瞬间总线上就出现 START；写 0 的瞬间出现 STOP。', 't20w');
+  txt(scene, 80, 556, '所以重复起始的写法是：在中断里写 RSTA=1（而不是先 STOP 再 START），总线不释放，地址重新发一遍。', 't20w');
+  txt(scene, 80, 590, '主机接收收尾要提前置 TXAK=1：在倒数第二个字节读完后就置，最后一个字节的第 9 拍才会发 NACK，然后清 MSTA 发 STOP。', 't20w');
+  txt(scene, 80, 624, 'IIF 是「写 0 清」，和 GPIO/GPT 的 w1c 正好相反。写 1 清不掉，反而会被当成「保持挂起」，表现为中断一直进。', 't20w');
+  txt(scene, 80, 658, 'IAL 只有硬件能置，软件只能写 0 清。仲裁丢失后必须先清 IAL、再关开 IEN 重新初始化，否则状态机停在半路。', 't20w');
+}
+
+function drawTransfer() {
+  txt(scene, 56, 146, '一次主机发送：等空闲 → 发 START → 发地址 → 逐字节看 ACK → 发 STOP', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '初始化四步');
+  txt(scene, 80, 252, '① IFDR 定分频', 't20w');
+  txt(scene, 80, 288, '② IADR 定自己的从机地址', 't20w');
+  txt(scene, 80, 324, '③ IEN=1 使能', 't20w');
+  txt(scene, 80, 360, '④ I2CR 选主从、收/发、中断', 't20w');
+  txt(scene, 80, 396, '顺序错了：IEN=0 时别的位都不生效', 't20w');
+  txt(scene, 80, 432, 'IOMUX 必须提前配好并置 SION', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '主发流程');
+  txt(scene, 680, 252, '① 读 IBB，=0 才继续', 't20w');
+  txt(scene, 680, 288, '② MSTA=1、MTX=1（发 START）', 't20w');
+  txt(scene, 680, 324, '③ 地址 + W 写进 I2DR', 't20w');
+  txt(scene, 680, 360, '④ 等 ICF，看 RXAK 判断从机应答', 't20w');
+  txt(scene, 680, 396, '⑤ 逐字节写数据，重复 ④', 't20w');
+  txt(scene, 680, 432, '⑥ MSTA=0 发 STOP，IBB 变 0', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '主收的关键动作');
+  txt(scene, 1280, 252, '① 地址阶段仍是 MTX=1', 't20w');
+  txt(scene, 1280, 288, '② 收到地址 ACK 后清 MTX', 't20w');
+  txt(scene, 1280, 324, '③ 对 I2DR 做一次空读（dummy read）', 't20w');
+  txt(scene, 1280, 360, '④ 之后每读一次 I2DR 就收下一字节', 't20w');
+  txt(scene, 1280, 396, '⑤ 倒数第二字节后置 TXAK=1', 't20w');
+  txt(scene, 1280, 432, '⑥ 清 MSTA 发 STOP', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '「空读一次」不是多余动作：不读，接收状态机不会往前走', 't24');
+  txt(scene, 80, 522, '主机接收在地址周期结束时仍处于发送态（因为地址是发出去的）。要把方向切过来，必须清 MTX，再对 I2DR 做一次空读来启动接收移位。', 't20w');
+  txt(scene, 80, 556, '从机接收也一样：地址匹配后 IAAS=1，写 I2CR 清 IAAS 并置 MTX=0，然后空读一次 I2DR 释放 SCL，主机才能继续发数据。', 't20w');
+  txt(scene, 80, 590, '每个字节结束 ICF 置 1，IIF 也置 1；中断里先清 IIF（写 0），再看 RXAK：0 表示从机应答，1 表示没人接 —— 通常意味着地址写错或器件没焊。', 't20w');
+  txt(scene, 80, 624, '写地址后如果 RXAK=1，不要继续写数据：直接清 MSTA 发 STOP，把总线释放掉，再重试。硬撑着发完只会得到一串无意义的总线波形。', 't20w');
+  txt(scene, 80, 658, '轮询方式的超时不要凭感觉：手册给的公式是 Tmin = 10/FSCL，400 kbps 时约 25 µs；无限制地 while(!ICF) 会在从机拉伸时钟时死等。', 't20w');
+}
+
+function drawJudge() {
+  txt(scene, 56, 146, 'I2C 的故障大多不是寄存器写错，而是电气与地址：先量波形，再查地址', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '三层判据');
+  txt(scene, 80, 252, '电气层：空闲时 SCL/SDA 都是高', 't20w');
+  txt(scene, 80, 288, '若被拉低：某器件死锁或短路', 't20w');
+  txt(scene, 80, 324, '协议层：START 后第 9 拍有 ACK', 't20w');
+  txt(scene, 80, 360, '无 ACK：地址错/器件不在/没供电', 't20w');
+  txt(scene, 80, 396, '数据层：读回 ID 与手册一致', 't20w');
+  txt(scene, 80, 432, '不一致：字节序或寄存器指针错位', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '常见四个坑');
+  txt(scene, 680, 252, '① 忘了置 SION，仲裁误报', 't20w');
+  txt(scene, 680, 288, '② 用了片内弱上拉，边沿起不来', 't20w');
+  txt(scene, 680, 324, '③ 地址写成 8 位（左移了一位）', 't20w');
+  txt(scene, 680, 360, '④ 收完没置 TXAK，总线被拉住', 't20w');
+  txt(scene, 680, 396, '地址 7 位：0x50 的 EEPROM 写是 0xA0', 't20w');
+  txt(scene, 680, 432, '驱动里通常给 7 位，硬件自己拼 R/W', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '实测步骤');
+  txt(scene, 1280, 252, '读 I2SR，空闲应接近 0x0081', 't20s');
+  txt(scene, 1280, 288, '置 MSTA 后 IBB 应变 1', 't20s');
+  txt(scene, 1280, 324, '写地址后看 RXAK 是否 0', 't20s');
+  txt(scene, 1280, 360, '用示波器看第 9 拍 SDA 是否低', 't20w');
+  txt(scene, 1280, 396, '清 MSTA 后 IBB 应变 0', 't20s');
+  txt(scene, 1280, 432, '异常时先关 IEN 再开，重启状态机', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '总线卡死的第一招：把 SCL 手动打 9 个脉冲，让从机把字节吐完', 't24');
+  txt(scene, 80, 522, '主控复位时从机可能正卡在「等第 9 拍」，它会一直拉低 SDA。此时把引脚临时切成 GPIO 输出，发 9 个 SCL 脉冲再发 STOP，从机就会释放。', 't20w');
+  txt(scene, 80, 556, '这一招在热插拔、上电时序错乱、看门狗复位后特别常用；i.MX6ULL 的 I2C 脚都能切成 GPIO，所以恢复流程是可实现的。', 't20w');
+  txt(scene, 80, 590, '第二种坑是「时钟拉伸」被误判成死机：从机拉住 SCL 时 ICF 永远不置位，轮询没有超时就会卡死；加超时后重发 START 通常能恢复。', 't20w');
+  txt(scene, 80, 624, '第三种是地址位宽：很多器件手册给 7 位地址（如 0x50），但某些驱动接口要 8 位形式（0xA0）。写 IADR 用 7 位，写 I2DR 的地址字节用 8 位。', 't20w');
+  txt(scene, 80, 658, '最后：I2C 是低速总线，长导线 + 排线 + 无上拉是最常见的「时好时坏」。降到 100 kbps 能跑、400 kbps 就错，基本都是边沿与上拉的问题。', 't20w');
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawRole();
+  else if (s === 1) drawBoard();
+  else if (s === 2) drawRegs();
+  else if (s === 3) drawIfdr();
+  else if (s === 4) drawCtrl();
+  else if (s === 5) drawTransfer();
+  else drawJudge();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () {
+  state.step = INIT.step; state.lane = INIT.lane; draw();
+});
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>

@@ -1,0 +1,297 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0, lane: 0 };
+var state = { step: INIT.step, lane: INIT.lane };
+
+var STEPS = [
+  { h: 'NAND 的三件套', hint: 'APBH DMA · GPMI · BCH',
+    note: 'GPMI 不是一个独立外设：它挂在 APBH 上，靠 DMA 搬数据、靠 BCH 算 ECC。CPU 只写一条描述符链，剩下全由硬件跑完。' },
+  { h: '板上的 NAND 引脚', hint: 'CE0/CE1 · CLE/ALE · 8 位数据',
+    note: 'ALPHA 与 MINI 的 NAND 都是 8 位总线：CE0/CE1 走 ALT0，CE2/CE3 借用 CSI_MCLK 与 CSI_PIXCLK 的 ALT2，控制线还串了 10 Ω。' },
+  { h: '寄存器地图', hint: '0x0180_6000 · 每 0x10 一组',
+    note: 'CTRL0/ECCCTRL/CTRL1 都有 SET/CLR/TOG 四个地址，寄存器按 0x10 分组。复位值里 SFTRST=CLKGATE=1，第一步必须先清这两颗雷。' },
+  { h: '一条命令怎么写', hint: 'COMMAND_MODE · ADDRESS · XFER',
+    note: 'CTRL0 是「这一次事务」的描述：读还是写、哪个片选、走 CLE 还是 ALE、搬多少字节。ADDRESS 的 0/1/2 正好对应数据、命令、地址。' },
+  { h: '时序与采样窗口', hint: 'tAS · tDS · tDH · RDN_DELAY',
+    note: '异步模式三个数就够：ADDRESS_SETUP、DATA_SETUP、DATA_HOLD。高速读要靠反馈 RE 的延迟窗，DELAY = tREA + 4ns − tRP，最大 6 ns。' },
+  { h: '初始化与判据', hint: '清复位 · TIMING · ECC · STAT',
+    note: '上电流程：清 SFTRST 与 CLKGATE → 配 CTRL1（BCH_MODE 必须为 1）→ 配时序 → 配 ECC → 挂 DMA 描述符。判据先看 STAT 的 PRESENT 与 FIFO_EMPTY。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+
+function drawRole() {
+  txt(scene, 56, 146, 'GPMI 是 NAND 的总线控制器，数据搬运交给 DMA，纠错交给 BCH，CPU 基本可以不管', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '三个角色');
+  txt(scene, 80, 252, 'GPMI：产生 NAND 的时序与命令', 't20w');
+  txt(scene, 80, 288, 'APBH DMA：搬数据、串描述符', 't20w');
+  txt(scene, 80, 324, 'BCH：算 ECC、纠错', 't20w');
+  txt(scene, 80, 360, '寄存器时钟在 HCLK 域', 't20w');
+  txt(scene, 80, 396, 'IO 时序在独立的 GPMICLK 域', 't20w');
+  txt(scene, 80, 432, 'BCH 与 GPMI 之间是直连通路', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '支持的能力');
+  txt(scene, 680, 252, 'ONFI 3.2、DDR、Toggle 协议', 't20w');
+  txt(scene, 680, 288, '最多 4 个片选，RDY 可并联', 't20w');
+  txt(scene, 680, 324, '每片选独立状态机与 DMA 通道', 't20w');
+  txt(scene, 680, 360, '异步 50 MB/s、源同步 200 MB/s', 't20w');
+  txt(scene, 680, 396, '地址/命令行为完全可配', 't20w');
+  txt(scene, 680, 432, '等待 RDY 带超时，可条件跳转', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, 'DMA 的三种动作');
+  txt(scene, 1280, 252, '数据/寄存器读写：连发多拍', 't20w');
+  txt(scene, 1280, 288, '等待就绪：盯 RDY/BUSY，计时超时', 't20w');
+  txt(scene, 1280, 324, '读并比较：状态字不符就跳转', 't20w');
+  txt(scene, 1280, 360, '描述符带分支，能自动跨页', 't20w');
+  txt(scene, 1280, 396, 'DECOUPLE_CS=1 时一个通道管全部', 't20w');
+  txt(scene, 1280, 432, '=0 时通道 n 只能访问片选 n', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '为什么 NAND 需要「控制器 + DMA + ECC」三件套', 't24');
+  txt(scene, 80, 522, 'NAND 的协议很啰嗦：先发命令、再发 5 个地址周期、然后等 100 µs 级就绪，最后才是数据。每一步都由 GPMI 的状态机按拍产生。', 't20w');
+  txt(scene, 80, 556, '数据量又大（一页 2 KB + 64 B 冗余），CPU 逐字节搬会吃掉总线。所以 APBH DMA 按描述符链自动搬，还能在等待就绪时把 CPU 让出来。', 't20w');
+  txt(scene, 80, 590, 'NAND 天生会出错，BCH 在数据进出的同一路径上算校验，GPMI 不需要把数据先搬到内存再算 ECC，这就是「直连 BCH」的意义。', 't20w');
+  txt(scene, 80, 624, '这套结构在 Linux 里对应 mxs-dma + gpmi-nand + bch 三个驱动，设备树里是一个 nand-controller 节点带 ECC 子节点。', 't20w');
+  txt(scene, 80, 658, '一句话总结：GPMI 决定「时序对不对」，DMA 决定「搬得快不快」，BCH 决定「数据可不可信」。三者缺一，NAND 都用不起来。', 't20w');
+}
+
+function drawBoard() {
+  txt(scene, 56, 146, 'NAND 的 18 根线在核心板上全部引出，控制线还各串了 10 Ω 阻尼电阻', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '控制与片选');
+  txt(scene, 80, 252, 'CE0  C5（NAND_CE0，ALT0）', 't20s');
+  txt(scene, 80, 288, 'CE1  B5（NAND_CE1，ALT0）', 't20s');
+  txt(scene, 80, 324, 'CLE  A4 / ALE  B4（ALT0）', 't20s');
+  txt(scene, 80, 360, 'RE   D8 / WE   C8（ALT0）', 't20s');
+  txt(scene, 80, 396, 'WP   D5 / RDY  A3（ALT0）', 't20s');
+  txt(scene, 80, 432, 'DQS  E6（ALT0）', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '8 位数据总线');
+  txt(scene, 680, 252, 'D0 D7 / D1 B7 / D2 A7 / D3 D6', 't20s');
+  txt(scene, 680, 288, 'D4 C6 / D5 B6 / D6 A6 / D7 A5', 't20s');
+  txt(scene, 680, 324, '全部 ALT0，与 USDHC2、QSPI 复用', 't20w');
+  txt(scene, 680, 360, '控制线经 R35/R36/R37 共 10 Ω 串联', 't20w');
+  txt(scene, 680, 396, 'CE2 = CSI_MCLK（ALT2）F5', 't20s');
+  txt(scene, 680, 432, 'CE3 = CSI_PIXCLK（ALT2）E5', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '板级约束');
+  txt(scene, 1280, 252, 'CE2/CE3 不是默认 NAND 脚位', 't20w');
+  txt(scene, 1280, 288, '要用就得把 CSI 的脚改配 ALT2', 't20w');
+  txt(scene, 1280, 324, '一旦改了，CSI_MCLK 摄像头就没时钟', 't20w');
+  txt(scene, 1280, 360, 'RDY 只引了一根：NAND_RB0', 't20w');
+  txt(scene, 1280, 396, '多片时要用 GANGED_RDYBUSY 并联', 't20w');
+  txt(scene, 1280, 432, '8 位总线必须 CTRL0[23]=1', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '引脚复用是这张表最该先确认的事：CE2/CE3 抢的是摄像头时钟', 't24');
+  txt(scene, 80, 522, '芯片默认只把 CE0/CE1 放在 NAND 专用脚上，CE2/CE3 复用 CSI_MCLK 与 CSI_PIXCLK，属于 ALT2 —— 和其余 NAND 脚的 ALT0 不一样。', 't20w');
+  txt(scene, 80, 556, '这意味着四片 NAND 的板子通常不能同时用摄像头，或者必须用外部译码器。设计阶段就要算清楚，不要等驱动报「CE2 无响应」才发现。', 't20w');
+  txt(scene, 80, 590, '控制线上那三颗 10 Ω 不是随便放的：NAND 的 RE/WE 频率最高，串阻能压过冲和振铃；手册也建议把 RE/WE 的驱动强度调到 8 mA，其它脚 4 mA 即可。', 't20w');
+  txt(scene, 80, 624, 'READY 只有一根 RB0 引到连接器。多片 NAND 若各自有独立 RDY，要么把 GANGED_RDYBUSY 置 1 全听 RB0，要么在硬件上把几根 RDY 线与起来。', 't20w');
+  txt(scene, 80, 658, 'DQS 只在源同步/Toggle 模式用，异步模式下它是普通复用脚。板上引了它，说明硬件留了高速 NAND 的余地。', 't20w');
+}
+
+function drawRegs() {
+  txt(scene, 56, 146, 'GPMI 的寄存器按 0x10 分组，CTRL0/ECCCTRL/CTRL1 各有四个地址做置位与清零', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '控制类');
+  txt(scene, 80, 252, '+0x000 CTRL0   复位 0xC000_0000', 't20s');
+  txt(scene, 80, 288, '+0x004/8/C  CTRL0_SET/CLR/TOG', 't20s');
+  txt(scene, 80, 324, '+0x060 CTRL1   复位 0x0004_0004', 't20s');
+  txt(scene, 80, 360, '+0x020 ECCCTRL 复位 0', 't20s');
+  txt(scene, 80, 396, '+0x030 ECCCOUNT / +0x010 COMPARE', 't20s');
+  txt(scene, 80, 432, '+0x040 PAYLOAD / +0x050 AUXILIARY', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '时序类');
+  txt(scene, 680, 252, '+0x070 TIMING0  0x0001_0203', 't20s');
+  txt(scene, 680, 288, '+0x080 TIMING1  RDY 超时 ×4096', 't20s');
+  txt(scene, 680, 324, '+0x090 TIMING2  0x0302_3336', 't20s');
+  txt(scene, 680, 360, '+0x100 READ_DDR_DLL_CTRL', 't20s');
+  txt(scene, 680, 396, '+0x110 WRITE_DDR_DLL_CTRL', 't20s');
+  txt(scene, 680, 432, '+0x120/0x130 两个 DLL 状态', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '数据与状态');
+  txt(scene, 1280, 252, '+0x0A0 DATA：DMA 搬运口', 't20s');
+  txt(scene, 1280, 288, '+0x0B0 STAT：复位 0x0000_0005', 't20s');
+  txt(scene, 1280, 324, '+0x0C0 DEBUG / +0x0D0 VERSION', 't20s');
+  txt(scene, 1280, 360, '+0x0E0 DEBUG2 / +0x0F0 DEBUG3', 't20s');
+  txt(scene, 1280, 396, 'VERSION 复位 0x0502_0000', 't20s');
+  txt(scene, 1280, 432, 'STAT 的 PRESENT=1 才说明有这个模块', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '复位值 0xC000_0000 是第一个陷阱：SFTRST 与 CLKGATE 都默认置 1', 't24');
+  txt(scene, 80, 522, '也就是说上电后 GPMI 被按在复位里、时钟还被关掉了。初始化第一件事就是清 bit31 与 bit30，并且必须在 CLKGATE=0 之后才发软复位。', 't20w');
+  txt(scene, 80, 556, '手册明确写了：CLKGATE 已经为 1 时置 SFTRST 不起作用。所以顺序是「清 CLKGATE → 清 SFTRST」，反过来会得到一个永远不工作的模块。', 't20w');
+  txt(scene, 80, 590, 'CTRL1 复位 0x0004_0004 里藏着两个救命默认值：bit18 BCH_MODE=1（只用 BCH 纠错单元）、bit2=1（RDY 高有效）。改这两位的板子要先确认硬件极性。', 't20w');
+  txt(scene, 80, 624, 'SET/CLR/TOG 三个别名地址是纯硬件操作：写 1 才生效，读它们返回当前值。多核或中断里改同一位时，用 CLR/SET 能免掉读-改-写的竞争。', 't20w');
+  txt(scene, 80, 658, 'STAT 复位是 0x0000_0005：bit0 PRESENT=1、bit2 FIFO_EMPTY=1。这两个位是「模块活着」的最小证据，调试任何 NAND 问题都先读它。', 't20w');
+}
+
+function drawCmd() {
+  txt(scene, 56, 146, 'CTRL0 是每一次事务的身份证：干什么、找谁、走哪根线、搬多少', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '事务四要素');
+  txt(scene, 80, 252, 'bit25:24 COMMAND_MODE 读/写/比较/等', 't20s');
+  txt(scene, 80, 288, 'bit22:20 CS  片选 0–3', 't20s');
+  txt(scene, 80, 324, 'bit19:17 ADDRESS  0 数据/1 CLE/2 ALE', 't20s');
+  txt(scene, 80, 360, 'bit15:0  XFER_COUNT  0 表示 64 KB', 't20s');
+  txt(scene, 80, 396, 'bit23 WORD_LENGTH  1 = 8 位总线', 't20s');
+  txt(scene, 80, 432, 'bit27 LOCK_CS  跑完是否保持片选', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '四种模式');
+  txt(scene, 680, 252, '00 写：命令、地址、数据都走这条', 't20w');
+  txt(scene, 680, 288, '01 读：从器件搬数据进来', 't20w');
+  txt(scene, 680, 324, '10 读并比较：状态字比对参考值', 't20w');
+  txt(scene, 680, 360, '11 等就绪：盯 RDY，带超时', 't20w');
+  txt(scene, 680, 396, '比较失败可让 DMA 跳到备用描述符', 't20w');
+  txt(scene, 680, 432, '等就绪超时会置 STAT 的 RDY_TIMEOUT', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '命令序列长什么样');
+  txt(scene, 1280, 252, '① 写 1 字节 0xFF（复位）', 't20s');
+  txt(scene, 1280, 288, '② 写 1 字节 0x90（读 ID）', 't20s');
+  txt(scene, 1280, 324, '③ 写 1 字节 0x00（地址周期）', 't20s');
+  txt(scene, 1280, 360, '④ 读 4 字节（厂商+设备 ID）', 't20s');
+  txt(scene, 1280, 396, '每步都是「CTRL0 + DMA 描述符」', 't20w');
+  txt(scene, 1280, 432, 'CLE 期间数据脚内容是 don\'t care', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, 'ADDRESS 的三个取值不是地址，而是「往哪根锁存线上发」', 't24');
+  txt(scene, 80, 522, '0 = NAND_DATA：数据周期；1 = NAND_CLE：命令周期；2 = NAND_ALE：地址周期。CTRL0[16] ADDRESS_INCREMENT 会在 CLE 之后自动切到 ALE。', 't20w');
+  txt(scene, 80, 556, 'XFER_COUNT 是字节数，写 0 被解释成 65536 —— 这个「0 等于 64 KB」的设计在算页大小的时候很容易多算或少算一页。', 't20w');
+  txt(scene, 80, 590, 'COMMAND_MODE=10（读并比较）配 COMPARE 寄存器：读回的状态字先与 REFERENCE 异或，再与 MASK 相与，结果为 0 才算通过。判忙/判失败就靠它。', 't20w');
+  txt(scene, 80, 624, 'COMMAND_MODE=11（等就绪）不搬数据，只看 RDY 电平；超时值在 TIMING1 的 DEVICE_BUSY_TIMEOUT，单位是 4096 个 GPMI 时钟。', 't20w');
+  txt(scene, 80, 658, 'LOCK_CS=1 可以让多条命令共用一次片选拉低，省掉每次重新选片的建立时间；但两次事务之间必须保证 NAND 处于可接受命令的状态。', 't20w');
+}
+
+function drawTiming() {
+  txt(scene, 56, 146, '异步模式看三个数，高速读看一个延迟窗：时序错了，读回的全是随机值', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'TIMING0 三兄弟');
+  txt(scene, 80, 252, 'ADDRESS_SETUP[23:16] = tAS', 't20s');
+  txt(scene, 80, 288, 'DATA_SETUP[7:0] = tDS（RE/WE 宽度）', 't20s');
+  txt(scene, 80, 324, 'DATA_HOLD[15:8] = tDH', 't20s');
+  txt(scene, 80, 360, '复位值 0x0001_0203：1 / 2 / 3', 't20s');
+  txt(scene, 80, 396, '写 0 被解释成 256 拍', 't20w');
+  txt(scene, 80, 432, '单位都是 GPMICLK 周期', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, 'TIMING2 的 DDR 参数');
+  txt(scene, 680, 252, 'CE_DELAY[20:16]：片选到读写沿', 't20s');
+  txt(scene, 680, 288, 'PREAMBLE[15:12] / POSTAMBLE[11:8]', 't20s');
+  txt(scene, 680, 324, 'CMDADD_PAUSE[7:4] / DATA_PAUSE[3:0]', 't20s');
+  txt(scene, 680, 360, 'READ_LATENCY[26:24] 默认 3', 't20s');
+  txt(scene, 680, 396, 'TCR[28:27] 与 TRPSTH[31:29] 只给 Toggle', 't20s');
+  txt(scene, 680, 432, '写 0 都有默认值：32 / 16 / 16 / 16', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '高速读的延迟窗');
+  txt(scene, 1280, 252, 'DELAY = tREA + 4ns − tRP', 't20s');
+  txt(scene, 1280, 288, 'DELAY ≤ 6 ns，否则加大 tDS', 't20s');
+  txt(scene, 1280, 324, 'RDN_DELAY = DELAY / (0.125 × RP)', 't20s');
+  txt(scene, 1280, 360, 'GPMICLK > 12 ns 必须关 DLL', 't20s');
+  txt(scene, 1280, 396, '6–12 ns 之间置 HALF_PERIOD=1', 't20s');
+  txt(scene, 1280, 432, '算例：tREA 20、tRP 14.58 → 9.42', 't20s');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '先算周期，再算份额：所有时序参数都是以 GPMICLK 为尺子', 't24');
+  txt(scene, 80, 522, '例：GPMICLK = 480/7 ≈ 68.57 MHz，周期 14.58 ns。设 tDS = tDH = 1 拍，则 RE 低电平宽 14.58 ns、整个读周期 29.16 ns。', 't20w');
+  txt(scene, 80, 556, '这颗 NAND 的 tREA 是 20 ns，比 tRP 大，所以反馈 RE 要延迟 20 + 4 − 14.58 = 9.42 ns 才能采到稳定数据；延迟窗上限只有 6 ns，超了就得加宽 tRP。', 't20w');
+  txt(scene, 80, 590, '把 tDS 从 1 加到 2，tRP 变成 29.16 ns，DELAY 变成 24 − 29.16 < 0，不需要延迟，DLL 都不用开。代价是读带宽掉一半 —— 这就是「稳定」与「快」的取舍。', 't20w');
+  txt(scene, 80, 624, '需要延迟时，RP 由 HALF_PERIOD 决定：GPMICLK 周期 ≤ 6 ns 取整周期，6–12 ns 取半周期。RDN_DELAY 是 0.125 RP 的倍数，最大 1.875 RP。', 't20w');
+  txt(scene, 80, 658, '改 HALF_PERIOD 与 RDN_DELAY 前必须把 DLL_ENABLE 清 0，改完再置 1 等 64 个 GPMI 时钟锁定，否则采样点会漂。', 't20w');
+  txt(scene, 80, 692, '源同步模式另外还有 PREAMBLE/POSTAMBLE/PAUSE 要配；异步模式只要 TIMING0 三个数，先把异步跑通再上高速。', 't20w');
+}
+
+function drawInit() {
+  txt(scene, 56, 146, '初始化顺序错了会得到一个「读什么都像坏块」的 NAND，判据要一层一层立', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '上电六步');
+  txt(scene, 80, 252, '① 清 CLKGATE，再清 SFTRST', 't20w');
+  txt(scene, 80, 288, '② CTRL1：BCH_MODE=1、NAND 模式', 't20w');
+  txt(scene, 80, 324, '③ TIMING0 三参数、TIMING1 超时', 't20w');
+  txt(scene, 80, 360, '④ ECCCTRL：ECC_CMD、BUFFER_MASK', 't20w');
+  txt(scene, 80, 396, '⑤ PAYLOAD/AUXILIARY 指向内存', 't20w');
+  txt(scene, 80, 432, '⑥ 挂 DMA 描述符，置 RUN', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, 'ECC 三个字段');
+  txt(scene, 680, 252, 'ECC_CMD[14:13]：0 解码 / 1 编码', 't20s');
+  txt(scene, 680, 288, 'ENABLE_ECC[12]：1 才真正算', 't20s');
+  txt(scene, 680, 324, 'BUFFER_MASK[8:0]：0x1FF 整页', 't20s');
+  txt(scene, 680, 360, '0x100 只搬第 0 块（aux only）', 't20s');
+  txt(scene, 680, 396, '写入必须整页，不能只写半页', 't20w');
+  txt(scene, 680, 432, '非法 mask 会终止 DMA 描述符', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '判据与常见错');
+  txt(scene, 1280, 252, 'STAT bit0 PRESENT 应为 1', 't20s');
+  txt(scene, 1280, 288, 'STAT bit2 FIFO_EMPTY 应为 1', 't20s');
+  txt(scene, 1280, 324, '读 VERSION 应得 0x0502_0000', 't20s');
+  txt(scene, 1280, 360, 'DEV_ERROR 某位置 1：那一通道出错', 't20w');
+  txt(scene, 1280, 396, 'RDY_TIMEOUT 置位 → 器件没响应', 't20w');
+  txt(scene, 1280, 432, 'INVALID_BUFFER_MASK → 掩码写错', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '第一层判「模块活没活」，第二层判「器件在不在」，第三层才判「数据对不对」', 't24');
+  txt(scene, 80, 522, '模块层：读 VERSION=0x0502_0000、STAT 的 PRESENT=1 与 FIFO_EMPTY=1。这三条不过，后面所有读写都没有意义。', 't20w');
+  txt(scene, 80, 556, '器件层：发 0xFF 复位、0x90 读 ID，正常应读回厂商码与设备码（例如 0x2C / 0xDA 一类）。读回 0x00 或 0xFF，先查片选与 RDY 极性。', 't20w');
+  txt(scene, 80, 590, '数据层：先擦一个块再读，全 0xFF 说明擦成功；写一页再读回逐字节比对，再看 BCH 的状态寄存器有没有报不可纠错误。', 't20w');
+  txt(scene, 80, 624, '最常见的三个错：忘了清 SFTRST/CLKGATE、RDY 极性配反（一直超时）、BUFFER_MASK 与页大小不匹配（DMA 直接终止）。', 't20w');
+  txt(scene, 80, 658, '修时序的经验法则：先用很慢的 GPMICLK（比如 4 分频）把 ID 读对，再逐档提速到 READ 出错，退回一档就是这条线束的安全频率。', 't20w');
+  txt(scene, 80, 692, '最后：NAND 的坏块是常态，不是异常。驱动层要在 OOB 里标记坏块并跳过，不要把「读某块失败」当成控制器故障。', 't20w');
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawRole();
+  else if (s === 1) drawBoard();
+  else if (s === 2) drawRegs();
+  else if (s === 3) drawCmd();
+  else if (s === 4) drawTiming();
+  else drawInit();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () {
+  state.step = INIT.step; state.lane = INIT.lane; draw();
+});
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>

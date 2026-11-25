@@ -1,0 +1,295 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0, lane: 0 };
+var state = { step: INIT.step, lane: INIT.lane };
+
+var STEPS = [
+  { h: '引脚的最后一级', hint: 'ALT5 · 8 个寄存器 · 32 位',
+    note: 'GPIO 不是引脚本身，而是 IOMUX 后面的一级数字逻辑。引脚先被 IOMUXC 选成 ALT5，GPIO 才能接管它的方向和电平。' },
+  { h: 'PAD 里的六个旋钮', hint: 'PKE · PUS · ODE · DSE · SRE · HYS',
+    note: '同一个引脚能配上拉、下拉、开漏、七档驱动、三档摆率、施密特。这些不在 GPIO 寄存器里，在 IOMUXC 的 SW_PAD_CTL 里。' },
+  { h: '五个 bank 八张表', hint: '0x0209_C000 起，步长 0x4000',
+    note: '五个 bank 各 8 个寄存器，偏移固定：DR +0、GDIR +4、PSR +8、ICR1 +C、ICR2 +10、IMR +14、ISR +18、EDGE_SEL +1C。只支持 32 位访问。' },
+  { h: '读和写是两条路', hint: 'GDIR=0 读 DR 得到 PSR',
+    note: 'GDIR 定方向，DR 定输出。但读 DR 时看到什么，取决于 GDIR 和 IOMUX 是否 GPIO 模式 —— 这四个组合里有两种会读出 0。' },
+  { h: '边沿检测与中断', hint: 'ICR 四种条件 · IMR 1=使能',
+    note: 'ICR 每两位一个引脚：低电平、高电平、上升沿、下降沿。IMR 是 1 使能（和 GPC 的掩码正好相反），ISR 写 1 清零、且与 IMR 无关。' },
+  { h: '板上的灯和键', hint: 'LED0/LED1 · KEY0–2 · BEEP',
+    note: '核心板把 LED0/LED1、KEY0/KEY1/KEY2、BEEP 作为网络引到连接器。点灯按键的本质就是：选 ALT5、设 GDIR、写或读一个位。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+
+function drawRole() {
+  txt(scene, 56, 146, 'GPIO 只管一件事：把这个引脚当成一位数据，方向、电平、中断都在它自己的寄存器里', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '它在链路里的位置');
+  txt(scene, 80, 252, '引脚 → IOMUXC 的 MUX_MODE', 't20w');
+  txt(scene, 80, 288, '选到 ALT5 才是 GPIO 功能', 't20w');
+  txt(scene, 80, 324, 'PAD 电气特性由 SW_PAD_CTL 定', 't20w');
+  txt(scene, 80, 360, '再往后才是 GPIO 的 8 个寄存器', 't20w');
+  txt(scene, 80, 396, '三者的地址完全不同，别写错窗口', 't20w');
+  txt(scene, 80, 432, '一个 bank 最多 32 位，五位 bank 共 160', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '八个寄存器');
+  txt(scene, 680, 252, 'DR：输出数据 / 读回输入', 't20w');
+  txt(scene, 680, 288, 'GDIR：0 输入，1 输出', 't20w');
+  txt(scene, 680, 324, 'PSR：引脚当前电平（只读）', 't20w');
+  txt(scene, 680, 360, 'ICR1/ICR2：每引脚两位触发条件', 't20w');
+  txt(scene, 680, 396, 'IMR：1 = 允许中断', 't20w');
+  txt(scene, 680, 432, 'ISR：挂起标志，写 1 清；EDGE_SEL 覆盖 ICR', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '硬性约束');
+  txt(scene, 1280, 252, '只支持 32 位访问，8/16 位读写无效', 't20w');
+  txt(scene, 1280, 288, '读 DR/PSR/ISR 需 2 个等待周期同步', 't20w');
+  txt(scene, 1280, 324, 'PSR 由 ipg_clk_s 采样，读到的是访问瞬间值', 't20w');
+  txt(scene, 1280, 360, 'GPIO5 的引脚是 SNVS 域，No Muxing', 't20w');
+  txt(scene, 1280, 396, 'GPIO5_IO10/11 是 BOOT_MODE0/1', 't20w');
+  txt(scene, 1280, 432, '每 bank 两条合并中断：0–15 与 16–31', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '先记住这条链：MUX_MODE 选功能，PAD_CTL 定电气，GPIO 定方向与值', 't24');
+  txt(scene, 80, 522, '很多人点不亮灯，不是 GPIO 寄存器写错，而是 IOMUXC 里那个引脚的 MUX_MODE 还停在 0（ALT0），GPIO 根本没有接到引脚上。', 't20w');
+  txt(scene, 80, 556, '反过来，电气参数配错不会让寄存器读写出错，只会在示波器上暴露：上升沿太慢、驱动不够、上拉太弱、开漏没有外部上拉。', 't20w');
+  txt(scene, 80, 590, 'GPIO 的寄存器窗口和 IOMUXC 完全分开：前者在 0x0209_C000 一带，后者在 0x020E_0000 一带。搞混就会「写了没反应」。', 't20w');
+  txt(scene, 80, 624, '还有一点反直觉：GDIR=0（输入）时读 DR，硬件返回的是 PSR 的值，不是你以为的 DR 锁存值。这是本章最容易踩的坑。', 't20w');
+  txt(scene, 80, 658, '最后，GPIO5 属于 SNVS 常电域，主电源掉了它还在，所以它既能做普通 IO，也能在低功耗里当唤醒源。', 't20w');
+}
+
+function drawPad() {
+  txt(scene, 56, 146, '同一个引脚，GPIO 只决定「谁在驱动」，PAD 决定「怎么驱动」', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '输入侧');
+  txt(scene, 80, 252, 'HYS：施密特触发，滤掉抖动', 't20w');
+  txt(scene, 80, 288, 'PKE：keeper 锁存上一个电平', 't20w');
+  txt(scene, 80, 324, 'PUS：上拉 22K / 47K / 100K', 't20w');
+  txt(scene, 80, 360, '下拉固定 100K，精度 ±20%', 't20w');
+  txt(scene, 80, 396, 'OVDD 掉电时接收器三态，keeper 保态', 't20w');
+  txt(scene, 80, 432, '读 PSR 才能看到真实引脚电平', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '输出侧');
+  txt(scene, 680, 252, 'ODE：开漏，需要上拉才有高电平', 't20w');
+  txt(scene, 680, 288, 'DSE：七档驱动强度', 't20w');
+  txt(scene, 680, 324, 'SRE：50 / 100 / 200 MHz 三档摆率', 't20w');
+  txt(scene, 680, 360, '外部上拉时高电平取决于外部 OVDD', 't20w');
+  txt(scene, 680, 396, 'SION=1 才能把输出值回读到 PSR', 't20w');
+  txt(scene, 680, 432, '驱动档位是为了阻抗匹配，不是越大越好', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '三种常见配置');
+  txt(scene, 1280, 252, '推挽输出：ODE=0，DSE 中档', 't20w');
+  txt(scene, 1280, 288, '开漏 + 外部上拉：I2C 一类总线', 't20w');
+  txt(scene, 1280, 324, '输入 + 上拉：按键按下接地', 't20w');
+  txt(scene, 1280, 360, '输入 + keeper：低功耗保持', 't20w');
+  txt(scene, 1280, 396, 'Keeper 与 Pull 不能同时开', 't20w');
+  txt(scene, 1280, 432, '高阻输入既不开拉也不开 keeper', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '按键为什么常配「输入 + 上拉」：松开靠上拉回高，按下被开关拉到地', 't24');
+  txt(scene, 80, 522, '片内上拉只有 22K/47K/100K 三档，阻值越大越省电、抗干扰越弱。长线或强干扰环境宁可用 22K，或者干脆外部 4.7K。', 't20w');
+  txt(scene, 80, 556, '上拉/下拉与 keeper 是互斥的两套：keeper 用锁存器记住最后一个电平，静态不耗电流；上拉靠电阻，持续耗电但抗干扰强。', 't20w');
+  txt(scene, 80, 590, '开漏输出必须有人提供高电平：用片内上拉时高电平等于本域 OVDD；用外部上拉时高电平由外部电源决定，这正是电平转换的做法。', 't20w');
+  txt(scene, 80, 624, 'SRE 不是「越快越好」：边沿太陡会带来过冲和 EMI，50 MHz 档配长线通常比 200 MHz 档更稳。DSE 同理，够用就好。', 't20w');
+  txt(scene, 80, 658, '最后一条：输出模式下想把电平读回来验证，必须在 IOMUXC 里把 SION 置 1，否则 PSR 看到的是输入通路，可能一直是 0。', 't20w');
+}
+
+function drawRegs() {
+  txt(scene, 56, 146, '五个 bank 共用同一套偏移，地址只差一个固定步长', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '基址');
+  txt(scene, 80, 252, 'GPIO1  0x0209_C000', 't20s');
+  txt(scene, 80, 288, 'GPIO2  0x020A_0000', 't20s');
+  txt(scene, 80, 324, 'GPIO3  0x020A_4000', 't20s');
+  txt(scene, 80, 360, 'GPIO4  0x020A_8000', 't20s');
+  txt(scene, 80, 396, 'GPIO5  0x020A_C000', 't20s');
+  txt(scene, 80, 432, '相邻 bank 间隔 0x4000', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '偏移与属性');
+  txt(scene, 680, 252, '+0x00 DR       R/W  复位 0', 't20s');
+  txt(scene, 680, 288, '+0x04 GDIR     R/W  复位 0', 't20s');
+  txt(scene, 680, 324, '+0x08 PSR      R    只读', 't20s');
+  txt(scene, 680, 360, '+0x0C ICR1     R/W  引脚 0–15', 't20s');
+  txt(scene, 680, 396, '+0x10 ICR2     R/W  引脚 16–31', 't20s');
+  txt(scene, 680, 432, '+0x14 IMR / +0x18 ISR / +0x1C EDGE_SEL', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '每个 bank 的位数');
+  txt(scene, 1280, 252, 'GPIO1：32 位都用（IO0–IO31）', 't20w');
+  txt(scene, 1280, 288, 'GPIO2：IO0–IO21，其余保留', 't20w');
+  txt(scene, 1280, 324, 'GPIO3：IO0–IO28，其余保留', 't20w');
+  txt(scene, 1280, 360, 'GPIO4：IO0–IO28，其余保留', 't20w');
+  txt(scene, 1280, 396, 'GPIO5：IO0–IO11（SNVS 域）', 't20w');
+  txt(scene, 1280, 432, '写保留位不会报错，但读回来是 0', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '地址换算只需要记住：bank 基址 + 固定偏移', 't24');
+  txt(scene, 80, 522, '比如 GPIO1_IO03 在 GPIO1 的 bit3：设输出就是写 0x0209_C004 = 0x0000_0008，点灯就是写 0x0209_C000 = 0x0000_0008。', 't20w');
+  txt(scene, 80, 556, 'GPIO2 的 IO0 从 0x020A_0000 开始，GPIO3 从 0x020A_4000 开始 —— 注意 GPIO3 不是紧接 GPIO2 后 0x4000 吗？是，但 GPIO2 的窗口到 0x020A_3FFF 为止。', 't20w');
+  txt(scene, 80, 590, '窗口大小是 0x4000，不是 0x1000：每个 bank 里除了 8 个常用寄存器，还有控制/观测等保留空间，跨 bank 访问不会静默回绕。', 't20w');
+  txt(scene, 80, 624, '所有访问必须是 32 位。用 8 位写会触发总线错误或者被忽略，具体行为依总线桥而定 —— 别拿 char 指针去点灯。', 't20w');
+  txt(scene, 80, 658, '读 DR/PSR/ISR 有 2 个等待周期，意味着连续快速轮询会明显吃总线带宽；要高频采样就用定时器触发或 DMA，不要死循环读 PSR。', 't20w');
+}
+
+function drawReadWrite() {
+  txt(scene, 56, 146, 'GDIR 决定方向，但「读 DR 读到什么」还取决于 IOMUXC 有没有选 GPIO', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '读输入三步');
+  txt(scene, 80, 252, '① IOMUXC 选 ALT5（GPIO）', 't20w');
+  txt(scene, 80, 288, '② GDIR 对应位清 0', 't20w');
+  txt(scene, 80, 324, '③ 读 DR 或 PSR 取电平', 't20w');
+  txt(scene, 80, 360, 'DR 与 PSR 在输入模式下等价', 't20w');
+  txt(scene, 80, 396, 'PSR 只读，任何时候都能读引脚', 't20w');
+  txt(scene, 80, 432, '要边沿中断就必须 GDIR=0', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '写输出三步');
+  txt(scene, 680, 252, '① 选 ALT5，需要回读就开 SION', 't20w');
+  txt(scene, 680, 288, '② GDIR 对应位置 1', 't20w');
+  txt(scene, 680, 324, '③ 写 DR 输出电平', 't20w');
+  txt(scene, 680, 360, '回读只看 PSR，不要看 DR', 't20w');
+  txt(scene, 680, 396, '先设电平再切方向可避免毛刺', 't20w');
+  txt(scene, 680, 432, '读-改-写要整字操作，别碰别的位', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '读 DR 的四种结果');
+  txt(scene, 1280, 252, 'GDIR=1 且是 GPIO：读回 DR 锁存值', 't20w');
+  txt(scene, 1280, 288, 'GDIR=0 且是 GPIO：读回输入电平', 't20w');
+  txt(scene, 1280, 324, 'GDIR=1 且非 GPIO：读回 DR 锁存值', 't20w');
+  txt(scene, 1280, 360, 'GDIR=0 且非 GPIO：永远读回 0', 't20w');
+  txt(scene, 1280, 396, '最后一条最坑：引脚被 UART 占着', 't20w');
+  txt(scene, 1280, 432, '看起来像「输入一直是低」', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '点灯的最小代码只有三行，但顺序有讲究', 't24');
+  txt(scene, 80, 522, '先写 DR 再改 GDIR：这样引脚一变成输出就是目标电平，不会先输出一个 0 再跳变，继电器和 LED 都不会闪一下。', 't20w');
+  txt(scene, 80, 556, '反过来先切 GDIR 再写 DR，中间会有一段时间输出 DR 里的旧值（复位后是 0）。对电机、蜂鸣器这类负载，这一下毛刺很明显。', 't20w');
+  txt(scene, 80, 590, '输入侧没有这种问题，但要注意上电默认：复位后 GDIR 全 0，所有引脚都是输入，悬空引脚读到什么全看外部电路和 PAD 上拉配置。', 't20w');
+  txt(scene, 80, 624, '读-改-写的正确姿势是读整个 32 位、改目标位、写回整个 32 位；用位带或 SET/CLR 别名当然更好，但 GPIO 没有单独的置位/清位寄存器。', 't20w');
+  txt(scene, 80, 658, '实测判据：写 GDIR=1、DR=1 后读 PSR 应为 1；若 PSR 一直是 0，先查 SION 是否开、再查这个引脚是不是被别的外设抢走了。', 't20w');
+}
+
+function drawIrq() {
+  txt(scene, 56, 146, '每个引脚一个边沿检测器，32 个检测结果按 0–15、16–31 两条线合并送 GIC', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'ICR 的四种条件');
+  txt(scene, 80, 252, '00  低电平触发', 't20s');
+  txt(scene, 80, 288, '01  高电平触发', 't20s');
+  txt(scene, 80, 324, '10  上升沿', 't20s');
+  txt(scene, 80, 360, '11  下降沿', 't20s');
+  txt(scene, 80, 396, 'ICR1 管 0–15，ICR2 管 16–31', 't20w');
+  txt(scene, 80, 432, 'EDGE_SEL 置 1 则忽略 ICR，双边沿', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, 'IMR 与 ISR');
+  txt(scene, 680, 252, 'IMR=1 允许，=0 屏蔽（默认屏蔽）', 't20w');
+  txt(scene, 680, 288, 'ISR 置位与 IMR 无关，只看条件', 't20w');
+  txt(scene, 680, 324, 'ISR 写 1 清零，写 0 无影响', 't20w');
+  txt(scene, 680, 360, '电平触发要求源一直保持才会重入', 't20w');
+  txt(scene, 680, 396, 'GPIO1 额外暴露 IRQ0–IRQ7 独立线', 't20w');
+  txt(scene, 680, 432, '其它 bank 只有合并中断，要软件查 ISR', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '中断服务四步');
+  txt(scene, 1280, 252, '① 读 ISR 找是哪一位', 't20w');
+  txt(scene, 1280, 288, '② 写 1 清掉该位', 't20w');
+  txt(scene, 1280, 324, '③ 处理外设/消抖', 't20w');
+  txt(scene, 1280, 360, '④ 退出前再读一次 ISR 防漏', 't20w');
+  txt(scene, 1280, 396, '按键要软件消抖 10–20 ms', 't20w');
+  txt(scene, 1280, 432, '电平触发不清源会立刻再进', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '「进中断」和「一直进中断」的区别在电平与边沿', 't24');
+  txt(scene, 80, 522, '上升/下降沿只在跳变时置一次 ISR，清掉就安静了；低/高电平触发只要电平还在，清完 ISR 立刻又置起来，表现为中断风暴。', 't20w');
+  txt(scene, 80, 556, '按键用边沿 + 软件消抖最稳：机械触点会抖出几十个边沿，硬件不会替你滤，ISR 里延时或计数确认才是正解。', 't20w');
+  txt(scene, 80, 590, '注意 IMR 的极性：这里 1 是「允许」，和 GPC 的 IMR（1 是屏蔽）正好相反。同一个项目里两套掩码混着写，是低级但高发的错误。', 't20w');
+  txt(scene, 80, 624, '只有 GPIO1 有 IRQ0–IRQ7 的独立中断线，其它 bank 进来后必须先读 ISR 才知道是谁；别在 ISR 里假设「一定是 IO18」。', 't20w');
+  txt(scene, 80, 658, '最后，ISR 的置位不依赖 IMR：即使中断被屏蔽，条件满足照样置位并保持。所以重新使能前先清一次 ISR，否则一开就立刻进中断。', 't20w');
+}
+
+function drawBoard() {
+  txt(scene, 56, 146, '核心板把 LED、按键、蜂鸣器都做成网络引到连接器，剩下的事就是选 ALT5 加读写一位', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '板上的对象');
+  txt(scene, 80, 252, 'LED0 / LED1：网络名 LED0、LED1', 't20w');
+  txt(scene, 80, 288, 'KEY0 / KEY1 / KEY2：三个独立网络', 't20w');
+  txt(scene, 80, 324, 'BEEP：蜂鸣器驱动网络', 't20w');
+  txt(scene, 80, 360, '全部经 SO-DIMM 连接器引到核心板', 't20w');
+  txt(scene, 80, 396, '具体落到哪个 GPIO 看底板原理图', 't20w');
+  txt(scene, 80, 432, 'MINI 与 ALPHA 的分配不完全相同', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '点灯四步');
+  txt(scene, 680, 252, '① SW_MUX_CTL 写 ALT5', 't20w');
+  txt(scene, 680, 288, '② SW_PAD_CTL 设驱动与上拉', 't20w');
+  txt(scene, 680, 324, '③ GDIR 置 1（输出）', 't20w');
+  txt(scene, 680, 360, '④ 写 DR 的对应位翻转', 't20w');
+  txt(scene, 680, 396, '低电平点亮还是高电平要看电路', 't20w');
+  txt(scene, 680, 432, '翻转用异或，别整字覆盖', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '读键四步');
+  txt(scene, 1280, 252, '① MUX 选 ALT5，PAD 开上拉', 't20w');
+  txt(scene, 1280, 288, '② GDIR 清 0（输入）', 't20w');
+  txt(scene, 1280, 324, '③ 读 PSR 的对应位', 't20w');
+  txt(scene, 1280, 360, '④ 软件消抖后再确认一次', 't20w');
+  txt(scene, 1280, 396, '按下为 0 说明按键接地 + 上拉', 't20w');
+  txt(scene, 1280, 432, '按下为 1 则是接电源 + 下拉', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '先量电平，再写代码：按键极性由电路决定，不由手册决定', 't24');
+  txt(scene, 80, 522, '用万用表量一下按键未按下时引脚对地电压：接近 OVDD 就是上拉型（按下为低），接近 0 就是下拉型（按下为高）。这一步能省掉一半调试时间。', 't20w');
+  txt(scene, 80, 556, 'LED 同理：很多板子是 GPIO → 限流电阻 → LED → 地，输出高才亮；也有接 OVDD 的灌电流接法，输出低才亮。原理图上找 LED 的公共端即可。', 't20w');
+  txt(scene, 80, 590, '写代码前的自检顺序：MUX 是否 ALT5、PAD 是否使能输入/输出、GDIR 方向、DR 值。这四步任一错位，表现都是「没反应」。', 't20w');
+  txt(scene, 80, 624, '读键一定要用 PSR（或输入模式下的 DR），不要用输出模式下的 DR —— 那是你自己写进去的值，跟引脚无关。', 't20w');
+  txt(scene, 80, 658, '最后提醒：这些引脚大多和 LCD、UART、ENET 复用，底板把某个网络接到哪个球，就在 IOMUXC 里配那个球；配错球会出现「另一个外设突然不动了」。', 't20w');
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawRole();
+  else if (s === 1) drawPad();
+  else if (s === 2) drawRegs();
+  else if (s === 3) drawReadWrite();
+  else if (s === 4) drawIrq();
+  else drawBoard();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () {
+  state.step = INIT.step; state.lane = INIT.lane; draw();
+});
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>

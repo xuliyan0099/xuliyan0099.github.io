@@ -1,0 +1,337 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0, lane: 0 };
+var state = { step: INIT.step, lane: INIT.lane };
+
+var STEPS = [
+  { h: '三级复用结构', hint: 'IOMUXC · IOMUX 单元 · IORING',
+    note: 'IOMUXC 是寄存器，IOMUX 是组合逻辑，IORING 是管脚缓冲。ALT0–ALT7 八个模式，ALT6/ALT7 优先级最高，可被硬件强制覆盖。' },
+  { h: '三张表怎么查', hint: 'MUX_CTL · PAD_CTL · SELECT_INPUT',
+    note: '这章 642 页几乎全是表：每个焊盘一张 MUX 表、一张 PAD 表，外加若干 daisy 表。先认清命名和地址段，查表就变成查字典。' },
+  { h: 'MUX_MODE 与 ALT', hint: '0x020E_0044 起 · 复位常是 ALT5',
+    note: 'MUX_CTL 的低 4 位就是 MUX_MODE，选 ALT0–7；bit4 是 SION。GPIO1_IO03 的 MUX 复位值 0x0000_0005，意味着上电默认就是 GPIO。' },
+  { h: 'PAD_CTL 六个旋钮', hint: 'HYS · PUS · PUE · PKE · ODE · SPEED · DSE · SRE',
+    note: 'PAD 寄存器决定电气：迟滞、上拉阻值、keeper 还是 pull、开漏、速度档、驱动档、摆率。复位值 0x0000_10B0 可以直接解成一句话。' },
+  { h: 'Daisy chain', hint: '多个焊盘喂同一个模块输入',
+    note: '当一个模块输入可能由多个焊盘驱动时，IOMUX 后面还要再加一级选择器，由 SELECT_INPUT 寄存器决定听谁的；这个焊盘要配两次。' },
+  { h: '板级冲突清单', hint: 'NAND · CSI · I2C · UART · ENET',
+    note: '同一个球位往往有三四个身份。NAND 的 CE2/CE3 就是 CSI_MCLK/PIXCLK，I2C3/4 又借用 ENET2 与 LCD 的脚，配之前先列冲突。' },
+  { h: '校验与陷阱', hint: '读回比对 · SION · DSE · GPR',
+    note: '写完读回是唯一可靠的确认方式；再记住四个坑：忘开 SION、DSE 拉满、把 ALT 编号当球位、把 GPR 当普通寄存器乱写。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+
+function drawTop() {
+  txt(scene, 56, 146, 'IOMUXC 只是寄存器，真正把信号接上管脚的是 IOMUX 的组合逻辑和 IORING 的缓冲', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '三层结构');
+  txt(scene, 80, 252, 'IOMUXC：寄存器 + 地址译码', 't20w');
+  txt(scene, 80, 288, 'IOMUX：每个焊盘一个复用单元', 't20w');
+  txt(scene, 80, 324, 'IORING：管脚缓冲与电气特性', 't20w');
+  txt(scene, 80, 360, '共约 8 个 ALT 模式（ALT0–ALT7）', 't20w');
+  txt(scene, 80, 396, 'ALT7 优先级最高，ALT6 次之', 't20w');
+  txt(scene, 80, 432, 'ALT6/7 可被硬件（fuse/JTAG）强制', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '两类寄存器');
+  txt(scene, 680, 252, 'SW_MUX_CTL：选功能（MUX_MODE）', 't20w');
+  txt(scene, 680, 288, 'SW_PAD_CTL：定电气（电气属性）', 't20w');
+  txt(scene, 680, 324, '都有「单焊盘」与「组」两种粒度', 't20w');
+  txt(scene, 680, 360, '组寄存器一次改一整批 DDR 脚', 't20w');
+  txt(scene, 680, 396, '只有用到的位才实现，别假设全 0 有效', 't20w');
+  txt(scene, 680, 432, '读未实现位得到 0，写它可能无效果', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, 'SION 的两个用途');
+  txt(scene, 1280, 252, '强制输入通路有效（ipp_ibe=1）', 't20w');
+  txt(scene, 1280, 288, '不管模块当前是输出还是输入', 't20w');
+  txt(scene, 1280, 324, '用途一：回环自测（自己发自己收）', 't20w');
+  txt(scene, 1280, 360, '用途二：GPIO 捕获输出值', 't20w');
+  txt(scene, 1280, 396, 'I2C 的 SDA 必须开 SION', 't20w');
+  txt(scene, 1280, 432, '否则读回恒 0，误判仲裁丢失', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '为什么需要 ALT6/ALT7：有些功能必须能压过软件配置', 't24');
+  txt(scene, 80, 522, 'ALT0–ALT5 完全由软件 MUX_MODE 决定；ALT6 与 ALT7 是「扩展模式」，可以被熔丝、JTAG、测试逻辑强制选中，优先级高于软件。', 't20w');
+  txt(scene, 80, 556, '这就是为什么调试口、边界扫描能在软件配错的情况下仍然接管管脚 —— 芯片留的后门，也是量产时 fuse 能锁定某些脚的原因。', 't20w');
+  txt(scene, 80, 590, '每个 iomux_cell 就是一个多路选择器：输入侧把 N 个模块信号选一个接到 PAD，输出侧把 PAD 值分发给 N 个模块，两边独立配置。', 't20w');
+  txt(scene, 80, 624, '所以同一个焊盘可以「进」和「出」走不同模块 —— 但 MUX_MODE 只有一个，进出必须属于同一个 ALT，这是硬件约束。', 't20w');
+  txt(scene, 80, 658, '一句话：MUX_MODE 决定这个球此刻是谁的，PAD_CTL 决定它电学上长什么样，两者互不影响但必须都配对。', 't20w');
+}
+
+function drawTables() {
+  txt(scene, 56, 146, '这章 642 页里 95% 是表：认清地址分段，查表就是查字典', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '地址分段');
+  txt(scene, 80, 252, 'MUX 单焊盘：0x020E_0044 起', 't20s');
+  txt(scene, 80, 288, 'PAD 单焊盘：0x020E_02D4 起', 't20s');
+  txt(scene, 80, 324, '组寄存器：0x020E_04A4 一带', 't20s');
+  txt(scene, 80, 360, 'Daisy：0x020E_04B8 起', 't20s');
+  txt(scene, 80, 396, 'GPR：0x020E_4000 起', 't20s');
+  txt(scene, 80, 432, 'SNVS 的 IO：0x0229_0000 起', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '命名规则');
+  txt(scene, 680, 252, 'IOMUXC_SW_MUX_CTL_PAD_<焊盘名>', 't20s');
+  txt(scene, 680, 288, 'IOMUXC_SW_PAD_CTL_PAD_<焊盘名>', 't20s');
+  txt(scene, 680, 324, '焊盘名 = 原理图上的球位功能名', 't20w');
+  txt(scene, 680, 360, '如 CSI_MCLK、UART1_TX_DATA', 't20w');
+  txt(scene, 680, 396, '不是球号（A4/C5 那种）', 't20w');
+  txt(scene, 680, 432, '也不是 GPIO 编号', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '表里都有什么');
+  txt(scene, 1280, 252, '每个 ALT 对应哪个模块信号', 't20w');
+  txt(scene, 1280, 288, '比如 ALT2 = NAND_CE2', 't20w');
+  txt(scene, 1280, 324, '每个 ALT 的方向（I/O/IO）', 't20w');
+  txt(scene, 1280, 360, '默认复位值（多数 GPIO 脚是 ALT5）', 't20w');
+  txt(scene, 1280, 396, '哪些位保留、哪些位可写', 't20w');
+  txt(scene, 1280, 432, '越界地址访问会报 transfer error', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '查表顺序只有一条：原理图网络 → 焊盘名 → MUX 表 → ALT 编号 → 写寄存器', 't24');
+  txt(scene, 80, 522, '先在原理图上找到这个网络接到哪个球（比如 LED0 接到某个球），球旁边写着它的默认功能名（如 GPIO1_IO03），这个名字才是查表关键字。', 't20w');
+  txt(scene, 80, 556, '然后在 MUX 表里找到 SW_MUX_CTL_PAD_GPIO1_IO03，看哪个 ALT 写着你要的模块；若写的是 ALT5=GPIO1_IO03，就写 MUX_MODE=5。', 't20w');
+  txt(scene, 80, 590, '接着在同一焊盘的 PAD 表里挑电气参数；最后如果是 daisy 类输入，还要去 SELECT_INPUT 表里再选一次「听哪个焊盘」。', 't20w');
+  txt(scene, 80, 624, '反向查也很有用：想知道「CSI_MCLK 能干什么」，直接翻它的 MUX 表，八个 ALT 就是它的全部身份，比看十张原理图快。', 't20w');
+  txt(scene, 80, 658, '注意地址是绝对地址，手册里基址写作 20E_0000h；很多驱动用「基址 + 偏移」宏，抄寄存器值时别把偏移当绝对地址。', 't20w');
+}
+
+function drawMux() {
+  txt(scene, 56, 146, 'MUX_CTL 的低 4 位选 ALT，bit4 是 SION，其余位保留 —— 一个 32 位寄存器其实只用 5 位', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '字段');
+  txt(scene, 80, 252, 'bit3:0 MUX_MODE  0–7 选 ALT', 't20s');
+  txt(scene, 80, 288, 'bit4   SION  强制输入通路', 't20s');
+  txt(scene, 80, 324, 'bit31:5 保留，写 0', 't20s');
+  txt(scene, 80, 360, '有的焊盘只实现 1–2 位（够用就行）', 't20w');
+  txt(scene, 80, 396, '读回可能只看到部分位有效', 't20w');
+  txt(scene, 80, 432, 'GPIO1_IO03 复位 0x0000_0005', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '复位值的含义');
+  txt(scene, 680, 252, '0x05 = MUX_MODE 5 = ALT5', 't20s');
+  txt(scene, 680, 288, 'ALT5 在 i.MX6ULL 上就是 GPIO', 't20w');
+  txt(scene, 680, 324, '所以上电后这些脚默认是 GPIO', 't20w');
+  txt(scene, 680, 360, '但 GDIR=0，还是输入', 't20w');
+  txt(scene, 680, 396, '要输出还得配 GPIO 的 GDIR', 't20w');
+  txt(scene, 680, 432, 'JTAG 脚复位值不同，别一概而论', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '三个例子');
+  txt(scene, 1280, 252, 'GPIO1_IO03 MUX @0x020E_0068', 't20s');
+  txt(scene, 1280, 288, 'GPIO1_IO03 PAD @0x020E_02F4', 't20s');
+  txt(scene, 1280, 324, 'JTAG_MOD PAD 复位 0x0000_B0A0', 't20s');
+  txt(scene, 1280, 360, 'ALT8 是「扩展模式」，优先级最高', 't20w');
+  txt(scene, 1280, 396, '同一焊盘的 ALT 编号不通用', 't20w');
+  txt(scene, 1280, 432, '别把 UART1 的 ALT2 套到 UART2 上', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, 'ALT 编号是「每个焊盘各自一套」，不是全芯片统一', 't24');
+  txt(scene, 80, 522, '同一个焊盘上，ALT0 可能是 UART、ALT1 是 GPT、ALT2 是 I2C、ALT5 是 GPIO；换一个焊盘，编号对应的功能完全可能全变。', 't20w');
+  txt(scene, 80, 556, '所以永远不能凭记忆写 ALT 值，必须打开那一页的 MUX 表逐条核对。这是本章最容易犯、也最难查的错：写错 ALT 后寄存器读回值「看起来对」，脚却没反应。', 't20w');
+  txt(scene, 80, 590, '判断有没有写对，除了读回 MUX 值，还可以看模块自己的寄存器：UART 的发送计数器在动、GPIO 的 PSR 跟着电平变，说明信号确实接上了。', 't20w');
+  txt(scene, 80, 624, 'SION 只在需要「回读自己输出」或「强制输入」时置 1；普通输出脚置 1 会多一路输入缓冲，增加一点功耗，没有别的好处。', 't20w');
+  txt(scene, 80, 658, '有些焊盘的 MUX 寄存器只实现 1 位（只有 ALT0/ALT1 可用），手册说「按需生成最小位数」。写超出范围的 MUX_MODE 可能被静默截断。', 't20w');
+}
+
+function drawPad() {
+  txt(scene, 56, 146, 'PAD_CTL 复位值 0x0000_10B0 可以逐位翻译成一句电气描述', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '位域（普通焊盘）');
+  txt(scene, 80, 252, 'bit16 HYS 迟滞 0 关 / 1 开', 't20s');
+  txt(scene, 80, 288, 'bit15:14 PUS 上拉档：00 下拉100K', 't20s');
+  txt(scene, 80, 324, '01 上拉47K / 10 上拉100K / 11 22K', 't20s');
+  txt(scene, 80, 360, 'bit13 PUE 0 keeper / 1 pull', 't20s');
+  txt(scene, 80, 396, 'bit12 PKE 0 关 / 1 开', 't20s');
+  txt(scene, 80, 432, 'bit11 ODE 0 推挽 / 1 开漏', 't20s');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '速度与驱动');
+  txt(scene, 680, 252, 'bit7:6 SPEED 00 50M / 01 100M', 't20s');
+  txt(scene, 680, 288, '10 100M / 11 200M', 't20s');
+  txt(scene, 680, 324, 'bit5:3 DSE 000 关 → 111 R0/7', 't20s');
+  txt(scene, 680, 360, 'R0 = 260Ω@3.3V、150Ω@1.8V', 't20s');
+  txt(scene, 680, 396, 'bit0 SRE 0 慢 / 1 快摆率', 't20s');
+  txt(scene, 680, 432, 'bit10:8 保留，bit2:1 保留', 't20s');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '解码 0x0000_10B0');
+  txt(scene, 1280, 252, 'HYS=0：不开迟滞', 't20w');
+  txt(scene, 1280, 288, 'PUS=00：100K 下拉（但被 PUE 覆盖）', 't20w');
+  txt(scene, 1280, 324, 'PUE=0：用 keeper，不用 pull', 't20w');
+  txt(scene, 1280, 360, 'PKE=1：keeper 打开', 't20w');
+  txt(scene, 1280, 396, 'SPEED=01：100 MHz 档', 't20w');
+  txt(scene, 1280, 432, 'DSE=110：R0/6 ≈ 43Ω，SRE=0 慢摆', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '默认不是「上拉」，而是「keeper」：这决定了悬空脚上电时读到什么', 't24');
+  txt(scene, 80, 522, 'keeper 是一个弱锁存器：引脚悬空时它记住上一次的电平，静态几乎不耗电；pull 是电阻，一直有电流。PUE=0 选 keeper，PUE=1 才选 pull。', 't20w');
+  txt(scene, 80, 556, '复位 0x10B0 里 PKE=1、PUE=0，所以 GPIO 脚上电默认是「keeper 打开」；想让按键松开时稳定为高，必须显式改成 PUS=10/11 且 PUE=1。', 't20w');
+  txt(scene, 80, 590, 'DSE 是输出阻抗档：000 完全关闭输出（高阻），001 是 R0（260Ω@3.3V），111 是 R0/7（约 37Ω）。低阻驱动强、边沿快，但过冲与 EMI 大。', 't20w');
+  txt(scene, 80, 624, 'SPEED 与 SRE 是两级边沿控制：SPEED 选缓冲带宽档（50/100/200 MHz），SRE 选快慢摆率。高速接口才拉满，普通 LED/按键保持默认。', 't20w');
+  txt(scene, 80, 658, 'HYS 迟滞对慢边沿和噪声有效：I2C、按键、外部时钟建议开；纯输出脚开不开无所谓。开了会稍微增加输入延迟，高速同步接口要算进去。', 't20w');
+}
+
+function drawDaisy() {
+  txt(scene, 56, 146, 'Daisy chain 是第三级复用：先选焊盘是哪个 ALT，再选这个模块输入听哪个焊盘', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '什么时候需要');
+  txt(scene, 80, 252, '一个模块输入，可能由多个焊盘驱动', 't20w');
+  txt(scene, 80, 288, '比如 USB_OTG1_ID 有三个来源', 't20w');
+  txt(scene, 80, 324, 'UART 的 RX 也常有两个候选脚', 't20w');
+  txt(scene, 80, 360, 'I2C 的 SCL/SDA 同理', 't20w');
+  txt(scene, 80, 396, '不配 SELECT_INPUT，输入可能悬空', 't20w');
+  txt(scene, 80, 432, '表现为「模块收不到任何数据」', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '配置两处');
+  txt(scene, 680, 252, '① SW_MUX_CTL：焊盘选 ALT', 't20w');
+  txt(scene, 680, 288, '② SELECT_INPUT：选这个焊盘', 't20w');
+  txt(scene, 680, 324, '两处必须一致，缺一不可', 't20w');
+  txt(scene, 680, 360, '寄存器名以模块端口命名', 't20w');
+  txt(scene, 680, 396, '如 IOMUXC_ANATOP_USB_OTG_ID', 't20w');
+  txt(scene, 680, 432, '值是一个 2–3 位的 DAISY 编号', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '实例：USB_OTG1_ID');
+  txt(scene, 1280, 252, '@0x020E_04B8，2 位', 't20s');
+  txt(scene, 1280, 288, '00 = GPIO1_IO00 的 ALT2', 't20s');
+  txt(scene, 1280, 324, '01 = UART3_TX_DATA 的 ALT8', 't20s');
+  txt(scene, 1280, 360, '10 = SD1_DATA0 的 ALT8', 't20s');
+  txt(scene, 1280, 396, '注意括号里还写了 Mode', 't20w');
+  txt(scene, 1280, 432, '即焊盘必须同时配到那个 ALT', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, 'Daisy 表的每一行都写着「焊盘 + ALT」，这是一个完整的配方', 't24');
+  txt(scene, 80, 522, '它不是「选一个焊盘」那么简单：编码 01 的意思是「UART3_TX_DATA 这个焊盘，且它必须工作在 ALT8」，两者要一起满足。', 't20w');
+  txt(scene, 80, 556, '所以配 daisy 的顺序是：先把目标焊盘的 MUX 写成表里写的 ALT，再把 SELECT_INPUT 写成对应编码；只做一半就会出现「寄存器都对、功能不通」。', 't20w');
+  txt(scene, 80, 590, 'i.MX6ULL 上受 daisy 影响的端口不少：UART 的 RX、I2C 的 SDA、USB 的 ID、CCM_PMIC_READY、ENET 的 RX_ER 等，凡是「一个输入多个来源」的都要查。', 't20w');
+  txt(scene, 80, 624, '调试技巧：如果 TX 有波形、RX 没数据，先怀疑 daisy，而不是波特率；把 SELECT_INPUT 读出来，对照表看是不是选了没接线的那个焊盘。', 't20w');
+  txt(scene, 80, 658, '很多人把它和 SION 搞混：SION 是「让输入通路对自己开放」，daisy 是「让模块输入去听别人」，目的和寄存器完全不同。', 't20w');
+}
+
+function drawBoard() {
+  txt(scene, 56, 146, '同一个球位往往有三四个身份，先列冲突清单，再动手配寄存器', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, 'NAND 与 CSI 的冲突');
+  txt(scene, 80, 252, 'CSI_MCLK：ALT2 = NAND_CE2', 't20w');
+  txt(scene, 80, 288, 'CSI_PIXCLK：ALT2 = NAND_CE3', 't20w');
+  txt(scene, 80, 324, 'ALT3 = I2C1_SCL / I2C1_SDA', 't20w');
+  txt(scene, 80, 360, '所以同一个球只能是三者之一', 't20w');
+  txt(scene, 80, 396, '四片 NAND 与摄像头二选一', 't20w');
+  txt(scene, 80, 432, '或加外部译码器解决', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, 'UART 与 GPT 的冲突');
+  txt(scene, 680, 252, 'GPIO1_IO01/02/03 = GPT1 比较 1/2/3', 't20w');
+  txt(scene, 680, 288, '同一批脚 ALT4 = UART1/2', 't20w');
+  txt(scene, 680, 324, 'ALT3/2 还可能是 I2C1', 't20w');
+  txt(scene, 680, 360, '要三路 PWM 又要点灯就得算清楚', 't20w');
+  txt(scene, 680, 396, 'GPT2 全组压在 JTAG 与 SD1 上', 't20w');
+  txt(scene, 680, 432, '开调试口就抢不到 GPT2 的脚', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, 'ENET 与 I2C3/4');
+  txt(scene, 1280, 252, 'I2C3：ENET2_RX_DATA0/1 ALT3', 't20w');
+  txt(scene, 1280, 288, '也可 LCD_DATA00/01 ALT4', 't20w');
+  txt(scene, 1280, 324, 'I2C4：ENET2_RX_EN/TX_DATA0 ALT3', 't20w');
+  txt(scene, 1280, 360, '也可 LCD_DATA02/03 ALT4', 't20w');
+  txt(scene, 1280, 396, '双网口 + 四路 I2C 不能同时全要', 't20w');
+  txt(scene, 1280, 432, '这是 i.MX6ULL 脚位紧张的典型处', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '板级设计的顺序：先定功能，再列每个功能的候选焊盘，最后做冲突图', 't24');
+  txt(scene, 80, 522, '比如要「双网口 + LCD + 触摸 + 四路 I2C」，先把每个外设的候选脚列出来，会发现 ENET2 与 I2C3/4 抢、LCD 与 I2C3/4 抢，必然要做取舍。', 't20w');
+  txt(scene, 80, 556, '取舍的判断标准不是「哪个好配」，而是「哪个功能对时序最敏感」：ENET 的 RGMII/RMII 对延迟敏感，优先固定；I2C 可以换组或降速。', 't20w');
+  txt(scene, 80, 590, 'ALPHA 与 MINI 的差异也来自这里：一块板把 NAND 焊上、另一块把 eMMC 焊上，同样的 CS 脚就给了不同外设，所以驱动里的 pad 配置不能直接搬。', 't20w');
+  txt(scene, 80, 624, '写设备树时 pinctrl 节点名通常就是焊盘名，一组 pinctrl 里包含若干 MUX 与 PAD 值；看懂 pinctrl 的前提就是看懂本章的表。', 't20w');
+  txt(scene, 80, 658, '一个实用检查：把用到的所有焊盘做一张表，标注每颗芯片的 ALT 编号，能立刻发现「同一个焊盘被两个驱动各配了一次」这种隐蔽冲突。', 't20w');
+}
+
+function drawVerify() {
+  txt(scene, 56, 146, '写完读回是唯一可靠的确认方式：MUX 值不对，后面所有调试都是白费', 't24w');
+
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '三步校验');
+  txt(scene, 80, 252, '① 读 MUX_CTL，核 MUX_MODE', 't20w');
+  txt(scene, 80, 288, '② 读 PAD_CTL，核关键位', 't20w');
+  txt(scene, 80, 324, '③ 读模块状态寄存器', 't20w');
+  txt(scene, 80, 360, 'GPIO：PSR 随电平变化', 't20w');
+  txt(scene, 80, 396, 'UART：发送计数器在动', 't20w');
+  txt(scene, 80, 432, 'I2C：IBB 能置起说明线是通的', 't20w');
+
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '四个高频坑');
+  txt(scene, 680, 252, '① 忘开 SION：读回恒 0', 't20w');
+  txt(scene, 680, 288, '② DSE 拉满 111：过冲/EMI', 't20w');
+  txt(scene, 680, 324, '③ 把 ALT 编号当球位号用', 't20w');
+  txt(scene, 680, 360, '④ 把 GPR 当普通寄存器乱写', 't20w');
+  txt(scene, 680, 396, 'GPR1 复位 0x0F40_0005 管核时钟', 't20w');
+  txt(scene, 680, 432, '写错可能导致调试口失联', 't20w');
+
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, 'GPR 的正确用法');
+  txt(scene, 1280, 252, 'GPR0 @0x020E_4000：DMA 请求选择', 't20s');
+  txt(scene, 1280, 288, 'GPR1 @0x020E_4004：核时钟/调试使能', 't20s');
+  txt(scene, 1280, 324, 'GPR3 复位 0x0000_0FFF', 't20s');
+  txt(scene, 1280, 360, 'GPR10 复位 0x0000_0007', 't20s');
+  txt(scene, 1280, 396, 'GPR14 @0x020E_4038', 't20s');
+  txt(scene, 1280, 432, '先读后改，别整字覆盖', 't20w');
+
+  wide(456, 330);
+  txt(scene, 80, 490, '「读回值对」不等于「功能对」：还要看这个 ALT 在这颗硅片上是否真的实现', 't24');
+  txt(scene, 80, 522, '手册的表是芯片级定义，但具体封装可能没引出某个球，或者某个 ALT 只存在于测试模式。读回 MUX 值成功，不代表信号到了引脚。', 't20w');
+  txt(scene, 80, 556, '所以第三层校验一定是「模块侧现象」：GPIO 看 PSR、UART 看收发计数、I2C 看 IBB 与 ACK、ENET 看 MDIO 能否读到 PHY ID。', 't20w');
+  txt(scene, 80, 590, '如果现象全无，按顺序查：MUX 值 → SION → PAD 的 PKE/PUE → daisy → 时钟门控（CCGR）→ 引脚外部电路。顺序错了会白折腾很久。', 't20w');
+  txt(scene, 80, 624, 'GPR 是「芯片级杂项开关」：核时钟、DMA 请求映射、USB 与 ENET 的一些特殊模式都在里面。它们默认值往往是精心设定过的，不要清零。', 't20w');
+  txt(scene, 80, 658, '最后一条经验：改 pad 配置前先把原值打印出来存档，出问题时能一键恢复；盲目写「标准值」会把板厂调好的 DDR/ENET 时序破坏掉。', 't20w');
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) drawTables();
+  else if (s === 2) drawMux();
+  else if (s === 3) drawPad();
+  else if (s === 4) drawDaisy();
+  else if (s === 5) drawBoard();
+  else drawVerify();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () {
+  state.step = INIT.step; state.lane = INIT.lane; draw();
+});
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>
