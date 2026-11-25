@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RM11 系统安全：信任链与权限</title>
+<title>RM 第 11 章 · 系统安全 | i.MX6ULL 逐章解读</title>
 <style>/* 白板互动教学设计系统 · 样式。由 scripts/inline.py 整段拼进页面，不要手抄或删减。
  * 页面的全部颜色、字号、间距、圆角、阴影只在 :root 定义；改主题只改这一段。 */
 
@@ -2483,16 +2483,16 @@ text.bd-an-inner { font-size: var(--size-l4); }
 <div class="bd-viewport" id="viewport">
   <div class="bd-canvas" id="canvas">
     <header class="bd-titlebar">
-      <h1 class="bd-title">第 11 章 · 系统安全</h1>
+      <h1>第 11 章 · 信任链、TrustZone 与外设门卫</h1>
       <span class="bd-hint" id="hint"></span>
       <div class="bd-readings">
         <span class="bd-reading bd-reading-emphasis">
-          <span class="bd-reading-name">CSL 权限档</span>
-          <span class="bd-reading-value">8 档</span>
+          <span class="bd-reading-name">安全等级</span>
+          <span class="bd-reading-value">8 级</span>
         </span>
         <span class="bd-reading">
-          <span class="bd-reading-name">JTAG 档</span>
-          <span class="bd-reading-value">4 档</span>
+          <span class="bd-reading-name">HAB 签名</span>
+          <span class="bd-reading-value">RSA-4096</span>
         </span>
       </div>
     </header>
@@ -2506,7 +2506,8 @@ text.bd-an-inner { font-size: var(--size-l4); }
         <button class="bd-btn" type="button" id="next"></button>
       </div>
       <div class="bd-actions">
-        <a class="bd-btn" href="c10.html" style="text-decoration:none">← RM10</a>
+        <a class="bd-btn" href="c10.html" style="text-decoration:none">← RM10</a> <a class="bd-btn" href="c12.html" style="text-decoration:none">RM12 →</a>
+       
         <a class="bd-btn" href="index.html" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">☰ 目录</a>
         <button class="bd-btn" type="button" id="reset"></button>
       </div>
@@ -3628,88 +3629,42 @@ function reader(root, sentences, opts) {
   };
 }
 </script>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
 <script>
 var $ = function (id) { return document.getElementById(id); };
 var OX = 24, OY = 96;
 var svg = $('figure'), scene = $('scene');
 svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
 
-var ITEMS = [
-  ['HAB 启动验签', '启动信任根', [
-    '在 boot ROM 里跑，验签算法 RSA-4096',
-    '公钥哈希烧在 eFuse（SRK），签名不过就不执行',
-    '守不住这层，后面的安全功能全是纸糊的'
-  ]],
-  ['SNVS 安全存储', '密钥与状态机', [
-    '跑安全状态机，判定芯片当前是不是 secure',
-    '只有 secure 状态才放行主密钥去解长期机密',
-    '带防篡改检测，和断电仍在跑的计数器'
-  ]],
-  ['TrustZone', '运行时世界切换', [
-    '把 A7 切成 Secure / Non-secure 两个世界',
-    '普通世界的代码碰不到安全世界的内存与寄存器',
-    '切换靠 monitor 模式，进出都要过它'
-  ]],
-  ['GIC / WDOG-2', '中断与复位也分世界', [
-    'GIC 是 TZ-aware，中断可按组只投递给一个世界',
-    'WDOG-2 是第二个看门狗，可以绑到安全世界',
-    '安全世界独占复位权，普通世界关不掉它'
-  ]],
-  ['TZC-380', 'DDR 地址分区', [
-    '管 DDR 的地址区间，逐区域设读写权限',
-    '一个区域可以只允许某个 master 访问',
-    '配错的表现很直接：安全世界读自己的内存被拒'
-  ]],
-  ['OCRAM / OCOTP', '片上内存与熔丝', [
-    'OCRAM 控制器支持 TrustZone，可只保护某段',
-    'OCOTP 是 eFuse：SRK 哈希、boot 配置、JTAG 档位',
-    '熔丝只能 0→1 烧一次，烧错不可逆'
-  ]],
-  ['CSU', '外设权限总闸', [
-    '给每个外设设 8 档访问权限，就是 CSL 那张表',
-    '还能按策略覆盖总线 master 的 secure / privilege 信号',
-    '策略可由 HAB 验过的 CSF 写好，然后锁死'
-  ]],
-  ['SJC', '调试口分档', [
-    'JTAG 四档：Disabled / No-Debug / Secure / Enabled',
-    'Secure 档要过密钥 challenge-response 才放行',
-    '档位由 eFuse 决定，烧完就改不回来'
-  ]],
-  ['SDMA locked', 'DMA 不能越权', [
-    'locked 模式下 SDMA 碰不到安全世界的内存',
-    '防的是「用 DMA 绕过软件权限」这一类攻击',
-    '再叠 CSU 的 master 权限，两层一起拦'
-  ]],
-  ['Tamper ×2', '物理开盖检测', [
-    '两个 tamper 脚：被动比电平，主动做翻转确认',
-    '触发后开电、发报警中断，并擦掉 ZMK',
-    '要有常供（纽扣电池），断电时才守得住'
-  ]],
-  ['DCP 加速', '算法加速', [
-    'DCP 硬算 AES-128（ECB 与 CBC）与 SHA-1/256',
-    '另有 TRNG / PRNG，出随机数与密钥素材',
-    '让软件不必自己跑软件加密，也少漏时序信息'
-  ]]
-];
-var CSU = [
-  ['000', "8'b1111_1111", 'RD+WR', 'RD+WR', 'RD+WR', 'RD+WR', '全开，谁都读写得动 —— 只适合开发期'],
-  ['001', "8'b1011_1011", 'None', 'RD+WR', 'RD+WR', 'RD+WR', '挡住普通世界用户态，其余照旧'],
-  ['010', "8'b0011_1111", 'RD', 'RD', 'RD+WR', 'RD+WR', '普通世界只给读，写权限留给安全世界'],
-  ['011', "8'b0011_1011", 'None', 'RD', 'RD+WR', 'RD+WR', '普通用户态全挡，普通内核只读'],
-  ['100', "8'b0011_0011", 'None', 'None', 'RD+WR', 'RD+WR', '普通世界全挡，只给安全世界用'],
-  ['101', "8'b0010_0010", 'None', 'None', 'None', 'RD+WR', '只留安全内核 —— 最实用的高安全档'],
-  ['110', "8'b0000_0011", 'None', 'None', 'RD', 'RD', '连安全世界也只读，比如只读的密钥区'],
-  ['111', "任意其它值", 'None', 'None', 'None', 'None', '彻底封死，谁碰都返回错误']
-];
-
-var INIT = { step: 0, item: 0, row: 4 };
-var state = { step: INIT.step, item: INIT.item, row: INIT.row };
+var INIT = { step: 0 };
+var state = { step: INIT.step };
 
 var STEPS = [
-  { h: '1 / 4 十一件安全组件', hint: '点一张卡，看它守哪一段', note: '这十一件不是并列的开关，是一条链：信任根 → 运行时分区 → 存储与密钥 → 调试口收口。' },
-  { h: '2 / 4 外设权限：8 档 CSL', hint: '点一行，看谁能读谁', note: 'CSL 值就是这四档权限的位图编码，硬件照这张表查；默认全开，产品化时要一档一档收紧。' },
-  { h: '3 / 4 SNVS：状态机与防篡改', hint: '左边看判定，右边看它存了什么', note: 'SNVS 的结论只有两种：secure 就放钥匙，violation 就报警并擦钥匙。' },
-  { h: '4 / 4 信任链与两个收口', hint: '左边是链，右边是 DCP 与 SJC', note: '链的起点在熔丝里，终点在 SNVS 的 secure 位；中间任何一环配错，链就断在那一环。' }
+  { h: '八件安全件，各守一段', hint: '叠出来的防线',
+    note: 'HAB 决定「谁能跑」；CSU 决定「谁能碰哪个外设」；TZC 决定「DDR 哪段算安全内存」；TrustZone 决定「CPU 在哪个世界」；SNVS/OCOTP 存密钥与状态；SJC 决定 JTAG 开不开；DCP 干加解密。' },
+  { h: '信任链：从熔丝到内核', hint: '熔丝 → CSF → 镜像',
+    note: '根不在代码里，在 eFuse：烧进 OCOTP 的 SRK 哈希是唯一可信起点；ROM 读 IVT → CSF → 验签，通过才跳转。' },
+  { h: 'TrustZone 两个世界', hint: 'NS 位 / GIC / WDOG-2',
+    note: 'A7 的 NS 位决定当前世界；GIC 把中断分组；WDOG-2 是安全世界专属的看门狗；OCRAM 也能分区。' },
+  { h: 'TZC 守 DDR，OCRAM 守片内', hint: '地址分区',
+    note: 'TZC-380 在 MMDC 前面当门卫，只管 DDR；片内 OCRAM 由自己的控制器按区域放权限，两者互补。' },
+  { h: 'CSU 的八级权限', hint: '3 bit 八档',
+    note: 'CSU 把每个外设的 CSL 翻成八种放行组合，身份维度是「安全/非安全 × 特权/用户」；连 DMA 的身份也一起管。' },
+  { h: 'SJC 四级与一次性熔丝', hint: 'Enabled / Secure / No-Debug / Disabled',
+    note: 'JTAG 四档由 eFuse 选；熔丝烧了就不能改，所以测试阶段务必留着 Enabled。' },
+  { h: 'SNVS、DCP 与上手验证', hint: '四条验证',
+    note: 'SNVS 管防拆、ZMK、单调计数与 SRTC；DCP 加速 AES-128 与 SHA；验证看 hab_status、fuse read、J-Link、断电时间。' }
 ];
 
 function txt(parent, x, y, s, cls, anchor) {
@@ -3718,194 +3673,137 @@ function txt(parent, x, y, s, cls, anchor) {
 function box(x, y, w, h, fill, stroke, sw) {
   return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
 }
-function arrow(x1, y1, x2, y2) {
-  svgEl(scene, 'line', { x1: x1, y1: y1, x2: x2, y2: y2, stroke: 'var(--text-2)', 'stroke-width': 4 });
-  var a = Math.atan2(y2 - y1, x2 - x1), L = 18, W = 9;
-  svgEl(scene, 'path', {
-    d: 'M' + x2 + ' ' + y2 + ' L' + (x2 - L * Math.cos(a) + W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) - W * Math.cos(a)) +
-      ' L' + (x2 - L * Math.cos(a) - W * Math.sin(a)) + ' ' + (y2 - L * Math.sin(a) + W * Math.cos(a)) + ' Z',
-    fill: 'var(--text-2)', stroke: 'none'
-  });
-}
 function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+function three(a, b, c) {
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(a[0], 214, a[1]); for (var i = 0; i < a[2].length; i++) txt(scene, a[0], 252 + i * 36, a[2][i], a[3] || 't20w');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(b[0], 214, b[1]); for (var j = 0; j < b[2].length; j++) txt(scene, b[0], 252 + j * 36, b[2][j], b[3] || 't20w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(c[0], 214, c[1]); for (var k = 0; k < c[2].length; k++) txt(scene, c[0], 252 + k * 36, c[2][k], c[3] || 't20w');
+}
+function prose(title, lines) {
+  wide(456, 330);
+  txt(scene, 80, 490, title, 't24');
+  for (var i = 0; i < lines.length; i++) txt(scene, 80, 522 + i * 34, lines[i], 't20w');
+}
 
-function drawItems() {
-  txt(scene, 56, 146, '十一件组件，从信任根一路排到调试口', 't28w');
-  var cols = [80, 380, 680], rows = [210, 356, 502, 648], w = 280, h = 128;
-  ITEMS.forEach(function (it, i) {
-    var x = cols[i % 3], y = rows[Math.floor(i / 3)];
-    var on = i === state.item && state.item >= 0;
-    var g = svgEl(scene, 'g', {});
-    g.style.cursor = 'pointer';
-    svgEl(g, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: on ? 'var(--surface)' : 'var(--page)', stroke: on ? 'var(--observe-line)' : 'var(--line)', 'stroke-width': on ? 5 : 2 });
-    txt(g, x + 20, y + 50, it[0], 't28');
-    txt(g, x + 20, y + 96, it[1], 't28w');
-    g.addEventListener('click', function () { state.item = i; draw(); });
-  });
-  box(680, 648, 280, 128, 'var(--page)', 'var(--line)', 2);
-  txt(scene, 700, 700, '总原则', 't28');
-  txt(scene, 700, 748, '信任根先于一切', 't28w');
+function drawParts() {
+  txt(scene, 56, 146, '安全不是一个模块，而是八件东西叠出来的防线：任何一层单独拿出来都不牢靠，掉一层就得靠下一层兜', 't24w');
+  three([80, '启动与身份', ['HAB：ROM 里验签', 'SJC：JTAG 四档', 'OCOTP：一次性熔丝', 'SNVS：常电安全状态机', 'CSU：外设访问策略', 'SDMA 锁定模式'], 't20w'],
+        [680, '内存与执行', ['TrustZone：A7 的 NS 位', 'GIC：中断分组', 'WDOG-2：安全看门狗', 'TZC-380：DDR 分区', 'OCRAM：片内分区', 'TZ 地址空间控制'], 't20w'],
+        [1280, '密码学', ['DCP：数据协处理器', 'AES-128（ECB/CBC）', 'SHA-1 / SHA-256', '四个 AES 密钥槽', '密钥可来自 SNVS', '也可来自内部存储']]);
+  prose('把八件按“时间顺序”排一遍，就得到一条完整的信任链：上电验签 → 世界切换 → 内存分区 → 外设放行 → 调试关闭', [
+    '上电那一刻只有 ROM 可信，它验完签名才把控制权交出去；从这时起每一层都在“缩小下一个环节的权限”。',
+    '所以安全设计不是“加固某一个点”，而是“每一层都假设上一层已经被攻破”。',
+    '反过来，攻破也是从最弱的一层开始：很多“破解”其实就是 JTAG 没关或者 UART 下载没关，跟密码学无关。',
+    '对做产品的人，第一个要定的不是算法强度，而是“调试口在产品上关不关、什么时候关”。',
+    '对做学习板的人，保持全开是对的 —— 只有你自己知道这不是产品。',
+    '一句话：链条的强度等于最弱一环，而最弱一环通常是“为了方便留下的后门”。']);
+}
 
-  var it = ITEMS[state.item];
-  box(1020, 168, 850, 668, 'var(--surface)', 'var(--guide)');
-  head(1044, 220, it[0]);
-  txt(scene, 1044, 266, '守的是：' + it[1], 't28w');
-  svgEl(scene, 'line', { x1: 1044, y1: 288, x2: 1846, y2: 288, stroke: 'var(--guide)', 'stroke-width': 2 });
-  it[2].forEach(function (l, i) {
-    svgEl(scene, 'rect', { x: 1044, y: 320 + i * 88, width: 6, height: 34, fill: 'var(--cat-3-line)' });
-    txt(scene, 1068, 350 + i * 88, l, 't28w');
-  });
-  txt(scene, 1044, 700, '记这一条：', 't28');
-  txt(scene, 1044, 750, '安全是叠加出来的，', 't28w');
-  txt(scene, 1044, 796, '不是某一个寄存器打开就安全了。', 't28w');
+function drawHab() {
+  txt(scene, 56, 146, 'HAB 的根不在代码里，在 eFuse 里：烧进 OCOTP 的 SRK 哈希是唯一可信起点，之后一切靠它验', 't24w');
+  three([80, '验签流程', ['ROM 读 IVT（固定在 flash 头）', 'IVT 指向 CSF', 'CSF 里装证书链与命令', '用 SRK 哈希验证书', '用证书公钥验镜像哈希', '通过才跳转'], 't20s'],
+        [680, '签名算法', ['RSA-4096 签名校验', 'SHA-256 做摘要', 'CSF 由签名工具生成', '含“允许/禁止”命令', '可设引擎配置', '也可锁 CSU 策略'], 't20s'],
+        [1280, '配置状态', ['Open：允许未签名镜像', 'Closed：一律拒绝', 'SEC_CONFIG 在熔丝里', '烧错就救不回来', '量产前长期用 Open', '产品出厂才烧 Closed']]);
+  prose('“Open / Closed”这两个词是整个 HAB 的分水岭：Open 只报警不拦，Closed 直接拒绝运行', [
+    'Open 状态下 ROM 仍会验签，但失败只记录事件、不阻止启动 —— 这就是开发板“能跑自己的镜像”的原因。',
+    'Closed 状态下一旦验签失败，ROM 会进入串行下载（SDP）模式等你救，而不是跳去执行未签名代码。',
+    '熔丝是一次性的：SEC_CONFIG 烧成 Closed 就再也回不去，所以量产流程里这一步必须单独评审。',
+    'SRK 哈希有多个槽（可存多把公钥），这是为了支持密钥轮换：新固件用新钥签，旧钥逐步淘汰。',
+    'CSF 不只是“签名”，它还能下命令：配置引擎、锁 CSU、设定启动选项，相当于“签名过的启动脚本”。',
+    '判据：U-Boot 里 `hab_status` 若报 “No HAB Events Found” 说明验签通过；报事件则看事件码定位是哪一环失败。']);
+}
+
+function drawTz() {
+  txt(scene, 56, 146, 'TrustZone 把 CPU 分成两个世界：安全世界能看全部，非安全世界只能看被放行的那部分', 't24w');
+  three([80, 'CPU 侧', ['A7 的 NS 位标记当前世界', '安全世界跑 TEE/监控器', '非安全世界跑 Linux', '切换走 SMC 指令', '寄存器组可分世界', '异常向量也可分'], 't20w'],
+        [680, '中断侧', ['GIC 把中断分组', '组 0 只进安全世界', '组 1 进非安全世界', '安全中断优先级更高', '可屏蔽非安全中断', 'WDOG-2 属安全侧'], 't20w'],
+        [1280, '内存侧', ['OCRAM 可按区域设', 'TZC 管 DDR', '外设靠 CSU 放行', '三者要一起配', '只配一处等于没配', '常见漏洞就在这']]);
+  prose('TrustZone 常被误解成“CPU 的一个开关”，其实它是贯穿 CPU、中断、内存、外设的一整套标记体系', [
+    'CPU 的 NS 位只是“发起方身份”；能不能真的访问到，还要看内存控制器与外设桥是否认这个身份。',
+    '所以只把 CPU 切到安全世界、却没配 TZC 和 CSU，等于“穿着制服但没有钥匙”。',
+    'GIC 的分组很关键：把某个中断分到组 0，非安全世界就完全收不到它，这是“安全侧独占外设”的基础。',
+    'WDOG-2 是安全世界专属看门狗，用来保证“哪怕 Linux 挂了，安全侧也能复位系统”。',
+    '非安全世界想调安全服务，只能通过 SMC 陷入监控器，这是一次“受控越界”，不是直接跳转。',
+    '判据：在 Linux 里读一个被 TZ 保护的地址应触发 abort；在安全侧读同一地址应正常 —— 两侧对照才算验证。']);
+}
+
+function drawMem() {
+  txt(scene, 56, 146, '内存分区有两套：TZC-380 管 DDR（在 MMDC 前面当门卫），OCRAM 控制器管片内 RAM', 't24w');
+  three([80, 'TZC-380', ['在 MMDC 与总线之间', '按地址区间放行', '只对 DDR 生效', '拒绝即 abort + 记录地址', '区域有优先级', '配置要锁以防篡改'], 't20w'],
+        [680, 'OCRAM', ['片内 128 KB 级 SRAM', '按区域设安全属性', '可整块留给安全侧', 'TZ 与非 TZ 可共存', '常用于安全代码', '或 DMA 缓冲'], 't20w'],
+        [1280, '为什么要两套', ['DDR 在外、易被探针', 'SRAM 在内、更难读', '密钥类数据放 SRAM', '大数据放 DDR', '按数据敏感度分层', '别一律丢 DDR']]);
+  prose('“在 MMDC 前面当门卫”这个位置很关键：所有对 DDR 的访问都要先过它，包括 DMA 与 CPU，谁都绕不过去', [
+    'TZC 只认地址与发起方身份，不看内容，所以它防的是“越权访问”，不是“数据被读走”。',
+    '一旦拒绝，它会记录失败地址并对发起方产生 abort —— 这个记录地址是排查“谁在越权”的最直接证据。',
+    'OCRAM 分区的好处是“物理上就在片内”：外部探针很难读到，适合放密钥、安全启动代码、防拆逻辑。',
+    '两者互补：OCRAM 容量小但安全，DDR 容量大但暴露；分级存放是常规做法。',
+    '注意 TZC 也要“锁”：配置寄存器一般支持一次性锁定，锁了之后连安全世界也改不了，防止运行期被篡改。',
+    '判据：用非安全侧读受保护区间应 abort，且 TZC 失败地址寄存器记录到该地址；安全侧读同一区间正常。']);
 }
 
 function drawCsu() {
-  txt(scene, 56, 146, 'Table 11-1：一个外设一份权限，四档主体 × 8 种组合', 't28w');
-  box(56, 176, 950, 650, 'var(--page)', 'var(--line)');
-  head(80, 226, 'CSL 权限表');
-  var cols = [80, 176, 392, 532, 682, 832];
-  var labels = ['CSL', '寄存器值', '普通·用户', '普通·内核', '安全·用户', '安全·内核'];
-  labels.forEach(function (l, i) { txt(scene, cols[i], 274, l, 't28w'); });
-  svgEl(scene, 'line', { x1: 80, y1: 292, x2: 986, y2: 292, stroke: 'var(--guide)', 'stroke-width': 3 });
-  CSU.forEach(function (r, i) {
-    var y = 336 + i * 58, on = i === state.row;
-    var g = svgEl(scene, 'g', {});
-    g.style.cursor = 'pointer';
-    if (on) svgEl(g, 'rect', { x: 72, y: y - 38, width: 916, height: 46, rx: 6, fill: 'var(--surface)', stroke: 'var(--observe-line)', 'stroke-width': 3 });
-    txt(g, 80, y, '(' + r[0] + ')', 't28');
-    txt(g, 176, y, r[1], 't28w');
-    txt(g, 392, y, r[2], 't28w');
-    txt(g, 532, y, r[3], 't28w');
-    txt(g, 682, y, r[4], 't28w');
-    txt(g, 832, y, r[5], 't28w');
-    g.addEventListener('click', function () { state.row = i; draw(); });
-  });
-  txt(scene, 80, 806, 'CSL 存在 CSU 里，按外设逐个配；配完可以用 CSF 一并锁死。', 't28w');
-  var r = CSU[state.row];
-  box(1020, 168, 850, 400, 'var(--surface)', 'var(--guide)');
-  head(1044, 218, 'CSL = ' + r[0] + ' 这一档');
-  txt(scene, 1044, 268, '谁能碰：' + (r[2] === 'None' && r[3] === 'None' ? '只有安全世界' : '见左表结果'), 't28w');
-  svgEl(scene, 'line', { x1: 1044, y1: 292, x2: 1846, y2: 292, stroke: 'var(--guide)', 'stroke-width': 2 });
-  txt(scene, 1044, 344, r[6], 't28w');
-  txt(scene, 1044, 402, '读 / 写权限按主体分开算：', 't28w');
-  txt(scene, 1044, 448, 'RD = 只读，RD+WR = 读写，None = 拒绝', 't28w');
-  txt(scene, 1044, 494, '被拒的访问不会静默：会报总线错误', 't28w');
-
-  box(1020, 588, 850, 248, 'var(--page)', 'var(--line)');
-  head(1044, 636, '默认为什么是全开');
-  txt(scene, 1044, 686, '复位后 CSL=000，谁都读写得动，方便开发', 't28w');
-  txt(scene, 1044, 726, '产品化必须按外设逐个收紧，别指望默认值', 't28w');
-  txt(scene, 1044, 766, '策略写进 CSF，由 HAB 验过之后才生效', 't28w');
+  txt(scene, 56, 146, 'CSU 是“外设门卫”：它按主设备身份与从设备策略决定每一次总线访问是否放行，连 DMA 都管', 't24w');
+  three([80, '八级权限', ['000 全放行', '001 仅特权可写', '010 只给读（含用户）', '011 只给特权读', '100 只给安全世界', '110 安全只读 / 111 全禁'], 't20s'],
+        [680, '主设备身份', ['CSU 可覆盖 master 特权', '按策略改写 user/sup', '按策略改写 sec/nonsec', 'DMA 也带这套身份', '所以能防 DMA 越权', '不只看 CPU'], 't20w'],
+        [1280, '加固点', ['策略由 CSF 下发', '可在启动时锁定', '锁定后不可改', '运行期攻击面变小', '未锁定 = 可被改', '这是常见疏漏']]);
+  prose('CSL 的 8 位编码是“四类事务 × 读/写许可”的位图：手册表 11-1 直接给了每级的 8 位常量，抄值最稳', [
+    '手册给的常量依次是 0xFF、0xBB、0x3F、0x3B、0x33、0x22、0x03，最后一级全禁，对应 3 bit 的 000–111。',
+    '每个常量里的两位一组代表一类事务的读/写许可；具体位序以安全参考手册为准，工程上直接用表里的常量。',
+    '“能防 DMA 越权”是 CSU 存在的核心理由：软件自己受限，但它编程的 DMA 未必受限，DMA 会替它越界。',
+    '解决办法就是让 CSU 给 DMA 也打上身份，并让身份与发起软件一致 —— 这样 DMA 也读不到不该读的地址。',
+    '另一个关键是“锁定”：策略寄存器若不锁，任何拿到特权的人都能把它改回全放行，等于没配。',
+    '判据：配成 111 后访问该外设应 abort；改回 000 后恢复；再看锁定位是否已置，三者一起验才算完整。']);
 }
 
-function drawSnvs() {
-  txt(scene, 56, 146, 'SNVS 只回答一个问题：现在能不能用主密钥', 't28w');
-  box(56, 176, 940, 300, 'var(--page)', 'var(--line)');
-  head(80, 226, '判定链');
-
-  box(80, 254, 250, 92, 'var(--surface)', 'var(--line)', 2);
-  txt(scene, 100, 292, 'HAB 启动结果', 't28');
-  txt(scene, 100, 328, '验签过 / 没过', 't28w');
-  arrow(330, 300, 376, 300);
-
-  box(378, 254, 280, 92, 'var(--surface)', 'var(--observe-line)', 3);
-  txt(scene, 398, 292, '安全状态机', 't28');
-  txt(scene, 398, 328, '叠加篡改检测', 't28w');
-  arrow(658, 300, 704, 300);
-
-  box(706, 254, 270, 92, 'var(--surface)', 'var(--line)', 2);
-  txt(scene, 726, 292, 'secure / violation', 't28');
-  txt(scene, 726, 328, '只有两种结论', 't28w');
-
-  box(80, 366, 440, 92, 'var(--page)', 'var(--cat-6-line)', 3);
-  txt(scene, 100, 404, 'secure：放行主密钥', 't28');
-  txt(scene, 100, 440, '解长期机密与私有软件', 't28w');
-
-  box(540, 366, 436, 92, 'var(--page)', 'var(--cat-1-line)', 3);
-  txt(scene, 560, 404, 'violation：报警并擦密钥', 't28');
-  txt(scene, 560, 440, '发中断给 OS，ZMK 立即作废', 't28w');
-
-  box(56, 492, 940, 196, 'var(--surface)', 'var(--guide)');
-  head(80, 540, '防篡改怎么判');
-  txt(scene, 80, 586, '被动：期望电平固定，收到的电平一变就算事件', 't28w');
-  txt(scene, 80, 626, '主动：期望电平跟着时间翻转，对不上才算事件', 't28w');
-  txt(scene, 80, 666, '最多 10 个被动脚，或 5 对主动；每用一对，被动名额少 2 个', 't28w');
-
-  txt(scene, 80, 724, '触发之后的三件事：给系统上电、发报警中断、擦掉 ZMK 与安全内存。', 't28w');
-  txt(scene, 80, 768, '所以 SNVS 那一路必须常供，否则断电期间开盖也没人记。', 't28w');
-
-  box(1020, 168, 850, 320, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, '它替你保管什么');
-  txt(scene, 1044, 268, 'Master Key（OTPMK）存在熔丝里，SNVS 管它的读写', 't28w');
-  txt(scene, 1044, 310, '256 位 ZMK 可在出事时被自动清零', 't28w');
-  txt(scene, 1044, 352, 'DCP 用的 OTP 主密钥，也要经它放行', 't28w');
-  txt(scene, 1044, 394, '32 位通用寄存器：断电后还留着值', 't28w');
-  txt(scene, 1044, 436, '非易失单调计数器：防「回滚到旧版本」', 't28w');
-
-  box(1020, 508, 850, 328, 'var(--page)', 'var(--line)');
-  head(1044, 556, '两个计数器，别混');
-  txt(scene, 1044, 608, '安全实时计数器：受篡改保护，芯片断电仍在跑', 't28w');
-  txt(scene, 1044, 650, '普通实时计数器：可设闹钟与周期中断，给系统用', 't28w');
-  txt(scene, 1044, 692, '单调计数器只能往上走，回滚攻击就靠它拦', 't28w');
-  txt(scene, 1044, 734, 'SNVS_LP 还管 ONOFF 按钮与给 PMIC 的脉冲', 't28w');
-  txt(scene, 1044, 776, '这一块是唯一「断电也在值班」的安全区', 't28w');
+function drawSjc() {
+  txt(scene, 56, 146, 'JTAG 是芯片上最强的后门：能读内存、能停 CPU，所以 SJC 用熔丝把它分成四档，烧了就不能改', 't24w');
+  three([80, '四档', ['JTAG Enabled：不限制', 'Secure JTAG：需挑战应答', 'No-Debug：敏感功能全禁', 'Disabled：永久禁止', '档位由 eFuse 选', '熔丝一次性'], 't20s'],
+        [680, 'Secure JTAG 怎么玩', ['主机发随机挑战', '芯片用密钥算响应', '响应对才开调试', '密钥来自熔丝', '没有密钥就连不上', '这才是“产品级”'], 't20w'],
+        [1280, '开发板现实', ['默认 Enabled', 'J-Link 直连可用', '量产前千万别烧', '烧成 No-Debug 就回不来', '新手常在这翻车', '先想清楚再烧']]);
+  prose('“No-Debug”比“Disabled”更阴：它保留 JTAG 的边界扫描（BSD）用于产线测试，但把所有能读内存、能停核的功能全禁了', [
+    '所以产线可以用 BSD 做连通性测试，却拿不到任何代码与数据 —— 这是量产最常用的档位。',
+    '“Secure JTAG”需要挑战应答协议：调试器与芯片各算一遍，对上了才放行，密钥在熔丝里，抄不出来。',
+    '“Disabled”则连 BSD 都没有，彻底断掉，通常只在极端安全的产品上用。',
+    '这四个档位都靠 eFuse 选，烧之前一定确认：烧错档位等于把这颗芯片“用废”，只能换片。',
+    '开发阶段必须留 Enabled，否则你连自己的板子都调不了 —— 这不是理论风险，是常见的实操事故。',
+    '判据：改成 No-Debug 后 J-Link 应立刻连不上（但 BSD 仍可跑）；改回 Enabled 需重新烧片，因为熔丝不可逆。']);
 }
 
-function drawChain() {
-  txt(scene, 56, 146, '信任链：起点在熔丝，终点在 secure 位', 't28w');
-  var nodes = [
-    ['① eFuse 里的 SRK 哈希', '烧一次，之后谁都改不了这把公钥'],
-    ['② ROM + HAB 验签名', 'RSA-4096 验 CSF 与镜像，不过就不执行'],
-    ['③ CSF 里写 CSU 策略', '外设权限随镜像一起签，一起生效'],
-    ['④ 进 Secure 世界', 'TZ 分区、TZC、OCRAM 保护开始起作用'],
-    ['⑤ SNVS 置 secure', '到这一步，主密钥才允许被用来解密']
-  ];
-  nodes.forEach(function (n, i) {
-    var y = 196 + i * 98;
-    box(80, y, 840, 82, i === 4 ? 'var(--surface)' : 'var(--page)', i === 4 ? 'var(--observe-line)' : 'var(--line)', i === 4 ? 4 : 2);
-    txt(scene, 104, y + 36, n[0], 't28');
-    txt(scene, 104, y + 72, n[1], 't28w');
-    if (i < 4) arrow(500, y + 82, 500, y + 96);
-  });
-  txt(scene, 80, 742, '链断在哪一环，后面的组件就都白配：断了②，③④⑤根本没机会跑。', 't28w');
-  txt(scene, 80, 786, 'HAB 只验签名，不负责加密；加密与随机数交给 DCP。', 't28w');
-
-  box(1020, 168, 850, 300, 'var(--surface)', 'var(--guide)');
-  head(1044, 216, 'DCP：唯一的加密加速口');
-  txt(scene, 1044, 268, 'AES-128，ECB 与 CBC 两种模式', 't28w');
-  txt(scene, 1044, 308, 'SHA-1 / SHA-256 摘要', 't28w');
-  txt(scene, 1044, 348, '密钥可来自 SNVS、DCP 内部槽、或普通内存', 't28w');
-  txt(scene, 1044, 388, '四个 AES-128 密钥槽，写进去只有引擎能读', 't28w');
-  txt(scene, 1044, 428, '挂 IP slave 接口，也能自己发 DMA', 't28w');
-
-  box(1020, 486, 850, 350, 'var(--page)', 'var(--line)');
-  head(1044, 534, 'SJC：JTAG 四档，熔丝选定');
-  txt(scene, 1044, 584, 'Disabled：JTAG 永久封死', 't28w');
-  txt(scene, 1044, 624, 'No-Debug：所有安全相关调试特性永久封死', 't28w');
-  txt(scene, 1044, 664, 'Secure：并入 No-Debug，但要过密钥问答才放行', 't28w');
-  txt(scene, 1044, 704, 'Enabled：不限制，产线调试用', 't28w');
-  txt(scene, 1044, 744, '四档由 eFuse 选，量产前想清楚再烧', 't28w');
-  txt(scene, 1044, 784, '它还兼 IEEE 1149.1 / 1149.6 边界扫描', 't28w');
+function drawVerify() {
+  txt(scene, 56, 146, '验证安全配置不需要复杂工具：四个动作分别打信任链、熔丝、调试口、常开域', 't24w');
+  three([80, '四条验证', ['hab_status 看 SEC_CONFIG', 'fuse read 看 SRK 哈希', 'J-Link 连不连得上', '断电看时间是否归零', '四条各打一层', '缺一条就说不清'], 't20s'],
+        [680, 'SNVS 的能力', ['256 bit 零化主密钥（ZMK）', 'OTPMK 存熔丝里', '单调计数器防回滚', 'SRTC 断电continued', '10 路无源防拆 / 5 对', '或 5 对有源'], 't20w'],
+        [1280, '板级真相', ['核心板 SNVS_TAMPER0', '借给了加速度计中断', '其余九根引到排针', '没有纽扣电池位', '断电后时间归零', '防拆断电即失效']]);
+  prose('手册写的能力和板子能给的能力要分开看：这颗核心板没有纽扣电池位，所以 SNVS 的“常开”在断电后并不成立', [
+    '这意味着断电期间防拆、SRTC、单调计数全部停摆 —— 想做真正的产品级防拆，必须自己加纽扣电池。',
+    'DCP 是免费的性能红利：AES-128（ECB/CBC）与 SHA-1/256 走硬件，比软件快一到两个数量级，还不占 CPU。',
+    'DCP 的四个密钥槽只能被 AES 引擎读，CPU 读不到 —— 这就是“密钥不进内存”的基本做法。',
+    '密钥来源可以是 SNVS 的 OTPMK，也可以是内部存储或普通内存，安全等级依次降低。',
+    '“断电时间归零”是最简单的判据：拔电 30 秒再上电，date 归零说明没有独立供电；不变说明有电池。',
+    '判据四件套：hab_status 无事件、fuse read 显示 SRK 已烧、No-Debug 下 J-Link 失败、断电后时间归零。']);
 }
 
 function draw() {
-  var s = STEPS[state.step];
-  $('hint').textContent = s.hint;
-  $('note').textContent = s.note;
-  scene.textContent = '';
-  if (state.step === 0) drawItems();
-  else if (state.step === 1) drawCsu();
-  else if (state.step === 2) drawSnvs();
-  else drawChain();
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawParts();
+  else if (s === 1) drawHab();
+  else if (s === 2) drawTz();
+  else if (s === 3) drawMem();
+  else if (s === 4) drawCsu();
+  else if (s === 5) drawSjc();
+  else drawVerify();
 }
 
-var step = stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
-void step;
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
 zoomable(document.querySelector('.bd-stage'));
-resetButton($('reset'), function () {
-  state.step = INIT.step; state.item = INIT.item; state.row = INIT.row; draw();
-});
+resetButton($('reset'), function () { state.step = INIT.step; draw(); });
 fitCanvas($('viewport'), $('canvas'), draw);
 </script>
 </body>
