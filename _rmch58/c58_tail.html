@@ -1,0 +1,190 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0 };
+var state = { step: INIT.step };
+
+var STEPS = [
+  { h: '两路 SD 主机', hint: '0x0219_0000 / 4000',
+    note: 'SD 卡与 eMMC 都挂在 uSDHC 上，两路基址只差 0x4000，寄存器完全同构。' },
+  { h: '一条命令怎么发', hint: 'CMD_XFR_TYP',
+    note: '命令号、响应类型、是否带数据、是否校验，全写进这一个寄存器，写它即发送。' },
+  { h: '时钟与总线宽度', hint: '分频 + DTW',
+    note: '卡时钟由 SDCLKFS 与 DVS 两级分频得到；总线宽度在 PROT_CTRL 的 DTW 里选。' },
+  { h: '数据怎么搬', hint: '三种 DMA',
+    note: 'CPU 轮询、SDMA 单地址、ADMA 描述符表；块大小与块数在 BLK_ATT 里定。' },
+  { h: '中断与错误', hint: '两级使能',
+    note: '状态位是写 1 清；错误类中断（超时、CRC、数据线）必须单独看，别只看 CC。' },
+  { h: '卡的初始化流程', hint: 'CMD0→ACMD41',
+    note: '从复位卡到能读写，是一条固定的命令序列；顺序错任何一步都拿不到 RCA。' },
+  { h: '高速与调优', hint: 'DLL 与 tuning',
+    note: 'SDR104/HS200 必须做窗口扫描（tuning），否则读数据会随温度与板子漂移。' },
+  { h: '板上判据', hint: '先看 CD 与时钟',
+    note: '卡座 CD 脚、CLK 频率、CMD 上拉，这三样不对，驱动再对也没用。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+function three(a, b, c) {
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(a[0], 214, a[1]); for (var i = 0; i < a[2].length; i++) txt(scene, a[0], 252 + i * 36, a[2][i], a[3] || 't20w');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(b[0], 214, b[1]); for (var j = 0; j < b[2].length; j++) txt(scene, b[0], 252 + j * 36, b[2][j], b[3] || 't20w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(c[0], 214, c[1]); for (var k = 0; k < c[2].length; k++) txt(scene, c[0], 252 + k * 36, c[2][k], c[3] || 't20w');
+}
+function prose(title, lines) {
+  wide(456, 330);
+  txt(scene, 80, 490, title, 't24');
+  for (var i = 0; i < lines.length; i++) txt(scene, 80, 522 + i * 34, lines[i], 't20w');
+}
+
+function drawTop() {
+  txt(scene, 56, 146, 'SD 卡的“协议”全在主机这一侧：控制器负责发命令、收响应、搬数据，卡只负责应答', 't24w');
+  three([80, '两路实例', ['uSDHC1  0x0219_0000', 'uSDHC2  0x0219_4000', '两路寄存器布局相同', '本板 SD 卡走 uSDHC1', 'eMMC 常走 uSDHC2', '引脚复用要先配好'], 't20s'],
+        [680, '能力寄存器', ['+0x40 HOST_CTRL_CAP', '复位 0x07F3_B407', '里面写死了时钟与电压能力', '只读，别写', '能读它说明地址正确', '用它算可用分频范围'], 't20s'],
+        [1280, '支持什么', ['SD 2.0 / SDHC / SDXC', 'SDIO 设备', 'MMC/eMMC（含 8 位）', '1 位与 4 位总线', '可做高速与 SDR 模式', '不负责卡内协议栈']]);
+  prose('本章讲的是“主机控制器”，不是“卡文件系统”：控制器只管把命令按 SD 协议发出去，FAT/ext4 与块层都在软件里', [
+    '所以“卡插上没反应”与“能识别但挂载失败”是两个层次的问题：前者是本章，后者是文件系统。',
+    '两路实例完全同构，意味着写好的初始化序列可以只换基址就复用；差异在引脚、卡座检测脚与供电开关。',
+    'HOST_CTRL_CAP 里的“基频”字段告诉你控制器最高能跑多快，实际会用 SDCLKFS/DVS 分频到卡支持的速度。',
+    'uSDHC1 通常接 TF 卡座（可插拔），uSDHC2 接板载 eMMC 或 NAND（不可插拔），所以两路的错误处理策略并不一样。',
+    '热插拔必须靠卡座的 CD（card detect）脚，控制器本身不知道“卡在不在”是靠 PRES_STATE 的卡检测位读引脚。',
+    '一句话：先把“控制器能不能发命令”跑通（读 CID），再谈速度与文件系统。']);
+}
+
+function drawCmd() {
+  txt(scene, 56, 146, '发一条命令只需要写一个寄存器：命令号 + 响应类型 + 校验要求 + 是否带数据，写下去就发', 't24w');
+  three([80, 'CMD_XFR_TYP 位域', ['[29:24] CMDINX 命令号', '[23:22] CMDTYP 类型', '[21] DPSEL 带数据', '[20] CICEN 查命令号', '[19] CCCEN 查 CRC', '[17:16] RSPTYP 响应类型'], 't20s'],
+        [680, '响应与校验对照', ['00 = 无响应', '01 = R2（136 位，不查 CRC）', '10 + 不查 = R3/R4', '10 + 查 = R1/R5/R6', '11 + 查 = R1b/R5b（等忙）', 'R3/R4 的 CRC 恒为全 1'], 't20s'],
+        [1280, '响应放哪', ['+0x10 RSP0 最低 32 位', '+0x14 RSP1', '+0x18 RSP2', '+0x1C RSP3 最高 32 位', 'R2 要 4 个一起拼', '命令参数写 +0x08']]);
+  prose('CMDINX 是 6 位，正好覆盖 SD 规范的 0–63 号命令；写错一位就是“发了个不存在的命令”，卡要么不回要么回错误', [
+    '“写它即发送”这点很关键：不需要额外的“start”位，所以必须先把 CMD_ARG、BLK_ATT 等前置寄存器配好，最后才写 CMD_XFR_TYP。',
+    'R1b（11 型）会在响应后继续等卡释放数据线（忙），适合 CMD7、CMD12 这类会“占线”的命令。',
+    'R2 是 136 位响应（CID/CSD），CRC 检查必须关掉（CCCEN=0），否则永远收不到完整响应。',
+    '发命令前要查 PRES_STATE 的 CIHB/CDIHB：前者表示命令线在忙，后者表示数据线在忙；写早了会被硬件静默丢弃。',
+    '带数据的命令还必须让块大小与块数都非 0（单块时 MSBSEL=0 即可），否则控制器会忽略这条命令 —— 这是“命令发出去了却没反应”的常见原因。',
+    '判据：发 CMD0（RSPTYP=00）后读 INT_STATUS 应见 CC；发 CMD8（R7）后 RSP0 的低 12 位应回 0x1AA 的电压模式。']);
+}
+
+function drawClock() {
+  txt(scene, 56, 146, '卡时钟是两级分频出来的：先 SDCLKFS 粗分，再 DVS 细分；总线宽度则在另一个寄存器里选', 't24w');
+  three([80, '时钟', ['SYS_CTRL[15:8] SDCLKFS', 'SYS_CTRL[7:4] DVS', '最终时钟 = 基频/分频', '先配分频再置使能', '改分频前先停时钟', 'DVS 只在部分模式生效'], 't20s'],
+        [680, '总线宽度', ['PROT_CTRL[2:1] DTW', '00 = 1 位', '01 = 4 位', '10 = 8 位（仅 MMC）', '复位 0x0880_0020 是 1 位', '要用 4 位必须改它'], 't20s'],
+        [1280, '状态判据', ['PRES_STATE[0] CIHB 命令线忙', '[1] CDIHB 数据线忙', '[2] DLA 数据线在用', '[3] SDSTB 时钟稳定', '复位值 0x0000_8080', '忙时别写配置']]);
+  prose('上电后卡只跑 400 kHz 以下的识别时钟：先慢速完成识别，再切到高速，这是 SD 规范强制的顺序', [
+    '所以“卡不认”时常把时钟降到 400 kHz 重试，成功率高很多 —— 这不是玄学，是规范要求的初始化速率。',
+    'SYS_CTRL 复位值 0x8080_800F 里已经带了一些默认置位，改它必须“读回 → 改位 → 写回”，整字覆盖会关掉不该关的东西。',
+    '停时钟（把分频设到最大或清使能）后要等 SDSTB 稳定，再改分频，然后再开 —— 顺序反了会出现“时钟毛刺被卡当成命令”。',
+    '总线宽度必须在卡侧也切换（ACMD6）之后才改 DTW，否则会出现“主机 4 位、卡还在 1 位”的错配，数据全错。',
+    'PRES_STATE 的 CIHB/CDIHB 是所有写操作的前置条件：中断里想立刻发下一条命令，先确认这两位都清了。',
+    '判据：把分频设为识别速率，量 CLK 脚应得 400 kHz 以内；切到 4 位后读 PRES_STATE 的 DLA 应在传输期间为 1。']);
+}
+
+function drawData() {
+  txt(scene, 56, 146, '数据搬运有三条路：CPU 轮询缓冲口、SDMA 单地址、ADMA 描述符表；块参数在 BLK_ATT 里定', 't24w');
+  three([80, '块参数', ['+0x04 BLK_ATT', '[12:0] BLKSIZE 块大小', '[31:16] BLKCNT 块数', '单块时 MSBSEL=0', '多块时 BCEN=1', 'BLKSIZE 为 0 不许传输'], 't20s'],
+        [680, '三种搬运', ['CPU：读写 +0x20 缓冲口', 'SDMA：+0x00 写一个地址', 'ADMA：+0x58 写描述符表', 'ADMA 有 32 位地址描述符', 'ADMA 出错看 +0x54', '小数据用 CPU 最省事'], 't20s'],
+        [1280, '水位线', ['+0x44 WTMK_LVL', '复位 0x0810_0810', '高 16 位 = 读水印', '低 16 位 = 写水印', '水印大 → 突发更长', '水印太大致使延迟变差']]);
+  prose('块大小必须是 2 的幂且不超过卡支持的最大块长；SD 卡标准块是 512 字节，写 1000 这样的值会被卡拒绝', [
+    'BLKSIZE 为 0 时控制器直接忽略整条命令（手册明确写了），这是“命令发出去了但没数据”的第一嫌疑。',
+    'ADMA 描述符里带长度与地址，可以一次描述多个不连续缓冲；代价是要保证描述符本身的 cache 一致性。',
+    'SDMA 只有一个地址寄存器，适合连续大缓冲；多块传输时硬件自己递增地址。',
+    'CPU 轮询虽然慢，但在小数据（读写 CSD、CID）时最省事，也最容易调试。',
+    '读方向（DTDSEL=1）与写方向必须与命令一致（CMD17 读、CMD24 写），写错方向会搬出错数据而不报错。',
+    '判据：读一块 512 字节后与预期内容比对；若内容“整体偏移”或“重复”，先查块大小与方向位。']);
+}
+
+function drawIrq() {
+  txt(scene, 56, 146, '中断是两级开关：状态位（写 1 清）→ 状态使能 → 信号使能 → 真正到 GIC，三级任一没开就没有中断', 't24w');
+  three([80, '常用状态位', ['CC 命令完成', 'TC 传输完成', 'DINT DMA 中断', 'BRR 缓冲读就绪', 'BWR 缓冲写就绪', '全部写 1 清'], 't20s'],
+        [680, '错误类', ['CTOE 命令超时', 'CCE 命令 CRC 错', 'CEBE 命令结束位错', 'AC12E 自动 CMD12 错', 'DMAE DMA 错', 'TNE 传输未完成'], 't20s'],
+        [1280, '三级使能', ['+0x30 INT_STATUS（只状态）', '+0x34 INT_STATUS_EN 状态使能', '+0x38 INT_SIGNAL_EN 信号使能', '两级都要置 1', '只开一级 = 中断不来', '错误位建议单独处理']]);
+  prose('“中断不来”九成是只开了 INT_STATUS_EN 忘了 INT_SIGNAL_EN；这两级是串联的，缺一级就断在中间', [
+    '反之“中断一下停不下来”是状态位没清：所有位都是写 1 清，读不会清。',
+    '错误类中断要单独开、单独处理：CTOE 表示卡在 64 个时钟内没应答，通常是卡没插好或电压不对。',
+    'CCE（CRC 错）在识别阶段很常见，若换了慢时钟就好，说明信号质量而非卡的问题。',
+    'DMAE 表示 ADMA 描述符有问题（地址错、长度 0、描述符没按 8 字节对齐），查 +0x54 的 ADMA 错误状态可定位。',
+    '建议做法：正常事件用中断，错误事件用“中断 + 轮询状态”双保险，因为中断可能被更高优先级抢占而延迟。',
+    '判据：发一条单块读命令，应依次看到 CC、BRR/BWR、TC；若只有 CC 没有 TC，说明数据阶段没走完。']);
+}
+
+function drawInit() {
+  txt(scene, 56, 146, '从插卡到能读写是一条固定序列：复位卡 → 查电压 → 读 OCR → 拿 CID → 分 RCA → 选卡 → 定宽度', 't24w');
+  three([80, '识别序列', ['CMD0 复位（进 idle）', 'CMD8 查 2.0 与电压', 'ACMD41 查 OCR 并轮询', 'CMD2 取 CID（R2）', 'CMD3 取 RCA（R6）', 'CMD9 取 CSD（R2）'], 't20s'],
+        [680, '进入传输态', ['CMD7 选中卡（R1b）', 'ACMD6 设 4 位总线', 'CMD16 设块长 512', '此后可读写', 'CMD17/18 读', 'CMD24/25 写'], 't20s'],
+        [1280, '易错点', ['ACMD41 要循环发', '直到 OCR 的忙位为 1', 'CMD8 失败 = 老卡', '走 CMD55+ACMD41 慢路径', 'CMD3 前不能读数据', '跳过 CMD7 卡仍是 standby']]);
+  prose('ACMD41 是“轮询式”的：卡上电需要时间，主机要反复发直到它把 busy 位清掉，固定延时一次是不够的', [
+    '每一次 ACMD41 前面都要先发 CMD55（RCA=0 表示“下一条是应用命令”），漏发就等于发了个普通 CMD41，卡不理。',
+    'CMD8 返回 0x1AA 表示支持 2.0 高容量；若命令超时（CTOE），说明是老卡，要走 SDSC 的初始化路径并把电压范围放宽。',
+    'CMD2 的响应是 136 位 CID，包含厂商、产品名与序列号；拿到它才算“认出了这张卡”。',
+    'RCA 是卡的“临时地址”，之后所有命令都带这个地址（CMD_XFR_TYP 的 CMD_ARG 高 16 位放 RCA）。',
+    'eMMC 的序列不同：没有 ACMD41，用 CMD1 轮询 OCR，然后 CMD2/CMD3，且支持 8 位总线与 HS200。',
+    '判据：读出的 CID 里厂商 ID 与卡面品牌一致、CSD 里的容量与标称一致，说明识别链路完全正确。']);
+}
+
+function drawTuning() {
+  txt(scene, 56, 146, '超过 50 MHz 后不能再“固定采样点”：必须在数据窗口里扫一遍找出最佳相位，这就是 tuning', 't24w');
+  three([80, '相关寄存器', ['+0x60 DLL_CTRL 复位 0x0200', '+0x64 DLL_STATUS 只读', '+0x68 CLK_TUNE_CTRL_STATUS', '+0xCC TUNING_CTRL 0x0021_2800', '+0xC0 VEND_SPEC 0x2000_7809', 'DLL 锁定状态要等'], 't20s'],
+        [680, '什么时候要做', ['SDR50 及以下可不做', 'SDR104 必须做', 'eMMC HS200 必须做', '换卡/换温度后重做', '调优失败要降速', '别跳过直接跑'], 't20w'],
+        [1280, '失败怎么办', ['先降一档速度', '再查走线与上拉', 'CMD/DATA 需 10 k 上拉', '电源纹波大也会调优失败', '多次失败 = 信号余量不足', '宁可降速也别丢数据']]);
+  prose('tuning 的本质是“找眼图中心”：扫 128 或 64 个相位点，记录哪些点能正确读到已知图案，取连续窗口的中间', [
+    '没做 tuning 就跑 SDR104，典型现象是“刚上电正常，跑热了开始读错，最后卡死”——相位漂出窗口。',
+    'DLL 是否锁定可以从 DLL_STATUS 读；未锁定就跑高速，误码率会高得离谱。',
+    'TUNING_CTRL 的复位值已经给了默认窗口参数，一般不需要改；改它通常是“已经确认信号很好、想缩短扫描时间”。',
+    '板级上 CMD 与 DAT 线的 10 kΩ 上拉不是可选项：缺了上拉，高速时线电平会浮，调优必然失败。',
+    'eMMC 的 HS200 还要求 8 位总线与专用时序，切之前要确认卡与控制器都支持，否则会“识别成功但读写报错”。',
+    '判据：跑 tuning 后读状态，应看到一段连续的成功窗口且 DLL 已锁；随后连续读 100 MB 无 CRC 错。']);
+}
+
+function drawBoard() {
+  txt(scene, 56, 146, '上板排查四条：卡座 CD 脚对不对、CLK 有没有 400 kHz、CMD 有没有上拉、供电是不是 3.3 V', 't24w');
+  three([80, '卡座与检测', ['CD 脚接地 = 有卡', '多数卡座是常开开关', '要配上拉与去抖', 'GPIO 方式或 PRES_STATE', '无 CD 的卡座只能轮询', '插拔事件靠软件定时'], 't20w'],
+        [680, '信号与电源', ['CLK 空闲时可为低或高', 'CMD/DAT 需上拉', 'VCC 3.3 V（SD 模式）', 'UHS 才用 1.8 V', '电流峰值可达数百 mA', '供电弱会“识别后掉卡”'], 't20w'],
+        [1280, '软件判据', ['读 CID 是否合理', '读 CSD 算容量', 'dd 读 10 MB 比对 md5', '连续读写 30 分钟', '看 INT_STATUS 有无 CCE', '有 CRC 错就降速']]);
+  prose('最快的自检是“读 CID + 读一块 + 比对”：三步都过，说明命令、时钟、数据三条链路全部正常', [
+    '读 CID 失败但 CLK 有波形：查 CMD 线上拉与卡是否真的上电（量 VCC 而不是看代码）。',
+    '读 CID 成功但读块失败：查数据线宽度与 DAT 上拉，尤其 4 位模式下 DAT1/2/3 是否被别的功能占用。',
+    '能读不能写：先查写保护开关（卡座 WP 脚）与 CSD 里的写保护位，再看是否真的是“只读卡”。',
+    '“识别后掉卡”多半是供电：TF 卡写操作峰值电流大，LDO 带不动就会瞬间掉压复位。',
+    '若用了 eMMC，注意它没有 CD 脚，且上电后需要额外的复位时序（部分颗粒要求 CMD0 前先给时钟）。',
+    '判据：连续 30 分钟 dd 读写循环无误码、INT_STATUS 无 CRC/超时错误，这条 SD 通路才算稳定。']);
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) drawCmd();
+  else if (s === 2) drawClock();
+  else if (s === 3) drawData();
+  else if (s === 4) drawIrq();
+  else if (s === 5) drawInit();
+  else if (s === 6) drawTuning();
+  else drawBoard();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () { state.step = INIT.step; draw(); });
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>
