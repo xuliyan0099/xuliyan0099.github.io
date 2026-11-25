@@ -2477,13 +2477,13 @@ text.bd-an-inner { font-size: var(--size-l4); }
   <symbol id="i-drag" viewBox="0 0 24 24"><title>拖动</title><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></symbol>
   <symbol id="i-speak" viewBox="0 0 24 24"><title>朗读</title><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
   <symbol id="i-fullscreen" viewBox="0 0 24 24"><title>全屏</title><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
-  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>RM 第 17 章 · NAND 纠错加速器 BCH | i.MX6ULL 逐章解读</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
+  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>RM 第 13 章 · ADC 通道、触发与转换 | i.MX6ULL 逐章解读</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
 </svg>
 
 <div class="bd-viewport" id="viewport">
   <div class="bd-canvas" id="canvas">
     <header class="bd-titlebar">
-      <h1>第 17 章 · NAND 纠错加速器 BCH</h1>
+      <h1>第 17 章 · BCH 纠错：从位数算术到读页时序</h1>
       <span class="bd-hint" id="hint"></span>
       <div class="bd-readings">
         <span class="bd-reading bd-reading-emphasis">
@@ -2506,8 +2506,7 @@ text.bd-an-inner { font-size: var(--size-l4); }
         <button class="bd-btn" type="button" id="next"></button>
       </div>
       <div class="bd-actions">
-        <a class="bd-btn" href="c16.html" style="text-decoration:none">← RM16</a>
-        <a class="bd-btn" href="c18.html" style="text-decoration:none">RM18 →</a>
+        <a class="bd-btn" href="c16.html" style="text-decoration:none">← RM16</a> <a class="bd-btn" href="c18.html" style="text-decoration:none">RM18 →</a>
         <a class="bd-btn" href="index.html" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">☰ 目录</a>
         <button class="bd-btn" type="button" id="reset"></button>
       </div>
@@ -3653,6 +3652,23 @@ function reader(root, sentences, opts) {
 .t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
 .t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
 .t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
 </style>
 <script>
 var $ = function (id) { return document.getElementById(id); };
@@ -3670,8 +3686,12 @@ var STEPS = [
     note: '一颗 NAND 的页怎么切块、每块纠几位、metadata 单独保护还是并进第一块，全部由四个 layout 寄存器描述；片选号通过 LAYOUTSELECT 索引到某一套布局。复位值本身就是一张 4K+218 的可用布局。' },
   { h: '寄存器只有二十个', hint: '0x00 … 0xF0',
     note: 'CTRL 管复位、时钟、中断与内存到内存模式；STATUS0 报结果；MODE 管空白页判据；三个指针给内存到内存用；LAYOUTSELECT 与四对 LAYOUT 寄存器描述页格式。全部 32 位，SET/CLR/TOG 三个别名跟在主寄存器后面。' },
+  { h: '纠错能力的算术', hint: 't × 13 bit',
+    note: 'GF(2^13) 下每纠 1 bit 要 13 bit 校验：t=40 → 520 bit = 65 B/块，4 块就 260 B，已超过 4K 页的 218 B spare —— 这就是 layout 必须折中的原因。' },
   { h: '不接 NAND 也能练', hint: '内存到内存 + 环路',
-    note: 'BCH 有 memory-to-memory 模式：给三个指针、选布局、写 M2M_ENABLE，它就在 DDR 里做一次编码或解码，完全不碰 GPMI。造几个错位再解码，就能把纠错链路整个跑通——这是这块板子上最实际的练法。' },
+    note: 'BCH 有 memory-to-memory 模式：给三个指针、选布局、写 M2M_ENABLE，它就在 DDR 里做一次编码或解码，完全不碰 GPMI。' },
+  { h: '一次读：GPMI 与 BCH 协同', hint: '搬 → 解 → 报',
+    note: 'APBH 把整页（数据+spare 里的校验）搬进 DDR，再触发 BCH 解码；BCH 报状态，GPMI 才能把页标记为好/坏。任何一环顺序错，结果都不可信。' },
   { h: '结果怎么读', hint: 'STATUS0 · STATUS1 · IRQ',
     note: '一次操作完成后先读 STATUS0/1 再清中断位：STATUS_BLK0 给出第一块的错误数（0xFE 不可纠、0xFF 空白页），COMPLETED_CE 告诉你是哪个片选，CORRECTED/UNCORRECTABLE 是两个总标志。清早了，后续完成会被挂住。' }
 ];
@@ -3880,13 +3900,91 @@ function drawVerify() {
   txt(scene, 80, 746, '排查顺序：CTRL 复位位 → 布局寄存器读回 → STATUS0 错误数 → BM_ERROR_IRQ（指针问题）。', 't20w');
 }
 
+function drawMath() {
+  txt(scene, 56, 146, '纠错强度不是随便选的：它按 t×13 bit 直接吃掉 spare 区，强度越高留给坏块标记的空间越少', 't24w');
+
+  box(56, 176, 560, 236, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '符号宽度 13 bit');
+  txt(scene, 80, 252, 'GF(2^13)，符号 8192 个', 't20w');
+  txt(scene, 80, 288, '每纠 1 bit 要 13 bit 校验', 't20w');
+  txt(scene, 80, 324, 't = 2 → 26 bit ≈ 4 B', 't20w');
+  txt(scene, 80, 360, 't = 24 → 312 bit = 39 B', 't20w');
+  txt(scene, 80, 396, 't = 40 → 520 bit = 65 B', 't20w');
+
+  box(656, 176, 560, 236, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '4K 页的预算');
+  txt(scene, 680, 252, '数据 4096 B 分 4 块', 't20w');
+  txt(scene, 680, 288, 'spare 只有 218 B', 't20w');
+  txt(scene, 680, 324, '40 bit × 4 = 260 B', 't20w');
+  txt(scene, 680, 360, '260 > 218，装不下', 't20w');
+  txt(scene, 680, 396, '这就是 layout 要折中的原因', 't20w');
+
+  box(1256, 176, 612, 236, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '可行的组合');
+  txt(scene, 1280, 252, '24 bit × 4 = 156 B ✓', 't20w');
+  txt(scene, 1280, 288, '40 bit × 3 = 195 B ✓', 't20w');
+  txt(scene, 1280, 324, '剩 23 B 给坏块标记', 't20w');
+  txt(scene, 1280, 360, '或把 metadata 并进第一块', 't20w');
+  txt(scene, 1280, 396, 'LAYOUT 里 META 位干这个', 't20w');
+
+  box(56, 432, 1812, 360, 'var(--surface)', 'var(--guide)');
+  head(80, 470, '为什么“强度越高越好”是错的');
+  txt(scene, 80, 508, '每提高 1 bit 纠错，每块多 13 bit（约 1.6 B）；4 块就是 6.5 B —— spare 区就这么被吃掉。', 't20w');
+  txt(scene, 80, 542, '而坏块标记、页状态、元数据也要占 spare，所以 ECC 一旦占满，就没有地方放坏块信息了。', 't20w');
+  txt(scene, 80, 576, '经验折中：MLC 常用 24 bit、SLC 常用 40 bit；4K+218 的页配 24 bit/4 块最从容。', 't20w');
+  txt(scene, 80, 610, '强度不足的后果是“用久了开始丢数据”；强度过高的后果是“写不进 spare、或没了坏块标记”。', 't20w');
+  txt(scene, 80, 644, '编码端算出的校验必须与解码端完全一致，所以“改强度”意味着整片要重写一遍，不能只改读端。', 't20w');
+  txt(scene, 80, 678, '判据：t=24、4 块时读 LAYOUT 寄存器应见每块 BCH_MODE=24；spare 占用应为 39 B/块、共 156 B。', 't20w');
+  txt(scene, 80, 712, '若某次读回 STATUS_BLK0=0xFE，先别怀疑颗粒：先核对编码与解码用的是不是同一套 layout。', 't20w');
+}
+
+function drawTiming() {
+  txt(scene, 56, 146, '一次读页是三个模块接力的过程：APBH 搬、BCH 算、GPMI 判；任何一环顺序错，结果都不可信', 't24w');
+
+  box(56, 176, 560, 236, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '① 搬');
+  txt(scene, 80, 252, 'APBH 通道把整页搬进 DDR', 't20w');
+  txt(scene, 80, 288, '数据 4096 B + spare 218 B', 't20w');
+  txt(scene, 80, 324, '命令链由 CCW 描述', 't20w');
+  txt(scene, 80, 360, '搬完才谈得上解码', 't20w');
+  txt(scene, 80, 396, '顺序错就解到半页', 't20w');
+
+  box(656, 176, 560, 236, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '② 算');
+  txt(scene, 680, 252, 'BCH 读数据和 spare 里的校验', 't20w');
+  txt(scene, 680, 288, '算 syndrome', 't20w');
+  txt(scene, 680, 324, '定位错误位置（BM/Chien）', 't20w');
+  txt(scene, 680, 360, '直接在 DDR 里翻转修好', 't20w');
+  txt(scene, 680, 396, '全硬件，CPU 不参与', 't20w');
+
+  box(1256, 176, 612, 236, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '③ 报');
+  txt(scene, 1280, 252, 'STATUS0/1 给出每块错位数', 't20w');
+  txt(scene, 1280, 288, 'COMPLETED_CE 标出片选', 't20w');
+  txt(scene, 1280, 324, 'HANDLE 回传 GPMI 的 12 位标识', 't20w');
+  txt(scene, 1280, 360, 'GPMI 据此标记页好坏', 't20w');
+  txt(scene, 1280, 396, '0xFE → 这页应转坏块表', 't20w');
+
+  box(56, 432, 1812, 360, 'var(--surface)', 'var(--guide)');
+  head(80, 470, '三个“顺序陷阱”');
+  txt(scene, 80, 508, '陷阱一：DMA 还没搬完就触发 BCH —— 解码读到半页数据，syndrome 必然非零，误判成“有错”。', 't20w');
+  txt(scene, 80, 542, '陷阱二：BCH 还没报结果就读 STATUS —— 读到的是上一次的残值，最容易“偶尔对偶尔错”。', 't20w');
+  txt(scene, 80, 576, '陷阱三：先清中断再读 STATUS —— 完成位没了，驱动永远等不到下一次完成，表现为“卡死”。', 't20w');
+  txt(scene, 80, 610, '正确顺序：等 DMA 完成 → 等 BCH 完成 → 读 STATUS0/1 → 清中断 → 再取下一块。', 't20w');
+  txt(scene, 80, 644, '写方向同理：先让 BCH 编码（校验写进 spare），再由 APBH 把整页（数据+校验）搬到 NAND。', 't20w');
+  txt(scene, 80, 678, '判据：故意翻 1 位后重读，应见 STATUS_BLK0=0x01 且数据被修回；翻 41 位应见 0xFE。', 't20w');
+  txt(scene, 80, 712, '这条链的“心跳”是 HANDLE：它把 GPMI 的请求与 BCH 的结果对上，丢了它就只能靠猜。', 't20w');
+}
+
 function draw() {
   while (scene.firstChild) scene.removeChild(scene.firstChild);
   var s = state.step;
   if (s === 0) drawWhat();
   else if (s === 1) drawLayout();
   else if (s === 2) drawRegs();
-  else if (s === 3) drawM2M();
+  else if (s === 3) drawMath();
+  else if (s === 4) drawM2M();
+  else if (s === 5) drawTiming();
   else drawVerify();
 }
 
