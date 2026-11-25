@@ -1,0 +1,173 @@
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var OX = 24, OY = 96;
+var svg = $('figure'), scene = $('scene');
+svg.setAttribute('viewBox', OX + ' ' + OY + ' 1872 872');
+
+var INIT = { step: 0 };
+var state = { step: INIT.step };
+
+var STEPS = [
+  { h: '两个模拟前端', hint: 'LS/FS/HS 全支持',
+    note: 'PHY 是纯模拟的“翻译器”：16 位并行进，差分串行出，速率靠 PLL 分频选。' },
+  { h: '阈值都是有数的', hint: '400 / 100 / 575 mV',
+    note: '接收机不是“能收到就行”，每一个判决门限都是固定毫伏，理解它们才能看懂眼图。' },
+  { h: '寄存器只有九个', hint: '0x020C_9000',
+    note: 'PWD/TX/RX/CTRL/STATUS/DEBUG/DEBUG0/DEBUG1/VERSION，每组还带 SET/CLR/TOG。' },
+  { h: '上电顺序', hint: '先解复位再解门控',
+    note: 'SFTRST 与 CLKGATE 默认都是 1；不解开它们，寄存器读得到，线上却一动不动。' },
+  { h: '断电位的默认值', hint: '复位就在省电',
+    note: 'PWD 复位 0x001E_1C00：发送侧与包络检测默认关着，必须显式清位才能工作。' },
+  { h: '自检与状态', hint: 'VERSION 先读',
+    note: 'VERSION 是只读常量，读对了说明地址与总线通；DEBUG0 能看到 UTMI 的收发实况。' },
+  { h: '板上判据', hint: '量 1.5 k 上拉',
+    note: '设备身份是 D+ 上的 1.5 k 上拉；高速时是 45 Ω 终端，量不出这些就别谈枚举。' }
+];
+
+function txt(parent, x, y, s, cls, anchor) {
+  return svgEl(parent, 'text', { x: x, y: y, 'text-anchor': anchor || 'start' }, cls || 'bd-label', s || '');
+}
+function box(x, y, w, h, fill, stroke, sw) {
+  return svgEl(scene, 'rect', { x: x, y: y, width: w, height: h, rx: 16, fill: fill || 'var(--surface)', stroke: stroke || 'var(--line)', 'stroke-width': sw || 3 });
+}
+function head(x, y, s) { txt(scene, x, y, s, 'bd-heading'); }
+function wide(y, h) {
+  svgEl(scene, 'rect', { x: 56, y: y, width: 1812, height: h, rx: 16, fill: 'var(--surface)', stroke: 'var(--guide)', 'stroke-width': 3 });
+}
+function three(a, b, c) {
+  box(56, 176, 560, 268, 'var(--page)', 'var(--observe-line)', 4);
+  head(a[0], 214, a[1]); for (var i = 0; i < a[2].length; i++) txt(scene, a[0], 252 + i * 36, a[2][i], a[3] || 't20w');
+  box(656, 176, 560, 268, 'var(--page)', 'var(--guide)', 2);
+  head(b[0], 214, b[1]); for (var j = 0; j < b[2].length; j++) txt(scene, b[0], 252 + j * 36, b[2][j], b[3] || 't20w');
+  box(1256, 176, 612, 268, 'var(--page)', 'var(--alert-line)', 4);
+  head(c[0], 214, c[1]); for (var k = 0; k < c[2].length; k++) txt(scene, c[0], 252 + k * 36, c[2][k], c[3] || 't20w');
+}
+function prose(title, lines) {
+  wide(456, 330);
+  txt(scene, 80, 490, title, 't24');
+  for (var i = 0; i < lines.length; i++) txt(scene, 80, 522 + i * 34, lines[i], 't20w');
+}
+
+function drawTop() {
+  txt(scene, 56, 146, 'USB 的“模拟那一半”就在这两块 PHY 里：数字控制器说 16 位并行，它负责变成 D+/D− 上的差分波形', 't24w');
+  three([80, '两块宏单元', ['PHY1 基址 0x020C_9000', 'PHY2 基址 0x020C_A000', '各自服务一路 USB', '速率 LS 1.5 / FS 12 / HS 480', '引脚 USB_n_DP/DN 直连座子', '内部 PLL 出 120 MHz'], 't20s'],
+        [680, '接口与时钟', ['UTMI 16 位并行接口', '接口时钟 30 MHz', '120 MHz ÷ 4 得到', '发送 30 MHz 并行 → 串行', '接收串行 → 30 MHz 并行', '中间有弹性缓冲跨时钟域'], 't20w'],
+        [1280, '数字侧做什么', ['比特填充（bit stuffing）', 'NRZI 编解码', '去直流分量', '串并/并串转换', '由 UTMI 统一握手', '这些都在 PHY 内完成']]);
+  prose('为什么“USB 驱动写对了却不通”——因为驱动只管数字侧，模拟侧的复位、门控、PLL、断电都没解，波形根本出不去', [
+    'PHY 的数字部分与模拟部分在同一块宏单元里，寄存器能读说明数字总线通，但不代表模拟发送器已上电。',
+    '30 MHz × 16 位 = 480 Mbit/s，正好等于高速速率；全速时只是每个位重复 40 次，低速重复 320 次，所以复用同一套 30 MHz 通路。',
+    'PHY 需要 480 MHz PLL（在 CCM_ANALOG 的 USBPHYx_PLL_480_CTRL 里），PLL 没锁定就没有 120 MHz，也就没有 30 MHz，一切寄存器读起来正常但总线静默。',
+    '两块 PHY 相互独立：可以一路做主机、一路做设备；但板子上通常只焊一路，另一路悬空。',
+    'PHY 的模拟性能直接决定“能不能跑高速”：走线阻抗、ESD 器件电容、连接器质量，都会体现在误码率上。',
+    '一句话：驱动是“说什么”，PHY 是“怎么喊出去”；喊不出去时先查 PHY 的上电与时钟，而不是改协议栈。']);
+}
+
+function drawAnalog() {
+  txt(scene, 56, 146, '模拟前端全是比较器：不同门槛判断“有没有信号、是高速还是全速、对方拔没拔”，门限值都是写死的', 't24w');
+  three([80, '接收门限', ['HS 差分：±400 mV', 'Squelch（包络）：100 mV', 'LS/FS 交叉点：1.3–2.0 V', 'HS 断开检测：575 mV', '插入检测：DP 与 DN 同时高', '共模容限 ±500 mV'], 't20w'],
+        [680, '终端电阻', ['HS：两侧各 45 Ω 端接', 'FS/LS：15 kΩ 下拉', '设备侧 D+ 1.5 kΩ 上拉', '未插线时 200 kΩ 保持高', '主机侧 15 kΩ 下拉', '这些电阻决定“能不能被看见”'], 't20w'],
+        [1280, '由此得到的判据', ['插设备：DP 由低变高', 'HS 握手：先 FS 再切 HS', '拔线：差分幅度掉到阈值下', 'SE0：两根都低 = 复位/包尾', 'SE1：非法状态', '量波形就能对上这些状态']]);
+  prose('1.5 kΩ 上拉是“我是设备”的物理声明：主机靠它判断“有人插进来了”，所以这颗电阻丢了，插上也毫无反应', [
+    '上拉接在 D+ 上是全速/高速设备，接在 D− 上是低速设备；接错边，主机就会按错的速率去复位它，枚举必然失败。',
+    '高速不是一插就 480 Mbit/s：先以全速握手（chirp K/J），双方确认后才切到高速，此时端接从 1.5 k 上拉变成 45 Ω 终端。',
+    'Squelch 的 100 mV 门限用于“信号太小就当没有”，所以线太长、阻抗不匹配时会出现“时好时坏”的枚举。',
+    '575 mV 的断开检测门限比 400 mV 高，是为了避免把噪声当成“设备还在”，从而正确触发拔出。',
+    '这些门限不能通过寄存器调（除了少量 TX/RX 微调位），所以模拟问题只能从板级解决：换连接器、改走线、加共模电感。',
+    '判据：插上设备时 D+ 静态电压应约 3.0–3.3 V（1.5 k 上拉 + 主机 15 k 下拉分压），拔掉应回落；这条电压就能判“身份电阻在不在”。']);
+}
+
+function drawMap() {
+  txt(scene, 56, 146, '九个寄存器，偏移都是 0x10 的倍数；PHY1 与 PHY2 的差别只是基址差 0x1000', 't24w');
+  three([80, '控制类', ['+0x00 PWD 断电控制', '+0x10 TX 发送调参', '+0x20 RX 接收调参', '+0x30 CTRL 总控制', '+0x40 STATUS 状态', '复位值各不同', ], 't20s'],
+        [680, '复位值要记住', ['PWD 0x001E_1C00', 'TX 0x1006_0607', 'RX 0x0000_0000', 'CTRL 0xC020_0000', 'DEBUG 0x7F18_0000', 'VERSION 0x0402_0000'], 't20s'],
+        [1280, '调试类', ['+0x50 DEBUG（含模拟测试位）', '+0x60 DEBUG0_STATUS（只读）', '+0x70 DEBUG1', '+0x80 VERSION（只读常量）', '每组 0x10/0x14/0x18/0x1C 是 SET/CLR/TOG', '写别名免读改写']]);
+  prose('VERSION 是最好的“地址自检”：读 +0x80 若得 0x0402_0000，说明基址、总线、时钟全部正常，可以直接排除“映射错”这类问题', [
+    'PWD 与 CTRL 的复位值都偏“省电”：CTRL 的 bit31 是软复位、bit30 是时钟门控，两个默认都是 1 —— 这就是为什么刚上电时 PHY 是“醒着但不工作”。',
+    'TX 复位值 0x1006_0607 已经是一组合适的发送幅度与斜率设置，除非有眼图测量手段，否则不要乱改。',
+    'RX 复位值全 0（最高灵敏度），误码时才考虑加一点 squelch 门限来抗噪，但要接受灵敏度下降的代价。',
+    'DEBUG 寄存器里有“强制某个模拟状态”的位，用于产线测试；正常驱动不要碰，误置会让 PHY 停在测试模式。',
+    'SET/CLR/TOG 别名对 PWD 特别有用：唤醒时只需写 PWD_CLR 清某一位，不必读回整字，天然避免多任务竞争。',
+    '判据：读 VERSION 应稳定为 0x0402_0000；读 CTRL 应见 SFTRST=1、CLKGATE=1（未初始化时），初始化后应为 0。']);
+}
+
+function drawPower() {
+  txt(scene, 56, 146, 'PHY 上电是四步串联：解软复位 → 解时钟门控 → 起 480 MHz PLL → 清断电位；任何一步没做，后面都不会有波形', 't24w');
+  three([80, '四步顺序', ['① CTRL 清 SFTRST(31)', '② CTRL 清 CLKGATE(30)', '③ CCM_ANALOG 起 480 PLL', '④ PWD 清相关断电位', '⑤ 等 PLL 锁定', '⑥ 再启动 USB 控制器'], 't20s'],
+        [680, '为什么不能省', ['PLL 未锁 → 无 30 MHz', '无 30 MHz → UTMI 不工作', '断电位未清 → 发送器不开', '门控未解 → 寄存器写不进', '顺序反了会锁在不稳定态', '复位后再来一遍'], 't20w'],
+        [1280, '常见现象', ['寄存器读正常，枚举失败', 'dmesg 无任何 USB 事件', '偶尔能枚举，重启又不通', '设备自供电才通', 'PLL 抖动 → 随机掉线', '用 VERSION 与 STATUS 交叉验证']]);
+  prose('“先解复位再解门控”的顺序是硬的：若 CLKGATE 还开着就写 PWD，写入可能不生效，且之后很难判断是配置问题还是时钟问题', [
+    'PLL 480 的使能与锁定位在 CCM_ANALOG 的 USBPHYx_PLL_480_CTRL 里（第 57.4 节的模拟区），不在 PHY 本体内，容易漏。',
+    '上电后如果 STATUS 里始终看不到时钟有效，先怀疑 PLL：量 480 MHz 参考晶振、查分频设置、看锁定位。',
+    '唤醒时不要重新走“全上电”：只需清对应的 PWD 位（或用 ENAUTOCLR_PHY_PWD 让唤醒事件自动清），保持 PLL 与配置。',
+    '若唤醒后必须重新初始化才能用，说明配置没有被保持（可能被 CLKGATE 期间的写丢失），要改流程而不是加延时。',
+    '很多板子把 VBUS 检测接到 GPIO，而 PHY 的上电与 VBUS 无关；这两件事要分别验证，别混为一谈。',
+    '判据：写完四步后读 CTRL 应见 bit31=0、bit30=0，读 VERSION 稳定，读 STATUS 有 UTMI 活动 —— 三者都满足才算 PHY 活着。']);
+}
+
+function drawPwd() {
+  txt(scene, 56, 146, 'PWD 的复位值 0x001E_1C00 已经把发送侧和包络检测关掉了：想要工作，必须按需逐位清 0', 't24w');
+  three([80, '接收侧断电位', ['[20] RXPWDRX 整个接收块', '[19] RXPWDDIFF 高速差分接收', '[17] RXPWDENV 包络/占用检测', '清 0 = 正常工作', '唤醒事件可自动清（若开自动清）', '全清 = 最高灵敏度'], 't20s'],
+        [680, '发送侧断电位', ['[13] TXPWDV2I 电压到电流', '[12] TXPWDIBIAS 偏置电流', '[11] TXPWDFS 全速驱动', '复位时这三位都是 1', '所以默认“发不出去”', '上电必须清 0'], 't20s'],
+        [1280, '省电的取舍', ['挂起时把 TX 位重新置 1', '接收侧保留 1PT1 以检测唤醒', '唤醒后只清回需要的位', '不要整字写 0 再整体恢复', '用 PWD_CLR/PWD_SET 精确控制', '否则会把 PLL 配置也打乱'], 't20w']);
+  prose('记住“复位即省电”这条：芯片刚上电时 PHY 的发送器是关着的，所以任何“复位后立刻发数据”的流程都必须先清 TXPWD* 三位', [
+    '[20] RXPWDRX 会关掉除全速接收机以外的整个接收块，这是“挂起模式”的典型配置：只留能感知唤醒的全速接收机。',
+    '[17] RXPWDENV 关的是包络检测（squelch），高速时必须打开，否则接收机无法判断“信号是否有效”，会一直解出垃圾。',
+    '[13][12] 是发送器的偏置与电压电流转换，任何一位为 1，D+/D− 上就没有驱动电流，示波器看到的是“静止高电平”。',
+    '用 SET/CLR 别名做挂起/唤醒最稳：挂起只 SET 需要关的位，唤醒只 CLR 需要开的位，绝不整字覆盖。',
+    '自动清（CTRL 里的 ENAUTOCLR_PHY_PWD）能让唤醒事件硬件清位，省掉中断里的时序处理，但要求你只把“该自动清的位”交给它。',
+    '判据：清 TX 三位后，设备模式下 D+ 上应能看到 1.5 k 上拉对应的电平抬升；主机模式下空闲时 D+/D− 应都是低（SE0 之外的 J 态需按速度判断）。']);
+}
+
+function drawDebug() {
+  txt(scene, 56, 146, '调模拟不靠猜：DEBUG0_STATUS 直接给出 UTMI 的收发状态，VERSION 给出“我是谁”，两者配合能定位到具体一级', 't24w');
+  three([80, 'DEBUG0_STATUS', ['只读，反映 UTMI 实况', '能看到接收活动/线路状态', '也能看到发送握手', '配合断点看“卡在哪一拍”', '比在总线上瞎猜快得多', '需要 datasheet 位义对照'], 't20w'],
+        [680, 'STATUS', ['+0x40 只读状态', '给 UTMI 的汇总信息', '可判断挂起/恢复', '可判断主机断开检测', '与控制器 USBSTS 交叉看', '两边不一致 → 接线/时钟问题'], 't20w'],
+        [1280, 'VERSION 的用法', ['+0x80 恒为 0x0402_0000', '读到别的值 = 地址错', '读不到 = 总线/时钟问题', '是“最小可判据”', '上电先读它', '省掉大量排查']]);
+  prose('把“能不能读到 VERSION”当作第一道门：读不到就别查枚举，因为问题在总线或时钟层，跟 USB 协议无关', [
+    '读到 VERSION 但 STATUS 里没有活动，说明 PHY 数字侧活着、模拟侧没上电（PLL 或 PWD）。',
+    'STATUS 有活动但控制器 USBSTS 没反应，问题在 UTMI 连接或控制器未启动（USBCMD 的 RS 没置）。',
+    '控制器有中断但枚举失败，才轮到协议栈与描述符 —— 这是排查的正确分层。',
+    'DEBUG 寄存器里有些位会“强制”模拟状态，产线测试用；调试时误写会让 PHY 卡在测试态，现象极像“坏了”。',
+    '若两块 PHY 表现不同（一块能枚举一块不能），先对照读 VERSION 与 CTRL，能立刻区分“芯片坏”与“这一路没配”。',
+    '判据：三块读数（VERSION 常量、CTRL 的 SFTRST/CLKGATE=0、PWD 的 TX 位=0）同时成立，PHY 才算“配置完成”。']);
+}
+
+function drawBoard() {
+  txt(scene, 56, 146, '板上只看四个量：D+ 的 1.5 k 上拉电压、空闲电平、复位时的 SE0 时长、高速时的 45 Ω 终端', 't24w');
+  three([80, '静态电压', ['设备未插：D+ 约 0', '设备插上：D+ 被上拉', '主机侧 15 k 下拉分压', '约 3.0 V 左右', '拔掉应回落', '不变说明上拉没接对'], 't20w'],
+        [680, '动态波形', ['复位：SE0 持续 10 ms 以上', '全速位宽 83.3 ns', '低速位宽 333 ns', '高速位宽 2.08 ns', 'SE0 两根都低', 'SE1 是非法态'], 't20s'],
+        [1280, '常见硬伤', ['D+/D− 走线不等长', '没做 90 Ω 差分阻抗', 'ESD 器件电容过大', 'VBUS 没供电', '连接器虚焊', '飞线接 USB 必失败']]);
+  prose('位宽数字记下来最有用：全速一位 83.3 ns、低速 333 ns、高速 2.08 ns；量到的位宽不对，就说明速率档位判断错了', [
+    '高速的 2.08 ns 位宽用普通示波器很难看清，需要 1 GHz 以上带宽探头；量不清就用“能否枚举成 high-speed”间接判断。',
+    '复位时 SE0 必须持续 10 ms 以上，若只有几毫秒，设备不会进入默认状态，表现就是“主机发了复位但设备没反应”。',
+    '如果 D+ 上拉到 3.3 V 而 VBUS 是 5 V，注意上拉应接在 3.3 V 侧（PHY 的 VDDIO），接错会通过 IO 二极管倒灌。',
+    'USB 线太长（超过 3 米）或用了劣质延长线，是“台式机能认、开发板不认”的常见原因；换短线立刻见分晓。',
+    'ESD 保护器件要选低电容型：普通 TVS 的几 pF 电容在 480 Mbit/s 下就是明显的眼图闭合。',
+    '判据：插拔 20 次枚举成功率 100%，且 dmesg 里稳定显示 high-speed；有一次掉到 full-speed 就说明信号余量不足。']);
+}
+
+function draw() {
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+  var s = state.step;
+  if (s === 0) drawTop();
+  else if (s === 1) drawAnalog();
+  else if (s === 2) drawMap();
+  else if (s === 3) drawPower();
+  else if (s === 4) drawPwd();
+  else if (s === 5) drawDebug();
+  else drawBoard();
+}
+
+stepper($('prev'), $('next'), $('hint'), STEPS, function (i) { state.step = i; draw(); });
+zoomable(document.querySelector('.bd-stage'));
+resetButton($('reset'), function () { state.step = INIT.step; draw(); });
+fitCanvas($('viewport'), $('canvas'), draw);
+</script>
+</body>
+</html>
