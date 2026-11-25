@@ -2477,7 +2477,7 @@ text.bd-an-inner { font-size: var(--size-l4); }
   <symbol id="i-drag" viewBox="0 0 24 24"><title>拖动</title><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></symbol>
   <symbol id="i-speak" viewBox="0 0 24 24"><title>朗读</title><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
   <symbol id="i-fullscreen" viewBox="0 0 24 24"><title>全屏</title><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
-  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>RM 第 16 章 · 异步采样率转换 ASRC | i.MX6ULL 逐章解读</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
+  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><title>RM 第 13 章 · ADC 通道、触发与转换 | i.MX6ULL 逐章解读</title><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
 </svg>
 
 <div class="bd-viewport" id="viewport">
@@ -2506,8 +2506,7 @@ text.bd-an-inner { font-size: var(--size-l4); }
         <button class="bd-btn" type="button" id="next"></button>
       </div>
       <div class="bd-actions">
-        <a class="bd-btn" href="c15.html" style="text-decoration:none">← RM15</a>
-        <a class="bd-btn" href="c17.html" style="text-decoration:none">RM17 →</a>
+        <a class="bd-btn" href="c15.html" style="text-decoration:none">← RM15</a> <a class="bd-btn" href="c17.html" style="text-decoration:none">RM17 →</a>
         <a class="bd-btn" href="index.html" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">☰ 目录</a>
         <button class="bd-btn" type="button" id="reset"></button>
       </div>
@@ -3653,6 +3652,18 @@ function reader(root, sentences, opts) {
 .t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
 .t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
 .t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
+.t20s { font: 400 20px var(--font-mono, monospace); fill: var(--text-2); }
+</style>
+<style>
+.t24 { font: 600 24px var(--font-sans); fill: var(--text-1); }
+.t24w { font: 400 24px var(--font-sans); fill: var(--text-2); }
+.t20w { font: 400 21px var(--font-sans); fill: var(--text-2); }
 </style>
 <script>
 var $ = function (id) { return document.getElementById(id); };
@@ -3670,8 +3681,12 @@ var STEPS = [
     note: '通道按对分组：A、B、C 各 0–10 路，合计不超过 10。每对一组 FIFO，每组 64 个样本、阈值 32。写输入必须按通道顺序循环，硬件再按 ASRCCR 的当前通道号把样本分回各自通道。' },
   { h: '比率与分频', hint: 'Q6.26 · 76K/56K',
     note: '比率就是 Fsin/Fsout，用一个 32 位定点数表示，其中 26 位是小数：1.0 等于 0x0400_0000。比率可以来自硬件实测（两路采样时钟都在），也可以来自软件写的理想值。另外两个寄存器 ASR76K、ASR56K 是滤波器自动选择的标尺，按处理时钟折算。' },
-  { h: '寄存器与启动', hint: 'SRST → 通道 → 比率',
-    note: '全部寄存器挤在 0x0203_4000 起的 0xC8 字节里：控制、中断、通道数、时钟、分频、状态、数据、理想比率、标尺、FIFO 阈值、字对齐。启动顺序固定：软复位、配通道数与时钟分频、选比率模式、使能三对、按顺序灌数据。' },
+  { h: '比率算例与漂移', hint: 'Q6.26 手算',
+    note: '44.1k→48k 的比率 0.91875，乘 2^26 得 61 656 268.8，截断为 0x03AC_CCCC；48k→44.1k 的 1.088435… 恰好落在 0x045A_8ECD。一个 LSB 等于 2^-26 ≈ 1.5×10^-8，截断误差在百万分之一量级，够用。' },
+  { h: '寄存器地图：0xC8 字节', hint: '0x0203_4000',
+    note: '全部寄存器挤在 0x0203_4000 起的 0xC8 字节里：控制、中断、通道数、时钟、分频、状态、数据、理想比率、标尺、FIFO 阈值、字对齐。' },
+  { h: '五步启动，顺序不能翻', hint: 'SRST → 通道 → 比率',
+    note: '软复位（9 个处理时钟后自清）→ 使能 → 写三对通道数 → 选时钟配分频并重算标尺 → 选比率模式写 ASRIDR → 置使能与中断、按通道顺序灌数据。漏第一步的典型症状是写进去读回全 0。' },
   { h: '实测与板级', hint: '标尺 · 状态 · codec',
     note: '四个观察点：ASR76K/ASR56K 是否与实际处理时钟匹配、ASRSTR 三个关键位、ASRFSTx 的 FIFO 计数、以及比率方向有没有写反。板级还要确认一件事：这块 MINI 底板上到底有没有能被驱动的音频 codec。' }
 ];
@@ -3844,11 +3859,89 @@ function drawRegs() {
   });
 
   box(56, 580, 1812, 212, 'var(--surface)', 'var(--guide)');
-  head(80, 618, '五步启动，顺序不能翻');
-  txt(scene, 80, 654, '① ASRCTR.SRST=1 软复位（9 个处理时钟后自清），然后置 ASRCEN=1；② ASRCNCR 写三对通道数；', 't20w');
-  txt(scene, 80, 688, '③ ASRCSR + ASRCDR1/2 选时钟配分频，并重算 ASR76K/ASR56K；④ ASRCTR 选比率模式、写 ASRIDR；', 't20w');
-  txt(scene, 80, 722, '⑤ 置 ASREA/ASREB/ASREC 与 ASRIER，按通道顺序写 ASRDIA，输出从 ASRDOA 取。', 't20w');
-  txt(scene, 80, 756, '漏掉第①步最常见的症状：写进去的值读回全 0，因为整块还在复位里。', 't20w');
+  head(80, 618, '看表的方法');
+  txt(scene, 80, 654, '左边一列是“控制与配置”，右边一列是“数据与比率”；调不通时先看左、读回时先看右。', 't20w');
+  txt(scene, 80, 688, 'ASRSTR 在 0x20 只读，状态问题只能靠它和 ASRFSTx 判断，写它没用。', 't20w');
+  txt(scene, 80, 722, 'ASRIDR 是 32 位定点数，但寄存器是 16 位宽：高半字 0x80–0x88、低半字 0x84–0x94，别写反。', 't20w');
+  txt(scene, 80, 756, '地址差 4 的成对寄存器（0x60/0x64）就是“输入/输出”一对，读写方向别混。', 't20w');
+}
+
+function drawStartup() {
+  txt(scene, 56, 146, '五步启动的顺序是硬约束：复位没退、通道数没写、比率没设，后面所有配置都白做', 't24w');
+
+  box(56, 176, 1812, 250, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '① 复位与使能');
+  txt(scene, 80, 252, 'ASRCTR.SRST = 1', 't20w');
+  txt(scene, 80, 288, '9 个处理时钟后自清', 't20w');
+  txt(scene, 80, 324, '然后置 ASRCEN = 1', 't20w');
+  txt(scene, 80, 360, '顺序反了就一直在复位里', 't20w');
+  txt(scene, 80, 396, '读回全 0 就是没退复位', 't20w');
+
+  box(56, 446, 560, 340, 'var(--page)', 'var(--guide)', 2);
+  head(80, 484, '②③ 通道与时钟');
+  txt(scene, 80, 522, 'ASRCNCR 写 ANCA/ANCB/ANCC', 't20w');
+  txt(scene, 80, 556, '三对合计 ≤ 10', 't20w');
+  txt(scene, 80, 590, 'ASRCSR 选每对用哪个 asrck', 't20w');
+  txt(scene, 80, 624, 'ASRCDR1/2 配输入输出分频', 't20w');
+  txt(scene, 80, 658, '按实际处理时钟重算标尺', 't20w');
+  txt(scene, 80, 692, '标尺错 → 滤波器选错', 't20w');
+
+  box(656, 446, 560, 340, 'var(--page)', 'var(--guide)', 2);
+  head(680, 484, '④ 比率');
+  txt(scene, 680, 522, 'ASRCTR 选比率来源', 't20w');
+  txt(scene, 680, 556, '硬件实测 or 软件理想值', 't20w');
+  txt(scene, 680, 590, '写 ASRIDR（高/低半字）', 't20w');
+  txt(scene, 680, 624, 'Q6.26，1.0 = 0x0400_0000', 't20w');
+  txt(scene, 680, 658, '方向 = Fsin / Fsout', 't20w');
+  txt(scene, 680, 692, '写反 → 变调且持续漂', 't20w');
+
+  box(1256, 446, 612, 340, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 484, '⑤ 使能与灌数据');
+  txt(scene, 1280, 522, '置 ASREA/ASREB/ASREC', 't20w');
+  txt(scene, 1280, 556, '配 ASRIER 开中断', 't20w');
+  txt(scene, 1280, 590, '按 channel_0..n 顺序写', 't20w');
+  txt(scene, 1280, 624, 'ASRDIA/B/C', 't20w');
+  txt(scene, 1280, 658, '输出从 ASRDOA/B/C 取', 't20w');
+  txt(scene, 1280, 692, '只置 ASREA 不写 ANCA 不动', 't20w');
+  txt(scene, 1280, 726, '使能位与通道数是两个开关', 't20w');
+}
+
+function drawMath() {
+  txt(scene, 56, 146, '比率是一个 Q6.26 定点数：整数占 6 位、小数占 26 位，1.0 就是 0x0400_0000', 't24w');
+
+  box(56, 176, 560, 250, 'var(--page)', 'var(--observe-line)', 4);
+  head(80, 214, '定义');
+  txt(scene, 80, 252, '比率 R = Fsin / Fsout', 't20w');
+  txt(scene, 80, 288, '编码值 = R × 2^26', 't20w');
+  txt(scene, 80, 324, '1.0 → 0x0400_0000', 't20w');
+  txt(scene, 80, 360, '1 LSB = 2^-26 ≈ 1.49e-8', 't20w');
+  txt(scene, 80, 396, '按 6.26 定点存放', 't20w');
+
+  box(656, 176, 560, 250, 'var(--page)', 'var(--guide)', 2);
+  head(680, 214, '例：44.1k → 48k');
+  txt(scene, 680, 252, 'R = 44100 / 48000', 't20w');
+  txt(scene, 680, 288, 'R = 0.918 75（精确）', 't20w');
+  txt(scene, 680, 324, '× 2^26 = 61 656 268.8', 't20w');
+  txt(scene, 680, 360, '截断 → 0x03AC_CCCC', 't20w');
+  txt(scene, 680, 396, '进位 → 0x03AC_CCCD', 't20w');
+
+  box(1256, 176, 612, 250, 'var(--page)', 'var(--alert-line)', 4);
+  head(1280, 214, '例：48k → 44.1k');
+  txt(scene, 1280, 252, 'R = 48000 / 44100', 't20w');
+  txt(scene, 1280, 288, 'R ≈ 1.088 435 37', 't20w');
+  txt(scene, 1280, 324, '× 2^26 = 73 043 661.1', 't20w');
+  txt(scene, 1280, 360, '取整 → 0x045A_8ECD', 't20w');
+  txt(scene, 1280, 396, '与手册给的值一致', 't20w');
+
+  box(56, 446, 1812, 346, 'var(--surface)', 'var(--guide)');
+  head(80, 484, '误差有多小、什么时候才需要关心');
+  txt(scene, 80, 522, '截断与舍入只差 1 个 LSB，相对误差约 1.5e-8；对应 48 kHz 上漂移约 0.7 个样本/小时，可以忽略。', 't20w');
+  txt(scene, 80, 556, '真正麻烦的是“时钟本身不准”：晶振偏 100 ppm 时，一小时就漂 17 万个样本 —— 这才是 ASRC 要解决的问题。', 't20w');
+  txt(scene, 80, 590, '所以比率有两种来源：两路采样时钟都在时让硬件实测，省掉软件估算的偏差；只有一路时才写理想值。', 't20w');
+  txt(scene, 80, 624, '写理想值时必须用“输入/输出”而不是“输出/输入”，写反的结果是音调变了、并且随时间持续漂移。', 't20w');
+  txt(scene, 80, 658, '单通道调试技巧：先把 ANCA 写成 1、其余为 0，比率写 1.0（0x0400_0000），确认数据能原样穿过再改比率。', 't20w');
+  txt(scene, 80, 692, '“1.0 直通”是最有用的基线：直通都不通，说明问题在通道、时钟或 FIFO，不在重采样算法。', 't20w');
+  txt(scene, 80, 726, '判据：写 0x0400_0000 时输入输出样本数 1:1；改成 0x03AC_CCCC 后每 48 个输入应产出约 44.1 个输出。', 't20w');
 }
 
 function drawVerify() {
@@ -3896,7 +3989,9 @@ function draw() {
   if (s === 0) drawWhy();
   else if (s === 1) drawFifo();
   else if (s === 2) drawRatio();
-  else if (s === 3) drawRegs();
+  else if (s === 3) drawMath();
+  else if (s === 4) drawRegs();
+  else if (s === 5) drawStartup();
   else drawVerify();
 }
 
