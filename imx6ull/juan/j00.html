@@ -23,6 +23,8 @@ main.doc ul.acc{margin:10px 0 20px;padding-left:22px;color:#c8d6ec}
 main.doc ul.acc li{margin:0 0 8px}
 @media(max-width:900px){main.doc td.kk{display:none}}
 </style>
+<script src="../assets/catalog.js" defer></script>
+<script src="../assets/sidebar.js" defer></script>
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -35,24 +37,7 @@ main.doc ul.acc li{margin:0 0 8px}
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
 <div class="shell">
-  <aside id="sidebar">
-<div class="vol-h">卷 00 · 起步 · Linux 与实验台</div>
-<ol>
-<li><a href="../ref/ch01.html" class="active">
-  <span class="no">01</span><span>Linux 全景认知<span class="sub">核心篇</span></span></a></li>
-<li><a href="../ref/ch02.html">
-  <span class="no">02</span><span>搭好实验台<span class="sub">核心篇</span></span></a></li>
-<li><a href="../ref/ch03.html">
-  <span class="no">03</span><span>命令行与文件系统<span class="sub">核心篇</span></span></a></li>
-<li><a href="../ref/ch04.html">
-  <span class="no">04</span><span>系统管理四件事<span class="sub">核心篇</span></span></a></li>
-<li><a href="../ref/ch05.html">
-  <span class="no">05</span><span>Vim 与 Shell 脚本<span class="sub">核心篇</span></span></a></li>
-<li><a href="../ref/ch06.html">
-  <span class="no">06</span><span>网络与远程开发<span class="sub">核心篇</span></span></a></li>
-</ol>
-<div class="vol-nav"><a href="index.html">☰ 总览</a><a href="j01.html">卷 01 →</a></div>
-  </aside>
+  <aside id="sidebar" data-root="../" data-vol="00"></aside>
   <main class="doc">
 
     <div class="doc-kicker"><span>卷 00 / 13</span><span>·</span><span>6 篇</span><span>·</span><span>读 8h + 做 70h</span></div>

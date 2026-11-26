@@ -18,6 +18,8 @@
 <script src="../assets/anim2.js" defer></script>
 <script src="../assets/cpu3.js" defer></script>
 <script src="../assets/cpu-cycle.js" defer></script>
+<script src="../assets/catalog.js" defer></script>
+<script src="../assets/sidebar.js" defer></script>
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -30,33 +32,7 @@
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
 <div class="shell">
-<aside id="sidebar">
-<div class="vol-h">卷 08 · 启动链</div>
-<ol><li><a href="course-th08.html" class="active">
-  <span class="no">01</span><span>从第一个字节开始：BootROM → SPL → U-Boot<span class="sub">约 5 小时 · 当前</span></span></a></li>
-<li><a href="course-36.html">
-  <span class="no">02</span><span>启动链<span class="sub">约 1 小时</span></span></a></li>
-<li><a href="course-ch08.html">
-  <span class="no">03</span><span>i.MX6ULL 与启动链路<span class="sub">约 10 小时</span></span></a></li>
-<li><a href="course-th09.html">
-  <span class="no">04</span><span>内核怎么起来：head.S → start_kernel → init<span class="sub">约 5 小时</span></span></a></li>
-<li><a href="course-ch09.html">
-  <span class="no">05</span><span>U-Boot 与烧写<span class="sub">约 12 小时</span></span></a></li>
-<li><a href="course-ch10.html">
-  <span class="no">06</span><span>内核裁剪与设备树<span class="sub">约 18 小时</span></span></a></li>
-<li><a href="course-41.html">
-  <span class="no">07</span><span>根文件系统<span class="sub">约 1 小时</span></span></a></li>
-<li><a href="course-ch11.html">
-  <span class="no">08</span><span>根文件系统构建<span class="sub">约 14 小时</span></span></a></li>
-<li><a href="course-42.html">
-  <span class="no">09</span><span>做出一块能跑的系统<span class="sub">约 1 小时</span></span></a></li>
-<li><a href="viz-boot.html">
-  <span class="no">10</span><span>互动台：启动链路逐级点亮<span class="sub">💻 · 约 1 小时</span></span></a></li></ol>
-<div class="vol-nav">
-  <a href="../juan/j07.html">← 卷 07</a>
-  <a href="../juan/j09.html">卷 09 →</a>
-</div>
-</aside>
+<aside id="sidebar" data-root="../" data-page="docs/course-th08.html"></aside>
 <main class="doc">
   <div class="doc-kicker">卷 08<span>·</span>启动链<span>·</span>第 01 篇</div>
   <h1>从第一个字节开始：BootROM → SPL → U-Boot</h1>

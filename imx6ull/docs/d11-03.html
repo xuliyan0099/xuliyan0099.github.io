@@ -18,6 +18,8 @@
 <script src="../assets/anim2.js" defer></script>
 <script src="../assets/cpu3.js" defer></script>
 <script src="../assets/cpu-cycle.js" defer></script>
+<script src="../assets/catalog.js" defer></script>
+<script src="../assets/sidebar.js" defer></script>
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -30,23 +32,7 @@
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
 <div class="shell">
-<aside id="sidebar">
-<div class="vol-h">卷 11 · 调试与可观测</div>
-<ol><li><a href="course-43.html">
-  <span class="no">01</span><span>排障方法论<span class="sub">约 1 小时</span></span></a></li>
-<li><a href="course-ch13.html">
-  <span class="no">02</span><span>调试与排障工具箱<span class="sub">约 8 小时</span></span></a></li>
-<li><a href="d11-01.html">
-  <span class="no">03</span><span>oops 现场还原：寄存器、栈回溯、反汇编定位到行<span class="sub">约 3 小时</span></span></a></li>
-<li><a href="d11-02.html">
-  <span class="no">04</span><span>JTAG 与 Ozone：停核、看页表、单步走启动链<span class="sub">约 4 小时</span></span></a></li>
-<li><a href="d11-03.html" class="active">
-  <span class="no">05</span><span>ftrace / perf / eBPF：内核里的可观测四件套<span class="sub">◆ · 约 4 小时 · 当前</span></span></a></li></ol>
-<div class="vol-nav">
-  <a href="../juan/j10.html">← 卷 10</a>
-  <a href="../juan/j12.html">卷 12 →</a>
-</div>
-</aside>
+<aside id="sidebar" data-root="../" data-page="docs/d11-03.html"></aside>
 <main class="doc">
   <div class="doc-kicker">卷 11<span>·</span>调试与可观测<span>·</span>第 05 篇</div>
   <h1>ftrace / perf / eBPF：内核里的可观测四件套</h1>

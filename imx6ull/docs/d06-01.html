@@ -18,6 +18,8 @@
 <script src="../assets/anim2.js" defer></script>
 <script src="../assets/cpu3.js" defer></script>
 <script src="../assets/cpu-cycle.js" defer></script>
+<script src="../assets/catalog.js" defer></script>
+<script src="../assets/sidebar.js" defer></script>
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -30,19 +32,7 @@
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
 <div class="shell">
-<aside id="sidebar">
-<div class="vol-h">卷 06 · 网络栈</div>
-<ol><li><a href="d06-01.html" class="active">
-  <span class="no">01</span><span>从 socket 到协议栈：套接字、sock、传输层入口<span class="sub">约 2 小时 · 当前</span></span></a></li>
-<li><a href="d06-02.html">
-  <span class="no">02</span><span>TCP 状态机与 sk_buff：一次数据往返的完整路径<span class="sub">约 2 小时</span></span></a></li>
-<li><a href="d06-03.html">
-  <span class="no">03</span><span>IP、路由与网卡驱动：包怎么出了门又回来<span class="sub">约 2 小时</span></span></a></li></ol>
-<div class="vol-nav">
-  <a href="../juan/j05.html">← 卷 05</a>
-  <a href="../juan/j07.html">卷 07 →</a>
-</div>
-</aside>
+<aside id="sidebar" data-root="../" data-page="docs/d06-01.html"></aside>
 <main class="doc">
   <div class="doc-kicker">卷 06<span>·</span>网络栈<span>·</span>第 01 篇</div>
   <h1>从 socket 到协议栈：套接字、sock、传输层入口</h1>

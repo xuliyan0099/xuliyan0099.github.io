@@ -23,6 +23,8 @@ main.doc ul.acc{margin:10px 0 20px;padding-left:22px;color:#c8d6ec}
 main.doc ul.acc li{margin:0 0 8px}
 @media(max-width:900px){main.doc td.kk{display:none}}
 </style>
+<script src="../assets/catalog.js" defer></script>
+<script src="../assets/sidebar.js" defer></script>
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -35,22 +37,7 @@ main.doc ul.acc li{margin:0 0 8px}
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
 <div class="shell">
-  <aside id="sidebar">
-<div class="vol-h">卷 11 · 调试与可观测</div>
-<ol>
-<li><a href="../course/43.html" class="active">
-  <span class="no">01</span><span>排障方法论<span class="sub">核心篇</span></span></a></li>
-<li><a href="../ref/ch13.html">
-  <span class="no">02</span><span>调试与排障工具箱<span class="sub">核心篇</span></span></a></li>
-<li><a href="../docs/d11-01.html">
-  <span class="no">03</span><span>oops 现场还原：寄存器、栈回溯、反汇编定位到行<span class="sub">深读 · 待补动手</span></span></a></li>
-<li><a href="../docs/d11-02.html">
-  <span class="no">04</span><span>JTAG 与 Ozone：停核、看页表、单步走启动链<span class="sub">深读 · 待补动手</span></span></a></li>
-<li><a href="../docs/d11-03.html">
-  <span class="no">05</span><span>ftrace / perf / eBPF：内核里的可观测四件套<span class="sub">深读 · 带互动组件</span></span></a></li>
-</ol>
-<div class="vol-nav"><a href="index.html">☰ 总览</a><a href="j12.html">卷 12 →</a></div>
-  </aside>
+  <aside id="sidebar" data-root="../" data-vol="11"></aside>
   <main class="doc">
 
     <div class="doc-kicker"><span>卷 11 / 13</span><span>·</span><span>5 篇</span><span>·</span><span>读 3h + 做 14h</span></div>

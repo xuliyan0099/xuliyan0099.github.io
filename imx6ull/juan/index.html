@@ -23,6 +23,8 @@ main.doc ul.acc{margin:10px 0 20px;padding-left:22px;color:#c8d6ec}
 main.doc ul.acc li{margin:0 0 8px}
 @media(max-width:900px){main.doc td.kk{display:none}}
 </style>
+<script src="../assets/catalog.js" defer></script>
+<script src="../assets/sidebar.js" defer></script>
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -34,40 +36,7 @@ main.doc ul.acc li{margin:0 0 8px}
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
 <div class="shell">
-  <aside id="sidebar">
-<div class="vol-h">十四卷 · 逐卷进入</div>
-<ol>
-<li><a href="j00.html">
-  <span class="no">00</span><span>起步 · Linux 与实验台<span class="sub">6 篇 · 读 8h</span></span></a></li>
-<li><a href="j01.html">
-  <span class="no">01</span><span>机器与指令<span class="sub">20 篇 · 读 24h</span></span></a></li>
-<li><a href="j02.html">
-  <span class="no">02</span><span>编译与运行<span class="sub">6 篇 · 读 4h</span></span></a></li>
-<li><a href="j03.html">
-  <span class="no">03</span><span>存储与地址<span class="sub">11 篇 · 读 12h</span></span></a></li>
-<li><a href="j04.html">
-  <span class="no">04</span><span>操作系统<span class="sub">11 篇 · 读 13h</span></span></a></li>
-<li><a href="j05.html">
-  <span class="no">05</span><span>文件与设备<span class="sub">3 篇 · 读 3h</span></span></a></li>
-<li><a href="j06.html">
-  <span class="no">06</span><span>网络栈<span class="sub">3 篇 · 读 6h</span></span></a></li>
-<li><a href="j07.html">
-  <span class="no">07</span><span>芯片与硬件底座<span class="sub">14 篇 · 读 15h</span></span></a></li>
-<li><a href="j08.html">
-  <span class="no">08</span><span>启动链<span class="sub">10 篇 · 读 13h</span></span></a></li>
-<li><a href="j09.html">
-  <span class="no">09</span><span>驱动体系<span class="sub">11 篇 · 读 8h</span></span></a></li>
-<li><a href="j10.html">
-  <span class="no">10</span><span>用户态<span class="sub">4 篇 · 读 8h</span></span></a></li>
-<li><a href="j11.html">
-  <span class="no">11</span><span>调试与可观测<span class="sub">5 篇 · 读 3h</span></span></a></li>
-<li><a href="j12.html">
-  <span class="no">12</span><span>产品化<span class="sub">5 篇 · 读 2h</span></span></a></li>
-<li><a href="j13.html">
-  <span class="no">13</span><span>拔高<span class="sub">4 篇 · 读 1h</span></span></a></li>
-</ol>
-<div class="vol-nav"><a href="../index.html">← 路口页</a><a href="j00.html">卷 00 →</a></div>
-  </aside>
+  <aside id="sidebar" data-root="../" data-mode="vols"></aside>
   <main class="doc">
 
     <div class="doc-kicker"><span>总览</span><span>·</span><span>14 卷 113 篇</span></div>

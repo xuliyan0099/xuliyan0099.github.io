@@ -18,6 +18,8 @@
 <script src="../assets/anim2.js" defer></script>
 <script src="../assets/cpu3.js" defer></script>
 <script src="../assets/cpu-cycle.js" defer></script>
+<script src="../assets/catalog.js" defer></script>
+<script src="../assets/sidebar.js" defer></script>
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -30,21 +32,7 @@
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
 <div class="shell">
-<aside id="sidebar">
-<div class="vol-h">卷 13 · 拔高</div>
-<ol><li><a href="course-44.html">
-  <span class="no">01</span><span>总复盘<span class="sub">约 1 小时</span></span></a></li>
-<li><a href="d13-01.html">
-  <span class="no">02</span><span>AArch64 / RISC-V / x86：三套体系横向对照<span class="sub">● · 约 4 小时</span></span></a></li>
-<li><a href="d13-02.html" class="active">
-  <span class="no">03</span><span>xv6 或自制一个最小 OS：把操作系统造一遍<span class="sub">● · 约 8 小时 · 当前</span></span></a></li>
-<li><a href="d13-03.html">
-  <span class="no">04</span><span>虚拟化与 KVM：ARM 上的 EL2 与 stage-2 页表<span class="sub">● · 约 4 小时</span></span></a></li></ol>
-<div class="vol-nav">
-  <a href="../juan/j12.html">← 卷 12</a>
-  
-</div>
-</aside>
+<aside id="sidebar" data-root="../" data-page="docs/d13-02.html"></aside>
 <main class="doc">
   <div class="doc-kicker">卷 13<span>·</span>拔高<span>·</span>第 03 篇</div>
   <h1>xv6 或自制一个最小 OS：把操作系统造一遍</h1>

@@ -18,6 +18,8 @@
 <script src="../assets/anim2.js" defer></script>
 <script src="../assets/cpu3.js" defer></script>
 <script src="../assets/cpu-cycle.js" defer></script>
+<script src="../assets/catalog.js" defer></script>
+<script src="../assets/sidebar.js" defer></script>
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -30,21 +32,7 @@
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
 <div class="shell">
-<aside id="sidebar">
-<div class="vol-h">卷 10 · 用户态</div>
-<ol><li><a href="d10-01.html">
-  <span class="no">01</span><span>文件 IO 与 mmap：从 read 到直接映射寄存器<span class="sub">约 2 小时</span></span></a></li>
-<li><a href="d10-02.html">
-  <span class="no">02</span><span>多线程与锁：pthread、条件变量、常见死锁<span class="sub">约 2 小时</span></span></a></li>
-<li><a href="d10-03.html">
-  <span class="no">03</span><span>socket 与 epoll：一个能扛住千连接的事件循环<span class="sub">约 2 小时</span></span></a></li>
-<li><a href="d10-04.html" class="active">
-  <span class="no">04</span><span>进程间通信：管道、共享内存、消息队列、信号<span class="sub">约 2 小时 · 当前</span></span></a></li></ol>
-<div class="vol-nav">
-  <a href="../juan/j09.html">← 卷 09</a>
-  <a href="../juan/j11.html">卷 11 →</a>
-</div>
-</aside>
+<aside id="sidebar" data-root="../" data-page="docs/d10-04.html"></aside>
 <main class="doc">
   <div class="doc-kicker">卷 10<span>·</span>用户态<span>·</span>第 04 篇</div>
   <h1>进程间通信：管道、共享内存、消息队列、信号</h1>

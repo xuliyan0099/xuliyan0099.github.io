@@ -18,6 +18,8 @@
 <script src="../assets/anim2.js" defer></script>
 <script src="../assets/cpu3.js" defer></script>
 <script src="../assets/cpu-cycle.js" defer></script>
+<script src="../assets/catalog.js" defer></script>
+<script src="../assets/sidebar.js" defer></script>
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -30,25 +32,7 @@
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
 <div class="shell">
-<aside id="sidebar">
-<div class="vol-h">卷 02 · 编译与运行</div>
-<ol><li><a href="course-19.html" class="active">
-  <span class="no">01</span><span>从源码到可执行<span class="sub">约 1 小时 · 当前</span></span></a></li>
-<li><a href="course-ch07.html">
-  <span class="no">02</span><span>交叉编译与工程构建<span class="sub">约 12 小时</span></span></a></li>
-<li><a href="course-th17.html">
-  <span class="no">03</span><span>交叉编译与工具链原理<span class="sub">约 4 小时</span></span></a></li>
-<li><a href="d02-01.html">
-  <span class="no">04</span><span>ELF 与链接重定位：从符号表到 .rel.text<span class="sub">约 3 小时</span></span></a></li>
-<li><a href="d02-02.html">
-  <span class="no">05</span><span>静态库与动态链接：PLT / GOT / PIC 全链路<span class="sub">约 3 小时</span></span></a></li>
-<li><a href="d02-03.html">
-  <span class="no">06</span><span>程序加载与内存布局：段、栈、堆、core dump<span class="sub">约 2 小时</span></span></a></li></ol>
-<div class="vol-nav">
-  <a href="../juan/j01.html">← 卷 01</a>
-  <a href="../juan/j03.html">卷 03 →</a>
-</div>
-</aside>
+<aside id="sidebar" data-root="../" data-page="docs/course-19.html"></aside>
 <main class="doc">
   <div class="doc-kicker">卷 02<span>·</span>编译与运行<span>·</span>第 01 篇</div>
   <h1>从源码到可执行</h1>

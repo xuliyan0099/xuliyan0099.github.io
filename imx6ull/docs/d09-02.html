@@ -18,6 +18,8 @@
 <script src="../assets/anim2.js" defer></script>
 <script src="../assets/cpu3.js" defer></script>
 <script src="../assets/cpu-cycle.js" defer></script>
+<script src="../assets/catalog.js" defer></script>
+<script src="../assets/sidebar.js" defer></script>
 </head><body>
 <input id="navChk" class="nav-chk" type="checkbox" aria-label="展开目录">
 <header id="topbar">
@@ -30,35 +32,7 @@
 </header>
 <label for="navChk" class="nav-mask" aria-hidden="true"></label>
 <div class="shell">
-<aside id="sidebar">
-<div class="vol-h">卷 09 · 驱动体系</div>
-<ol><li><a href="course-th05.html">
-  <span class="no">01</span><span>设备模型与驱动框架<span class="sub">约 4 小时</span></span></a></li>
-<li><a href="course-45.html">
-  <span class="no">02</span><span>写一个字符设备<span class="sub">约 1 小时</span></span></a></li>
-<li><a href="course-46.html">
-  <span class="no">03</span><span>pinctrl 与 GPIO<span class="sub">约 1 小时</span></span></a></li>
-<li><a href="course-47.html">
-  <span class="no">04</span><span>I2C 设备驱动<span class="sub">约 1 小时</span></span></a></li>
-<li><a href="course-48.html">
-  <span class="no">05</span><span>中断的上半部与下半部<span class="sub">约 1 小时</span></span></a></li>
-<li><a href="course-ch12.html">
-  <span class="no">06</span><span>驱动开发入门<span class="sub">约 20 小时</span></span></a></li>
-<li><a href="d09-01.html">
-  <span class="no">07</span><span>platform 总线模型：probe、匹配、资源与设备树<span class="sub">约 4 小时</span></span></a></li>
-<li><a href="d09-02.html" class="active">
-  <span class="no">08</span><span>阻塞 IO 与等待队列：poll / select / epoll 的驱动侧<span class="sub">约 3 小时 · 当前</span></span></a></li>
-<li><a href="d09-03.html">
-  <span class="no">09</span><span>SPI 子系统：控制器驱动与设备驱动<span class="sub">◆ · 约 3 小时</span></span></a></li>
-<li><a href="d09-04.html">
-  <span class="no">10</span><span>块设备与 eMMC：gendisk、请求队列与分区<span class="sub">◆ · 约 4 小时</span></span></a></li>
-<li><a href="d09-05.html">
-  <span class="no">11</span><span>DMA 与 Cache 一致性：谁负责 flush，谁负责 invalidate<span class="sub">◆ · 约 3 小时</span></span></a></li></ol>
-<div class="vol-nav">
-  <a href="../juan/j08.html">← 卷 08</a>
-  <a href="../juan/j10.html">卷 10 →</a>
-</div>
-</aside>
+<aside id="sidebar" data-root="../" data-page="docs/d09-02.html"></aside>
 <main class="doc">
   <div class="doc-kicker">卷 09<span>·</span>驱动体系<span>·</span>第 08 篇</div>
   <h1>阻塞 IO 与等待队列：poll / select / epoll 的驱动侧</h1>

@@ -57,3 +57,24 @@
   #sidebar{position:static;max-height:none;border-right:none;border-bottom:1px solid rgba(255,255,255,.08);padding:16px 16px 12px}
   .doc{padding:22px 18px 70px}
 }
+
+/* ---------- 左栏：卷 / 体裁组 / 配对（sidebar.js 渲染） ---------- */
+#sidebar .vol-h{margin:0 0 4px 10px}
+#sidebar .vol-stat{font-size:11px;color:#66738c;margin:0 0 10px 10px;letter-spacing:.4px}
+#sidebar .vol-stat.now{color:#8fa3c4;margin:-4px 0 12px 10px;font-size:10.5px}
+#sidebar a .no{width:40px;text-align:left}
+#sidebar .grp-h{
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+  font-size:10px;letter-spacing:2px;font-weight:700;
+  padding:12px 10px 5px;margin-top:2px;
+}
+#sidebar .grp-h em{font-style:normal;letter-spacing:0;font-weight:400;font-size:9.5px;color:#4a566d}
+#sidebar .grp-core .grp-h{color:#3fbf9b}
+#sidebar .grp-detail .grp-h{color:#6b86e8}
+#sidebar .grp-practice .grp-h{color:#c98b32}
+#sidebar .grp-deep .grp-h{color:#8b78e0}
+#sidebar .grp-lab .grp-h{color:#c9745e}
+#sidebar li.pair a{padding-left:24px}
+#sidebar li.pair a .no{width:32px;color:#4a566d}
+#sidebar li.pair .sub{color:#4a566d}
+@media(max-width:900px){#sidebar a .no{width:36px}}
