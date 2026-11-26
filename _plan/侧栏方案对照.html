@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>左栏方案对照 · 卷 07</title>
+<style>
+:root{
+  --bg:#07080b; --panel:#0b0e14; --line:#1e222c; --line2:#2a3040;
+  --fg:#e7eaf0; --muted:#98a1b2; --dim:#6b7385; --dim2:#596374;
+  --ac:#7c9cff; --ac2:#43d6a8;
+  --mono:ui-monospace,SFMono-Regular,"Cascadia Mono",Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:
+    radial-gradient(900px 500px at 10% -10%,rgba(124,156,255,.13),transparent 70%),
+    radial-gradient(700px 420px at 92% 4%,rgba(67,214,168,.08),transparent 72%),
+    var(--bg);
+  color:var(--fg);
+  font:14.5px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1240px;margin:0 auto;padding:40px 22px 70px}
+
+h1{font-size:clamp(22px,3.4vw,30px);line-height:1.3;margin:0 0 10px;font-weight:800;
+   background:linear-gradient(96deg,#fff 10%,#cfd8ff 50%,#8fe9cf 92%);
+   -webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{margin:0;color:#aeb8c7;max-width:74ch;font-size:14px}
+.badge{display:inline-flex;align-items:center;gap:8px;font:600 10.5px/1 var(--mono);letter-spacing:.16em;
+  color:#9fb0d8;padding:6px 11px;border:1px solid var(--line2);border-radius:999px;background:rgba(124,156,255,.06);margin-bottom:16px}
+.badge:before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ac2);box-shadow:0 0 10px var(--ac2)}
+
+.sec{margin:40px 0 16px}
+.sec h2{font-size:17.5px;margin:0;font-weight:700;letter-spacing:.01em}
+.sec h2 span{font:600 11px/1 var(--mono);color:var(--ac2);letter-spacing:.1em;margin-right:9px;vertical-align:2px}
+.sec p{margin:7px 0 0;color:var(--muted);font-size:13px;max-width:88ch}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+@media(max-width:880px){.grid2{grid-template-columns:1fr}}
+
+.panel{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:linear-gradient(180deg,var(--panel),#08090c)}
+.ph{display:flex;align-items:center;gap:9px;padding:11px 14px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}
+.ph .tag{font:700 10px/1 var(--mono);padding:4px 7px;border-radius:5px;background:rgba(124,156,255,.13);
+  border:1px solid rgba(124,156,255,.28);color:#a9c2ff}
+.ph h3{font-size:13.5px;margin:0;font-weight:700}
+.ph em{margin-left:auto;font:400 11px/1.4 var(--mono);color:var(--dim);font-style:normal;text-align:right}
+
+.side{padding:10px 8px 14px}
+.chips{display:flex;flex-wrap:wrap;gap:4px;padding:2px 6px 10px}
+.chip{font:600 9.5px/1 var(--mono);padding:4px 5px;border-radius:4px;border:1px solid #212734;color:#77828f}
+.chip.on{background:rgba(67,214,168,.15);border-color:rgba(67,214,168,.5);color:#7ff0c9}
+.chip.dots{border:0;color:var(--dim2);padding:4px 2px}
+
+.sh{display:flex;align-items:baseline;gap:8px;padding:6px 6px 8px;border-bottom:1px dashed #232936;margin-bottom:4px}
+.sh b{font-size:13px;font-weight:700;color:#eaf0ff}
+.sh em{margin-left:auto;font:400 10px/1.4 var(--mono);color:var(--dim);font-style:normal}
+
+.gh{display:flex;align-items:center;gap:7px;margin:13px 4px 3px;font:600 10px/1 var(--mono);letter-spacing:.06em;color:#8ea3c6}
+.gh:before{content:"";width:3px;height:11px;border-radius:2px;background:#39445c}
+.gh i{margin-left:auto;font-style:normal;color:var(--dim2);letter-spacing:0}
+
+.row{display:flex;gap:8px;padding:5px 7px;border-radius:6px;color:#c6d0e0;line-height:1.5}
+.row:hover{background:rgba(255,255,255,.025)}
+.row .no{flex:none;width:38px;font:600 9.5px/2 var(--mono);color:#5c6779;text-align:right}
+.row .tt{flex:1;min-width:0;font-size:12.8px}
+.row .h{flex:none;font:500 9.5px/2 var(--mono);color:#5c6779}
+.row.on{background:rgba(95,241,239,.07);box-shadow:inset 2px 0 0 var(--ac2);color:#eafdff}
+.row.on .h{color:#7ff0c9}
+.row.deep{padding-left:26px;color:#93a4bb}
+.row.deep .no{width:38px;color:#4e5867}
+.row.deep .tt{font-size:12.3px}
+.pill{display:inline-block;font:600 9px/1.4 var(--mono);padding:1px 5px;border-radius:4px;margin-left:6px;vertical-align:1px}
+.pill.g{background:rgba(124,156,255,.12);color:#a9c2ff;border:1px solid rgba(124,156,255,.26)}
+.pill.y{background:rgba(255,183,77,.12);color:#ffc46b;border:1px solid rgba(255,183,77,.26)}
+.pill.t{background:rgba(67,214,168,.12);color:#7ff0c9;border:1px solid rgba(67,214,168,.26)}
+.lvl{display:flex;gap:7px;padding:6px 7px;border-radius:6px;color:#c6d0e0;line-height:1.5;font-size:12.8px}
+.lvl .no{flex:none;width:26px;font:600 9.5px/2 var(--mono);color:#5c6779}
+.lvl .tt{flex:1}
+.lvl .h{flex:none;font:500 9.5px/2 var(--mono);color:#5c6779}
+.lvl.on{background:rgba(95,241,239,.07);box-shadow:inset 2px 0 0 var(--ac2);color:#eafdff}
+.sub2{padding:4px 0 2px 26px;color:#9aa8bd;font-size:12.3px}
+.sub2 .sg{display:flex;align-items:center;gap:7px;padding:4px 7px;border-radius:6px}
+.sub2 .sg b{font-weight:600;color:#c3cfe2}
+.sub2 .sg i{margin-left:auto;font:400 9.5px/1 var(--mono);color:var(--dim2);font-style:normal}
+.cut{border-top:1px dashed #232936;margin:10px 4px 4px;padding-top:8px;color:var(--dim2);font:400 10.5px/1.6 var(--mono);text-align:center}
+
+.an{padding:11px 14px 13px;border-top:1px solid var(--line);background:rgba(255,255,255,.018);font-size:12.3px;line-height:1.75;color:#9aa3b2}
+.an b{color:#c9d4e6;font-weight:600}
+.an .k{display:inline-block;font:600 9px/1 var(--mono);padding:3px 5px;border-radius:4px;margin-right:6px;vertical-align:1px}
+.k.s{background:rgba(67,214,168,.13);color:#7ff0c9;border:1px solid rgba(67,214,168,.3)}
+.k.l{background:rgba(255,140,110,.12);color:#ffa48c;border:1px solid rgba(255,140,110,.3)}
+.an p{margin:0 0 5px}
+.an p:last-child{margin:0}
+
+.rec{margin-top:26px;border:1px solid rgba(67,214,168,.3);border-radius:14px;padding:16px 18px;
+  background:linear-gradient(120deg,rgba(67,214,168,.08),rgba(124,156,255,.04))}
+.rec h3{margin:0 0 8px;font-size:14.5px;color:#b8f5e2}
+.rec p{margin:0 0 7px;font-size:13px;color:#aeb8c7;line-height:1.8}
+.rec p:last-child{margin:0}
+.rec code{font:12px var(--mono);color:#cfe0ff;background:rgba(124,156,255,.1);border:1px solid rgba(124,156,255,.2);border-radius:4px;padding:1px 5px}
+footer{margin-top:34px;padding-top:16px;border-top:1px solid var(--line);color:var(--dim);font-size:11.5px;display:flex;gap:14px;flex-wrap:wrap;justify-content:space-between}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="badge">layout compare</div>
+<h1>左栏方案对照 · 以「卷 07 · 芯片与硬件底座」为例</h1>
+<p class="lead">同一卷、同样 14 篇、同样 39 小时，只换左栏的组织方式。全文 113 篇的数据结构不动，只换「先放什么、怎么分组」。第一节只看一级轴，第二节只看卷内切法，两组都用真实篇目标题与真实时长。</p>
+
+<!-- ============ 决策一 ============ -->
+<div class="sec">
+  <h2><span>DECISION 1</span>一级轴放什么</h2>
+  <p>两个面板都按「体裁」分组（核心 / 详解 / 互动），只变一级是什么：甲是「卷」，乙是「主题 + 阶段」，卷名退成阶段下的组名。</p>
+</div>
+
+<div class="grid2">
+
+  <!-- 甲 -->
+  <article class="panel">
+    <div class="ph"><span class="tag">甲</span><h3>卷为一级</h3><em>14 卷并列 · 现状延续</em></div>
+    <div class="side">
+      <div class="chips">
+        <span class="chip">00</span><span class="chip">01</span><span class="chip">02</span><span class="chip">03</span>
+        <span class="chip">04</span><span class="chip">05</span><span class="chip">06</span><span class="chip on">07</span>
+        <span class="chip">08</span><span class="chip">09</span><span class="chip">10</span><span class="chip">11</span>
+        <span class="chip">12</span><span class="chip">13</span>
+      </div>
+      <div class="sh"><b>卷 07 · 芯片与硬件底座</b><em>14 篇 · 39h</em></div>
+
+      <div class="gh">核心 · 先跑通<i>5 篇 · 5h</i></div>
+      <div class="row on"><span class="no">07.01</span><span class="tt">i.MX6ULL 最小系统</span><span class="h">1h</span></div>
+      <div class="row"><span class="no">07.02</span><span class="tt">总线</span><span class="h">1h</span></div>
+      <div class="row"><span class="no">07.03</span><span class="tt">GIC 与定时器</span><span class="h">1h</span></div>
+      <div class="row"><span class="no">07.04</span><span class="tt">存储与外设</span><span class="h">1h</span></div>
+      <div class="row"><span class="no">07.05</span><span class="tt">设备树</span><span class="h">1h</span></div>
+
+      <div class="gh">详解 · 补原理<i>6 篇 · 31h</i></div>
+      <div class="row"><span class="no">07.06</span><span class="tt">ARM 架构与 Cortex-A7</span><span class="h">5h</span></div>
+      <div class="row"><span class="no">07.07</span><span class="tt">总线体系：AXI / AHB / APB 与 I2C / SPI / CAN</span><span class="h">4h</span></div>
+      <div class="row"><span class="no">07.08</span><span class="tt">时钟树、复位、电源域、RTC 与看门狗</span><span class="h">5h</span></div>
+      <div class="row"><span class="no">07.09</span><span class="tt">最小系统必需外设（上）：DDR、中断、定时器、GPIO、UART</span><span class="h">6h</span></div>
+      <div class="row"><span class="no">07.10</span><span class="tt">最小系统必需外设（下）：存储、DMA、以太网、USB</span><span class="h">5h</span></div>
+      <div class="row"><span class="no">07.11</span><span class="tt">BSP 与设备树原理</span><span class="h">6h</span></div>
+
+      <div class="gh">互动 · 动手<i>3 台 · 3h</i></div>
+      <div class="row"><span class="no">07.12</span><span class="tt">互动台：时钟树与门控</span><span class="h">1h</span></div>
+      <div class="row"><span class="no">07.13</span><span class="tt">互动台：GPIO 与 IOMUX 配置</span><span class="h">1h</span></div>
+      <div class="row"><span class="no">07.14</span><span class="tt">互动台：中断优先级与抢占</span><span class="h">1h</span></div>
+    </div>
+    <div class="an">
+      <p><span class="k s">改动小</span>只换渲染器 + 清洗字段，<b>113 个手写左栏一次全改</b>，正文与 URL 都不动。</p>
+      <p><span class="k l">代价</span>14 卷平铺，一级只能答「我在哪一卷」，答不了「我该不该现在学这一卷」。跨卷的主题（设备树、启动）仍要靠总览页串。</p>
+    </div>
+  </article>
+
+  <!-- 乙 -->
+  <article class="panel">
+    <div class="ph"><span class="tag">乙</span><h3>主题 + 阶段为一级</h3><em>6 阶段 · 卷降为组</em></div>
+    <div class="side">
+      <div class="sh"><b>i.MX6ULL · 从裸机到驱动</b><em>113 篇 · 六阶段</em></div>
+
+      <div class="lvl"><span class="no">①</span><span class="tt">起步与机器：比特、门电路、CPU、指令</span><span class="h">26</span></div>
+      <div class="lvl"><span class="no">②</span><span class="tt">编译、存储与地址</span><span class="h">17</span></div>
+      <div class="lvl"><span class="no">③</span><span class="tt">操作系统内核：进程、文件、网络</span><span class="h">17</span></div>
+      <div class="lvl on"><span class="no">④</span><span class="tt">芯片、启动与驱动</span><span class="h">35</span></div>
+      <div class="sub2">
+        <div class="sg"><b>芯片与硬件</b><i>14</i></div>
+        <div class="sg" style="padding-left:14px;color:#8b9ab0"><b style="color:#a9b8cd">核心</b><i>5 · 5h</i></div>
+        <div class="row deep" style="padding-left:34px"><span class="no"></span><span class="tt">i.MX6ULL 最小系统</span><span class="h">1h</span></div>
+        <div class="row deep" style="padding-left:34px"><span class="no"></span><span class="tt">总线</span><span class="h">1h</span></div>
+        <div class="row deep" style="padding-left:34px"><span class="no"></span><span class="tt">GIC 与定时器</span><span class="h">1h</span></div>
+        <div class="row deep" style="padding-left:34px"><span class="no"></span><span class="tt">存储与外设</span><span class="h">1h</span></div>
+        <div class="row deep" style="padding-left:34px"><span class="no"></span><span class="tt">设备树</span><span class="h">1h</span></div>
+        <div class="sg" style="padding-left:14px;color:#8b9ab0"><b style="color:#a9b8cd">详解</b><i>6 · 31h</i></div>
+        <div class="sg" style="padding-left:14px;color:#8b9ab0"><b style="color:#a9b8cd">互动</b><i>3 · 3h</i></div>
+        <div class="sg"><b>启动链</b><i>10</i></div>
+        <div class="sg"><b>驱动体系</b><i>11</i></div>
+      </div>
+      <div class="lvl"><span class="no">⑤</span><span class="tt">用户态、调试与产品化</span><span class="h">14</span></div>
+      <div class="lvl"><span class="no">⑥</span><span class="tt">拔高：体系对照、xv6、虚拟化</span><span class="h">4</span></div>
+      <div class="cut">①–⑥ 合计 113 篇 · 与首页七个入口一一对应</div>
+    </div>
+    <div class="an">
+      <p><span class="k s">优点</span>一级就能回答「我现在该学到哪」，和首页入口页的叙事一致；跨卷主题自然收进同一个阶段。</p>
+      <p><span class="k l">改动大</span>要定 6 阶段映射、14 个卷名退成组名、<b>左栏变成四层</b>（阶段 → 组 → 体裁 → 篇），窄屏必须折叠；旧链接要整体重定向。</p>
+    </div>
+  </article>
+
+</div>
+
+<!-- ============ 决策二 ============ -->
+<div class="sec">
+  <h2><span>DECISION 2</span>卷内怎么切</h2>
+  <p>两个面板都用「卷为一级」，只变卷内的分组依据：A 按体裁切，B 按子主题切并把主线与详解配成一对。</p>
+</div>
+
+<div class="grid2">
+
+  <!-- A -->
+  <article class="panel">
+    <div class="ph"><span class="tag">A</span><h3>按体裁切</h3><em>3 组 · 先读哪 5 篇一眼可见</em></div>
+    <div class="side">
+      <div class="sh"><b>卷 07 · 芯片与硬件底座</b><em>14 篇 · 39h</em></div>
+
+      <div class="gh">核心 · 先跑通<i>5 篇 · 5h</i></div>
+      <div class="row"><span class="no">07.01</span><span class="tt">i.MX6ULL 最小系统</span><span class="h">1h</span></div>
+      <div class="row"><span class="no">07.02</span><span class="tt">总线</span><span class="h">1h</span></div>
+      <div class="row"><span class="no">07.03</span><span class="tt">GIC 与定时器</span><span class="h">1h</span></div>
+      <div class="row"><span class="no">07.04</span><span class="tt">存储与外设</span><span class="h">1h</span></div>
+      <div class="row"><span class="no">07.05</span><span class="tt">设备树</span><span class="h">1h</span></div>
+
+      <div class="gh">详解 · 补原理<i>6 篇 · 31h</i></div>
+      <div class="row"><span class="no">07.06</span><span class="tt">ARM 架构与 Cortex-A7</span><span class="h">5h</span></div>
+      <div class="row"><span class="no">07.07</span><span class="tt">总线体系：AXI / AHB / APB 与 I2C / SPI / CAN</span><span class="h">4h</span></div>
+      <div class="row"><span class="no">07.08</span><span class="tt">时钟树、复位、电源域、RTC 与看门狗</span><span class="h">5h</span></div>
+      <div class="row"><span class="no">07.09</span><span class="tt">最小系统必需外设（上）：DDR、中断、定时器、GPIO、UART</span><span class="h">6h</span></div>
+      <div class="row"><span class="no">07.10</span><span class="tt">最小系统必需外设（下）：存储、DMA、以太网、USB</span><span class="h">5h</span></div>
+      <div class="row"><span class="no">07.11</span><span class="tt">BSP 与设备树原理</span><span class="h">6h</span></div>
+
+      <div class="gh">互动 · 动手<i>3 台 · 3h</i></div>
+      <div class="row"><span class="no">07.12</span><span class="tt">互动台：时钟树与门控</span><span class="h">1h</span></div>
+      <div class="row"><span class="no">07.13</span><span class="tt">互动台：GPIO 与 IOMUX 配置</span><span class="h">1h</span></div>
+      <div class="row"><span class="no">07.14</span><span class="tt">互动台：中断优先级与抢占</span><span class="h">1h</span></div>
+    </div>
+    <div class="an">
+      <p><span class="k s">优点</span>左栏短、组数固定（3–4 组），读者先扫 5 小时的核心，愿意深挖再去 31 小时的详解；<b>编号顺序 = 阅读顺序</b>。</p>
+      <p><span class="k l">代价</span>想查「总线」这一个主题，要点开两处（核心 07.02 + 详解 07.07）；主题相关性靠标题猜。</p>
+    </div>
+  </article>
+
+  <!-- B -->
+  <article class="panel">
+    <div class="ph"><span class="tag">B</span><h3>按子主题切 + 主线 / 详解配对</h3><em>7 组 · 按问题查</em></div>
+    <div class="side">
+      <div class="sh"><b>卷 07 · 芯片与硬件底座</b><em>14 篇 · 39h</em></div>
+
+      <div class="gh">芯片与架构<i>2 篇 · 6h</i></div>
+      <div class="row on"><span class="no">07.01</span><span class="tt">i.MX6ULL 最小系统<span class="pill t">主线</span></span><span class="h">1h</span></div>
+      <div class="row deep"><span class="no"></span><span class="tt">ARM 架构与 Cortex-A7<span class="pill g">详解</span></span><span class="h">5h</span></div>
+
+      <div class="gh">总线<i>2 篇 · 5h</i></div>
+      <div class="row"><span class="no">07.02</span><span class="tt">总线<span class="pill t">主线</span></span><span class="h">1h</span></div>
+      <div class="row deep"><span class="no"></span><span class="tt">总线体系：AXI / AHB / APB 与 I2C / SPI / CAN<span class="pill g">详解</span></span><span class="h">4h</span></div>
+
+      <div class="gh">中断与定时器<i>2 篇 · 7h</i></div>
+      <div class="row"><span class="no">07.03</span><span class="tt">GIC 与定时器<span class="pill t">主线</span></span><span class="h">1h</span></div>
+      <div class="row deep"><span class="no"></span><span class="tt">最小系统必需外设（上）：DDR、中断、定时器、GPIO、UART<span class="pill g">详解</span></span><span class="h">6h</span></div>
+
+      <div class="gh">存储与外设<i>2 篇 · 6h</i></div>
+      <div class="row"><span class="no">07.04</span><span class="tt">存储与外设<span class="pill t">主线</span></span><span class="h">1h</span></div>
+      <div class="row deep"><span class="no"></span><span class="tt">最小系统必需外设（下）：存储、DMA、以太网、USB<span class="pill g">详解</span></span><span class="h">5h</span></div>
+
+      <div class="gh">设备树<i>2 篇 · 7h</i></div>
+      <div class="row"><span class="no">07.05</span><span class="tt">设备树<span class="pill t">主线</span></span><span class="h">1h</span></div>
+      <div class="row deep"><span class="no"></span><span class="tt">BSP 与设备树原理<span class="pill g">详解</span></span><span class="h">6h</span></div>
+
+      <div class="gh">时钟与电源<i>1 篇 · 5h</i></div>
+      <div class="row"><span class="no">07.06</span><span class="tt">时钟树、复位、电源域、RTC 与看门狗</span><span class="h">5h</span></div>
+
+      <div class="gh">互动台<i>3 台 · 3h</i></div>
+      <div class="row"><span class="no">07.07</span><span class="tt">互动台：时钟树与门控</span><span class="h">1h</span></div>
+      <div class="row"><span class="no">07.08</span><span class="tt">互动台：GPIO 与 IOMUX 配置</span><span class="h">1h</span></div>
+      <div class="row"><span class="no">07.09</span><span class="tt">互动台：中断优先级与抢占</span><span class="h">1h</span></div>
+    </div>
+    <div class="an">
+      <p><span class="k s">优点</span>「1 小时主线 + 5 小时详解」终于配成对，重复主题不再分家；按问题查最顺。</p>
+      <p><span class="k l">代价</span>14 篇切出 <b>7 组、平均 2 条/组</b>，左栏比 A 长近一倍；编号失去阅读顺序（详解只能缩进不编号）；7 个组名要人工定，14 卷都要重定一次。</p>
+    </div>
+  </article>
+
+</div>
+
+<div class="rec">
+  <h3>我的建议：甲 + A 做骨架，把 B 的配对关系收进 A 的组内</h3>
+  <p>一级用「卷」（改动小、旧链接不断），卷内按体裁切三到四组；在「核心」组里，把对应详解按缩进挂在主线下面，标一个 <code>详解</code> 小角标 —— 既拿到 B 的配对价值，又不用为 14 个卷重新发明 7 个组名。</p>
+  <p>「主题 + 阶段」不进左栏，进首页：现在 <code>imx6ull/index.html</code> 的七个入口（十四卷 / 参考卷 / 互动台 / 硬件 / 汇编 / 手册 / RM）本来就是阶段轴的雏形，把它整理成 6 阶段，比在左栏多加一层更划算。</p>
+  <p>前提是先把 <code>catalog.js</code> 立起来（卷 / 组 / 篇 / 体裁 / 时长 / 状态 / 真实 URL），否则上面任何一种排法都得再抄 113 遍。</p>
+</div>
+
+<footer>
+  <span>对照稿 · 未改动站点任何文件 · 数据取自 docs/ 真实左栏（卷 07，14 篇，合计 39h）</span>
+  <span>总览现写「14 篇 · 读 15h」，与左栏 39h 不符，一并待修</span>
+</footer>
+
+</div>
+</body>
+</html>
