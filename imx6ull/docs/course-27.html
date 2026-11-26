@@ -34,7 +34,7 @@
 <div class="shell">
 <aside id="sidebar" data-root="../" data-page="docs/course-27.html"></aside>
 <main class="doc">
-  <div class="doc-kicker">卷 04<span>·</span>操作系统<span>·</span>第 02 篇</div>
+  <div class="doc-kicker">卷 04<span>·</span>操作系统<span>·</span>04.01</div>
   <h1>进程、线程与 task_struct</h1>
   <p class="lede">Linux 在这件事上有个非常「反教科书」的设计：它根本不区分进程和线程。内核里只有一种东西——task。所谓「进程」只是「有自己地址空间的 task」，而「线程」是「和别人共享地址空间的 task」。这一课讲清这个统一模型，以及描述它的那个巨大结构体。</p>
   <div class="doc-chips">
@@ -174,7 +174,7 @@ cat /proc/$PID/task/*/stat | awk '{print $1, $2, $3}'   # pid, comm, state</code
   
 
 <nav class="pager">
-  <a href="course-th01.html"><span>← 上一篇</span><b>操作系统与 Linux 的分层</b></a>
+  <a href="viz-cache.html"><span>← 上一篇</span><b>互动台：Cache 层次与命中</b></a>
   <a class="nx" href="course-28.html"><span>下一篇 →</span><b>fork 与 exec</b></a>
 </nav>
 <footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>

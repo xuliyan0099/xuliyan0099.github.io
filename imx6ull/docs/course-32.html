@@ -34,7 +34,7 @@
 <div class="shell">
 <aside id="sidebar" data-root="../" data-page="docs/course-32.html"></aside>
 <main class="doc">
-  <div class="doc-kicker">卷 04<span>·</span>操作系统<span>·</span>第 07 篇</div>
+  <div class="doc-kicker">卷 04<span>·</span>操作系统<span>·</span>04.06</div>
   <h1>上下文切换</h1>
   <p class="lede">调度器决定「该换 B 了」，但真正执行「换人」的是 switch_to 里那几行汇编：保存 callee-saved、换栈、把返回地址指向 B 上次离开的地方。这一课把它拆开，再算清真实代价——你会发现大头根本不在寄存器保存上。</p>
   <div class="doc-chips">

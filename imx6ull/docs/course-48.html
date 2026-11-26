@@ -34,7 +34,7 @@
 <div class="shell">
 <aside id="sidebar" data-root="../" data-page="docs/course-48.html"></aside>
 <main class="doc">
-  <div class="doc-kicker">卷 09<span>·</span>驱动体系<span>·</span>第 05 篇</div>
+  <div class="doc-kicker">卷 09<span>·</span>驱动体系<span>·</span>09.04</div>
   <h1>中断的上半部与下半部</h1>
   <p class="lede">按键按下去，芯片的电平变了，可 CPU 不会自己知道——它要么不停轮询（浪费），要么等一个中断。中断处理有三条铁律：不能睡、要快、不能丢事件。这一课把「硬件触发 → GIC → 上半部 → 下半部 → 你的业务」这条链走一遍，并用一个带防抖的按键驱动收尾。</p>
   <div class="doc-chips">
@@ -141,7 +141,7 @@ static int key_probe(struct platform_device *pdev)
 
 <nav class="pager">
   <a href="course-47.html"><span>← 上一篇</span><b>I2C 设备驱动</b></a>
-  <a class="nx" href="course-ch12.html"><span>下一篇 →</span><b>驱动开发入门</b></a>
+  <a class="nx" href="course-th05.html"><span>下一篇 →</span><b>设备模型与驱动框架</b></a>
 </nav>
 <footer class="doc-foot">本篇属于《i.MX6ULL · 从比特到产品》十四卷主线，共 113 篇。左侧是本卷篇目；「动手 / 实作」段落默认折叠，右下角可一键展开。</footer>
 </main>

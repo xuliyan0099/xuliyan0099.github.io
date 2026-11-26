@@ -34,7 +34,7 @@
 <div class="shell">
 <aside id="sidebar" data-root="../" data-page="docs/course-26.html"></aside>
 <main class="doc">
-  <div class="doc-kicker">卷 03<span>·</span>存储与地址<span>·</span>第 07 篇</div>
+  <div class="doc-kicker">卷 03<span>·</span>存储与地址<span>·</span>03.07</div>
   <h1>缺页与换页</h1>
   <p class="lede">你 malloc 了 100MB，程序立刻返回，物理内存却只多了一点。真相是：malloc 只给了一段虚拟地址，物理页要等第一次访问才分配。这个「等」由一个异常完成——缺页异常。它同时是 SIGSEGV 的来源，也是 fork 能廉价的原因。</p>
   <div class="doc-chips">
